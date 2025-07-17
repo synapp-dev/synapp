@@ -1,0 +1,68 @@
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+} from "@workspace/ui/components/breadcrumb";
+import { Separator } from "@workspace/ui/components/separator";
+import { SidebarTrigger } from "@workspace/ui/components/sidebar";
+import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
+import { RightSidebarTrigger } from "@workspace/ui/components/right-sidebar-trigger";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+
+import { ChevronRight } from "lucide-react";
+import { CommandMenu } from "@/components/molecules/command-menu";
+
+export function AppHeader() {
+  const pathname = usePathname();
+
+  // Remove empty segments and format the path segments
+  const rawSegments = pathname.split("/").filter(Boolean);
+  let accumulatedPath = "";
+  const pathSegments = rawSegments.map((segment) => {
+    accumulatedPath += `/${segment}`;
+    return {
+      label:
+        segment.charAt(0).toUpperCase() + segment.slice(1).replace(/-/g, " "),
+      href: accumulatedPath,
+    };
+  });
+
+  return (
+    <header className="flex h-16 shrink-0 items-center gap-2 justify-between transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14 sticky top-0 z-50 bg-background">
+      <div className="flex items-center gap-2 px-4">
+        <SidebarTrigger className="-ml-1" />
+        <Separator
+          orientation="vertical"
+          className="mr-2 data-[orientation=vertical]:h-4"
+        />
+        <Breadcrumb className="capitalize">
+          <BreadcrumbList>
+            {pathSegments.map((segment, index) => (
+              <BreadcrumbItem key={segment.href}>
+                {index < pathSegments.length - 1 ? (
+                  <BreadcrumbLink asChild href={segment.href}>
+                    <Link href={segment.href}>{segment.label}</Link>
+                  </BreadcrumbLink>
+                ) : (
+                  <BreadcrumbPage>{segment.label}</BreadcrumbPage>
+                )}
+                {index < pathSegments.length - 1 && (
+                  <ChevronRight className="w-3 h-3" />
+                )}
+              </BreadcrumbItem>
+            ))}
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
+      <div className="flex items-center gap-2 px-4">
+        <CommandMenu />
+        <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
+        <ThemeToggle />
+        <RightSidebarTrigger />
+      </div>
+    </header>
+  );
+}
