@@ -3,7 +3,7 @@
 import * as React from "react";
 
 import { NavUser } from "@/components/molecules/nav-user";
-// import { OrganisationSwitcher } from "@/components/organisation-switcher";
+import { OrganisationSwitcher } from "@/components/molecules/organisation-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +26,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader></SidebarHeader>
       <Separator />
       <SidebarContent>
+        <OrganisationSwitcher />
         {/* <div className="px-2 pt-4"></div>
         {!activeProject ? (
           <></>
