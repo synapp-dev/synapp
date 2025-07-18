@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useOrganisationsQuery } from "./read";
-import { useOrganisationStore } from "@/stores/organisationStore";
+import { useOrganisationStore } from "@/stores/organisations/organisation-store";
 
 export function useSyncOrganisationsToStore() {
   const { data, isSuccess } = useOrganisationsQuery();
