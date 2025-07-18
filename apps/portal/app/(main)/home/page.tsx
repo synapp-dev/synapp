@@ -2,7 +2,7 @@
 
 import { useSyncOrganisationsToStore } from "@/hooks/organisations/queries/useSyncOrganisationsToStore";
 import { useOrganisationsQuery } from "@/hooks/organisations/queries/read";
-import { useOrganisationStore } from "@/stores/organisationStore";
+import { useOrganisationStore } from "@/stores/organisations/organisation-store";
 import { useUserOrganisationRoleStore } from "@/stores/userOrganisationRoleStore";
 import { useSyncUserOrganisationRolesToStore } from "@/hooks/user-organisation-roles/queries/useSyncOrganisationsToStore";
 import { useUserOrganisationRolesQuery } from "@/hooks/user-organisation-roles/queries/read";
