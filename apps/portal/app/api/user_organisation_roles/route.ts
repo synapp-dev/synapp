@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { getAllUserOrganisationRoles } from "@/providers/postgres/user_organisation_roles/read";
+import { getUserOrganisationRolesByUserId } from "@/providers/postgres/user_organisation_roles/read";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 export async function GET(request: Request) {
-  const userId = getUserIdFromRequest(request);
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get("user_id") || getUserIdFromRequest(request);
   if (!userId) {
     return NextResponse.json(
       { success: false, error: "Unauthorized", data: [] },
@@ -12,8 +13,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const allRoles = await getAllUserOrganisationRoles();
-    return NextResponse.json({ success: true, data: allRoles });
+    const roles = await getUserOrganisationRolesByUserId(userId);
+    return NextResponse.json({ success: true, data: roles });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: (error as Error).message, data: [] },
