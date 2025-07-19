@@ -1,26 +1,20 @@
 "use client";
 
-import { useSyncOrganisationsToStore } from "@/hooks/organisations/queries/useSyncOrganisationsToStore";
-import { useOrganisationsQuery } from "@/hooks/organisations/queries/read";
-import { useOrganisationStore } from "@/stores/organisations/organisation-store";
+import { useOrganisations } from "@/stores/organisations/organisation-store";
 import { useUserOrganisationRoleStore } from "@/stores/userOrganisationRoleStore";
 import { useSyncUserOrganisationRolesToStore } from "@/hooks/user-organisation-roles/queries/useSyncOrganisationsToStore";
 import { useUserOrganisationRolesQuery } from "@/hooks/user-organisation-roles/queries/read";
 import { Card, CardHeader, CardTitle } from "@workspace/ui/components/card";
 
 export default function Home() {
-  // Sync organisations from React Query to Zustand
-  useSyncOrganisationsToStore();
+  // Use our new combined hook for organisations
+  const { organisations, isLoading, isError, error } = useOrganisations();
+  
+  // Keep the old pattern for user organisation roles for now
   useSyncUserOrganisationRolesToStore();
-
-  // Get organisations from Zustand
-  const organisations = useOrganisationStore((s) => s.organisations);
   const userOrganisationRoles = useUserOrganisationRoleStore(
     (s) => s.userOrganisationRoles
   );
-
-  // For loading and error states, use React Query directly
-  const { isLoading, isError, error } = useOrganisationsQuery();
   const {
     isLoading: isLoadingUserOrganisationRoles,
     isError: isErrorUserOrganisationRoles,
@@ -31,7 +25,7 @@ export default function Home() {
     return <div>Loading organisations...</div>;
   if (isError || isErrorUserOrganisationRoles)
     return (
-      <div>Error: {error?.message || errorUserOrganisationRoles?.message}</div>
+      <div>Error: {error || errorUserOrganisationRoles?.message}</div>
     );
 
   return (
