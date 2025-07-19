@@ -1,102 +1,89 @@
 import { create } from "zustand";
-import React from "react";
+
 import type { Organisation } from "@/providers/postgres/organisations/read";
-import { useDatabaseEndpoint } from "@/utils/api-client";
+import { 
+  useGetAllOrganisations, 
+  useGetOrganisationById,
+  useGetOrganisationBySlug
+} from "@/hooks/organisations/queries/read";
+import { useEffect } from "react";
 
 type OrganisationStore = {
-  organisations: Organisation[];
-  isLoading: boolean;
-  error: string | null;
-  setOrganisations: (orgs: Organisation[]) => void;
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
   selectedOrganisation: Organisation | null;
   setSelectedOrganisation: (org: Organisation | null) => void;
-  // Auto-fetch method that components can call
-  fetchOrganisations: () => Promise<void>;
 };
 
-export const useOrganisationStore = create<OrganisationStore>((set, get) => ({
-  organisations: [],
-  isLoading: false,
-  error: null,
-  setOrganisations: (orgs) => set({ organisations: orgs }),
-  setLoading: (loading) => set({ isLoading: loading }),
-  setError: (error) => set({ error }),
+export const useOrganisationStore = create<OrganisationStore>((set) => ({
   selectedOrganisation: null,
   setSelectedOrganisation: (org) => set({ selectedOrganisation: org }),
-
-  // Auto-fetch method that triggers the query using the new API client
-  fetchOrganisations: async () => {
-    const { setLoading, setError, setOrganisations } = get();
-
-    // Don't fetch if already loading
-    if (get().isLoading) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      // We'll need to pass the API client from the component
-      // This will be handled in the useOrganisations hook
-      const response = await fetch("/api/organisations", {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch organisations");
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        setOrganisations(result.data);
-      } else {
-        throw new Error(result.error || "Failed to fetch organisations");
-      }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  },
 }));
 
-// Hook that automatically fetches data when the store is accessed
+// Hook that uses React Query for data fetching and Zustand for local state
 export function useOrganisations() {
-  const store = useOrganisationStore();
-  const apiClient = useDatabaseEndpoint();
+  const { selectedOrganisation, setSelectedOrganisation } = useOrganisationStore();
+  const queryResult = useGetAllOrganisations();
 
-  // Auto-fetch on first access
-  React.useEffect(() => {
-    if (store.organisations.length === 0 && !store.isLoading) {
-      const fetchData = async () => {
-        store.setLoading(true);
-        store.setError(null);
+  return {
+    // React Query data and states
+    organisations: queryResult.data?.data || [],
+    isLoading: queryResult.isLoading,
+    error: queryResult.error?.message || null,
+    isError: queryResult.isError,
+    refetch: queryResult.refetch,
+    
+    // Zustand local state
+    selectedOrganisation,
+    setSelectedOrganisation,
+  };
+}
 
-        try {
-          const result = await apiClient.organisations();
+// New explicit hooks for ID and slug
+export function useOrganisationById(id: string) {
+  const { selectedOrganisation, setSelectedOrganisation } = useOrganisationStore(); 
+  const queryResult = useGetOrganisationById(id);
 
-          if (result.success) {
-            store.setOrganisations(result.data);
-          } else {
-            throw new Error(result.error || "Failed to fetch organisations");
-          }
-        } catch (error) {
-          store.setError(
-            error instanceof Error ? error.message : "Unknown error"
-          );
-        } finally {
-          store.setLoading(false);
-        }
-      };
-
-      fetchData();
+  // Auto-set as selected organisation when data loads
+  useEffect(() => {
+    if (queryResult.data?.success && queryResult.data.data) {
+      setSelectedOrganisation(queryResult.data.data);
     }
-  }, [store, apiClient]);
+  }, [queryResult.data, setSelectedOrganisation]);
 
-  return store;
+  return {
+    // React Query data and states
+    organisation: queryResult.data?.data || null,
+    isLoading: queryResult.isLoading,
+    error: queryResult.error?.message || null,
+    isError: queryResult.isError,
+    refetch: queryResult.refetch,
+    
+    // Zustand local state
+    selectedOrganisation,
+    setSelectedOrganisation,
+  };
+}
+
+export function useOrganisationBySlug(slug: string) {
+  const { selectedOrganisation, setSelectedOrganisation } = useOrganisationStore();
+  const queryResult = useGetOrganisationBySlug(slug);
+
+  // Auto-set as selected organisation when data loads
+  useEffect(() => {
+    if (queryResult.data?.success && queryResult.data.data) {
+      setSelectedOrganisation(queryResult.data.data);
+    }
+  }, [queryResult.data, setSelectedOrganisation]);
+
+  return {
+    // React Query data and states
+    organisation: queryResult.data?.data || null,
+    isLoading: queryResult.isLoading,
+    error: queryResult.error?.message || null,
+    isError: queryResult.isError,
+    refetch: queryResult.refetch,
+    
+    // Zustand local state
+    selectedOrganisation,
+    setSelectedOrganisation,
+  };
 }
