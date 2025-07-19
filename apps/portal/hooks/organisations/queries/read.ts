@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Organisation } from "@/providers/postgres/organisations/read";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useDatabaseEndpoint } from "@/utils/api-client";
 
 export type OrganisationsResponse = {
   success: boolean;
@@ -8,30 +8,53 @@ export type OrganisationsResponse = {
   error?: string;
 };
 
-export function useOrganisationsQuery() {
-  const authFetch = useAuthFetch();
+export function useGetAllOrganisations() {
+  const db = useDatabaseEndpoint();
   return useQuery<OrganisationsResponse, Error>({
     queryKey: ["organisations"],
     queryFn: async () => {
-      const res = await authFetch("/api/organisations");
-      if (!res.ok) throw new Error("Failed to fetch organisations");
-      return res.json();
+      const response = await db.organisations();
+      if (!response.success) {
+        throw new Error(response.error || "Failed to fetch organisations");
+      }
+      return response;
     },
   });
 }
 
-export function useOrganisationQuery(id: string) {
-  const authFetch = useAuthFetch();
+// New explicit hooks for ID and slug
+export function useGetOrganisationById(id: string) {
+  const db = useDatabaseEndpoint();
   return useQuery<
     { success: boolean; data: Organisation | null; error?: string },
     Error
   >({
-    queryKey: ["organisations", id],
+    queryKey: ["organisations", "id", id],
     queryFn: async () => {
-      const res = await authFetch(`/api/organisations/${id}`);
-      if (!res.ok) throw new Error("Failed to fetch organisation");
-      return res.json();
+      const response = await db.organisationById(id);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to fetch organisation by ID");
+      }
+      return response;
     },
     enabled: !!id,
+  });
+}
+
+export function useGetOrganisationBySlug(slug: string) {
+  const db = useDatabaseEndpoint();
+  return useQuery<
+    { success: boolean; data: Organisation | null; error?: string },
+    Error
+  >({
+    queryKey: ["organisations", "slug", slug],
+    queryFn: async () => {
+      const response = await db.organisationBySlug(slug);
+      if (!response.success) {
+        throw new Error(response.error || "Failed to fetch organisation by slug");
+      }
+      return response;
+    },
+    enabled: !!slug,
   });
 }
