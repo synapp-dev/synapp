@@ -19,5 +19,9 @@
   "packageManager": "pnpm@10.4.1",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^5.1.1",
+    "zod": "^4.0.5"
   }
 }
