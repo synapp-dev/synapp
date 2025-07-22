@@ -20,6 +20,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link rel="stylesheet" href="https://use.typekit.net/jxj1ggz.css" />
+      </head>
       <body
         className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased `}
       >
