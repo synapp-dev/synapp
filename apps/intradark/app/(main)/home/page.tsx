@@ -30,50 +30,13 @@ export default function Home() {
 
   return (
     <div className="space-y-6 p-6">
-      <h1 className="text-3xl font-bold">Welcome to Your App</h1>
-
-      {/* Zustand Store Example */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Zustand Store Example</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-2xl font-semibold">Count: {count}</p>
-          <div className="flex gap-2">
-            <Button onClick={increment}>Increment</Button>
-            <Button onClick={decrement}>Decrement</Button>
-            <Button onClick={reset} variant="outline">
-              Reset
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* React Query Example */}
-      <Card>
-        <CardHeader>
-          <CardTitle>React Query Example</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <p>
-              <strong>Message:</strong> {exampleData?.message}
-            </p>
-            <p>
-              <strong>Timestamp:</strong> {exampleData?.timestamp}
-            </p>
-          </div>
-          <Button
-            onClick={handleCreateExample}
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? "Creating..." : "Create New Example"}
-          </Button>
-        </CardContent>
-      </Card>
+      <h1 className="text-3xl font-bold">Home</h1>
 
       <div className="text-sm text-muted-foreground">
-        <p>This is a template page showing how to use:</p>
+        <p>
+          This is a placeholder page, instantiated from the synapp monorepo. It
+          contains the following:
+        </p>
         <ul className="list-disc list-inside mt-2 space-y-1">
           <li>Zustand stores for state management</li>
           <li>React Query for data fetching and mutations</li>

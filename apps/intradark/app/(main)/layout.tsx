@@ -19,7 +19,7 @@ export default function MainLayout({
     <SidebarProvider>
       <RightSidebarProvider>
         <UserProfileLoader />
-        <AppSidebar />
+        {/* <AppSidebar /> */}
         <div className="flex flex-col flex-1 max-w-7xl mx-auto">
           <AppHeader />
           <SidebarInset>
