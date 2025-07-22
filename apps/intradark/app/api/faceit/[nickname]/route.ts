@@ -1,16 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { nickname: string } }
+  context: { params: Promise<{ nickname: string }> }
 ) {
   try {
-    const nickname = params.nickname;
+    const { nickname } = await context.params;
 
     // Validate nickname (basic validation - must not be empty and contain valid characters)
     if (!nickname || nickname.trim().length === 0) {
       return NextResponse.json(
-        { error: 'Invalid nickname. Must not be empty.' },
+        { error: "Invalid nickname. Must not be empty." },
         { status: 400 }
       );
     }
@@ -22,9 +22,9 @@ export async function GET(
     const faceitResponse = await fetch(
       `https://www.faceit.com/api/users/v1/nicknames/${sanitizedNickname}`,
       {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       }
     );
@@ -32,7 +32,7 @@ export async function GET(
     if (!faceitResponse.ok) {
       if (faceitResponse.status === 404) {
         return NextResponse.json(
-          { error: 'Faceit profile not found' },
+          { error: "Faceit profile not found" },
           { status: 404 }
         );
       }
@@ -43,10 +43,10 @@ export async function GET(
 
     return NextResponse.json(faceitData);
   } catch (error) {
-    console.error('Error fetching Faceit profile:', error);
+    console.error("Error fetching Faceit profile:", error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
-} 
+}
