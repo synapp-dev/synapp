@@ -15,6 +15,10 @@ const nextConfig = {
         protocol: "https",
         hostname: "faceit-a.akamaihd.net",
       },
+      {
+        protocol: "https",
+        hostname: "avatars.steamstatic.com",
+      },
     ],
   },
 };

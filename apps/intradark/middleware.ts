@@ -3,13 +3,29 @@ import { NextRequest, NextResponse } from "next/server";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Check if the path starts with /@ and has a username
+  // /@username redirect (already present)
   if (pathname.startsWith("/@") && pathname.length > 2) {
-    // Extract the username (everything after /@)
-    const username = pathname.substring(2); // Remove the /@ part
-
+    const username = pathname.substring(2);
     const newUrl = new URL(`/api/steam/resolve/${username}`, request.url);
     return NextResponse.redirect(newUrl);
+  }
+
+  // /id/* redirect
+  if (pathname.startsWith("/id/") && pathname.length > 4) {
+    const id = pathname.substring(4); // everything after /id/
+    if (id) {
+      const newUrl = new URL(`/api/steam/resolve/${id}`, request.url);
+      return NextResponse.redirect(newUrl);
+    }
+  }
+
+  // /profiles/* redirect
+  if (pathname.startsWith("/profiles/") && pathname.length > 10) {
+    const id = pathname.substring(10); // everything after /profiles/
+    if (id) {
+      const newUrl = new URL(`/api/steam/resolve/${id}`, request.url);
+      return NextResponse.redirect(newUrl);
+    }
   }
 
   return NextResponse.next();
