@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
 import { PanelRightIcon } from "lucide-react";
-import { useRightSidebar } from "@workspace/ui/providers/right-sidebar-provider.js";
+import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider.js";
 
 export function RightSidebarTrigger({
   className,
