@@ -49,7 +49,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Avatar, AvatarImage } from "@workspace/ui/components/avatar";
-import { useRightSidebar } from "@workspace/ui/providers/right-sidebar-provider";
+import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider";
 
 // This is sample data.
 const data = {
