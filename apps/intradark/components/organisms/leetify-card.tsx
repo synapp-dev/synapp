@@ -102,7 +102,7 @@ export function LeetifyCard() {
   const currentColor = getRatingColor(activeRating);
 
   return (
-    <Card className="relative group/leetify-card">
+    <Card className="relative group/leetify-card w-full h-full">
       <div className="absolute opacity-0 inset-0 bg-gradient-to-br from-pink-800/10 via-pink-800/5 to-transparent z-0 group-hover/leetify-card:opacity-100 transition-opacity duration-200 ease-out" />
       <Image
         src="/images/logos/leetify-logo-colored.svg"
@@ -130,7 +130,7 @@ export function LeetifyCard() {
       />
       <CardHeader className="z-10">
         <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Image
               src="/images/logos/leetify-logo-colored.svg"
               alt="Leetify"
@@ -138,7 +138,7 @@ export function LeetifyCard() {
               height={100}
               className="w-5 h-auto"
             />
-            Leetify
+            <h1 className="text-xs font-bold text-muted-foreground">Leetify</h1>
           </div>
 
           <div className="text-xs text-muted-foreground mb-0.5">
@@ -154,11 +154,10 @@ export function LeetifyCard() {
                     target="_blank"
                     rel="noopener noreferrer"
                     className={cn(
-                      "flex items-center gap-0.5",
-                      leetifyProfile?.meta?.vanityUrl ? "text-sm" : "text-xs"
+                      "flex items-center gap-0.5 text-xs hover:underline"
                     )}
                   >
-                    <ArrowUpRight className="w-4 h-4" />
+                    <ArrowUpRight className="w-3 h-3 mt-0.5" />
                     <span className="">
                       {leetifyProfile?.meta?.vanityUrl
                         ? `${leetifyProfile?.meta?.vanityUrl}`
