@@ -82,7 +82,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
 // Main hook for getting player data by vanity URL or Steam ID64
 export function usePlayerByVanityUrl(input: string) {
-  const { setSelectedPlayer, updatePlayer, setLoading, setError } =
+  const { setSelectedPlayer, updatePlayer, setLoading, setError, getPlayer } =
     usePlayerStore();
 
   // 1. Fetch base player info
@@ -96,18 +96,21 @@ export function usePlayerByVanityUrl(input: string) {
     profile: steamProfile,
     isLoading: steamLoading,
     error: steamError,
+    refetch: refetchSteam,
   } = useSteamProfile(steamId64 || "");
   // --- Loading/Error for Leetify ---
   const {
     profile: leetifyProfile,
     isLoading: leetifyLoading,
     error: leetifyError,
+    refetch: refetchLeetify,
   } = useLeetifyProfile(steamId64 || "");
   // --- Loading/Error for CSStats ---
   const {
     profile: csstatsProfile,
     isLoading: csstatsLoading,
     error: csstatsError,
+    refetch: refetchCSStats,
   } = useCSStatsProfile(steamId64 || "");
   // --- Faceit depends on Leetify ---
   const faceitNickname = leetifyProfile?.meta?.faceitNickname;
@@ -115,6 +118,7 @@ export function usePlayerByVanityUrl(input: string) {
     profile: faceitProfile,
     isLoading: faceitLoading,
     error: faceitError,
+    refetch: refetchFaceit,
   } = useFaceitProfile(steamId64 || "", faceitNickname || "");
 
   // --- Update Zustand loading/error states ---
@@ -171,8 +175,56 @@ export function usePlayerByVanityUrl(input: string) {
     }
   }, [steamId64, faceitProfile, updatePlayer]);
 
-  // --- Return nothing (store is the source of truth) ---
-  return null;
+  // --- Compose return object ---
+  // Get the player from the store (will be updated by effects)
+  const player = steamId64 ? getPlayer(steamId64) : null;
+
+  // Combined loading: any service or base query is loading
+  const isLoading =
+    queryResult.isLoading ||
+    steamLoading ||
+    leetifyLoading ||
+    faceitLoading ||
+    csstatsLoading;
+
+  // Combined error: base query or any service error
+  const error =
+    queryResult.error?.message ||
+    steamError ||
+    leetifyError ||
+    faceitError ||
+    csstatsError ||
+    (queryResult.data && !queryResult.data.success && queryResult.data.error) ||
+    null;
+
+  // Combined refetch: refetch all queries
+  const refetch = () => {
+    queryResult.refetch();
+    refetchSteam();
+    refetchLeetify();
+    refetchFaceit();
+    refetchCSStats();
+  };
+
+  return {
+    player,
+    isLoading,
+    error,
+    refetch,
+    // Individual service states for advanced usage
+    steamProfileData: steamProfile,
+    steamProfileLoading: steamLoading,
+    steamProfileError: steamError,
+    leetifyProfileData: leetifyProfile,
+    leetifyProfileLoading: leetifyLoading,
+    leetifyProfileError: leetifyError,
+    faceitProfileData: faceitProfile,
+    faceitProfileLoading: faceitLoading,
+    faceitProfileError: faceitError,
+    csstatsProfileData: csstatsProfile,
+    csstatsProfileLoading: csstatsLoading,
+    csstatsProfileError: csstatsError,
+  };
 }
 
 // Individual service hooks for independent usage
