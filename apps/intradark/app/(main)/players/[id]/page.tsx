@@ -27,6 +27,7 @@ import { Play } from "lucide-react";
 import ThreeDCard from "@/components/atoms/three-d-card";
 import Image from "next/image";
 import { PremierCard } from "@/components/organisms/premier-card";
+import { StatsCard } from "@/components/organisms/stats-card";
 
 // HighlightCard component
 function HighlightCard({
@@ -141,17 +142,19 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6 p-6">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 w-full h-full">
-        <ThreeDCard brand="steam">
-          <SteamCard />
-        </ThreeDCard>
-        <ThreeDCard brand="steam">
-          <PremierCard />
-        </ThreeDCard>
+        <div className="flex flex-col gap-6">
+          <ThreeDCard brand="steam">
+            <SteamCard />
+          </ThreeDCard>
+          <ThreeDCard brand="faceit">
+            <FaceitCard />
+          </ThreeDCard>
+        </div>
         <ThreeDCard brand="leetify">
           <LeetifyCard />
         </ThreeDCard>
         <ThreeDCard brand="faceit">
-          <FaceitCard />
+          <StatsCard />
         </ThreeDCard>
       </div>
     </div>

@@ -31,10 +31,10 @@ interface PlayerSummaryResponse {
 
 export async function GET(
   request: NextRequest,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = context.params;
+    const { id } = await context.params;
     const steamApiKey = process.env.STEAM_API_KEY;
 
     if (!steamApiKey) {
@@ -99,7 +99,7 @@ export async function GET(
     console.error("Steam resolve error:", error);
     // On error, redirect to players page with original input (will show error)
     return NextResponse.redirect(
-      new URL(`/players/${context.params.id}`, request.url)
+      new URL(`/players/${(await context.params).id}`, request.url)
     );
   }
 }
