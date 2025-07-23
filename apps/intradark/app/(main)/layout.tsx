@@ -8,7 +8,7 @@ import {
   SidebarInset,
   SidebarProvider,
 } from "@workspace/ui/components/sidebar";
-import { RightSidebarProvider } from "@workspace/ui/providers/right-sidebar-provider";
+import { RightSidebarProvider } from "@workspace/ui/components/right-sidebar-provider";
 
 export default function MainLayout({
   children,
