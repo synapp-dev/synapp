@@ -49,8 +49,8 @@ export interface ThreeDCardProps {
 export const ThreeDCard: React.FC<ThreeDCardProps> = ({
   brand,
   isStatic = false,
-  shineStrength = 0.01,
-  cursorPointer = true,
+  shineStrength = 0.001,
+  cursorPointer = false,
   onClick,
   style,
   children,
@@ -94,8 +94,8 @@ export const ThreeDCard: React.FC<ThreeDCardProps> = ({
     const angle = rawAngle < 0 ? rawAngle + 360 : rawAngle;
     // Shine opacity
     const shineOpacity = Math.max(
-      0.15,
-      Math.min(1, (y / height) * shineStrength + 0.15)
+      0.05,
+      Math.min(1, (y / height) * shineStrength + 0.05)
     );
 
     setContainerStyle({
