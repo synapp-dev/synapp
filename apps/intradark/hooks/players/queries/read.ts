@@ -26,6 +26,32 @@ export interface LeetifyProfile {
     isProPlan: boolean;
     isLeetifyStaff: boolean;
   };
+  games: Array<{
+    enemyTeamSteam64Ids: string[];
+    isCompletedLongMatch: boolean;
+    ownTeamSteam64Ids: string[];
+    ownTeamTotalLeetifyRatingRounds: Record<string, number>;
+    ownTeamTotalLeetifyRatings: Record<string, number>;
+    ctLeetifyRating: number;
+    ctLeetifyRatingRounds: number;
+    dataSource: string;
+    elo: number | null;
+    gameFinishedAt: string;
+    gameId: string;
+    isCs2: boolean;
+    mapName: string;
+    matchResult: string;
+    rankType: number;
+    scores: [number, number];
+    skillLevel: number;
+    tLeetifyRating: number;
+    tLeetifyRatingRounds: number;
+    deaths: number;
+    hasBannedPlayer: boolean;
+    kills: number;
+    partySize: number;
+  }>;
+
   recentGameRatings: {
     aim: number;
     positioning: number;
