@@ -64,7 +64,7 @@ export function PremierCard() {
               alt="Premier"
               width={100}
               height={100}
-              className="w-30 h-auto"
+              className="w-24 h-auto"
             />
           </div>
           <div className="text-sm text-muted-foreground flex flex-col items-end gap-1">

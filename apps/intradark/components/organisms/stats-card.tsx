@@ -13,6 +13,9 @@ import { useEffect } from "react";
 import { Button } from "@workspace/ui/components/button";
 import { useState } from "react";
 import { MapRadialChart } from "../molecules/map-radial-chart";
+import { Separator } from "@workspace/ui/components/separator";
+import { SkipBack } from "lucide-react";
+import { cn } from "@workspace/ui/lib/utils";
 
 export function StatsCard() {
   const { selectedPlayer } = usePlayerStore();
@@ -30,7 +33,7 @@ export function StatsCard() {
   }, [leetifyProfile]);
 
   const [selectedRange, setSelectedRange] = useState("30");
-  const rangeOptions = ["10", "30", "60", "90", "All"];
+  const rangeOptions = ["10", "30", "60"];
 
   // Determine how many games to use based on selected tab
   const gamesToUse = leetifyProfile?.games
@@ -143,16 +146,22 @@ export function StatsCard() {
       .slice(0, n);
   }
 
-  const topOwnTeam = getTopEntries(ownTeamCounts, 5);
-  const topEnemyTeam = getTopEntries(enemyTeamCounts, 5);
+  const topOwnTeam = getTopEntries(ownTeamCounts, 4);
+  const topEnemyTeam = getTopEntries(enemyTeamCounts, 4);
 
   return (
     <Card className="w-full h-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <h1 className="text-xs font-bold text-muted-foreground">Stats</h1>
+          <div>
+            <h1 className="text-xs font-bold text-muted-foreground">Stats</h1>
+          </div>
+
           {/* Range Tabs on the opposite end */}
           <div className="flex items-center gap-1 ml-auto">
+            <SkipBack className="w-3 h-3 text-muted-foreground" />
+            {/* <p className="text-xs text-muted-foreground">Recent</p> */}
+            <div className="" />
             {rangeOptions.map((option) => (
               <Button
                 key={option}
@@ -171,109 +180,66 @@ export function StatsCard() {
         <CardDescription></CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            {/* Display total kills from first 30 games */}
-            <div className="text-sm">
-              Total Kills (last {selectedRange} games):{" "}
-              <span className="font-semibold">
-                {totalKills}
-                {missingKills > 0 ? "*" : ""}
-              </span>
+        {/* <div>
+          <div className="flex items-center justify-center gap-1">
+            {gamesToUse.slice(0, 5).map((game, idx) => {
+              const result = (game.matchResult || "").toLowerCase();
+              return (
+                <span
+                  key={idx}
+                  className={cn(
+                    result === "win"
+                      ? "text-green-300"
+                      : result === "loss"
+                        ? "text-red-300"
+                        : "text-gray-400",
+                    "text-2xl font-bold"
+                  )}
+                >
+                  {result === "win" ? "W" : result === "loss" ? "L" : "D"}
+                </span>
+              );
+            })}
+          </div>
+        </div> */}
+        {/* <Separator className="my-4" /> */}
+        <div className="grid grid-cols-2 gap-4 border-spacing-x-2 border-muted">
+          <div className="flex flex-col items-center gap-4">
+            {/* KD Ratio */}
+            <div className="text-sm flex flex-col items-center gap-0.5">
+              <h2 className="font-bold text-3xl">{killDeathRatio}</h2>
+              <p className="text-xs text-muted-foreground">K/D Ratio</p>
             </div>
-            <div className="text-xs text-muted-foreground">
-              Missing kills:{" "}
-              <span className="font-semibold">{missingKills}</span>
+          </div>
+          <div className="flex flex-col items-center gap-4">
+            <div className="text-sm flex flex-col items-center gap-0.5">
+              <h2 className="font-bold text-3xl">{winPercentage}%</h2>
+              <p className="text-xs text-muted-foreground">Win Rate</p>
             </div>
-            <div className="text-sm">
-              Total Deaths (last {selectedRange} games):{" "}
-              <span className="font-semibold">
-                {totalDeaths}
-                {missingDeaths > 0 ? "*" : ""}
-              </span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Missing deaths:{" "}
-              <span className="font-semibold">{missingDeaths}</span>
-            </div>
-            {/* Display K/D ratio from first 30 games */}
-            <div className="text-sm">
-              K/D Ratio (last {selectedRange} games):{" "}
-              <span className="font-semibold">{killDeathRatio}</span>
-            </div>
-            {/* Display match result counts from first 30 games */}
-            <div className="text-sm mt-2">
-              Match Results (last {selectedRange} games):
-            </div>
-            <ul className="text-xs ml-2">
-              {Object.entries(matchResultCounts).map(([result, count]) => (
-                <li key={result}>
-                  <span className="font-semibold">
-                    {result.charAt(0).toUpperCase() + result.slice(1)}:
-                  </span>{" "}
-                  {count}
-                </li>
-              ))}
-            </ul>
-            {/* Display win percentage from first 30 games */}
-            <div className="text-sm mt-2">
-              Win % (last {selectedRange} games):{" "}
-              <span className="font-semibold">{winPercentage}</span>
-            </div>
-            {/* Display map counts from first 30 games */}
-            <div className="text-sm mt-2">
-              Maps Played (last {selectedRange} games):
-            </div>
-            {/* <ul className="text-xs ml-2">
-              {Object.entries(mapWinLossCounts).map(
-                ([map, { win, loss, total }]) => (
-                  <li key={map}>
-                    <span className="font-semibold">
-                      {map.charAt(0).toUpperCase() + map.slice(1)}:
-                    </span>{" "}
-                    {total} (W: {win}, L: {loss})
-                  </li>
-                )
-              )}
-            </ul> */}
-            {/* Radar chart for maps played */}
-            <MapRadialChart
-              mapCounts={mapCounts}
-              mapWinLossCounts={mapWinLossCounts}
-            />
-            {/* Display party size counts from first 30 games */}
-            <div className="text-sm mt-2">
-              Party Sizes (last {selectedRange} games):
-            </div>
-            <ul className="text-xs ml-2">
-              {Object.entries(partySizeCounts).map(([size, count]) => (
-                <li key={size}>
-                  <span className="font-semibold">{size}:</span> {count}
-                </li>
-              ))}
-            </ul>
-            {/* Display top own team steam64Ids */}
-            <div className="text-sm mt-2">
-              Most Common Teammates (last {selectedRange} games):
-            </div>
-            <ul className="text-xs ml-2">
-              {topOwnTeam.map(([id, count]) => (
-                <li key={id}>
-                  <span className="font-semibold">{id}:</span> {count}
-                </li>
-              ))}
-            </ul>
-            {/* Display top enemy team steam64Ids */}
-            {/* <div className="text-sm mt-2">
-              Most Common Opponents (last {selectedRange} games):
-            </div>
-            <ul className="text-xs ml-2">
-              {topEnemyTeam.map(([id, count]) => (
-                <li key={id}>
-                  <span className="font-semibold">{id}:</span> {count}
-                </li>
-              ))}
-            </ul> */}
+            {/* <div>{winCount} W</div> */}
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+        <MapRadialChart
+          mapCounts={mapCounts}
+          mapWinLossCounts={mapWinLossCounts}
+        />
+        <Separator className="my-4" />
+
+        <div>
+          <p className="text-xs text-muted-foreground">Crew</p>
+          <div className="flex items-center justify-center gap-4">
+            {topOwnTeam.map((player, index) => {
+              return (
+                <div
+                  key={index}
+                  className="w-12 h-12 rounded-full border border-muted flex items-center justify-center"
+                >
+                  {index}
+                </div>
+              );
+            })}
           </div>
         </div>
       </CardContent>
