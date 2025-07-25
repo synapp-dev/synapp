@@ -28,6 +28,10 @@ import ThreeDCard from "@/components/atoms/three-d-card";
 import Image from "next/image";
 import { PremierCard } from "@/components/organisms/premier-card";
 import { StatsCard } from "@/components/organisms/stats-card";
+import { FormCard } from "@/components/organisms/form-card";
+import { CrewCard } from "@/components/organisms/crew-card";
+import { FormCrewCard } from "@/components/organisms/form-crew-card";
+import { BotPreviewCard } from "@/components/organisms/bot-preview-card";
 
 // HighlightCard component
 function HighlightCard({
@@ -141,8 +145,19 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6 p-6">
+      {/* <div className="grid grid-cols-4 gap-6 h-48">
+        <div className="flex border border-muted rounded-lg p-4 w-full h-full col-span-1">
+          <div>comments</div>
+        </div>
+        <div className="flex border border-muted rounded-lg p-4 w-full h-full col-span-3">
+          <div>comments</div>
+        </div>
+      </div> */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 w-full h-full">
         <div className="flex flex-col gap-6">
+          <ThreeDCard brand="faceit">
+            <BotPreviewCard />
+          </ThreeDCard>
           <ThreeDCard brand="steam">
             <SteamCard />
           </ThreeDCard>
@@ -150,12 +165,26 @@ export default function ProfilePage() {
             <FaceitCard />
           </ThreeDCard>
         </div>
-        <ThreeDCard brand="leetify">
-          <LeetifyCard />
-        </ThreeDCard>
-        <ThreeDCard brand="faceit">
-          <StatsCard />
-        </ThreeDCard>
+        <div className="flex flex-col gap-6">
+          <ThreeDCard brand="leetify">
+            <LeetifyCard />
+          </ThreeDCard>
+          <ThreeDCard brand="faceit">
+            <CrewCard />
+          </ThreeDCard>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <ThreeDCard brand="faceit">
+            <FormCard />
+          </ThreeDCard>
+          <ThreeDCard brand="faceit">
+            <StatsCard />
+          </ThreeDCard>
+        </div>
+      </div>
+      <div className="flex border border-muted rounded-lg p-4 w-full h-full">
+        <div>highlights</div>
       </div>
     </div>
   );

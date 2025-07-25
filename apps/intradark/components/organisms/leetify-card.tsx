@@ -140,7 +140,6 @@ export function LeetifyCard() {
             />
             <h1 className="text-xs font-bold text-muted-foreground">Leetify</h1>
           </div>
-
           <div className="text-xs text-muted-foreground mb-0.5">
             <span className="">
               {safeMeta(() => (
@@ -253,6 +252,7 @@ export function LeetifyCard() {
             suffix=".00"
             progressTransform={(v) => ((v + 10) / 20) * 100}
             delay={0.45}
+            showPlusSign={true}
           />
 
           {/* Clutch */}
@@ -267,78 +267,52 @@ export function LeetifyCard() {
             suffix=".00"
             progressTransform={(v) => (v / 16) * 100}
             delay={0.6}
+            showPlusSign={true}
           />
 
           <Separator />
 
-          {/* Rating Type Buttons */}
-          <div className="flex justify-center items-center gap-4 mb-4">
-            <Button
-              variant={activeRating === "ct" ? "default" : "outline"}
-              size="sm"
-              onMouseEnter={() => handleRatingChange("ct")}
-              onMouseLeave={handleMouseLeave}
-              className="w-6 h-6 rounded-full p-0 text-xs flex items-center justify-center"
-            >
-              <Image
-                src="/images/logos/ct-patch-small.webp"
-                alt="CT Icon"
-                width={100}
-                height={100}
-                className="w-full h-full object-contain"
-              />
-            </Button>
-            <Button
-              variant={activeRating === "overall" ? "default" : "outline"}
-              size="sm"
-              onMouseEnter={() => handleRatingChange("overall")}
-              onMouseLeave={handleMouseLeave}
-              className="w-10 h-10 rounded-full p-0 flex items-center justify-center relative overflow-hidden"
-            >
-              {/* CT half (top-left) */}
-              <span
-                className="absolute inset-0 w-full h-full"
-                style={{ zIndex: 1 }}
-              >
-                <Image
-                  src="/images/logos/ct-patch-small.webp"
-                  alt="CT Icon"
-                  width={100}
-                  height={100}
-                  className="w-full h-full object-contain"
-                  style={{ clipPath: "polygon(0 0, 100% 0, 0 100%)" }}
-                />
-              </span>
-              {/* T half (bottom-right) */}
-              <span
-                className="absolute inset-0 w-full h-full"
-                style={{ zIndex: 2 }}
-              >
-                <Image
-                  src="/images/logos/t-patch-small.webp"
-                  alt="T Icon"
-                  width={100}
-                  height={100}
-                  className="w-full h-full object-contain"
-                  style={{ clipPath: "polygon(100% 0, 100% 100%, 0 100%)" }}
-                />
-              </span>
-            </Button>
-            <Button
-              variant={activeRating === "t" ? "default" : "outline"}
-              size="sm"
-              onMouseEnter={() => handleRatingChange("t")}
-              onMouseLeave={handleMouseLeave}
-              className="w-6 h-6 rounded-full p-0 text-xs flex items-center justify-center"
-            >
-              <Image
-                src="/images/logos/t-patch-small.webp"
-                alt="T Icon"
-                width={100}
-                height={100}
-                className="w-full h-full object-contain"
-              />
-            </Button>
+          {/* Tabs for rating type, right-aligned */}
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-1">
+              {(
+                [
+                  {
+                    key: "ct",
+                    label: "CT",
+                    icon: "/images/logos/ct-patch-small.webp",
+                  },
+                  {
+                    key: "overall",
+                    label: "Overall",
+                    icon: "/images/logos/leetify-logo-colored.svg",
+                  },
+                  {
+                    key: "t",
+                    label: "T",
+                    icon: "/images/logos/t-patch-small.webp",
+                  },
+                ] as const
+              ).map((tab) => (
+                <Button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveRating(tab.key)}
+                  variant={activeRating === tab.key ? "default" : "ghost"}
+                  size="sm"
+                  className="text-xs px-2 py-0.5 h-fit flex items-center gap-1"
+                >
+                  <Image
+                    src={tab.icon}
+                    alt={tab.label}
+                    width={18}
+                    height={18}
+                    className="w-4 h-4 object-contain"
+                  />
+                  <span>{tab.label}</span>
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Dynamic Rating Display */}
@@ -349,9 +323,10 @@ export function LeetifyCard() {
             colorClass={currentColor}
             progressMax={100}
             decimals={2}
-            progressTransform={(v) => ((v / 100 + 10) / 20) * 100}
+            progressTransform={(v) => ((v + 8) / 16) * 100}
             delay={0.75}
             suffix=".00"
+            showPlusSign={true}
           />
         </div>
       </CardContent>

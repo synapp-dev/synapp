@@ -220,28 +220,12 @@ export function StatsCard() {
           </div>
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-8" />
         <MapRadialChart
           mapCounts={mapCounts}
           mapWinLossCounts={mapWinLossCounts}
         />
-        <Separator className="my-4" />
-
-        <div>
-          <p className="text-xs text-muted-foreground">Crew</p>
-          <div className="flex items-center justify-center gap-4">
-            {topOwnTeam.map((player, index) => {
-              return (
-                <div
-                  key={index}
-                  className="w-12 h-12 rounded-full border border-muted flex items-center justify-center"
-                >
-                  {index}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        {/* <Separator className="my-4" /> */}
       </CardContent>
     </Card>
   );

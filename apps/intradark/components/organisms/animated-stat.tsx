@@ -17,6 +17,7 @@ interface AnimatedStatProps {
   dataReady?: boolean; // new prop
   delay?: number; // seconds, optional
   loadingLabel?: string;
+  showPlusSign?: boolean; // new prop
 }
 
 // Easing function: easeInOutCubic
@@ -37,6 +38,7 @@ export function AnimatedStat({
   dataReady = true,
   delay = 0, // default to no delay
   loadingLabel = "Loading...",
+  showPlusSign = false, // default false
 }: AnimatedStatProps) {
   const [progress, setProgress] = useState(0);
   const frameRef = useRef<number | null>(null);
@@ -109,13 +111,16 @@ export function AnimatedStat({
               end={value}
               duration={duration}
               decimals={decimals}
+              prefix={showPlusSign && value > 0 ? "+" : ""}
               style={{
                 color: value > 85 ? "orange" : "var(--primary)",
               }}
               className={cn(value > 85 && "animate-pulse")}
             />
           ) : (
-            <span className="text-muted animate-pulse">0{suffix}</span>
+            <span className="text-muted animate-pulse">
+              {showPlusSign && 0 > 0 ? "+" : ""}0{suffix}
+            </span>
           )}
         </span>
       </div>

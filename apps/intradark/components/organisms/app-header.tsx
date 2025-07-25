@@ -16,7 +16,7 @@ export function AppHeader() {
         <h1 className="text-lg font-semibold">Intradark</h1>
       </div>
       <div className="flex items-center gap-2 px-4">
-        {/* <CommandMenu /> */}
+        <CommandMenu />
         <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
         <ThemeToggle />
         {/* <RightSidebarTrigger /> */}
