@@ -150,7 +150,7 @@ interface PlayerData {
 
 - `useSteamProfile(steamId64)` - Get Steam profile data only
 - `useLeetifyProfile(steamId64)` - Get Leetify profile data only
-- `useFaceitProfile(faceitNickname)` - Get Faceit profile data only
+- `useFaceitProfile(steamId64)` - Get Faceit profile data only
 - `useCSStatsProfile(steamId64)` - Get CSStats profile data only
 
 #### Mutation Hooks
@@ -179,7 +179,7 @@ const {
   profile: faceitProfile,
   isLoading: faceitLoading,
   error: faceitError,
-} = useFaceitProfile(faceitNickname);
+} = useFaceitProfile(steamId64);
 const {
   profile: csstatsProfile,
   isLoading: csstatsLoading,

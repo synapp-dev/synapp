@@ -9,6 +9,7 @@ import {
   useCSStatsProfile,
 } from "@/hooks/players/queries/read";
 import { useFaceitProfile } from "@/hooks/players/queries/read";
+import { useBotStore } from "@/stores/bot-store";
 
 // --- Types ---
 type PlayerStore = {
@@ -84,6 +85,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 export function usePlayerByVanityUrl(input: string) {
   const { setSelectedPlayer, updatePlayer, setLoading, setError, getPlayer } =
     usePlayerStore();
+  const { setPlayer, addMessage } = useBotStore();
 
   // 1. Fetch base player info
   const queryResult = useGetPlayerByVanityUrl(input);
@@ -112,14 +114,13 @@ export function usePlayerByVanityUrl(input: string) {
     error: csstatsError,
     refetch: refetchCSStats,
   } = useCSStatsProfile(steamId64 || "");
-  // --- Faceit depends on Leetify ---
-  const faceitNickname = leetifyProfile?.meta?.faceitNickname;
+  // --- Faceit profile ---
   const {
     profile: faceitProfile,
     isLoading: faceitLoading,
     error: faceitError,
     refetch: refetchFaceit,
-  } = useFaceitProfile(steamId64 || "", faceitNickname || "");
+  } = useFaceitProfile(steamId64 || "");
 
   // --- Update Zustand loading/error states ---
   // Steam
