@@ -156,7 +156,7 @@ export function PlayerProfileExample() {
                 {`const { profile, isLoading, error } = useLeetifyProfile("${player.steamId64}");`}
               </code>
               <code className="block bg-gray-100 p-2 rounded">
-                {`const { profile, isLoading, error } = useFaceitProfile("${player.leetifyProfile?.meta?.faceitNickname || "nickname"}");`}
+                {`const { profile, isLoading, error } = useFaceitProfile("${player.steamId64}");`}
               </code>
               <code className="block bg-gray-100 p-2 rounded">
                 {`const { profile, isLoading, error } = useCSStatsProfile("${player.steamId64}");`}

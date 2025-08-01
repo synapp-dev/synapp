@@ -1,9 +1,4 @@
-import {
-  useFaceitProfile,
-  useLeetifyProfile,
-  usePlayerByVanityUrl,
-  usePlayerStore,
-} from "@/hooks/players";
+import { useFaceitProfile, usePlayerStore } from "@/hooks/players";
 import {
   Card,
   CardTitle,
@@ -18,19 +13,12 @@ import CountUp from "react-countup";
 export function FaceitCard() {
   const { selectedPlayer } = usePlayerStore();
   const steamId64 = selectedPlayer?.steamId64;
-  const {
-    profile: leetifyProfile,
-    isLoading: leetifyLoading,
-    error: leetifyError,
-  } = useLeetifyProfile(steamId64 || "");
+
   const {
     profile: faceitProfile,
     isLoading: faceitLoading,
     error: faceitError,
-  } = useFaceitProfile(
-    steamId64 || "",
-    leetifyProfile?.meta?.faceitNickname || ""
-  );
+  } = useFaceitProfile(steamId64 || "");
 
   return (
     <Card className="relative group/faceit-card w-full h-full">

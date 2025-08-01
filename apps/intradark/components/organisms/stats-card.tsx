@@ -14,7 +14,7 @@ import { Button } from "@workspace/ui/components/button";
 import { useState } from "react";
 import { MapRadialChart } from "../molecules/map-radial-chart";
 import { Separator } from "@workspace/ui/components/separator";
-import { SkipBack } from "lucide-react";
+import { SkipBack, TrendingUp } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 
 export function StatsCard() {
@@ -29,6 +29,11 @@ export function StatsCard() {
   useEffect(() => {
     if (leetifyProfile) {
       console.log(leetifyProfile.games);
+      // Log unique map names to see what we're working with
+      const uniqueMaps = [
+        ...new Set(leetifyProfile.games.map((game) => game.mapName)),
+      ];
+      console.log("Unique map names:", uniqueMaps);
     }
   }, [leetifyProfile]);
 
@@ -80,30 +85,6 @@ export function StatsCard() {
   const winPercentage =
     totalGames > 0 ? ((winCount / totalGames) * 100).toFixed(1) : "N/A";
 
-  // Tally up mapName values from selected games
-  const mapCounts = gamesToUse.reduce(
-    (acc, game) => {
-      const map = (game.mapName || "Unknown").toLowerCase();
-      acc[map] = (acc[map] || 0) + 1;
-      return acc;
-    },
-    {} as Record<string, number>
-  );
-
-  // Tally up wins and losses per map
-  const mapWinLossCounts = gamesToUse.reduce(
-    (acc, game) => {
-      const map = (game.mapName || "Unknown").toLowerCase();
-      const result = (game.matchResult || "Unknown").toLowerCase();
-      if (!acc[map]) acc[map] = { win: 0, loss: 0, total: 0 };
-      if (result === "win") acc[map].win += 1;
-      else if (result === "loss") acc[map].loss += 1;
-      acc[map].total += 1;
-      return acc;
-    },
-    {} as Record<string, { win: number; loss: number; total: number }>
-  );
-
   // Tally up partySize values from selected games
   const partySizeCounts = gamesToUse.reduce(
     (acc, game) => {
@@ -153,12 +134,21 @@ export function StatsCard() {
     <Card className="w-full h-full">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xs font-bold text-muted-foreground">Stats</h1>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <TrendingUp className="w-3 h-3 text-muted-foreground" />
+              <h1 className="text-xs font-bold text-muted-foreground">Stats</h1>
+            </div>
+
+            <div className="w-0.5 h-0.5 rounded-full bg-muted-foreground animate-pulse" />
+            <p className="text-[0.6rem] text-muted-foreground/50 uppercase">
+              Last {selectedRange} games
+            </p>
           </div>
 
           {/* Range Tabs on the opposite end */}
           <div className="flex items-center gap-1 ml-auto">
+            {/* <p className="text-xs text-muted-foreground uppercase">Games</p> */}
             <SkipBack className="w-3 h-3 text-muted-foreground" />
             {/* <p className="text-xs text-muted-foreground">Recent</p> */}
             <div className="" />
@@ -221,11 +211,9 @@ export function StatsCard() {
         </div>
 
         <Separator className="my-8" />
-        <MapRadialChart
-          mapCounts={mapCounts}
-          mapWinLossCounts={mapWinLossCounts}
-        />
-        {/* <Separator className="my-4" /> */}
+        <div className="flex flex-col gap-4">
+          <MapRadialChart selectedRange={selectedRange} />
+        </div>
       </CardContent>
     </Card>
   );

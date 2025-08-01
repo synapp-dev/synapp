@@ -4,7 +4,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { CrewCard } from "./crew-card";
+import { CrewCard } from "../molecules/crew-card";
 import { FormCard } from "./form-card";
 
 export function FormCrewCard() {
