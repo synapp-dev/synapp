@@ -5,7 +5,7 @@
   "private": true,
   "description": "Clean, unopinionated Next.js application template with modern tooling",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev -p 3003 --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
