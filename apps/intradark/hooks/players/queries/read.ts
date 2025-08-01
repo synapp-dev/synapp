@@ -229,20 +229,20 @@ export function useGetLeetifyProfile(steamId64: string) {
 }
 
 export function useGetFaceitProfile(
-  faceitNickname: string | undefined,
+  steamId64: string | undefined,
   options = {}
 ) {
   return useQuery<FaceitProfile, Error>({
-    queryKey: ["players", "faceit", faceitNickname],
+    queryKey: ["players", "faceit", steamId64],
     queryFn: async () => {
-      if (!faceitNickname) throw new Error("No Faceit nickname provided");
-      const response = await fetch(`/api/faceit/profile/${faceitNickname}`);
+      if (!steamId64) throw new Error("No Steam ID64 provided");
+      const response = await fetch(`/api/faceit/profile/${steamId64}`);
       if (!response.ok) {
         throw new Error("Failed to fetch Faceit profile");
       }
       return response.json();
     },
-    enabled: !!faceitNickname,
+    enabled: !!steamId64,
     ...options,
   });
 }
@@ -265,16 +265,18 @@ export function useGetCSStatsProfile(steamId64: string) {
 import { usePlayerStore } from "@/stores/players/player-store";
 import { useEffect } from "react";
 
-export function useFaceitProfile(steamId64: string, faceitNickname: string) {
+export function useFaceitProfile(steamId64: string) {
   const { updatePlayer, setLoading, setError } = usePlayerStore();
-  const query = useGetFaceitProfile(faceitNickname, {
-    enabled: !!faceitNickname,
+  const query = useGetFaceitProfile(steamId64, {
+    enabled: !!steamId64,
   });
 
   useEffect(() => {
-    if (!faceitNickname || !steamId64) return;
+    if (!steamId64) return;
+
     setLoading("faceit", query.isLoading);
     setError("faceit", query.error?.message || null);
+
     if (query.data) {
       updatePlayer(steamId64, { faceitProfile: query.data });
     }
@@ -282,7 +284,6 @@ export function useFaceitProfile(steamId64: string, faceitNickname: string) {
     query.data,
     query.isLoading,
     query.error,
-    faceitNickname,
     steamId64,
     updatePlayer,
     setLoading,
@@ -305,8 +306,10 @@ export function useSteamProfile(steamId64: string) {
 
   useEffect(() => {
     if (!steamId64) return;
+
     setLoading("steam", query.isLoading);
     setError("steam", query.error?.message || null);
+
     if (query.data?.success) {
       updatePlayer(steamId64, { steamProfile: query.data });
     }
@@ -336,8 +339,10 @@ export function useLeetifyProfile(steamId64: string) {
 
   useEffect(() => {
     if (!steamId64) return;
+
     setLoading("leetify", query.isLoading);
     setError("leetify", query.error?.message || null);
+
     if (query.data) {
       updatePlayer(steamId64, { leetifyProfile: query.data });
     }
@@ -367,8 +372,10 @@ export function useCSStatsProfile(steamId64: string) {
 
   useEffect(() => {
     if (!steamId64) return;
+
     setLoading("csstats", query.isLoading);
     setError("csstats", query.error?.message || null);
+
     if (query.data?.success) {
       updatePlayer(steamId64, { csstatsProfile: query.data });
     }
