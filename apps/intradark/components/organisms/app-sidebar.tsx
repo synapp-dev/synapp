@@ -2,55 +2,95 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Home, Settings, User } from "lucide-react";
+import {
+  Binoculars,
+  Home,
+  LayoutDashboard,
+  Newspaper,
+  Search,
+  Settings,
+  ShieldCheck,
+  User,
+  UserSearch,
+} from "lucide-react";
 
 import { NavUser } from "@/components/molecules/nav-user";
+import { NavItem } from "@/components/molecules/nav-item";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
+import Image from "next/image";
+
+// Navigation data object
+const navigationItems = [
+  {
+    href: "/dashboard",
+    icon: LayoutDashboard,
+    children: "Dashboard",
+  },
+  {
+    href: "/news",
+    icon: Newspaper,
+    children: "News",
+  },
+  {
+    href: "/veritas",
+    icon: ShieldCheck,
+    children: "Veritas",
+    items: [
+      {
+        href: "/veritas/check",
+        icon: UserSearch,
+        children: "Check Player",
+      },
+      {
+        href: "/veritas/watchlist",
+        icon: Binoculars,
+        children: "Watchlist",
+      },
+    ],
+  },
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="px-4 py-2">
-          <h2 className="text-lg font-semibold">Navigation</h2>
+        <div className="flex items-center gap-1 my-4 w-full justify-center">
+          <Image
+            src="/images/logos/intradark-symbol-blue.svg"
+            alt="Intradark Logo"
+            width={20}
+            height={20}
+            className="h-3 w-3 animate-spin-slow mb-2"
+          />
+          <Image
+            src="/images/logos/intradark-wordmark-white.svg"
+            alt="Intradark Logo"
+            width={100}
+            height={20}
+            className="h-4"
+          />
         </div>
       </SidebarHeader>
       <Separator />
-      <SidebarContent>
+      <SidebarContent className="overflow-y-auto mx-6">
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/home">
-                <Home className="w-4 h-4" />
-                <span>Home</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/settings">
-                <Settings className="w-4 h-4" />
-                <span>Settings</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/profile">
-                <User className="w-4 h-4" />
-                <span>Profile</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {navigationItems.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              icon={item.icon}
+              items={item.items}
+            >
+              {item.children}
+            </NavItem>
+          ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
