@@ -16,6 +16,8 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { SteamLoginButton } from "@/components/atoms/steam-login-button";
+import { AuthDivider } from "@/components/atoms/auth-divider";
 
 const signInSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -114,6 +116,11 @@ export function AuthForm() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
+
+        {/* Steam Login Button */}
+        <SteamLoginButton />
+
+        <AuthDivider />
 
         {isSignUp ? (
           <form
