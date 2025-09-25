@@ -5,7 +5,7 @@
   "private": true,
   "description": "Intradark",
   "scripts": {
-    "dev": "next dev -p 3000 --turbopack",
+    "dev": "next dev -p 3004 --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
