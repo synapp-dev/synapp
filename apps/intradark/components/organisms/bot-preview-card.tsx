@@ -276,10 +276,10 @@ export function BotPreviewCard() {
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Legitimacy Score */}
-        <div className="space-y-2">
+        <div className="space-y-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
-              <StatusIcon className={`w-4 h-4 ${legitimacyStatus.color}`} />
+              <StatusIcon className={`w-3.5 h-3.5 ${legitimacyStatus.color}`} />
               <span
                 className={`text-sm font-semibold ${legitimacyStatus.color}`}
               >
