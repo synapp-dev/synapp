@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Melbourne Grammar",
+    "slug": "melbourne-grammar",
+    "type": "independent",
+    "levels": ["primary", "secondary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff", "School Admin"]
+  },
+  {
+    "name": "Sydney High School",
+    "slug": "sydney-high-school",
+    "type": "government",
+    "levels": ["secondary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff", "Roaming Teacher"]
+  },
+  {
+    "name": "St Patrick's College",
+    "slug": "st-patricks-college",
+    "type": "catholic",
+    "levels": ["primary", "secondary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff"]
+  },
+  {
+    "name": "Brisbane Primary School",
+    "slug": "brisbane-primary-school",
+    "type": "government",
+    "levels": ["primary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff", "Teacher"]
+  },
+  {
+    "name": "Adelaide Independent School",
+    "slug": "adelaide-independent-school",
+    "type": "independent",
+    "levels": ["primary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff"]
+  },
+  {
+    "name": "Perth Catholic Academy",
+    "slug": "perth-catholic-academy",
+    "type": "catholic",
+    "levels": ["secondary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff", "Roaming Teacher"]
+  },
+  {
+    "name": "Hobart Grammar",
+    "slug": "hobart-grammar",
+    "type": "independent",
+    "levels": ["primary", "secondary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff"]
+  },
+  {
+    "name": "Canberra Public School",
+    "slug": "canberra-public-school",
+    "type": "government",
+    "levels": ["primary"],
+    "roles": ["Bullyproof Admin", "Bullyproof Staff"]
+  }
+]
