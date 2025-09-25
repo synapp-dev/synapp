@@ -2,6 +2,7 @@
 
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import {
   Collapsible,
@@ -29,14 +30,30 @@ export function NavMain({
     url: string;
     icon?: LucideIcon;
     isActive?: boolean;
+    exact?: boolean;
     items?: {
       title: string;
       url: string;
       icon?: LucideIcon;
+      exact?: boolean;
     }[];
   }[];
   title?: string;
 }) {
+  const pathname = usePathname();
+
+  const isUrlActive = (url: string, exact?: boolean) => {
+    if (!url) return false;
+    try {
+      if (exact) {
+        return pathname === url;
+      }
+      return pathname === url || pathname.startsWith(url + "/") || pathname.startsWith(url + "?");
+    } catch {
+      return false;
+    }
+  };
+
   return (
     <SidebarGroup className="gap-0">
       {title && (
@@ -48,17 +65,29 @@ export function NavMain({
         </div>
       )}
       <SidebarMenu>
-        {items.map((item) => (
+        {items.map((item) => {
+          const itemActive =
+            item.isActive ||
+            isUrlActive(item.url, item.exact) ||
+            (item.items ?? []).some((s) => isUrlActive(s.url, s.exact));
+          return (
           <Collapsible
             key={item.title}
             asChild
-            defaultOpen={item.isActive}
+            defaultOpen={itemActive}
             className="group/collapsible"
           >
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
                 <Link href={item.url}>
-                  <SidebarMenuButton tooltip={item.title}>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    className={
+                      itemActive
+                        ? "bg-primary text-primary-foreground font-semibold hover:bg-primary hover:text-primary-foreground"
+                        : undefined
+                    }
+                  >
                     {item.icon && <item.icon />}
 
                     <span>{item.title}</span>
@@ -71,9 +100,18 @@ export function NavMain({
               {item.items && (
                 <CollapsibleContent>
                   <SidebarMenuSub>
-                    {item.items?.map((subItem) => (
+                    {item.items?.map((subItem) => {
+                      const subActive = isUrlActive(subItem.url);
+                      return (
                       <SidebarMenuSubItem key={subItem.title}>
-                        <SidebarMenuSubButton asChild className="gap-1">
+                        <SidebarMenuSubButton
+                          asChild
+                          className={
+                            subActive
+                              ? "gap-1 bg-primary/60 text-primary-foreground hover:bg-primary/60 hover:text-primary-foreground"
+                              : "gap-1"
+                          }
+                        >
                           <Link href={subItem.url}>
                             {subItem.icon && (
                               <subItem.icon className="text-muted-foreground/50" />
@@ -82,13 +120,15 @@ export function NavMain({
                           </Link>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>
-                    ))}
+                      );
+                    })}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               )}
             </SidebarMenuItem>
           </Collapsible>
-        ))}
+          );
+        })}
       </SidebarMenu>
     </SidebarGroup>
   );

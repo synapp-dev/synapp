@@ -4,13 +4,9 @@ import * as React from "react";
 import {
   AudioWaveform,
   Command,
-  Mail,
   School,
   FileText,
   Users,
-  TriangleAlert,
-  MessageCircleQuestion,
-  HandHelping,
   Presentation,
   BookOpenText,
   LibraryBig,
@@ -25,11 +21,12 @@ import {
   Hand,
   TrendingUp,
   BadgeCheck,
+  Apple,
 } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
 import { NavUser } from "@/components/molecules/nav-user";
-import { TeamSwitcher } from "@/components/organisms/team-switcher";
+import { SchoolSwitcher } from "@/components/organisms/school-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +38,7 @@ import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
 import { useDemoUserSwitcherStore } from "@/stores/demo-user-switcher-store";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 // This is sample data.
 const data = {
@@ -71,7 +69,7 @@ const data = {
       title: "Admin",
       url: "/admin",
       icon: ShieldCheck,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "Course Editor",
@@ -81,6 +79,7 @@ const data = {
         {
           title: "Schools",
           url: "/schools",
+          exact: true,
           icon: School,
           isActive: false,
         },
@@ -98,8 +97,14 @@ const data = {
     },
     {
       title: "AP Certification",
-      url: "/welcome",
+      url: "/ap-certification",
       icon: BadgeCheck,
+      isActive: false,
+    },
+    {
+      title: "Welcome",
+      url: "/welcome",
+      icon: Apple,
       isActive: false,
     },
     {
@@ -112,13 +117,13 @@ const data = {
       title: "Support",
       url: "/support",
       icon: HelpingHand,
-      isActive: true,
+      isActive: false,
     },
   ],
   navSchoolMain: [
     {
       title: "Home",
-      url: "/teachers",
+      url: "/home",
       icon: House,
       isActive: false,
     },
@@ -180,7 +185,7 @@ const data = {
     // },
     {
       title: "Reports",
-      url: "#",
+      url: "/reports",
       icon: FileText,
       isActive: false,
     },
@@ -189,6 +194,7 @@ const data = {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const selectedRole = useDemoUserSwitcherStore((s) => s.selectedUser);
+  const pathname = usePathname();
 
   const platformItems = React.useMemo(() => {
     const items = [...data.navBullyproof];
@@ -200,24 +206,39 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const selectedSchoolSlug = useDemoUserSwitcherStore(
     (s) => s.selectedSchoolSlug
   );
+  const setSelectedSchoolSlug = useDemoUserSwitcherStore(
+    (s) => s.setSelectedSchoolSlug
+  );
+
+  const schoolSlugFromPath = React.useMemo(() => {
+    // Match /schools/{slug}/...
+    const match = pathname.match(/^\/schools\/([^\/]+)/);
+    return match ? match[1] : null;
+  }, [pathname]);
+
+  React.useEffect(() => {
+    if (!selectedSchoolSlug && schoolSlugFromPath) {
+      setSelectedSchoolSlug(schoolSlugFromPath);
+    }
+  }, [selectedSchoolSlug, schoolSlugFromPath, setSelectedSchoolSlug]);
 
   const withSlug = React.useCallback(
     (items: Array<any>) =>
       items.map((i) => ({
         ...i,
-        url: selectedSchoolSlug
-          ? `/schools/${selectedSchoolSlug}${i.url}`
+        url: (selectedSchoolSlug || schoolSlugFromPath)
+          ? `/schools/${(selectedSchoolSlug || schoolSlugFromPath)!}${i.url}`
           : i.url,
         items: i.items
           ? i.items.map((sub: any) => ({
               ...sub,
-              url: selectedSchoolSlug
-                ? `/schools/${selectedSchoolSlug}${sub.url}`
+              url: (selectedSchoolSlug || schoolSlugFromPath)
+                ? `/schools/${(selectedSchoolSlug || schoolSlugFromPath)!}${sub.url}`
                 : sub.url,
             }))
           : undefined,
       })),
-    [selectedSchoolSlug]
+    [selectedSchoolSlug, schoolSlugFromPath]
   );
 
   return (
@@ -236,7 +257,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         <Separator className="my-3" />
 
-        <TeamSwitcher />
+        <SchoolSwitcher />
 
         <div className="space-y-4 -mt-2">
           <NavMain items={withSlug(data.navSchoolMain)} />
