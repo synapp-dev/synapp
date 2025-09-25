@@ -631,6 +631,7 @@ export type Database = {
           joined_at: string | null
           name: string
           sector_id: string | null
+          slug: string | null
           state_id: string | null
         }
         Insert: {
@@ -642,6 +643,7 @@ export type Database = {
           joined_at?: string | null
           name: string
           sector_id?: string | null
+          slug?: string | null
           state_id?: string | null
         }
         Update: {
@@ -653,6 +655,7 @@ export type Database = {
           joined_at?: string | null
           name?: string
           sector_id?: string | null
+          slug?: string | null
           state_id?: string | null
         }
         Relationships: [
@@ -1141,6 +1144,26 @@ export type Database = {
           moved: boolean
           updated_at: string
         }[]
+      }
+      make_school_slug_base: {
+        Args: { p_name: string; p_state_id: string }
+        Returns: string
+      }
+      pick_school_slug: {
+        Args: { p_id: string; p_name: string; p_state_id: string }
+        Returns: string
+      }
+      slugify_text: {
+        Args: { p_text: string }
+        Returns: string
+      }
+      unaccent: {
+        Args: { "": string }
+        Returns: string
+      }
+      unaccent_init: {
+        Args: { "": unknown }
+        Returns: unknown
       }
     }
     Enums: {
