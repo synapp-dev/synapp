@@ -47,9 +47,9 @@ export default function VeritasCheckPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <ThreeDCard brand="faceit">
-            <FormCard />
-          </ThreeDCard>
+          {/* <ThreeDCard brand="faceit"> */}
+          <FormCard />
+          {/* </ThreeDCard> */}
           <ThreeDCard brand="faceit">
             <StatsCard />
           </ThreeDCard>
