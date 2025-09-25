@@ -61,7 +61,9 @@ export async function GET(
         steamid64 = data.response.steamid;
       } else {
         // Vanity URL not found, redirect to /players/{id} (will show error)
-        return NextResponse.redirect(new URL(`/players/${id}`, request.url));
+        return NextResponse.redirect(
+          new URL(`/veritas/check/${id}`, request.url)
+        );
       }
     }
 
@@ -88,18 +90,20 @@ export async function GET(
 
     if (vanity) {
       // Redirect to /players/{vanity}
-      return NextResponse.redirect(new URL(`/players/${vanity}`, request.url));
+      return NextResponse.redirect(
+        new URL(`/veritas/check/${vanity}`, request.url)
+      );
     } else {
       // Fallback to /players/{steamid64}
       return NextResponse.redirect(
-        new URL(`/players/${steamid64}`, request.url)
+        new URL(`/veritas/check/${steamid64}`, request.url)
       );
     }
   } catch (error) {
     console.error("Steam resolve error:", error);
     // On error, redirect to players page with original input (will show error)
     return NextResponse.redirect(
-      new URL(`/players/${(await context.params).id}`, request.url)
+      new URL(`/veritas/check/${(await context.params).id}`, request.url)
     );
   }
 }
