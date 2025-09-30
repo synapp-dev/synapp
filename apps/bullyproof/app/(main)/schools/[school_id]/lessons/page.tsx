@@ -7,11 +7,13 @@ import {
 } from "@workspace/ui/components/card";
 import Link from "next/link";
 
-export default function LessonsPage({
+export default async function LessonsPage({
   params,
 }: {
-  params: { school_id: string };
+  params: Promise<{ school_id: string }>;
 }) {
+  const { school_id } = await params;
+
   return (
     <Card>
       <CardHeader>
@@ -19,14 +21,13 @@ export default function LessonsPage({
       </CardHeader>
       <CardContent>
         <div className="flex flex-col gap-4">
-          <h1 className="text-2xl font-bold">Lessons</h1>
           <p className="text-sm text-muted-foreground">
             Lessons are a collection of activities that are designed to help
             students learn about bullying and how to prevent it.
           </p>
         </div>
         <div className="flex justify-end">
-          <Link href={`/schools/${params.school_id}/lessons/new`}>
+          <Link href={`/schools/${school_id}/lessons/new`}>
             <Button>Add Lesson</Button>
           </Link>
         </div>
