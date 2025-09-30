@@ -22,6 +22,7 @@ import {
   TrendingUp,
   BadgeCheck,
   Apple,
+  UserSearch,
 } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
@@ -33,6 +34,7 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  useSidebar,
 } from "@workspace/ui/components/sidebar";
 import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
@@ -77,10 +79,10 @@ const data = {
           icon: FilePenLine,
         },
         {
-          title: "Schools",
-          url: "/schools",
+          title: "CRM",
+          url: "/admin/crm",
           exact: true,
-          icon: School,
+          icon: UserSearch,
           isActive: false,
         },
         {
@@ -131,6 +133,12 @@ const data = {
       title: "Performance",
       url: "/performance",
       icon: TrendingUp,
+      isActive: false,
+    },
+    {
+      title: "Settings",
+      url: "/settings",
+      icon: Settings,
       isActive: false,
     },
   ],
@@ -193,6 +201,7 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { state } = useSidebar();
   const selectedRole = useDemoUserSwitcherStore((s) => s.selectedUser);
   const pathname = usePathname();
 
@@ -226,15 +235,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     (items: Array<any>) =>
       items.map((i) => ({
         ...i,
-        url: (selectedSchoolSlug || schoolSlugFromPath)
-          ? `/schools/${(selectedSchoolSlug || schoolSlugFromPath)!}${i.url}`
-          : i.url,
+        url:
+          selectedSchoolSlug || schoolSlugFromPath
+            ? `/schools/${(selectedSchoolSlug || schoolSlugFromPath)!}${i.url}`
+            : i.url,
         items: i.items
           ? i.items.map((sub: any) => ({
               ...sub,
-              url: (selectedSchoolSlug || schoolSlugFromPath)
-                ? `/schools/${(selectedSchoolSlug || schoolSlugFromPath)!}${sub.url}`
-                : sub.url,
+              url:
+                selectedSchoolSlug || schoolSlugFromPath
+                  ? `/schools/${(selectedSchoolSlug || schoolSlugFromPath)!}${sub.url}`
+                  : sub.url,
             }))
           : undefined,
       })),
@@ -243,14 +254,24 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
-        <Image
-          src="/images/bullyproof-logo.svg"
-          alt="Bullyproof Logo"
-          width={500}
-          height={500}
-          className="h-16 mt-4"
-        />
+      <SidebarHeader className="mb-2">
+        {state === "expanded" ? (
+          <Image
+            src="/images/bullyproof-logo.svg"
+            alt="Bullyproof Logo"
+            width={500}
+            height={500}
+            className="h-16 mt-4"
+          />
+        ) : (
+          <Image
+            src="/images/bp-small-logo.svg"
+            alt="Bullyproof Small Logo"
+            width={500}
+            height={500}
+            className="h-10 mt-4"
+          />
+        )}
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={platformItems} title="Platform" />
