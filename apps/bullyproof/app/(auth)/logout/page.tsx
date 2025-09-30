@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@/utils/supabase/client";
 import {
   Card,
   CardContent,
@@ -16,20 +17,16 @@ export default function LogoutPage() {
   useEffect(() => {
     const handleLogout = async () => {
       try {
-        // TODO: Implement your logout logic here
-        // Example with Supabase:
-        // const supabase = createBrowserClient();
-        // await supabase.auth.signOut();
-
-        console.log("Logging out...");
+        const supabase = createBrowserClient();
+        await supabase.auth.signOut();
 
         // Redirect to auth page after a short delay
         setTimeout(() => {
-          router.push("/auth");
+          router.replace("/auth");
         }, 1000);
       } catch (error) {
         console.error("Error during logout:", error);
-        router.push("/auth");
+        router.replace("/auth");
       }
     };
 
