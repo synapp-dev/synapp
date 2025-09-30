@@ -4,13 +4,20 @@ import { Label } from "@workspace/ui/components/label";
 interface EmailInputProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  disabled?: boolean;
+  label?: React.ReactNode;
 }
 
-export function EmailInput({ value, onChange }: EmailInputProps) {
+export function EmailInput({
+  value,
+  onChange,
+  disabled,
+  label,
+}: EmailInputProps) {
   return (
     <div className="grid gap-2">
       <Label htmlFor="email" className="text-xs text-muted-foreground pl-1">
-        Email
+        {label || "Email"}
       </Label>
       <Input
         id="email"
@@ -19,6 +26,7 @@ export function EmailInput({ value, onChange }: EmailInputProps) {
         required
         value={value}
         onChange={onChange}
+        disabled={disabled}
       />
     </div>
   );

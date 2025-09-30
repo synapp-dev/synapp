@@ -9,7 +9,7 @@ import {
   CommandList,
 } from "@workspace/ui/components/command";
 import { Button } from "@workspace/ui/components/button";
-import { Command as CommandIcon } from "lucide-react";
+import { Command as CommandIcon, SquareTerminal } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/utils/supabase/client";
@@ -46,7 +46,9 @@ export function CommandMenu() {
       const { data, error } = await supabase.from("schools").select("*");
       if (!isMounted) return;
       if (!error) {
-        setSchools((data ?? []).filter((s): s is Tables<"schools"> => Boolean(s?.id)));
+        setSchools(
+          (data ?? []).filter((s): s is Tables<"schools"> => Boolean(s?.id))
+        );
       } else {
         setSchools([]);
       }
@@ -65,7 +67,7 @@ export function CommandMenu() {
         onClick={() => setOpen(true)}
         className="h-9 gap-2 w-[240px] justify-start text-muted-foreground"
       >
-        <CommandIcon className="h-4 w-4" />
+        <SquareTerminal className="h-4 w-4" />
         <span>Command Menu</span>
         <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           {shortcut}
@@ -93,7 +95,9 @@ export function CommandMenu() {
               >
                 <div className="flex w-full items-center justify-between gap-2">
                   <span className="truncate">{school.name}</span>
-                  <Badge variant="secondary" className="shrink-0">School</Badge>
+                  <Badge variant="secondary" className="shrink-0">
+                    School
+                  </Badge>
                 </div>
               </CommandItem>
             ))}
