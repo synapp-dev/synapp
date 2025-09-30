@@ -107,6 +107,20 @@ export type Database = {
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "classes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
+            referencedColumns: ["id"]
+          },
         ]
       }
       curriculum_stages: {
@@ -476,6 +490,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "lessons_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lessons_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lessons_topic_id_fkey"
             columns: ["topic_id"]
             isOneToOne: false
@@ -516,6 +544,77 @@ export type Database = {
           },
         ]
       }
+      school_invites: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          created_by: string | null
+          email: string
+          id: string
+          role_key: string
+          school_id: string
+          sent_at: string
+          status: Database["public"]["Enums"]["invite_status"]
+          token: string
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          email: string
+          id?: string
+          role_key: string
+          school_id: string
+          sent_at?: string
+          status?: Database["public"]["Enums"]["invite_status"]
+          token: string
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string
+          id?: string
+          role_key?: string
+          school_id?: string
+          sent_at?: string
+          status?: Database["public"]["Enums"]["invite_status"]
+          token?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_level_badge"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_invites_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       school_level_assignments: {
         Row: {
           level_id: string
@@ -551,6 +650,20 @@ export type Database = {
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "school_level_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_level_assignments_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
+            referencedColumns: ["id"]
+          },
         ]
       }
       school_levels: {
@@ -570,6 +683,74 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      school_licences: {
+        Row: {
+          auto_renew: boolean
+          created_at: string
+          created_by: string | null
+          ends_at: string
+          id: string
+          plan: string
+          school_id: string
+          starts_at: string
+          status: Database["public"]["Enums"]["licence_status"]
+          updated_at: string
+        }
+        Insert: {
+          auto_renew?: boolean
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string
+          id?: string
+          plan?: string
+          school_id: string
+          starts_at?: string
+          status?: Database["public"]["Enums"]["licence_status"]
+          updated_at?: string
+        }
+        Update: {
+          auto_renew?: boolean
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string
+          id?: string
+          plan?: string
+          school_id?: string
+          starts_at?: string
+          status?: Database["public"]["Enums"]["licence_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "school_licences_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "school_level_badge"
+            referencedColumns: ["school_id"]
+          },
+          {
+            foreignKeyName: "school_licences_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_licences_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "school_licences_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       school_sectors: {
         Row: {
@@ -990,6 +1171,20 @@ export type Database = {
             referencedRelation: "schools"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_roles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -1026,6 +1221,20 @@ export type Database = {
             columns: ["school_id"]
             isOneToOne: false
             referencedRelation: "schools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_enriched"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "classes_school_id_fkey"
+            columns: ["school_id"]
+            isOneToOne: false
+            referencedRelation: "v_schools_readable"
             referencedColumns: ["id"]
           },
         ]
@@ -1097,6 +1306,38 @@ export type Database = {
           },
         ]
       }
+      v_schools_enriched: {
+        Row: {
+          address: string | null
+          code: string | null
+          created_at: string | null
+          email_domain: string | null
+          id: string | null
+          joined_at: string | null
+          levels: Json | null
+          name: string | null
+          sector: Json | null
+          slug: string | null
+          state: Json | null
+        }
+        Relationships: []
+      }
+      v_schools_readable: {
+        Row: {
+          address: string | null
+          code: string | null
+          created_at: string | null
+          email_domain: string | null
+          id: string | null
+          joined_at: string | null
+          levels: string[] | null
+          name: string | null
+          sector: string | null
+          slug: string | null
+          state: string | null
+        }
+        Relationships: []
+      }
       v_stage_thresholds: {
         Row: {
           max_sort_index: number | null
@@ -1167,7 +1408,14 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      invite_status: "PENDING" | "ACCEPTED" | "CANCELLED" | "EXPIRED"
+      licence_status:
+        | "DRAFT"
+        | "PENDING"
+        | "ACTIVE"
+        | "SUSPENDED"
+        | "EXPIRED"
+        | "CANCELLED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1294,6 +1542,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      invite_status: ["PENDING", "ACCEPTED", "CANCELLED", "EXPIRED"],
+      licence_status: [
+        "DRAFT",
+        "PENDING",
+        "ACTIVE",
+        "SUSPENDED",
+        "EXPIRED",
+        "CANCELLED",
+      ],
+    },
   },
 } as const
