@@ -1,10 +1,6 @@
 import { createServerClient as createClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-// import { Database } from "@/types/supabase";
-
-// TODO: Add your database types once you have them set up
-// You can generate types from Supabase using: npx supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
-type Database = any; // Replace with your actual database types
+import { Database } from "@/types/supabase";
 
 export async function createServerClient() {
   const cookieStore = await cookies();
