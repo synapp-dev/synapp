@@ -1,41 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verifySupabaseJWT } from "./utils/verifySupabaseJWT";
+import { type NextRequest } from "next/server";
+import { updateSession } from "@/utils/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
-  // Only apply middleware to API routes
-  if (!request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.next();
-  }
-
-  const authHeader = request.headers.get("authorization");
-
-  if (!authHeader) {
-    return NextResponse.json(
-      { error: "No authorization header" },
-      { status: 401 }
-    );
-  }
-
-  const token = authHeader.replace("Bearer ", "");
-
-  try {
-    const payload = await verifySupabaseJWT(token);
-    const userId = payload.payload.sub as string;
-
-    // Clone the request and add the user ID as a custom header
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-user-id", userId);
-
-    return NextResponse.next({
-      request: {
-        headers: requestHeaders,
-      },
-    });
-  } catch (e) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-  }
+  return await updateSession(request);
 }
 
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * Feel free to modify this pattern to include more paths.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
