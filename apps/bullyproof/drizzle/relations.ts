@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { schoolLevels, schoolYears, usersInAuth, userProfile, schools, classes, lessons, topics, curriculumStages, scopes, roles, topicSlides, lessonLiveState, userRoles, lessonEvents, lessonSessions, schoolSectors, states, schoolInvites, schoolLicences, schoolLevelAssignments, lessonClasses, stageYearLinks, classYears, teacherSlideNotes, lessonSlideNotes } from "./schema";
+import { schoolLevels, schoolYears, usersInAuth, userProfile, schools, classes, lessons, topics, curriculumStages, scopes, roles, topicSlides, lessonLiveState, userRoles, lessonEvents, lessonSessions, schoolInvites, schoolLicences, schoolSectors, states, schoolLevelAssignments, lessonClasses, stageYearLinks, classYears, teacherSlideNotes, lessonSlideNotes } from "./schema";
 
 export const schoolYearsRelations = relations(schoolYears, ({one, many}) => ({
 	schoolLevel: one(schoolLevels, {
@@ -45,6 +45,8 @@ export const schoolsRelations = relations(schools, ({one, many}) => ({
 	classes: many(classes),
 	lessons: many(lessons),
 	userRoles: many(userRoles),
+	schoolInvites: many(schoolInvites),
+	schoolLicences: many(schoolLicences),
 	schoolSector: one(schoolSectors, {
 		fields: [schools.sectorId],
 		references: [schoolSectors.id]
@@ -53,8 +55,6 @@ export const schoolsRelations = relations(schools, ({one, many}) => ({
 		fields: [schools.stateId],
 		references: [states.id]
 	}),
-	schoolInvites: many(schoolInvites),
-	schoolLicences: many(schoolLicences),
 	schoolLevelAssignments: many(schoolLevelAssignments),
 }));
 
@@ -171,14 +171,6 @@ export const lessonSessionsRelations = relations(lessonSessions, ({one, many}) =
 	}),
 }));
 
-export const schoolSectorsRelations = relations(schoolSectors, ({many}) => ({
-	schools: many(schools),
-}));
-
-export const statesRelations = relations(states, ({many}) => ({
-	schools: many(schools),
-}));
-
 export const schoolInvitesRelations = relations(schoolInvites, ({one}) => ({
 	school: one(schools, {
 		fields: [schoolInvites.schoolId],
@@ -191,6 +183,14 @@ export const schoolLicencesRelations = relations(schoolLicences, ({one}) => ({
 		fields: [schoolLicences.schoolId],
 		references: [schools.id]
 	}),
+}));
+
+export const schoolSectorsRelations = relations(schoolSectors, ({many}) => ({
+	schools: many(schools),
+}));
+
+export const statesRelations = relations(states, ({many}) => ({
+	schools: many(schools),
 }));
 
 export const schoolLevelAssignmentsRelations = relations(schoolLevelAssignments, ({one}) => ({

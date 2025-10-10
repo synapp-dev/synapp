@@ -329,35 +329,6 @@ export const lessonSessions = pgTable("lesson_sessions", {
 	pgPolicy("sessions_update", { as: "permissive", for: "update", to: ["public"] }),
 ]);
 
-export const schools = pgTable("schools", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	name: text().notNull(),
-	code: text(),
-	stateId: uuid("state_id"),
-	sectorId: uuid("sector_id"),
-	emailDomain: text("email_domain"),
-	address: text(),
-	joinedAt: timestamp("joined_at", { withTimezone: true, mode: 'string' }),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-	slug: text(),
-}, (table) => [
-	index("idx_schools_sector_id").using("btree", table.sectorId.asc().nullsLast().op("uuid_ops")),
-	index("idx_schools_state_id").using("btree", table.stateId.asc().nullsLast().op("uuid_ops")),
-	uniqueIndex("ux_schools_name_lower").using("btree", sql`lower(name)`),
-	foreignKey({
-			columns: [table.sectorId],
-			foreignColumns: [schoolSectors.id],
-			name: "schools_sector_id_fkey"
-		}),
-	foreignKey({
-			columns: [table.stateId],
-			foreignColumns: [states.id],
-			name: "schools_state_id_fkey"
-		}),
-	unique("schools_code_key").on(table.code),
-	unique("schools_slug_key").on(table.slug),
-]);
-
 export const schoolInvites = pgTable("school_invites", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	schoolId: uuid("school_id").notNull(),
@@ -402,6 +373,37 @@ export const schoolLicences = pgTable("school_licences", {
 			foreignColumns: [schools.id],
 			name: "school_licences_school_id_fkey"
 		}).onDelete("cascade"),
+]);
+
+export const schools = pgTable("schools", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	name: text().notNull(),
+	code: text(),
+	stateId: uuid("state_id"),
+	sectorId: uuid("sector_id"),
+	emailDomain: text("email_domain"),
+	address: text(),
+	joinedAt: timestamp("joined_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	slug: text(),
+	bannerUrl: text("banner_url"),
+	avatarUrl: text("avatar_url"),
+}, (table) => [
+	index("idx_schools_sector_id").using("btree", table.sectorId.asc().nullsLast().op("uuid_ops")),
+	index("idx_schools_state_id").using("btree", table.stateId.asc().nullsLast().op("uuid_ops")),
+	uniqueIndex("ux_schools_name_lower").using("btree", sql`lower(name)`),
+	foreignKey({
+			columns: [table.sectorId],
+			foreignColumns: [schoolSectors.id],
+			name: "schools_sector_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.stateId],
+			foreignColumns: [states.id],
+			name: "schools_state_id_fkey"
+		}),
+	unique("schools_code_key").on(table.code),
+	unique("schools_slug_key").on(table.slug),
 ]);
 
 export const schoolLevelAssignments = pgTable("school_level_assignments", {
@@ -591,12 +593,29 @@ export const vSchoolsEnriched = pgView("v_schools_enriched", {	id: uuid(),
 export const vSchoolsReadable = pgView("v_schools_readable", {	id: uuid(),
 	name: text(),
 	code: text(),
-	slug: text(),
-	state: text(),
-	sector: text(),
-	levels: text(),
+	stateId: uuid("state_id"),
+	sectorId: uuid("sector_id"),
 	emailDomain: text("email_domain"),
 	address: text(),
 	joinedAt: timestamp("joined_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-}).as(sql`SELECT sch.id, sch.name, sch.code, sch.slug, lower(st.code) AS state, sec.key AS sector, ARRAY( SELECT lvl.name FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id ORDER BY ( CASE lvl.key WHEN 'primary'::text THEN 1 WHEN 'secondary'::text THEN 2 ELSE 99 END)) AS levels, sch.email_domain, sch.address, sch.joined_at, sch.created_at FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id`);
+	slug: text(),
+	bannerUrl: text("banner_url"),
+	avatarUrl: text("avatar_url"),
+	state: text(),
+	sector: text(),
+	levels: text(),
+}).with({"securityInvoker":"on"}).as(sql`SELECT sch.id, sch.name, sch.code, sch.state_id, sch.sector_id, sch.email_domain, sch.address, sch.joined_at, sch.created_at, sch.slug, sch.banner_url, sch.avatar_url, lower(st.code) AS state, sec.key AS sector, ARRAY( SELECT lvl.name FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id ORDER BY ( CASE lvl.key WHEN 'primary'::text THEN 1 WHEN 'secondary'::text THEN 2 ELSE 99 END)) AS levels FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id`);
+
+export const vUserProfileExpanded = pgView("v_user_profile_expanded", {	id: uuid(),
+	firstName: text("first_name"),
+	lastName: text("last_name"),
+	fullName: text("full_name"),
+	email: text(),
+	avatarUrl: text("avatar_url"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	metadata: jsonb(),
+	platformRoles: text("platform_roles"),
+	schoolRoles: jsonb("school_roles"),
+}).as(sql`SELECT up.id, up.first_name, up.last_name, TRIM(BOTH ' '::text FROM concat(up.first_name, ' ', up.last_name)) AS full_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'roleKey', r.key)) FILTER (WHERE ur.role_scope = 'school'::text), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);
