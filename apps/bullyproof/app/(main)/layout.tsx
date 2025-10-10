@@ -1,8 +1,8 @@
 "use client";
 
+import { MeLoader } from "@/components/molecules/me-loader";
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
-import { UserProfileLoader } from "@/components/molecules/user-profile-loader";
 
 import {
   SidebarInset,
@@ -16,7 +16,7 @@ export default function MainLayout({
 }) {
   return (
     <SidebarProvider>
-      <UserProfileLoader />
+      <MeLoader />
       <AppSidebar />
       <div className="flex flex-col flex-1 max-w-7xl mx-auto">
         <AppHeader />
