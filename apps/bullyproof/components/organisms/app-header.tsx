@@ -3,7 +3,8 @@ import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
 
 import { CommandMenu } from "@/components/molecules/command-menu";
-import { DemoUserSwitcher } from "@/components/molecules/demo-user-switcher";
+import { Breadcrumb } from "@/components/molecules/breadcrumb";
+import { ImpersonateMenu } from "@/components/molecules/impersonate-menu";
 
 export function AppHeader() {
   return (
@@ -14,12 +15,11 @@ export function AppHeader() {
           orientation="vertical"
           className="mr-2 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-lg font-semibold">Bullyproof</h1>
+        <Breadcrumb />
       </div>
       <div className="flex items-center gap-2 px-4">
-        <DemoUserSwitcher />
+        <ImpersonateMenu />
         <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
-
         <CommandMenu />
         <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
         <ThemeToggle />
