@@ -182,6 +182,8 @@
   --animate-shake-once: shake 0.3s ease-in-out;
   --animate-shake-twice: shake 0.3s ease-in-out 2;
   --animate-float-up-loop: float-up-loop 1.2s linear infinite;
+  --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
+  --animate-float-gentle: float-gentle 3s ease-in-out infinite;
 
   @keyframes gradient-animation {
     0%,
@@ -406,6 +408,26 @@
     100% {
       opacity: 0;
       transform: translateY(-6px);
+    }
+  }
+  @keyframes pulse-subtle {
+    0%,
+    100% {
+      background-color: rgb(255 237 213);
+      border-color: rgb(251 146 60);
+    }
+    50% {
+      background-color: rgb(254 215 170);
+      border-color: rgb(234 88 12);
+    }
+  }
+  @keyframes float-gentle {
+    0%,
+    100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-2px);
     }
   }
 }
