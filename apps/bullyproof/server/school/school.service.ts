@@ -33,4 +33,9 @@ export const schoolService = {
     const rows = await schoolRepo.getAllPaginated(params);
     return rows;
   },
+  async getSchoolBySlug(ctx: AuthContext, slug: string) {
+    await assertCanListSchools(ctx);
+    const rows = await schoolRepo.getBySlug(slug);
+    return rows[0] ?? null;
+  },
 };
