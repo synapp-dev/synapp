@@ -1,0 +1,411 @@
+{
+  "systemStatus": {
+    "authentication": {
+      "status": "operational",
+      "title": "Auth System",
+      "description": "All authentication services running normally",
+      "lastCheck": "2024-10-10T14:30:00Z"
+    },
+    "lms": {
+      "status": "operational",
+      "title": "LMS Module",
+      "description": "Training completions: 47 today, 312 this week",
+      "lastCheck": "2024-10-10T14:30:00Z"
+    },
+    "lessonDelivery": {
+      "status": "operational",
+      "title": "Lesson Delivery",
+      "description": "Total lessons delivered today: 1,247",
+      "lastCheck": "2024-10-10T14:30:00Z"
+    },
+    "reporting": {
+      "status": "degraded",
+      "title": "Reporting & Exports",
+      "description": "Recent report generation: 94% success rate",
+      "lastCheck": "2024-10-10T14:30:00Z"
+    },
+    "cultureFramework": {
+      "status": "operational",
+      "title": "Culture Framework",
+      "description": "Last data update: 2 minutes ago",
+      "lastCheck": "2024-10-10T14:30:00Z"
+    }
+  },
+  "platformMetrics": {
+    "totalUsers": {
+      "title": "Total Users",
+      "icon": "Users",
+      "value": {
+        "amount": 2847,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 2653,
+        "type": "number"
+      },
+      "subtitle": "All roles across platform"
+    },
+    "activeUsers": {
+      "title": "Active Users",
+      "icon": "Activity",
+      "value": {
+        "amount": 1842,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 1723,
+        "type": "number"
+      },
+      "subtitle": "Last 30 days"
+    },
+    "totalLogins": {
+      "title": "Total Logins",
+      "icon": "LogIn",
+      "value": {
+        "amount": 12456,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 11234,
+        "type": "number"
+      },
+      "subtitle": "Last 7 days"
+    },
+    "lessonDeliveries": {
+      "title": "Lesson Deliveries",
+      "icon": "BookOpen",
+      "value": {
+        "amount": 8742,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 8234,
+        "type": "number"
+      },
+      "subtitle": "All schools"
+    },
+    "certificatesIssued": {
+      "title": "Certificates Issued",
+      "icon": "Award",
+      "value": {
+        "amount": 1247,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 1089,
+        "type": "number"
+      },
+      "subtitle": "This term"
+    },
+    "avgSessionDuration": {
+      "title": "Avg Session Duration",
+      "icon": "Clock",
+      "value": {
+        "amount": 24,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 22,
+        "type": "number"
+      },
+      "subtitle": "Minutes per session"
+    }
+  },
+  "activeUsersChart": {
+    "title": "Active Users Over Time",
+    "data": [
+      { "week": "Week 1", "users": 1650 },
+      { "week": "Week 2", "users": 1720 },
+      { "week": "Week 3", "users": 1780 },
+      { "week": "Week 4", "users": 1842 },
+      { "week": "Week 5", "users": 1890 },
+      { "week": "Week 6", "users": 1920 },
+      { "week": "Week 7", "users": 1980 },
+      { "week": "Week 8", "users": 2010 }
+    ],
+    "trend": {
+      "percentage": "+21.8%",
+      "direction": "up",
+      "description": "Active users trending up"
+    }
+  },
+  "lessonsWeeklyChart": {
+    "title": "Lessons Delivered per Week",
+    "data": [
+      {
+        "week": "Week 1",
+        "independent": 186,
+        "catholic": 120,
+        "government": 80
+      },
+      {
+        "week": "Week 2",
+        "independent": 205,
+        "catholic": 140,
+        "government": 95
+      },
+      {
+        "week": "Week 3",
+        "independent": 192,
+        "catholic": 135,
+        "government": 88
+      },
+      {
+        "week": "Week 4",
+        "independent": 218,
+        "catholic": 155,
+        "government": 102
+      },
+      {
+        "week": "Week 5",
+        "independent": 201,
+        "catholic": 148,
+        "government": 98
+      },
+      {
+        "week": "Week 6",
+        "independent": 234,
+        "catholic": 168,
+        "government": 115
+      },
+      {
+        "week": "Week 7",
+        "independent": 247,
+        "catholic": 175,
+        "government": 122
+      },
+      {
+        "week": "Week 8",
+        "independent": 261,
+        "catholic": 182,
+        "government": 128
+      }
+    ]
+  },
+  "userRolesChart": {
+    "title": "User Role Distribution",
+    "data": [
+      { "role": "Teachers", "value": 1842, "color": "hsl(180, 70%, 50%)" },
+      { "role": "Admins", "value": 156, "color": "hsl(180, 70%, 40%)" },
+      { "role": "Government", "value": 89, "color": "hsl(180, 70%, 30%)" },
+      { "role": "Students", "value": 760, "color": "hsl(180, 70%, 60%)" }
+    ]
+  },
+  "systemHealth": {
+    "serverUptime": {
+      "title": "Server Uptime",
+      "status": "operational",
+      "value": "99.9%",
+      "description": "Last 30 days uptime"
+    },
+    "emailDelivery": {
+      "title": "Email Delivery Rate",
+      "status": "operational",
+      "value": "98.7%",
+      "description": "Twilio success rate (last 7 days)"
+    },
+    "databaseUsage": {
+      "title": "Database Usage",
+      "status": "operational",
+      "value": "67%",
+      "description": "Storage capacity used"
+    },
+    "authTokens": {
+      "title": "Authentication Tokens",
+      "status": "operational",
+      "value": "2,847",
+      "description": "Active sessions"
+    },
+    "supabaseConnection": {
+      "title": "Supabase Connection",
+      "status": "operational",
+      "value": "Connected",
+      "description": "Last sync: 2 minutes ago"
+    }
+  },
+  "userManagement": {
+    "totalTeachers": {
+      "title": "Total Teachers",
+      "value": 1842,
+      "trend": "+12%",
+      "subtitle": "Active teachers"
+    },
+    "totalAdmins": {
+      "title": "Total Admins",
+      "value": 156,
+      "trend": "+5%",
+      "subtitle": "Platform administrators"
+    },
+    "totalGovernment": {
+      "title": "Government Accounts",
+      "value": 89,
+      "trend": "+8%",
+      "subtitle": "Government officials"
+    },
+    "newAccountsThisWeek": {
+      "title": "New Accounts This Week",
+      "value": 47,
+      "trend": "+23%",
+      "subtitle": "New registrations"
+    },
+    "invitationsPending": {
+      "title": "Invitations Pending",
+      "value": 23,
+      "trend": "-15%",
+      "subtitle": "Awaiting activation"
+    },
+    "inactiveUsers": {
+      "title": "Inactive Users",
+      "value": 89,
+      "trend": "+3%",
+      "subtitle": "30+ days inactive"
+    }
+  },
+  "lmsSummary": {
+    "coursesPublished": {
+      "title": "Courses Published",
+      "value": 12,
+      "subtitle": "Active training courses"
+    },
+    "lessonsInLMS": {
+      "title": "Lessons in LMS",
+      "value": 156,
+      "subtitle": "Total lesson count"
+    },
+    "certificatesGenerated": {
+      "title": "Certificates Generated",
+      "value": 1247,
+      "subtitle": "All time"
+    },
+    "completionRate": {
+      "title": "Completion Rate",
+      "value": 87,
+      "subtitle": "Teachers finished mandatory training"
+    },
+    "mostCompletedCourse": {
+      "title": "Most Completed Course",
+      "value": "Anti-Bullying Protocol",
+      "subtitle": "Top module"
+    }
+  },
+  "cultureMonitoring": {
+    "averageRating": {
+      "title": "Average Culture Rating",
+      "value": 89,
+      "subtitle": "National average"
+    },
+    "changeSinceLastTerm": {
+      "title": "Change Since Last Term",
+      "value": "+5.2%",
+      "subtitle": "Improvement"
+    },
+    "topStates": [
+      { "state": "Victoria", "rating": 92 },
+      { "state": "New South Wales", "rating": 89 },
+      { "state": "Queensland", "rating": 87 }
+    ],
+    "lowestSchools": [
+      { "school": "Riverside High", "rating": 72 },
+      { "school": "Oakwood Middle", "rating": 75 },
+      { "school": "Springfield Elementary", "rating": 78 }
+    ],
+    "scoreDistribution": [
+      { "range": "90-100", "count": 45, "percentage": 36 },
+      { "range": "80-89", "count": 38, "percentage": 30 },
+      { "range": "70-79", "count": 25, "percentage": 20 },
+      { "range": "60-69", "count": 12, "percentage": 10 },
+      { "range": "50-59", "count": 5, "percentage": 4 }
+    ]
+  },
+  "compliance": {
+    "st4sAuth": {
+      "title": "ST4S Authentication",
+      "status": "compliant",
+      "description": "Multi-factor authentication enabled"
+    },
+    "st4sStorage": {
+      "title": "ST4S Data Storage",
+      "status": "compliant",
+      "description": "Encrypted storage compliant"
+    },
+    "st4sAccess": {
+      "title": "ST4S Data Access",
+      "status": "compliant",
+      "description": "Role-based access controls"
+    },
+    "auditLogCount": {
+      "title": "Audit Log Count",
+      "value": 1247,
+      "subtitle": "Events in last 7 days"
+    },
+    "lastSecurityReview": {
+      "title": "Last Security Review",
+      "value": "2024-09-15",
+      "status": "passed",
+      "subtitle": "Security assessment"
+    },
+    "anomaliesDetected": {
+      "title": "Anomalies Detected",
+      "value": 3,
+      "subtitle": "Failed login attempts flagged"
+    }
+  },
+  "activityFeed": [
+    {
+      "id": "1",
+      "timestamp": "2024-10-10T14:30:00Z",
+      "type": "school_onboarded",
+      "message": "New school onboarded: Glenmore High (NSW)",
+      "icon": "School"
+    },
+    {
+      "id": "2",
+      "timestamp": "2024-10-10T14:25:00Z",
+      "type": "training_completed",
+      "message": "10 new teachers completed ARP Training",
+      "icon": "Award"
+    },
+    {
+      "id": "3",
+      "timestamp": "2024-10-10T14:20:00Z",
+      "type": "lesson_feedback",
+      "message": "Lesson feedback submitted from Sacred Heart College",
+      "icon": "MessageSquare"
+    },
+    {
+      "id": "4",
+      "timestamp": "2024-10-10T14:15:00Z",
+      "type": "culture_update",
+      "message": "Culture data updated for Queensland region",
+      "icon": "TrendingUp"
+    },
+    {
+      "id": "5",
+      "timestamp": "2024-10-10T14:10:00Z",
+      "type": "system_deploy",
+      "message": "System deployed to v1.0.4 on 8 Oct 2025",
+      "icon": "Rocket"
+    },
+    {
+      "id": "6",
+      "timestamp": "2024-10-10T14:05:00Z",
+      "type": "user_registration",
+      "message": "5 new teachers registered from Melbourne High",
+      "icon": "UserPlus"
+    },
+    {
+      "id": "7",
+      "timestamp": "2024-10-10T14:00:00Z",
+      "type": "certificate_issued",
+      "message": "23 certificates issued for Anti-Bullying Protocol",
+      "icon": "Certificate"
+    },
+    {
+      "id": "8",
+      "timestamp": "2024-10-10T13:55:00Z",
+      "type": "data_export",
+      "message": "Monthly report exported for Department of Education",
+      "icon": "Download"
+    }
+  ]
+}

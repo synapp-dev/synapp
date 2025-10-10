@@ -1,0 +1,324 @@
+{
+  "metrics": {
+    "totalSchools": {
+      "title": "Total Schools",
+      "icon": "School",
+      "value": {
+        "amount": 123,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 109,
+        "type": "number"
+      },
+      "subtitle": "Schools actively using platform"
+    },
+    "activeTeachers": {
+      "title": "Active Teachers",
+      "icon": "Users",
+      "value": {
+        "amount": 842,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 778,
+        "type": "number"
+      },
+      "subtitle": "Teachers engaged this term"
+    },
+    "engagementRate": {
+      "title": "Engagement Rate",
+      "icon": "Activity",
+      "value": {
+        "amount": 87,
+        "type": "percentage"
+      },
+      "previousValue": {
+        "amount": 82,
+        "type": "percentage"
+      },
+      "subtitle": "Teachers active in last 30 days"
+    },
+    "completedLessons": {
+      "title": "Completed Lessons",
+      "icon": "BookOpen",
+      "value": {
+        "amount": 2847,
+        "type": "number"
+      },
+      "previousValue": {
+        "amount": 2398,
+        "type": "number"
+      },
+      "subtitle": "Lessons completed this term"
+    }
+  },
+  "lessonsChart": {
+    "title": "Lessons Delivered This Term",
+    "icon": "BookOpen",
+    "data": [
+      {
+        "month": "January",
+        "independent": 186,
+        "catholic": 120,
+        "government": 80
+      },
+      {
+        "month": "February",
+        "independent": 305,
+        "catholic": 200,
+        "government": 150
+      },
+      {
+        "month": "March",
+        "independent": 237,
+        "catholic": 180,
+        "government": 120
+      },
+      {
+        "month": "April",
+        "independent": 273,
+        "catholic": 190,
+        "government": 140
+      },
+      {
+        "month": "May",
+        "independent": 209,
+        "catholic": 160,
+        "government": 130
+      },
+      {
+        "month": "June",
+        "independent": 214,
+        "catholic": 170,
+        "government": 140
+      }
+    ],
+    "trend": {
+      "percentage": "+15.2%",
+      "direction": "up",
+      "description": "Lessons delivered trending up"
+    }
+  },
+  "cultureRating": {
+    "title": "Average Culture Rating",
+    "icon": "TrendingUp",
+    "schools": [
+      {
+        "id": "school-1",
+        "name": "Springfield Elementary",
+        "data": [
+          {
+            "metric": "attendance",
+            "value": { "amount": 78, "type": "percentage" },
+            "previousValue": { "amount": 72, "type": "percentage" },
+            "label": "Attendance Rating"
+          },
+          {
+            "metric": "lessons",
+            "value": { "amount": 65, "type": "percentage" },
+            "previousValue": { "amount": 58, "type": "percentage" },
+            "label": "Completed Lessons"
+          },
+          {
+            "metric": "engagement",
+            "value": { "amount": 82, "type": "percentage" },
+            "previousValue": { "amount": 76, "type": "percentage" },
+            "label": "Engagement Rating"
+          },
+          {
+            "metric": "incidents",
+            "value": { "amount": 23, "type": "percentage" },
+            "previousValue": { "amount": 28, "type": "percentage" },
+            "label": "Incident Rating"
+          },
+          {
+            "metric": "wellbeing",
+            "value": { "amount": 71, "type": "percentage" },
+            "previousValue": { "amount": 67, "type": "percentage" },
+            "label": "Wellbeing Score"
+          },
+          {
+            "metric": "satisfaction",
+            "value": { "amount": 89, "type": "percentage" },
+            "previousValue": { "amount": 84, "type": "percentage" },
+            "label": "Teacher Satisfaction"
+          }
+        ]
+      },
+      {
+        "id": "school-2",
+        "name": "Riverside High School",
+        "data": [
+          {
+            "metric": "attendance",
+            "value": { "amount": 91, "type": "percentage" },
+            "previousValue": { "amount": 87, "type": "percentage" },
+            "label": "Attendance Rating"
+          },
+          {
+            "metric": "lessons",
+            "value": { "amount": 43, "type": "percentage" },
+            "previousValue": { "amount": 38, "type": "percentage" },
+            "label": "Completed Lessons"
+          },
+          {
+            "metric": "engagement",
+            "value": { "amount": 56, "type": "percentage" },
+            "previousValue": { "amount": 51, "type": "percentage" },
+            "label": "Engagement Rating"
+          },
+          {
+            "metric": "incidents",
+            "value": { "amount": 15, "type": "percentage" },
+            "previousValue": { "amount": 19, "type": "percentage" },
+            "label": "Incident Rating"
+          },
+          {
+            "metric": "wellbeing",
+            "value": { "amount": 94, "type": "percentage" },
+            "previousValue": { "amount": 89, "type": "percentage" },
+            "label": "Wellbeing Score"
+          },
+          {
+            "metric": "satisfaction",
+            "value": { "amount": 67, "type": "percentage" },
+            "previousValue": { "amount": 62, "type": "percentage" },
+            "label": "Teacher Satisfaction"
+          }
+        ]
+      },
+      {
+        "id": "school-3",
+        "name": "Oakwood Middle School",
+        "data": [
+          {
+            "metric": "attendance",
+            "value": { "amount": 35, "type": "percentage" },
+            "previousValue": { "amount": 29, "type": "percentage" },
+            "label": "Attendance Rating"
+          },
+          {
+            "metric": "lessons",
+            "value": { "amount": 76, "type": "percentage" },
+            "previousValue": { "amount": 71, "type": "percentage" },
+            "label": "Completed Lessons"
+          },
+          {
+            "metric": "engagement",
+            "value": { "amount": 58, "type": "percentage" },
+            "previousValue": { "amount": 52, "type": "percentage" },
+            "label": "Engagement Rating"
+          },
+          {
+            "metric": "incidents",
+            "value": { "amount": 31, "type": "percentage" },
+            "previousValue": { "amount": 35, "type": "percentage" },
+            "label": "Incident Rating"
+          },
+          {
+            "metric": "wellbeing",
+            "value": { "amount": 83, "type": "percentage" },
+            "previousValue": { "amount": 78, "type": "percentage" },
+            "label": "Wellbeing Score"
+          },
+          {
+            "metric": "satisfaction",
+            "value": { "amount": 45, "type": "percentage" },
+            "previousValue": { "amount": 41, "type": "percentage" },
+            "label": "Teacher Satisfaction"
+          }
+        ]
+      },
+      {
+        "id": "school-4",
+        "name": "Valley View Academy",
+        "data": [
+          {
+            "metric": "attendance",
+            "value": { "amount": 96, "type": "percentage" },
+            "previousValue": { "amount": 92, "type": "percentage" },
+            "label": "Attendance Rating"
+          },
+          {
+            "metric": "lessons",
+            "value": { "amount": 88, "type": "percentage" },
+            "previousValue": { "amount": 83, "type": "percentage" },
+            "label": "Completed Lessons"
+          },
+          {
+            "metric": "engagement",
+            "value": { "amount": 92, "type": "percentage" },
+            "previousValue": { "amount": 87, "type": "percentage" },
+            "label": "Engagement Rating"
+          },
+          {
+            "metric": "incidents",
+            "value": { "amount": 7, "type": "percentage" },
+            "previousValue": { "amount": 11, "type": "percentage" },
+            "label": "Incident Rating"
+          },
+          {
+            "metric": "wellbeing",
+            "value": { "amount": 95, "type": "percentage" },
+            "previousValue": { "amount": 91, "type": "percentage" },
+            "label": "Wellbeing Score"
+          },
+          {
+            "metric": "satisfaction",
+            "value": { "amount": 89, "type": "percentage" },
+            "previousValue": { "amount": 85, "type": "percentage" },
+            "label": "Teacher Satisfaction"
+          }
+        ]
+      },
+      {
+        "id": "school-5",
+        "name": "Mountain Peak High",
+        "data": [
+          {
+            "metric": "attendance",
+            "value": { "amount": 62, "type": "percentage" },
+            "previousValue": { "amount": 57, "type": "percentage" },
+            "label": "Attendance Rating"
+          },
+          {
+            "metric": "lessons",
+            "value": { "amount": 39, "type": "percentage" },
+            "previousValue": { "amount": 34, "type": "percentage" },
+            "label": "Completed Lessons"
+          },
+          {
+            "metric": "engagement",
+            "value": { "amount": 74, "type": "percentage" },
+            "previousValue": { "amount": 69, "type": "percentage" },
+            "label": "Engagement Rating"
+          },
+          {
+            "metric": "incidents",
+            "value": { "amount": 26, "type": "percentage" },
+            "previousValue": { "amount": 31, "type": "percentage" },
+            "label": "Incident Rating"
+          },
+          {
+            "metric": "wellbeing",
+            "value": { "amount": 68, "type": "percentage" },
+            "previousValue": { "amount": 63, "type": "percentage" },
+            "label": "Wellbeing Score"
+          },
+          {
+            "metric": "satisfaction",
+            "value": { "amount": 81, "type": "percentage" },
+            "previousValue": { "amount": 76, "type": "percentage" },
+            "label": "Teacher Satisfaction"
+          }
+        ]
+      }
+    ],
+    "trend": {
+      "percentage": "+3.2%",
+      "direction": "up",
+      "description": "Culture ratings improving"
+    }
+  }
+}
