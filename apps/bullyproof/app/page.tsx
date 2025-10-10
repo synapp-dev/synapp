@@ -9,6 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
+import Image from "next/image";
+import { LoaderCircle } from "lucide-react";
 
 export default function Page() {
   const router = useRouter();
@@ -25,7 +27,6 @@ export default function Page() {
         // } else {
         //   router.push("/auth");
         // }
-
         // For now, redirect to home (you can change this to /auth when you implement auth)
         router.push("/dashboard");
       } catch (error) {
@@ -40,14 +41,21 @@ export default function Page() {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
+        <Image
+          src="/images/bullyproof-logo.svg"
+          alt="Bullyproof"
+          width={100}
+          height={100}
+          className="mx-auto"
+        />
         <CardHeader className="text-center">
-          <CardTitle>Loading...</CardTitle>
+          <CardTitle>Welcome!</CardTitle>
           <CardDescription>
             Please wait while we check your authentication status.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <LoaderCircle className="animate-spin h-5 w-5 mx-auto" />
         </CardContent>
       </Card>
     </div>
