@@ -5,11 +5,11 @@ import {
 } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { api } from "@/lib/api/client";
-import type { Tables } from "@/types/supabase";
+import type { schools } from "@/drizzle/schema";
 import { schoolKeys } from "@/entities/school/model/keys";
 import { useSchoolStore } from "@/entities/school/model/store";
 
-type School = Tables<"schools">;
+type School = typeof schools.$inferSelect;
 
 export const getAllSchoolsOptions = () =>
   queryOptions<School[]>({

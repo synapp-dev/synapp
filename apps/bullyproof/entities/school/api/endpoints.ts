@@ -1,12 +1,28 @@
-import { apiFetch, type ApiResult } from "@/lib/api/fetcher";
-import type { Tables } from "@/types/supabase";
+import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
+import type { vSchoolsReadable } from "@/drizzle/schema";
 
-type School = Tables<"schools">;
+type School = typeof vSchoolsReadable.$inferSelect;
 
 export const schoolApi = {
   get: {
     schools(): Promise<ApiResult<School[]>> {
       return apiFetch<School[]>("/schools");
+    },
+    listSchools(params?: {
+      limit?: number;
+      offset?: number;
+      search?: string;
+    }): Promise<ApiResult<School[]>> {
+      const searchParams = new URLSearchParams();
+      if (params?.limit) searchParams.set("limit", params.limit.toString());
+      if (params?.offset) searchParams.set("offset", params.offset.toString());
+      if (params?.search) searchParams.set("search", params.search);
+
+      const query = searchParams.toString();
+      return apiFetch<School[]>(`/schools${query ? `?${query}` : ""}`);
+    },
+    schoolBySlug(slug: string): Promise<ApiResult<School | null>> {
+      return apiFetch<School | null>(`/schools/${encodeURIComponent(slug)}`);
     },
   },
   post: {
