@@ -805,6 +805,8 @@ export type Database = {
       schools: {
         Row: {
           address: string | null
+          avatar_url: string | null
+          banner_url: string | null
           code: string | null
           created_at: string | null
           email_domain: string | null
@@ -817,6 +819,8 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          avatar_url?: string | null
+          banner_url?: string | null
           code?: string | null
           created_at?: string | null
           email_domain?: string | null
@@ -829,6 +833,8 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          avatar_url?: string | null
+          banner_url?: string | null
           code?: string | null
           created_at?: string | null
           email_domain?: string | null
@@ -1325,6 +1331,8 @@ export type Database = {
       v_schools_readable: {
         Row: {
           address: string | null
+          avatar_url: string | null
+          banner_url: string | null
           code: string | null
           created_at: string | null
           email_domain: string | null
@@ -1333,16 +1341,49 @@ export type Database = {
           levels: string[] | null
           name: string | null
           sector: string | null
+          sector_id: string | null
           slug: string | null
           state: string | null
+          state_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "schools_sector_id_fkey"
+            columns: ["sector_id"]
+            isOneToOne: false
+            referencedRelation: "school_sectors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "schools_state_id_fkey"
+            columns: ["state_id"]
+            isOneToOne: false
+            referencedRelation: "states"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       v_stage_thresholds: {
         Row: {
           max_sort_index: number | null
           min_sort_index: number | null
           stage_id: string | null
+        }
+        Relationships: []
+      }
+      v_user_profile_expanded: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          full_name: string | null
+          id: string | null
+          last_name: string | null
+          metadata: Json | null
+          platform_roles: string[] | null
+          school_roles: Json | null
+          updated_at: string | null
         }
         Relationships: []
       }
