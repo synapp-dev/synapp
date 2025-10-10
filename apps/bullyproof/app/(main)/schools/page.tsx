@@ -5,16 +5,16 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import type { Tables } from "@/types/supabase";
-import { api } from "@/lib/api/client";
+import { schoolServerApi } from "@/entities/school/api/server-endpoints";
 
 export default async function SchoolsPage() {
-  const { data: schools, error } = await api.get.schools();
+  const { data: schools, error } = await schoolServerApi.get.schools();
 
   if (error) {
     return <div>Error loading schools: {error.message}</div>;
   }
 
-  const schoolList = (schools as Tables<"schools">[] | null) ?? [];
+  const schoolList = schools ?? [];
 
   // culture rating
   // ahead or behind schedule

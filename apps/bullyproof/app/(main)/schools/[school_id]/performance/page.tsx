@@ -1,7 +1,16 @@
-import { Card, CardHeader, CardTitle, CardDescription } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@workspace/ui/components/card";
 
-export default function PerformancePage({ params }: { params: { school_id: string } }) {
-  const { school_id } = params;
+export default async function PerformancePage({
+  params,
+}: {
+  params: Promise<{ school_id: string }>;
+}) {
+  const { school_id } = await params;
 
   return (
     <div className="space-y-4">
@@ -14,5 +23,3 @@ export default function PerformancePage({ params }: { params: { school_id: strin
     </div>
   );
 }
-
-
