@@ -1,32 +1,22 @@
-// lib/api/fetcher.ts
+// lib/api/fetcher.ts (server-only)
 import type { RequestInit } from "next/dist/server/web/spec-extension/request";
-import { createBrowserClient } from "@/utils/supabase/client";
 import { createServerClient } from "@/utils/supabase/server";
 
 type ApiOk<T> = { data: T; error: null };
 type ApiErr = { data: null; error: { message: string; status?: number } };
 export type ApiResult<T> = ApiOk<T> | ApiErr;
 
-const isServer = typeof window === "undefined";
+// This module should only be imported in server code paths.
 
 async function withAuth(init?: RequestInit): Promise<RequestInit> {
   const headers = new Headers(init?.headers);
 
-  if (isServer) {
-    const supabase = createServerClient();
-    const {
-      data: { session },
-    } = await (await supabase).auth.getSession();
-    const token = session?.access_token;
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-  } else {
-    const supabase = createBrowserClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const token = session?.access_token;
-    if (token) headers.set("Authorization", `Bearer ${token}`);
-  }
+  const supabase = createServerClient();
+  const {
+    data: { session },
+  } = await (await supabase).auth.getSession();
+  const token = session?.access_token;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   return { ...init, headers };
 }
@@ -39,18 +29,15 @@ export async function apiFetch<T>(
 
   // Construct absolute URL on the server (relative URLs fail in Node fetch)
   let url = `/api${path}`;
-  if (isServer) {
-    try {
-      const { headers: nextHeaders } = await import("next/headers");
-      const h = await nextHeaders();
-      const proto = h.get("x-forwarded-proto") ?? "http";
-      const host =
-        h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
-      url = `${proto}://${host}/api${path}`;
-    } catch {
-      // Fallback for environments without next/headers (e.g., tests)
-      url = `http://localhost:3000/api${path}`;
-    }
+  try {
+    const { headers: nextHeaders } = await import("next/headers");
+    const h = await nextHeaders();
+    const proto = h.get("x-forwarded-proto") ?? "http";
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+    url = `${proto}://${host}/api${path}`;
+  } catch {
+    // Fallback for environments without next/headers (e.g., tests)
+    url = `http://localhost:3000/api${path}`;
   }
 
   const res = await fetch(url, {
