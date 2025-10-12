@@ -16,7 +16,10 @@ export const getCurrentUserOptions = () =>
     queryKey: meKeys.current(),
     queryFn: async () => {
       const { data, error } = await meApi.get.currentUser();
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error(error);
+        throw new Error(error.message);
+      }
       return data ?? null;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
