@@ -1,7 +1,6 @@
 import { OverviewSection } from "@/entities/dashboard/ui/admin/sections/overview/overview-section";
 import { PlatformSection } from "@/entities/dashboard/ui/admin/sections/platform/platform-section";
 import { HeroSection } from "@/entities/dashboard/ui/admin/sections/hero/hero-section";
-import { SchoolsSection } from "@/entities/dashboard/ui/admin/sections/schools/schools-section";
 import { AnalyticsSection } from "@/entities/dashboard/ui/admin/sections/analytics/analytics-section";
 import { CoursesSection } from "@/entities/dashboard/ui/admin/sections/courses/courses-section";
 import { CultureSection } from "@/entities/dashboard/ui/admin/sections/culture/culture-section";
@@ -18,7 +17,6 @@ import {
   ChartNoAxesCombined,
   Home,
   PieChart,
-  School,
 } from "lucide-react";
 
 export function AdminDashboard() {
@@ -34,10 +32,6 @@ export function AdminDashboard() {
           <TabsTrigger value="overview">
             <Home className="size-4" />
             Overview
-          </TabsTrigger>
-          <TabsTrigger value="schools">
-            <School className="size-4" />
-            Schools
           </TabsTrigger>
           <TabsTrigger value="platform">
             {/* <Platform className="size-4" /> */}
@@ -60,9 +54,6 @@ export function AdminDashboard() {
         </TabsList>
         <TabsContent value="overview">
           <OverviewSection />
-        </TabsContent>
-        <TabsContent value="schools">
-          <SchoolsSection />
         </TabsContent>
         <TabsContent value="platform">
           <PlatformSection />
