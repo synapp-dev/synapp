@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createServerClient } from "@/utils/supabase/server";
 import {
   getOrCreateSteamProfile,
   linkSteamProfileToUser,
@@ -7,7 +7,7 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const {
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createServerClient();
 
     // Get the current user
     const {
