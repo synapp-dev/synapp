@@ -184,6 +184,7 @@
   --animate-float-up-loop: float-up-loop 1.2s linear infinite;
   --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
   --animate-float-gentle: float-gentle 3s ease-in-out infinite;
+  --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
 
   @keyframes gradient-animation {
     0%,
@@ -428,6 +429,16 @@
     }
     50% {
       transform: translateY(-2px);
+    }
+  }
+  @keyframes bounce-slow {
+    0%, 100% {
+      transform: translateY(-25%);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+    50% {
+      transform: translateY(0);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
     }
   }
 }
