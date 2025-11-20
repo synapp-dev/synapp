@@ -31,6 +31,9 @@ export function NavMain({
     icon?: LucideIcon;
     isActive?: boolean;
     exact?: boolean;
+    // Special flags for custom rendering
+    disableActiveStyle?: boolean;
+    liveStyle?: boolean;
     items?: {
       title: string;
       url: string;
@@ -70,6 +73,7 @@ export function NavMain({
             item.isActive ||
             isUrlActive(item.url, item.exact) ||
             (item.items ?? []).some((s) => isUrlActive(s.url, s.exact));
+          const itemActiveEffective = item.disableActiveStyle ? false : itemActive;
           return (
           <Collapsible
             key={item.title}
@@ -83,7 +87,9 @@ export function NavMain({
                   <SidebarMenuButton
                     tooltip={item.title}
                     className={
-                      itemActive
+                      item.liveStyle
+                        ? "border border-orange-500/30 bg-orange-500/10 text-orange-700 font-medium hover:bg-orange-500/15"
+                        : itemActiveEffective
                         ? "bg-primary text-primary-foreground font-semibold hover:bg-primary hover:text-primary-foreground"
                         : undefined
                     }
@@ -91,6 +97,9 @@ export function NavMain({
                     {item.icon && <item.icon />}
 
                     <span>{item.title}</span>
+                    {item.liveStyle && (
+                      <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
+                    )}
                     {item.items && (
                       <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
                     )}

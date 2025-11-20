@@ -13,6 +13,8 @@ import {
   HelpingHand,
   Settings,
   TrendingUp,
+  ShieldCheck,
+  TvMinimalPlay,
 } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
@@ -28,42 +30,21 @@ import {
 } from "@workspace/ui/components/sidebar";
 import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
+import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useSchoolStore } from "@/stores/school-store";
 import { usePathname } from "next/navigation";
+import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useLiveLessonStore } from "@/stores/live-lesson-store";
 
 // This is sample data.
 const data = {
   navBullyproof: [
-    // {
-    //   title: "Admin",
-    //   url: "/admin",
-    //   icon: ShieldCheck,
-    //   isActive: false,
-    //   items: [
-    //     {
-    //       title: "Course Editor",
-    //       url: "/admin/course-editor",
-    //       icon: FilePenLine,
-    //     },
-    //     {
-    //       title: "CRM",
-    //       url: "/admin/crm",
-    //       exact: true,
-    //       icon: UserSearch,
-    //       isActive: false,
-    //     },
-    //     {
-    //       title: "Staff",
-    //       url: "/admin/staff",
-    //       icon: IdCard,
-    //     },
-    //     {
-    //       title: "Settings",
-    //       url: "/admin/settings",
-    //       icon: Settings,
-    //     },
-    //   ],
-    // },
+    {
+      title: "Admin",
+      url: "/admin",
+      icon: ShieldCheck,
+      isActive: false,
+    },
     // {
     //   title: "AP Certification",
     //   url: "/ap-certification",
@@ -156,10 +137,17 @@ const data = {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar();
   const pathname = usePathname();
+  const isPlatformAdmin = useIsPlatformAdmin();
 
   const platformItems = React.useMemo(() => {
-    return [...data.navBullyproof];
-  }, []);
+    // Filter out Admin menu if user is not a platform admin
+    return data.navBullyproof.filter(item => {
+      if (item.title === "Admin" && !isPlatformAdmin) {
+        return false;
+      }
+      return true;
+    });
+  }, [isPlatformAdmin]);
 
   const schoolSlugFromPath = React.useMemo(() => {
     // Match /schools/{slug}/...
@@ -202,6 +190,31 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     [activeSchoolSlug]
   );
 
+  
+
+  const isLive = useLiveLessonStore((s) => s.isLive);
+  const liveUrl = useLiveLessonStore((s) => s.getUrl());
+
+  const platformItemsWithLive = React.useMemo(() => {
+    if (!isLive || !liveUrl) return platformItems;
+    const items = [...platformItems];
+    const dashboardIndex = items.findIndex((i) => i.title === "Dashboard");
+    const liveItem = {
+      title: "Live Lesson",
+      url: liveUrl,
+      icon: TvMinimalPlay,
+      isActive: false,
+      disableActiveStyle: true,
+      liveStyle: true,
+    };
+    if (dashboardIndex !== -1) {
+      items.splice(dashboardIndex + 1, 0, liveItem);
+    } else {
+      items.unshift(liveItem);
+    }
+    return items;
+  }, [platformItems, isLive, liveUrl]);
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mb-2">
@@ -224,20 +237,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         )}
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={platformItems} title="Platform" />
+        <ScrollArea className="h-full">
+          <NavMain items={platformItemsWithLive} title="Platform" />
 
-        <Separator className="my-2" />
 
-        <div className="-space-y-2">
-          <SchoolSwitcher />
+          <Separator className="my-2" />
 
-          <div className="space-y-4">
-            <NavMain items={withSlug(data.navSchoolMain)} />
-            <NavMain items={withSlug(data.navPeople)} title="People" />
-            <NavMain items={withSlug(data.navCurriculum)} title="Curriculum" />
-            <NavMain items={withSlug(data.navData)} title="Data" />
+          <div className="-space-y-2">
+            <SchoolSwitcher />
+
+            <div className="space-y-4">
+              <NavMain items={withSlug(data.navSchoolMain)} />
+              <NavMain items={withSlug(data.navPeople)} title="People" />
+              <NavMain items={withSlug(data.navCurriculum)} title="Curriculum" />
+              <NavMain items={withSlug(data.navData)} title="Data" />
+            </div>
           </div>
-        </div>
+        </ScrollArea>
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
