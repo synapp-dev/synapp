@@ -2,7 +2,9 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { createBrowserClient } from "@/utils/supabase/client";
+import { clearAllUserData } from "@/utils/clear-user-data";
 import {
   Card,
   CardContent,
@@ -13,6 +15,7 @@ import {
 
 export default function LogoutPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const handleLogout = async () => {
@@ -20,18 +23,23 @@ export default function LogoutPage() {
         const supabase = createBrowserClient();
         await supabase.auth.signOut();
 
+        // Clear all user data from stores and queries
+        clearAllUserData(queryClient);
+
         // Redirect to auth page after a short delay
         setTimeout(() => {
           router.replace("/auth");
         }, 1000);
       } catch (error) {
         console.error("Error during logout:", error);
+        // Even if logout fails, clear user data and redirect
+        clearAllUserData(queryClient);
         router.replace("/auth");
       }
     };
 
     handleLogout();
-  }, [router]);
+  }, [router, queryClient]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">
