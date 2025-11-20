@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
-export default function SchoolPage({
+export default async function SchoolPage({
   params,
 }: {
-  params: { school_id: string };
+  params: Promise<{ school_id: string }>;
 }) {
-  redirect(`/schools/${params.school_id}/home`);
+  const { school_id } = await params;
+  redirect(`/schools/${school_id}/home`);
 }
