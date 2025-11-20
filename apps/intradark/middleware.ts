@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { updateSession } from "@/utils/supabase/middleware";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
+  // Update Supabase session
+  const response = await updateSession(request);
+
   const { pathname } = request.nextUrl;
 
   // /@username redirect (already present)
@@ -28,7 +32,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
