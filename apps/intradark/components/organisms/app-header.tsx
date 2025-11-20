@@ -4,6 +4,7 @@ import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
 import { RightSidebarTrigger } from "@workspace/ui/components/right-sidebar-trigger";
 import { CommandMenu } from "@/components/molecules/command-menu";
 import Image from "next/image";
+import { SteamLoginButton } from "../atoms/steam-login-button";
 
 export function AppHeader() {
   return (

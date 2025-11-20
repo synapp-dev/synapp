@@ -118,7 +118,7 @@ export function AuthForm() {
         )}
 
         {/* Steam Login Button */}
-        <SteamLoginButton />
+        <SteamLoginButton returnUrl="/dashboard" />
 
         <AuthDivider />
 

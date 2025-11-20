@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUserProfileStore } from "@/stores/user-profile-store";
 import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
@@ -12,65 +11,50 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar";
+
 import { LogOut, Settings, User } from "lucide-react";
+import { SteamLoginButton } from "@/components/atoms/steam-login-button";
 
 export function NavUser() {
   const router = useRouter();
-  const { user, setUser } = useUserProfileStore();
-  const [isLoading, setIsLoading] = useState(false);
+  const [steamId, setSteamId] = useState<string | null>(null);
 
-  const handleSignOut = async () => {
-    setIsLoading(true);
+  useEffect(() => {
     try {
-      // TODO: Implement your sign out logic here
-      // Example with Supabase:
-      // const supabase = createBrowserClient();
-      // await supabase.auth.signOut();
-
-      setUser(null);
-      router.push("/auth");
-    } catch (error) {
-      console.error("Error signing out:", error);
-    } finally {
-      setIsLoading(false);
+      const match = document.cookie.match(/(?:^|; )steamId=([^;]+)/);
+      const id = match ? decodeURIComponent(match[1] || "") : "";
+      setSteamId(id || null);
+    } catch {
+      setSteamId(null);
     }
-  };
+  }, []);
 
-  if (!user) {
-    return (
-      <Button variant="outline" size="sm" onClick={() => router.push("/auth")}>
-        Sign In
-      </Button>
-    );
+  if (!steamId) {
+    return <SteamLoginButton className="w-full" />;
   }
+
+  const handleSignOut = () => {
+    try {
+      document.cookie = "steamId=; path=/; max-age=0";
+      try { localStorage.removeItem("steamId"); } catch {}
+      setSteamId(null);
+      router.push("/news");
+    } catch {}
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-          <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatar_url} alt={user.name || user.email} />
-            <AvatarFallback>
-              {user.name
-                ? user.name.charAt(0).toUpperCase()
-                : user.email.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+        <Button variant="ghost" className="relative h-8 rounded-full px-3">
+          <span className="truncate max-w-[160px]">{steamId}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">
-              {user.name || "User"}
-            </p>
+            <p className="text-sm font-medium leading-none">{steamId}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
+              SteamID
             </p>
           </div>
         </DropdownMenuLabel>
@@ -84,9 +68,9 @@ export function NavUser() {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSignOut} disabled={isLoading}>
+        <DropdownMenuItem onClick={handleSignOut}>
           <LogOut className="mr-2 h-4 w-4" />
-          <span>{isLoading ? "Signing out..." : "Sign out"}</span>
+          <span>Sign out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

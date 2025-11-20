@@ -79,7 +79,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
       </SidebarHeader>
       <Separator />
-      <SidebarContent className="overflow-y-auto mx-6">
+      <SidebarContent className="overflow-y-auto mx-6 mt-4">
         <SidebarMenu>
           {navigationItems.map((item) => (
             <NavItem

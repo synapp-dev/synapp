@@ -10,36 +10,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import Marquee from "react-fast-marquee";
 import Image from "next/image";
 import { BicepsFlexed } from "lucide-react";
-
-// Function to map Leetify map names to image files
-const getMapImage = (mapName: string): string => {
-  const mapNameLower = mapName.toLowerCase();
-
-  // Map Leetify map names to image files
-  const mapImageMap: Record<string, string> = {
-    de_mirage: "/images/steam/maps/De_mirage.png",
-    de_dust2: "/images/steam/maps/De_dust2.png",
-    de_inferno: "/images/steam/maps/De_inferno.png",
-    de_overpass: "/images/steam/maps/De_overpass.png",
-    de_nuke: "/images/steam/maps/De_nuke.png",
-    de_ancient: "/images/steam/maps/De_ancient.png",
-    de_anubis: "/images/steam/maps/De_anubis.png",
-    de_vertigo: "/images/steam/maps/De_vertigo.png",
-    de_train: "/images/steam/maps/De_train.png",
-    de_grail: "/images/steam/maps/De_grail.png",
-    de_jura: "/images/steam/maps/De_jura.png",
-    de_dogtown: "/images/steam/maps/De_dogtown.png",
-    de_brewery: "/images/steam/maps/De_brewery.png",
-    cs_office: "/images/steam/maps/Cs_office.png",
-    cs_italy: "/images/steam/maps/Cs_italy.png",
-    cs_agency: "/images/steam/maps/Cs_agency.png",
-    ar_shoots: "/images/steam/maps/Ar_shoots.png",
-    ar_pool_day: "/images/steam/maps/Ar_pool_day.png",
-    ar_baggage: "/images/steam/maps/Ar_baggage.png",
-  };
-
-  return mapImageMap[mapNameLower] || "/images/steam/maps/De_mirage.png"; // Default fallback
-};
+import { getMapImageName, getMapDisplayName } from "@/utils/map-utils";
 
 export function FormCard() {
   const { selectedPlayer } = usePlayerStore();
@@ -54,7 +25,7 @@ export function FormCard() {
   const lastGames = leetifyProfile?.games?.slice(0, 10) || [];
 
   return (
-    <Card className="h-full gap-0">
+    <Card className="h-fit gap-0">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-1">
@@ -115,8 +86,8 @@ export function FormCard() {
                     </p>
                     <div className="w-4 h-4 relative">
                       <Image
-                        src={getMapImage(game.mapName || "")}
-                        alt={game.mapName || "Unknown map"}
+                        src={`/images/steam/maps/${getMapImageName(game.mapName)}`}
+                        alt={getMapDisplayName(game.mapName)}
                         width={16}
                         height={16}
                         className="rounded-sm"
