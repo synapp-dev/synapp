@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const returnUrl = searchParams.get("returnUrl") || "/home";
+    const returnUrl = searchParams.get("returnUrl") || "/dashboard";
+
+    // Get the base URL from the request
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                   `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host') || 'localhost:3000'}`;
 
     // Steam OpenID 2.0 authentication URL
     const steamAuthUrl = "https://steamcommunity.com/openid/login";
@@ -15,9 +19,8 @@ export async function GET(request: NextRequest) {
     const params = new URLSearchParams({
       "openid.ns": "http://specs.openid.net/auth/2.0",
       "openid.mode": "checkid_setup",
-      "openid.return_to": `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/steam/callback?returnUrl=${encodeURIComponent(returnUrl)}&state=${state}`,
-      "openid.realm":
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      "openid.return_to": `${baseUrl}/api/auth/steam/callback?returnUrl=${encodeURIComponent(returnUrl)}&state=${state}`,
+      "openid.realm": baseUrl,
       "openid.identity": "http://specs.openid.net/auth/2.0/identifier_select",
       "openid.claimed_id": "http://specs.openid.net/auth/2.0/identifier_select",
     });
