@@ -106,6 +106,13 @@ export async function POST(request: Request) {
     // Create the school
     const createdSchool = await schoolService.createSchool({ userId }, school);
 
+    if (!createdSchool) {
+      return NextResponse.json(
+        { error: "Failed to create school" },
+        { status: 500 }
+      );
+    }
+
     // Create admin users and assign roles
     const adminUsers = [];
     const errors = [];
