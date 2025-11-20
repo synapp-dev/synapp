@@ -21,6 +21,9 @@ export const curriculumApi = {
     byId(id: string): Promise<ApiResult<Stage & { years?: any[] }>> {
       return apiFetch<Stage & { years?: any[] }>(`/curriculum/stages/${encodeURIComponent(id)}`);
     },
+    byCode(code: string): Promise<ApiResult<Stage & { years?: any[] }>> {
+      return apiFetch<Stage & { years?: any[] }>(`/curriculum/stages/by-code/${encodeURIComponent(code)}`);
+    },
   },
   years: {
     list(params?: {
