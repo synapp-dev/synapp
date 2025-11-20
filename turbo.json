@@ -9,7 +9,9 @@
       "env": [
         "STEAM_API_KEY",
         "POSTGRES_*",
-        "SUPABASE_*"
+        "SUPABASE_*",
+        "DATABASE_URL",
+        "DATABASE_URL_POOLER"
       ]
     },
     "lint": {
