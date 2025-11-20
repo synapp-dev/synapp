@@ -17,7 +17,7 @@ export const topicsRepo = {
       .select()
       .from(topics)
       .where(eq(topics.stageId, stageId))
-      .orderBy(asc(topics.title)),
+      .orderBy(asc(topics.stageOrder), asc(topics.title)),
 
   getWithDetails: async (id: string) => {
     const topicData = await db
