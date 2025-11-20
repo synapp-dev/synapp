@@ -9,7 +9,7 @@ interface SteamLoginButtonProps {
 }
 
 export function SteamLoginButton({
-  returnUrl = "/home",
+  returnUrl = "/dashboard",
   className,
 }: SteamLoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
