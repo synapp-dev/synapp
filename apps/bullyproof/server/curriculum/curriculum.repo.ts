@@ -16,6 +16,13 @@ export const curriculumRepo = {
       .where(eq(curriculumStages.id, id))
       .limit(1),
 
+  getStageByCode: (code: string) =>
+    db
+      .select()
+      .from(curriculumStages)
+      .where(eq(curriculumStages.code, code))
+      .limit(1),
+
   getYears: () =>
     db
       .select({
@@ -51,6 +58,35 @@ export const curriculumRepo = {
       .innerJoin(schoolYears, eq(stageYearLinks.schoolYearId, schoolYears.id))
       .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
       .where(eq(stageYearLinks.stageId, stageId))
+      .orderBy(asc(schoolYears.sortIndex));
+
+    return {
+      ...stage[0],
+      years: years.map(y => ({
+        ...y.year,
+        level: y.level,
+      })),
+    };
+  },
+
+  getStageByCodeWithYears: async (code: string) => {
+    const stage = await db
+      .select()
+      .from(curriculumStages)
+      .where(eq(curriculumStages.code, code))
+      .limit(1);
+
+    if (stage.length === 0) return null;
+
+    const years = await db
+      .select({
+        year: schoolYears,
+        level: schoolLevels,
+      })
+      .from(stageYearLinks)
+      .innerJoin(schoolYears, eq(stageYearLinks.schoolYearId, schoolYears.id))
+      .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
+      .where(eq(stageYearLinks.stageId, stage[0].id))
       .orderBy(asc(schoolYears.sortIndex));
 
     return {

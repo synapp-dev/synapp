@@ -2,11 +2,13 @@ import {
   getStagesSchema,
   getYearsSchema,
   getStageByIdSchema,
+  getStageByCodeSchema,
   getYearByIdSchema,
   getLevelsSchema,
   type GetStagesParams,
   type GetYearsParams,
   type GetStageByIdParams,
+  type GetStageByCodeParams,
   type GetYearByIdParams,
   type GetLevelsParams,
 } from "./curriculum.validators";
@@ -59,6 +61,13 @@ export const curriculumService = {
     await assertCanViewCurriculum(ctx);
     
     return await curriculumRepo.getStageWithYears(id);
+  },
+
+  async getStageByCode(ctx: AuthContext, params: unknown) {
+    const { code } = getStageByCodeSchema.parse(params);
+    await assertCanViewCurriculum(ctx);
+    
+    return await curriculumRepo.getStageByCodeWithYears(code);
   },
 
   async getYearById(ctx: AuthContext, params: unknown) {
