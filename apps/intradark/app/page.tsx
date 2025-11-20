@@ -14,27 +14,17 @@ export default function Page() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // TODO: Implement your authentication check here
-        // Example with Supabase:
-        // const supabase = createBrowserClient();
-        // const { data } = await supabase.auth.getUser();
-        // if (data.user) {
-        //   router.push("/home");
-        // } else {
-        //   router.push("/auth");
-        // }
-
-        // For now, redirect to home (you can change this to /auth when you implement auth)
-        router.push("/home");
-      } catch (error) {
-        console.error("Error checking authentication:", error);
-        router.push("/auth");
+    try {
+      const match = document.cookie.match(/(?:^|; )steamId=([^;]+)/);
+      const steamId = match ? decodeURIComponent(match[1] || "") : "";
+      if (steamId) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/news");
       }
-    };
-
-    checkAuth();
+    } catch (error) {
+      router.replace("/news");
+    }
   }, [router]);
 
   return (
