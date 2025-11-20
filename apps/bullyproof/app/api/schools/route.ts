@@ -78,14 +78,23 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { school, adminEmails } = body;
 
-    if (!school || !adminEmails || !Array.isArray(adminEmails) || adminEmails.length === 0) {
+    if (
+      !school ||
+      !adminEmails ||
+      !Array.isArray(adminEmails) ||
+      adminEmails.length === 0
+    ) {
       return NextResponse.json(
         { error: "School data and at least one admin email are required" },
         { status: 400 }
       );
     }
 
-    if (!school.levelIds || !Array.isArray(school.levelIds) || school.levelIds.length === 0) {
+    if (
+      !school.levelIds ||
+      !Array.isArray(school.levelIds) ||
+      school.levelIds.length === 0
+    ) {
       return NextResponse.json(
         { error: "At least one school level is required" },
         { status: 400 }
@@ -94,7 +103,9 @@ export async function POST(request: Request) {
 
     // Get SCHOOL_ADMIN role ID
     const schoolAdminRoles = await rolesRepo.getAll();
-    const schoolAdminRole = schoolAdminRoles.find((r) => r.key === "SCHOOL_ADMIN");
+    const schoolAdminRole = schoolAdminRoles.find(
+      (r) => r.key === "SCHOOL_ADMIN"
+    );
 
     if (!schoolAdminRole) {
       return NextResponse.json(

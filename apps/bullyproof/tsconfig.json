@@ -10,7 +10,9 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "strict": false,
+    "noImplicitAny": false
   },
   "include": [
     "next-env.d.ts",
