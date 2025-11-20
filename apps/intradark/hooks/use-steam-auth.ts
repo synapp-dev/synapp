@@ -1,121 +1,95 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { fetchSteamProfile } from "@/utils/steam-profile";
 
-import {
-  getUserProfileWithSteam,
-  linkSteamProfileToUser,
-  unlinkSteamProfileFromUser,
-} from "@/utils/steam-profile";
-import type { Database } from "@/types/supabase";
-import { createBrowserClient } from "@/utils/supabase/client";
-
-type UserProfileWithSteam =
-  Database["public"]["Functions"]["get_user_profile_with_steam"]["Returns"][0];
-
-interface UseSteamAuthReturn {
-  userProfile: UserProfileWithSteam | null;
-  isLoading: boolean;
-  error: string | null;
-  linkSteamProfile: (steamid64: string) => Promise<boolean>;
-  unlinkSteamProfile: () => Promise<boolean>;
-  refreshProfile: () => Promise<void>;
+interface SteamUserProfile {
+  steamid: string;
+  personaname: string;
+  avatar: string;
+  avatarmedium: string;
+  avatarfull: string;
 }
 
-export async function useSteamAuth(): Promise<UseSteamAuthReturn> {
-  const [userProfile, setUserProfile] = useState<UserProfileWithSteam | null>(
-    null
-  );
+interface UseSteamAuthReturn {
+  steamId: string | null;
+  profile: SteamUserProfile | null;
+  isLoading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  signOut: () => void;
+}
+
+function getSteamIdFromStorage(): string | null {
+  try {
+    const match = document.cookie.match(/(?:^|; )steamId=([^;]+)/);
+    const fromCookie = match ? decodeURIComponent(match[1] || "") : "";
+    const fromLocal = typeof window !== "undefined" ? localStorage.getItem("steamId") : null;
+    return fromCookie || fromLocal || null;
+  } catch {
+    return null;
+  }
+}
+
+export function useSteamAuth(): UseSteamAuthReturn {
+  const [steamId, setSteamId] = useState<string | null>(null);
+  const [profile, setProfile] = useState<SteamUserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = await createBrowserClient();
-
-  const fetchUserProfile = async () => {
+  const load = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
-
-      const profile = await getUserProfileWithSteam();
-      setUserProfile(profile);
+      const id = getSteamIdFromStorage();
+      setSteamId(id);
+      if (!id) {
+        setProfile(null);
+        return;
+      }
+      // Persist to localStorage for later
+      try { localStorage.setItem("steamId", id); } catch {}
+      const data = await fetchSteamProfile(id);
+      if (!data) {
+        setProfile(null);
+        setError("Failed to load Steam profile");
+        return;
+      }
+      setProfile({
+        steamid: data.steamid,
+        personaname: data.personaname,
+        avatar: data.avatar,
+        avatarmedium: data.avatarmedium,
+        avatarfull: data.avatarfull,
+      });
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch user profile"
-      );
+      setError(err instanceof Error ? err.message : "Failed to load Steam profile");
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const linkSteamProfile = async (steamid64: string): Promise<boolean> => {
-    try {
-      setError(null);
-
-      const success = await linkSteamProfileToUser(steamid64);
-
-      if (success) {
-        // Refresh the user profile to get updated data
-        await fetchUserProfile();
-      }
-
-      return success;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to link Steam profile"
-      );
-      return false;
-    }
-  };
-
-  const unlinkSteamProfile = async (): Promise<boolean> => {
-    try {
-      setError(null);
-
-      const success = await unlinkSteamProfileFromUser();
-
-      if (success) {
-        // Refresh the user profile to get updated data
-        await fetchUserProfile();
-      }
-
-      return success;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to unlink Steam profile"
-      );
-      return false;
-    }
-  };
-
-  const refreshProfile = async () => {
-    await fetchUserProfile();
-  };
-
-  // Listen for auth state changes
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
-        await fetchUserProfile();
-      } else if (event === "SIGNED_OUT") {
-        setUserProfile(null);
-        setIsLoading(false);
-      }
-    });
-
-    // Initial fetch
-    fetchUserProfile();
-
-    return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const signOut = () => {
+    try {
+      // Clear cookie
+      document.cookie = "steamId=; path=/; max-age=0";
+      // Clear localStorage
+      try { localStorage.removeItem("steamId"); } catch {}
+      setSteamId(null);
+      setProfile(null);
+    } catch {}
+  };
+
   return {
-    userProfile,
+    steamId,
+    profile,
     isLoading,
     error,
-    linkSteamProfile,
-    unlinkSteamProfile,
-    refreshProfile,
+    refresh: load,
+    signOut,
   };
 }
