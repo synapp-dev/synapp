@@ -28,6 +28,9 @@ import {
   Search as SearchIcon,
   Loader2,
   X as ClearIcon,
+  MousePointer2,
+  School,
+  Pointer,
 } from "lucide-react";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -42,6 +45,7 @@ import {
 } from "@/entities/school/model/useListSchoolsQuery";
 import { useIsPlatformAdmin } from "@/entities/me/model/store";
 import { useSchoolStore } from "@/stores/school-store";
+import { cn } from "@workspace/ui/lib/utils";
 
 // Union type for both school types
 type School = MeSchool | SchoolServiceSchool;
@@ -95,63 +99,8 @@ export function SchoolSwitcher() {
   const isLoading = isPlatformAdmin ? allSchoolsLoading : mySchoolsLoading;
   const error = isPlatformAdmin ? allSchoolsError : mySchoolsError;
 
-  // Helpers to normalize sector and levels across different sources
-  function getSectorText(school: any): string | null {
-    const sector = school?.sector;
-    if (!sector) return null;
-    if (typeof sector === "string") return sector;
-    if (typeof sector === "object" && "name" in sector && sector.name) {
-      return String((sector as { name: string }).name);
-    }
-    return null;
-  }
-
-  function getLevelsText(school: any): string | null {
-    const levels = school?.levels;
-    if (!levels) return null;
-    if (Array.isArray(levels)) {
-      if (levels.length === 0) return null;
-      // If array of strings (from v_schools_readable)
-      if (typeof levels[0] === "string") {
-        return (levels as string[]).join(", ");
-      }
-      // If array of objects with name (from v_schools_enriched)
-      if (typeof levels[0] === "object" && levels[0] && "name" in levels[0]) {
-        return (levels as Array<{ name: string }>)
-          .map((l) => l.name)
-          .filter(Boolean)
-          .join(", ");
-      }
-    }
-    return null;
-  }
-
-  function getStateText(school: any): string | null {
-    const state = school?.state;
-    if (!state) return null;
-    if (typeof state === "string") return state.toUpperCase();
-    if (typeof state === "object" && "name" in state && (state as any).name) {
-      return String((state as { name: string }).name);
-    }
-    return null;
-  }
-
-  function getLevelsLabel(school: any): string | null {
-    const raw = school?.levels;
-    if (!Array.isArray(raw)) return null;
-    const names = (
-      typeof raw[0] === "string"
-        ? (raw as string[])
-        : (raw as Array<{ name?: string }>).map((l) => l?.name || "")
-    ).map((s) => s.toLowerCase());
-    const hasPrimary = names.some((n) => n.includes("primary"));
-    const hasSecondary = names.some((n) => n.includes("secondary"));
-    if (hasPrimary && hasSecondary) return "P-12";
-    if (hasPrimary) return "Primary";
-    if (hasSecondary) return "Secondary";
-    const text = getLevelsText(school);
-    return text ? text : null;
-  }
+  // Check if user has access to only one school
+  const hasOnlyOneSchool = schools.length === 1;
 
   // Keep local selectedSchool in sync with store or URL context
   useEffect(() => {
@@ -270,208 +219,270 @@ export function SchoolSwitcher() {
   return (
     <SidebarMenu>
       <SidebarMenuItem className="items-center w-full flex pb-2 px-2">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <SidebarMenuButton
-              tooltip={selectedSchool?.name || "Select school"}
-              className="w-full flex items-center gap-2 justify-between group/school-switcher py-6"
-            >
-              {state === "expanded" ? (
-                <>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Image
-                      src={"https://i.imgur.com/8TMyB0x.png"}
-                      alt={selectedSchool?.name || "School"}
-                      width={100}
-                      height={100}
-                      className="object-cover w-5 h-auto opacity-100"
-                    />
-                    <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
-                      <h3 className="font-medium truncate">
-                        {selectedSchool?.name || "No school selected"}
-                      </h3>
-                      <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
-                        {/* State */}
-                        <div className="truncate">
-                          {(() => {
-                            const st = (selectedSchool as any)?.state;
-                            if (!st) return "";
-                            return typeof st === "string"
-                              ? st.toUpperCase()
-                              : (st as any)?.name || "";
-                          })()}
-                        </div>
-                        <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                        {/* Sector */}
-                        <div className="truncate capitalize">
-                          {String(
-                            ((selectedSchool as any)?.sector ?? "") as string
+        {hasOnlyOneSchool ? (
+          // Simple display without popover when user has only one school
+          <SidebarMenuButton
+            tooltip={selectedSchool?.name || "School"}
+            className="w-full flex items-center gap-2 justify-start group/school-switcher py-6"
+          >
+            {state === "expanded" ? (
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <Image
+                  src={"https://i.imgur.com/8TMyB0x.png"}
+                  alt={selectedSchool?.name || "School"}
+                  width={100}
+                  height={100}
+                  className="object-cover w-5 h-auto opacity-100"
+                />
+                <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
+                  <h3 className="font-medium truncate">
+                    {selectedSchool?.name || "No school selected"}
+                  </h3>
+                  <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
+                    {(() => {
+                      const st = (selectedSchool as any)?.state;
+                      const stateText = st ? (typeof st === "string" ? st.toUpperCase() : (st as any)?.name || "") : "";
+                      
+                      const sectorText = String(((selectedSchool as any)?.sector ?? "") as string);
+                      
+                      const lvls = (selectedSchool as any)?.levels as string[] | undefined;
+                      let levelsText = "";
+                      if (Array.isArray(lvls) && lvls.length > 0) {
+                        const lower = lvls.map((s) => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
+                        const hasPrimary = lower.some((s) => s.includes("primary"));
+                        const hasSecondary = lower.some((s) => s.includes("secondary"));
+                        if (hasPrimary && hasSecondary) levelsText = "P-12";
+                        else if (hasPrimary) levelsText = "Primary";
+                        else if (hasSecondary) levelsText = "Secondary";
+                        else levelsText = lvls.join(", ");
+                      }
+                      
+                      const parts = [stateText, sectorText, levelsText].filter(Boolean);
+                      
+                      return parts.map((part, index) => (
+                        <div key={index} className="flex items-center gap-1">
+                          <div className="truncate">{part}</div>
+                          {index < parts.length - 1 && (
+                            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
                           )}
                         </div>
-                        <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                        {/* Levels */}
-                        <div className="truncate">
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <Image
+                src={"https://i.imgur.com/8TMyB0x.png"}
+                alt={selectedSchool?.name || "School"}
+                width={32}
+                height={32}
+                className="object-contain w-6 h-auto"
+              />
+            )}
+          </SidebarMenuButton>
+        ) : (
+          // Full popover functionality when user has multiple schools
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <SidebarMenuButton
+                tooltip={selectedSchool?.name || "Select school"}
+                className="w-full flex items-center gap-2 justify-between group/school-switcher py-6"
+              >
+                {state === "expanded" ? (
+                  <>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      
+                      {selectedSchool?.name ? (
+                        <Image
+                        src={"https://i.imgur.com/8TMyB0x.png"}
+                        alt={selectedSchool?.name || "School"}
+                        width={100}
+                        height={100}
+                        className="object-cover w-5 h-auto opacity-100"
+                      />
+                      ) : (
+                        <School 
+                          className="size-5 text-muted-foreground"
+                        />
+                      )}
+                      
+                      <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
+                        <h3 className={cn("font-medium truncate", selectedSchool?.name ? "text-foreground" : "text-muted-foreground")}>
+                          {selectedSchool?.name || "Select a school!"}
+                        </h3>
+                        <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
                           {(() => {
-                            const lvls = (selectedSchool as any)?.levels as
-                              | string[]
-                              | undefined;
-                            if (!Array.isArray(lvls) || lvls.length === 0)
-                              return "";
-                            const lower = lvls.map((s) => s.toLowerCase());
-                            const hasPrimary = lower.some((s) =>
-                              s.includes("primary")
-                            );
-                            const hasSecondary = lower.some((s) =>
-                              s.includes("secondary")
-                            );
-                            if (hasPrimary && hasSecondary) return "P-12";
-                            if (hasPrimary) return "Primary";
-                            if (hasSecondary) return "Secondary";
-                            return lvls.join(", ");
+                            const st = (selectedSchool as any)?.state;
+                            const stateText = st ? (typeof st === "string" ? st.toUpperCase() : (st as any)?.name || "") : "";
+                            
+                            const sectorText = String(((selectedSchool as any)?.sector ?? "") as string);
+                            
+                            const lvls = (selectedSchool as any)?.levels as string[] | undefined;
+                            let levelsText = "";
+                            if (Array.isArray(lvls) && lvls.length > 0) {
+                              const lower = lvls.map((s) => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
+                              const hasPrimary = lower.some((s) => s.includes("primary"));
+                              const hasSecondary = lower.some((s) => s.includes("secondary"));
+                              if (hasPrimary && hasSecondary) levelsText = "P-12";
+                              else if (hasPrimary) levelsText = "Primary";
+                              else if (hasSecondary) levelsText = "Secondary";
+                              else levelsText = lvls.join(", ");
+                            }
+                            
+                            const parts = [stateText, sectorText, levelsText].filter(Boolean);
+                            
+                            return parts.map((part, index) => (
+                              <div key={index} className="flex items-center gap-1">
+                                <div className="truncate capitalize">{part}</div>
+                                {index < parts.length - 1 && (
+                                  <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+                                )}
+                              </div>
+                            ));
                           })()}
                         </div>
                       </div>
                     </div>
-                  </div>
-                  <ArrowLeftRight className="flex-shrink-0 group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300" />
-                </>
-              ) : (
-                <Image
-                  src={"https://i.imgur.com/8TMyB0x.png"}
-                  alt={selectedSchool?.name || "School"}
-                  width={32}
-                  height={32}
-                  className="object-contain w-6 h-auto"
-                />
-              )}
-            </SidebarMenuButton>
-          </PopoverTrigger>
-          <PopoverContent className="w-80 p-0" align="start" side="right">
-            <div className="flex items-center justify-between px-3 py-2 border-b">
-              <p className="text-xs text-muted-foreground">Change school</p>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
-                View all
-              </Button>
-            </div>
-            <Command className="[&_[data-slot=command-input-wrapper]_svg]:hidden">
-              {(() => {
-                const showSpinner =
-                  isPlatformAdmin &&
-                  search.trim().length >= 2 &&
-                  (search !== debouncedSearch || searching);
-                const hasText = search.length > 0;
-                return (
-                  <div className="relative">
-                    <CommandInput
-                      placeholder="Search schools..."
-                      value={search}
-                      onValueChange={setSearch}
-                      className="pl-6 pr-8"
-                    />
-                    {showSpinner ? (
-                      <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    {selectedSchool?.name ? (
+                      <ArrowLeftRight className="flex-shrink-0 group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300" />
                     ) : (
-                      <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-slide-down-fade-in" />
+                      <Pointer className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
                     )}
-                    {hasText && (
-                      <button
-                        type="button"
-                        aria-label="Clear search"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 grid place-items-center rounded hover:bg-muted/60"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setSearch("");
-                          setDebouncedSearch("");
+                  </>
+                ) : (
+                  <Image
+                    src={"https://i.imgur.com/8TMyB0x.png"}
+                    alt={selectedSchool?.name || "School"}
+                    width={32}
+                    height={32}
+                    className="object-contain w-6 h-auto"
+                  />
+                )}
+              </SidebarMenuButton>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-0" align="start" side="right">
+              <div className="flex items-center justify-between px-3 py-2 border-b">
+                <p className="text-xs text-muted-foreground">Change school</p>
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                  View all
+                </Button>
+              </div>
+              <Command className="[&_[data-slot=command-input-wrapper]_svg]:hidden">
+                {(() => {
+                  const showSpinner =
+                    isPlatformAdmin &&
+                    search.trim().length >= 2 &&
+                    (search !== debouncedSearch || searching);
+                  const hasText = search.length > 0;
+                  return (
+                    <div className="relative">
+                      <CommandInput
+                        placeholder="Search schools..."
+                        value={search}
+                        onValueChange={setSearch}
+                        className="pl-6 pr-8"
+                      />
+                      {showSpinner ? (
+                        <Loader2 className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground animate-slide-down-fade-in" />
+                      )}
+                      {hasText && (
+                        <button
+                          type="button"
+                          aria-label="Clear search"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 h-5 w-5 grid place-items-center rounded hover:bg-muted/60"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setSearch("");
+                            setDebouncedSearch("");
+                          }}
+                        >
+                          <ClearIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })()}
+                <CommandList>
+                  <CommandEmpty>No schools found.</CommandEmpty>
+                  <CommandGroup>
+                    {/* Keep previous items visible while searching; spinner is inside input */}
+                    {schools.map((school) => (
+                      <CommandItem
+                        key={school.id}
+                        value={school.name || ""}
+                        onSelect={() => {
+                          setSelectedSchool(school);
+                          setOpen(false);
+                          // Persist last accessed immediately for non-school pages
+                          setLastAccessedSchool({
+                            id: school.id as string,
+                            name: school.name as string,
+                            slug: (school as any).slug as string,
+                            bannerUrl: (school as any).bannerUrl ?? null,
+                            avatarUrl: (school as any).avatarUrl ?? null,
+                          });
+                          // Navigate to the school route
+                          const slug =
+                            typeof (school as any).slug === "string"
+                              ? (school as any).slug
+                              : "";
+                          if (slug) {
+                            router.push(`/schools/${slug}/home`);
+                          }
                         }}
+                        className="flex items-center gap-2"
                       >
-                        <ClearIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
-              <CommandList>
-                <CommandEmpty>No schools found.</CommandEmpty>
-                <CommandGroup>
-                  {/* Keep previous items visible while searching; spinner is inside input */}
-                  {schools.map((school) => (
-                    <CommandItem
-                      key={school.id}
-                      value={school.name || ""}
-                      onSelect={() => {
-                        setSelectedSchool(school);
-                        setOpen(false);
-                        // Persist last accessed immediately for non-school pages
-                        setLastAccessedSchool({
-                          id: school.id as string,
-                          name: school.name as string,
-                          slug: (school as any).slug as string,
-                          bannerUrl: (school as any).bannerUrl ?? null,
-                          avatarUrl: (school as any).avatarUrl ?? null,
-                        });
-                        // Navigate to the school route
-                        const slug =
-                          typeof (school as any).slug === "string"
-                            ? (school as any).slug
-                            : "";
-                        if (slug) {
-                          router.push(`/schools/${slug}/home`);
-                        }
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <SchoolIcon className="h-4 w-4" />
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <span className="font-medium truncate">
-                          {school.name}
-                        </span>
-                        <div className="flex items-center gap-1">
-                          <span className="text-muted-foreground text-xs truncate">
+                        <SchoolIcon className="h-4 w-4" />
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="font-medium truncate">
+                            {school.name}
+                          </span>
+                          <div className="flex items-center gap-1">
                             {(() => {
                               const st = (school as any)?.state;
-                              if (!st) return "";
-                              return typeof st === "string"
-                                ? st.toUpperCase()
-                                : (st as any)?.name || "";
+                              const stateText = st ? (typeof st === "string" ? st.toUpperCase() : (st as any)?.name || "") : "";
+                              
+                              const sectorText = String(((school as any)?.sector ?? "") as string);
+                              
+                              const lvls = (school as any)?.levels as string[] | undefined;
+                              let levelsText = "";
+                              if (Array.isArray(lvls) && lvls.length > 0) {
+                                const lower = lvls.map((s) => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
+                                const hasPrimary = lower.some((s) => s.includes("primary"));
+                                const hasSecondary = lower.some((s) => s.includes("secondary"));
+                                if (hasPrimary && hasSecondary) levelsText = "P-12";
+                                else if (hasPrimary) levelsText = "Primary";
+                                else if (hasSecondary) levelsText = "Secondary";
+                                else levelsText = lvls.join(", ");
+                              }
+                              
+                              const parts = [stateText, sectorText, levelsText].filter(Boolean);
+                              
+                              return parts.map((part, index) => (
+                                <div key={index} className="flex items-center gap-1">
+                                  <span className="text-muted-foreground text-xs truncate capitalize">{part}</span>
+                                  {index < parts.length - 1 && (
+                                    <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+                                  )}
+                                </div>
+                              ));
                             })()}
-                          </span>
-                          <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                          <span className="text-muted-foreground text-xs truncate capitalize">
-                            {String(((school as any)?.sector ?? "") as string)}
-                          </span>
-                          <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                          <span className="text-muted-foreground text-xs truncate">
-                            {(() => {
-                              const lvls = (school as any)?.levels as
-                                | string[]
-                                | undefined;
-                              if (!Array.isArray(lvls) || lvls.length === 0)
-                                return "";
-                              const lower = lvls.map((s) => s.toLowerCase());
-                              const hasPrimary = lower.some((s) =>
-                                s.includes("primary")
-                              );
-                              const hasSecondary = lower.some((s) =>
-                                s.includes("secondary")
-                              );
-                              if (hasPrimary && hasSecondary) return "P-12";
-                              if (hasPrimary) return "Primary";
-                              if (hasSecondary) return "Secondary";
-                              return lvls.join(", ");
-                            })()}
-                          </span>
+                          </div>
                         </div>
-                      </div>
-                      {selectedSchool?.id === school.id && (
-                        <Check className="h-4 w-4 text-primary" />
-                      )}
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+                        {selectedSchool?.id === school.id && (
+                          <Check className="h-4 w-4 text-primary" />
+                        )}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        )}
       </SidebarMenuItem>
     </SidebarMenu>
   );
