@@ -12,7 +12,11 @@
     "lint:fix": "next lint --fix",
     "typecheck": "tsc --noEmit",
     "gen-types": "pnpx supabase gen types typescript --project-id sukurbtgprvxgoeagich --schema public > types/supabase.ts",
-    "supabase-start": "npx supabase start"
+    "supabase-start": "npx supabase start",
+    "seed:reference": "tsx scripts/seed-reference-data.ts",
+    "migrate:schools": "tsx scripts/migrate-schools.ts",
+    "test:migration": "tsx scripts/test-migration.ts",
+    "generate:sql": "tsx scripts/generate-sql.ts"
   },
   "dependencies": {
     "@supabase/auth-helpers-nextjs": "^0.10.0",
