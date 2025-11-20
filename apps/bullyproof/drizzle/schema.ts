@@ -128,23 +128,6 @@ export const lessons = pgTable("lessons", {
 	check("lessons_status_check", sql`status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text])`),
 ]);
 
-export const topics = pgTable("topics", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	stageId: uuid("stage_id").notNull(),
-	title: text().notNull(),
-	status: text().default('draft').notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	officialNotes: text("official_notes"),
-}, (table) => [
-	uniqueIndex("ux_topics_stage_title").using("btree", sql`stage_id`, sql`lower(title)`),
-	foreignKey({
-			columns: [table.stageId],
-			foreignColumns: [curriculumStages.id],
-			name: "topics_stage_id_fkey"
-		}).onDelete("restrict"),
-	check("topics_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
-]);
-
 export const roles = pgTable("roles", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	scopeId: uuid("scope_id").notNull(),
@@ -159,6 +142,24 @@ export const roles = pgTable("roles", {
 		}).onDelete("cascade"),
 	unique("roles_scope_id_name_key").on(table.scopeId, table.name),
 	unique("roles_key_key").on(table.key),
+]);
+
+export const topics = pgTable("topics", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	stageId: uuid("stage_id").notNull(),
+	title: text().notNull(),
+	status: text().default('draft').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	officialNotes: text("official_notes"),
+	stageOrder: smallint("stage_order"),
+}, (table) => [
+	uniqueIndex("ux_topics_stage_title").using("btree", sql`stage_id`, sql`lower(title)`),
+	foreignKey({
+			columns: [table.stageId],
+			foreignColumns: [curriculumStages.id],
+			name: "topics_stage_id_fkey"
+		}).onDelete("restrict"),
+	check("topics_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
 ]);
 
 export const lessonLiveState = pgTable("lesson_live_state", {

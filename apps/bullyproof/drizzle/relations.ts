@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { schoolLevels, schoolYears, usersInAuth, userProfile, schools, classes, lessons, topics, curriculumStages, scopes, roles, topicSlides, lessonLiveState, userRoles, lessonEvents, lessonSessions, schoolInvites, schoolLicences, schoolSectors, states, schoolLevelAssignments, lessonClasses, stageYearLinks, classYears, teacherSlideNotes, lessonSlideNotes } from "./schema";
+import { schoolLevels, schoolYears, usersInAuth, userProfile, schools, classes, lessons, topics, scopes, roles, curriculumStages, topicSlides, lessonLiveState, userRoles, lessonEvents, lessonSessions, schoolInvites, schoolLicences, schoolSectors, states, schoolLevelAssignments, lessonClasses, stageYearLinks, classYears, teacherSlideNotes, lessonSlideNotes } from "./schema";
 
 export const schoolYearsRelations = relations(schoolYears, ({one, many}) => ({
 	schoolLevel: one(schoolLevels, {
@@ -87,11 +87,6 @@ export const topicsRelations = relations(topics, ({one, many}) => ({
 	topicSlides: many(topicSlides),
 }));
 
-export const curriculumStagesRelations = relations(curriculumStages, ({many}) => ({
-	topics: many(topics),
-	stageYearLinks: many(stageYearLinks),
-}));
-
 export const rolesRelations = relations(roles, ({one, many}) => ({
 	scope: one(scopes, {
 		fields: [roles.scopeId],
@@ -102,6 +97,11 @@ export const rolesRelations = relations(roles, ({one, many}) => ({
 
 export const scopesRelations = relations(scopes, ({many}) => ({
 	roles: many(roles),
+}));
+
+export const curriculumStagesRelations = relations(curriculumStages, ({many}) => ({
+	topics: many(topics),
+	stageYearLinks: many(stageYearLinks),
 }));
 
 export const lessonLiveStateRelations = relations(lessonLiveState, ({one}) => ({
