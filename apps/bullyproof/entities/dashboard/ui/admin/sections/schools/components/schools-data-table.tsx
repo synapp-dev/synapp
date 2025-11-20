@@ -44,7 +44,7 @@ import {
 } from "@workspace/ui/components/select";
 
 import { columns, type School } from "./schools-table-columns";
-import schoolsData from "../dummy-data/schools-dummy-data.json";
+import { schoolApi } from "@/entities/school/api/endpoints";
 
 interface SchoolsDataTableProps {
   onSchoolClick: (school: School) => void;
@@ -58,8 +58,67 @@ export function SchoolsDataTable({ onSchoolClick }: SchoolsDataTableProps) {
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
+  const [schools, setSchools] = React.useState<School[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const data = schoolsData.schools as School[];
+  React.useEffect(() => {
+    const fetchSchools = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Fetch all schools in batches (max limit is 100 per API)
+        const allSchools: School[] = [];
+        let offset = 0;
+        const limit = 100; // Maximum allowed by API
+        let hasMore = true;
+
+        while (hasMore) {
+          const result = await schoolApi.get.listSchools({
+            limit,
+            offset,
+          });
+          
+          if (result.data === null) {
+            // TypeScript knows this is ApiErr when data is null
+            const errorObj = result.error as { message: string; status?: number };
+            setError(errorObj?.message || "Failed to fetch schools");
+            break;
+          }
+          
+          // Map the API response to match School type
+          const mappedSchools: School[] = result.data.map((school: any) => ({
+            id: school.id || "",
+            name: school.name || "",
+            state: school.state || null,
+            sector: school.sector || null,
+            teacherCount: school.teacherCount ?? 0,
+            slug: school.slug || null,
+          }));
+          
+          allSchools.push(...mappedSchools);
+          
+          // If we got fewer than the limit, we've fetched all schools
+          if (mappedSchools.length < limit) {
+            hasMore = false;
+          } else {
+            offset += limit;
+          }
+        }
+        
+        setSchools(allSchools);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to fetch schools");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSchools();
+  }, []);
+
+  const data = schools;
 
   const table = useReactTable({
     data,
@@ -139,7 +198,25 @@ export function SchoolsDataTable({ onSchoolClick }: SchoolsDataTableProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
+            {isLoading ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  Loading schools...
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center text-destructive"
+                >
+                  Error: {error}
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}

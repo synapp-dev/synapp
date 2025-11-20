@@ -28,10 +28,6 @@ import {
   Star,
   TrendingUp,
   MapPin,
-  Calendar,
-  Mail,
-  Phone,
-  ExternalLink,
 } from "lucide-react";
 import { type School as SchoolType } from "./schools-table-columns";
 
@@ -61,12 +57,14 @@ export function SchoolDetailDrawer({
               {school.name}
             </SheetTitle>
             <SheetDescription className="text-sm">
-              {school.state} •{" "}
+              {school.state || "—"} •{" "}
               {school.sector === "government"
                 ? "Government"
                 : school.sector === "catholic"
                   ? "Catholic"
-                  : "Independent"}
+                  : school.sector === "independent"
+                    ? "Independent"
+                    : "—"}
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -93,16 +91,16 @@ export function SchoolDetailDrawer({
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Teachers Trained
+                      Teachers
                     </CardTitle>
                     <Users className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {school.activeTeachers}
+                      {school.teacherCount}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      of {school.totalTeachers} total
+                      total teachers
                     </p>
                   </CardContent>
                 </Card>
@@ -110,47 +108,15 @@ export function SchoolDetailDrawer({
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Lessons Delivered
+                      State
                     </CardTitle>
-                    <BookOpen className="h-4 w-4 text-muted-foreground" />
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {school.lessonsDelivered}
+                      {school.state || "—"}
                     </div>
-                    <p className="text-xs text-muted-foreground">this term</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Culture Rating
-                    </CardTitle>
-                    <Star className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {school.cultureRating.toFixed(1)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">out of 5.0</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Engagement
-                    </CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {school.engagementPercentage}%
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      teachers active
-                    </p>
+                    <p className="text-xs text-muted-foreground">location</p>
                   </CardContent>
                 </Card>
               </div>
@@ -165,14 +131,20 @@ export function SchoolDetailDrawer({
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        {school.address || "Address not provided"}
+                        State: {school.state || "—"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <School className="h-4 w-4 text-muted-foreground" />
                       <span className="text-sm">
-                        Joined{" "}
-                        {new Date(school.joinedDate).toLocaleDateString()}
+                        Sector:{" "}
+                        {school.sector === "government"
+                          ? "Government"
+                          : school.sector === "catholic"
+                            ? "Catholic"
+                            : school.sector === "independent"
+                              ? "Independent"
+                              : "—"}
                       </span>
                     </div>
                   </div>
@@ -180,29 +152,16 @@ export function SchoolDetailDrawer({
                   <Separator />
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Status</span>
-                    <Badge
-                      variant={
-                        school.status === "active"
-                          ? "default"
-                          : school.status === "pending"
-                            ? "secondary"
-                            : "destructive"
-                      }
-                    >
-                      {school.status.charAt(0).toUpperCase() +
-                        school.status.slice(1)}
-                    </Badge>
+                    <span className="text-sm font-medium">School ID</span>
+                    <span className="text-sm text-muted-foreground font-mono">
+                      {school.id}
+                    </span>
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Last Active</span>
+                    <span className="text-sm font-medium">Teachers</span>
                     <span className="text-sm text-muted-foreground">
-                      {school.lastActiveDays === 0
-                        ? "Today"
-                        : school.lastActiveDays === 1
-                          ? "1 day ago"
-                          : `${school.lastActiveDays} days ago`}
+                      {school.teacherCount} teachers
                     </span>
                   </div>
                 </CardContent>
