@@ -39,5 +39,31 @@ export const schoolApi = {
         body: JSON.stringify(payload),
       });
     },
+    create(payload: {
+      school: {
+        name: string;
+        stateId: string;
+        sectorId: string;
+        levelIds: string[];
+        emailDomain?: string | null;
+        address?: string | null;
+        bannerUrl?: string | null;
+        avatarUrl?: string | null;
+      };
+      adminEmails: string[];
+    }): Promise<ApiResult<{
+      school: School;
+      adminUsers: Array<{ userId: string; email: string }>;
+      errors?: Array<{ email: string; error: string }>;
+    }>> {
+      return apiFetch<{
+        school: School;
+        adminUsers: Array<{ userId: string; email: string }>;
+        errors?: Array<{ email: string; error: string }>;
+      }>("/schools", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
   },
 };
