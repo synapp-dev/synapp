@@ -18,6 +18,8 @@ import { AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearAllUserData } from "@/utils/clear-user-data";
 import Image from "next/image";
 import {
   Brain,
@@ -33,6 +35,7 @@ import {
 } from "lucide-react";
 import { Label } from "@workspace/ui/components/label";
 import { Alert } from "@workspace/ui/components/alert";
+import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Tooltip,
   TooltipTrigger,
@@ -58,6 +61,7 @@ const cyclingTexts = [
 ];
 
 export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -75,6 +79,7 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [isFirstOtpSubmission, setIsFirstOtpSubmission] = useState(true);
   const [hasOtpError, setHasOtpError] = useState(false);
+  const [devBypassOtp, setDevBypassOtp] = useState(false);
   const otpRef = React.useRef<HTMLInputElement>(null);
   const hasShownInitialAlertRef = React.useRef(false);
   const router = useRouter();
@@ -201,6 +206,19 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
         // Add email to URL param
         router.replace(`?email=${encodeURIComponent(email)}`);
 
+        // Check if dev bypass is enabled
+        if (devBypassOtp) {
+          setAlertMessage({
+            title: "Development Mode",
+            description: "Bypassing OTP - proceeding to password entry",
+            variant: "info",
+          });
+          setIsOtpMode(true);
+          setIsPasswordMode(true);
+          setLoading(false);
+          return;
+        }
+
         setAlertMessage({
           title: "Sending Code",
           description: `Sending one time password to ${email}...`,
@@ -315,6 +333,8 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
         }
 
         if (data.session) {
+          // Clear any previous user data before setting new user
+          clearAllUserData(queryClient);
           router.push("/dashboard");
         }
         return;
@@ -351,6 +371,8 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
       }
 
       if (session) {
+        // Clear any previous user data before setting new user
+        clearAllUserData(queryClient);
         router.push("/dashboard");
       }
     } catch {
@@ -609,6 +631,23 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
                     ) : undefined
                   }
                 />
+
+                {/* Development bypass checkbox - only show when not in OTP mode */}
+                {!isOtpMode && (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="dev-bypass"
+                      checked={devBypassOtp}
+                      onCheckedChange={(checked) => setDevBypassOtp(checked as boolean)}
+                    />
+                    <Label
+                      htmlFor="dev-bypass"
+                      className="text-xs text-muted-foreground cursor-pointer"
+                    >
+                      Dev: Bypass OTP (go straight to password)
+                    </Label>
+                  </div>
+                )}
 
                 {isOtpMode && (
                   <div
