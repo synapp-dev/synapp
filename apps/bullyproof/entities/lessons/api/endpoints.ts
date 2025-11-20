@@ -65,4 +65,56 @@ export const lessonsApi = {
       });
     },
   },
+  liveState: {
+    get: {
+      byLessonId(id: string): Promise<ApiResult<{
+        liveState: {
+          lesson_id: string;
+          current_slide_id: string;
+          current_index: number;
+          is_paused: boolean;
+          updated_at: string;
+          updated_by: string;
+        } | null;
+        slides: Array<{
+          lessonId: string;
+          topicId: string;
+          topicSlideId: string;
+          orderIndex: number;
+          kind: string;
+          textHtml: string | null;
+          imageUrl: string | null;
+          videoUrl: string | null;
+          videoStartS: number | null;
+          videoEndS: number | null;
+          effectiveNotes: string | null;
+          teacherUserId: string | null;
+        }>;
+      }>> {
+        return apiFetch(`/lessons/${encodeURIComponent(id)}/live-state`);
+      },
+    },
+    post: {
+      update(
+        id: string,
+        payload: {
+          currentSlideId?: string;
+          currentIndex?: number;
+          isPaused?: boolean;
+        }
+      ): Promise<ApiResult<{
+        lesson_id: string;
+        current_slide_id: string;
+        current_index: number;
+        is_paused: boolean;
+        updated_at: string;
+        updated_by: string;
+      }>> {
+        return apiFetch(`/lessons/${encodeURIComponent(id)}/live-state`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      },
+    },
+  },
 };
