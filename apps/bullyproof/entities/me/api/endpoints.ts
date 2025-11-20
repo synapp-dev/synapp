@@ -5,6 +5,24 @@ import type { vUserProfileExpanded, vSchoolsEnriched } from "@/drizzle/schema";
 type UserProfile = typeof vUserProfileExpanded.$inferSelect;
 type School = typeof vSchoolsEnriched.$inferSelect;
 
+export type UserWithRolesAndSchools = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  avatarUrl: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  metadata: any;
+  platformRoles: string[];
+  schoolRoles: Array<{
+    schoolId: string;
+    schoolName: string | null;
+    roleKey: string | null;
+    roleName: string | null;
+  }>;
+};
+
 export const meApi = {
   get: {
     currentUser(): Promise<ApiResult<UserProfile | null>> {
@@ -16,6 +34,21 @@ export const meApi = {
     userByEmail(email: string): Promise<ApiResult<UserProfile | null>> {
       return apiFetch<UserProfile | null>(
         `/users?email=${encodeURIComponent(email)}`
+      );
+    },
+    listAllUsers(params?: {
+      limit?: number;
+      offset?: number;
+      search?: string;
+    }): Promise<ApiResult<UserWithRolesAndSchools[]>> {
+      const searchParams = new URLSearchParams();
+      if (params?.limit) searchParams.set("limit", params.limit.toString());
+      if (params?.offset) searchParams.set("offset", params.offset.toString());
+      if (params?.search) searchParams.set("search", params.search);
+
+      const query = searchParams.toString();
+      return apiFetch<UserWithRolesAndSchools[]>(
+        `/users${query ? `?${query}` : ""}`
       );
     },
   },
