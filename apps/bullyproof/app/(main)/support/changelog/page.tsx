@@ -7,15 +7,15 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  GitCommit, 
-  Plus, 
-  Bug, 
+import {
+  GitCommit,
+  Plus,
+  Bug,
   AlertTriangle,
   Star,
   Download,
   Filter,
-  Calendar
+  Calendar,
 } from "lucide-react";
 
 export default function ChangelogPage() {
@@ -36,12 +36,12 @@ export default function ChangelogPage() {
           "Fixed mobile app crash when accessing student profiles",
           "Corrected report generation for schools with 500+ students",
         ],
-        "Improvements": [
+        Improvements: [
           "Enhanced analytics dashboard loading performance",
           "Improved mobile app stability",
           "Optimized database queries for better response times",
         ],
-        "Security": [
+        Security: [
           "Updated authentication token validation",
           "Enhanced data encryption for sensitive information",
         ],
@@ -63,7 +63,7 @@ export default function ChangelogPage() {
           "New bulk student import functionality",
           "Added dark mode theme option",
         ],
-        "Improvements": [
+        Improvements: [
           "Redesigned mobile app interface",
           "Enhanced teacher dashboard with quick actions",
           "Improved report generation with new templates",
@@ -86,7 +86,7 @@ export default function ChangelogPage() {
         "Bug fixes for report generation",
       ],
       changes: {
-        "Security": [
+        Security: [
           "Critical security patch for authentication system",
           "Enhanced data encryption protocols",
           "Updated security headers and CORS policies",
@@ -96,7 +96,7 @@ export default function ChangelogPage() {
           "Resolved login issues for some users",
           "Fixed data export functionality",
         ],
-        "Performance": [
+        Performance: [
           "Optimized database queries",
           "Improved page loading times",
           "Enhanced caching mechanisms",
@@ -118,7 +118,7 @@ export default function ChangelogPage() {
           "Resolved notification timing problems",
           "Fixed mobile app sync issues",
         ],
-        "Improvements": [
+        Improvements: [
           "Enhanced user interface responsiveness",
           "Improved mobile app performance",
           "Better error messages and user guidance",
@@ -129,19 +129,27 @@ export default function ChangelogPage() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case "Major": return "bg-red-100 text-red-600";
-      case "Minor": return "bg-blue-100 text-blue-600";
-      case "Patch": return "bg-green-100 text-green-600";
-      default: return "bg-gray-100 text-gray-600";
+      case "Major":
+        return "bg-red-100 text-red-600";
+      case "Minor":
+        return "bg-blue-100 text-blue-600";
+      case "Patch":
+        return "bg-green-100 text-green-600";
+      default:
+        return "bg-gray-100 text-gray-600";
     }
   };
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case "Major": return <Star className="h-4 w-4" />;
-      case "Minor": return <Plus className="h-4 w-4" />;
-      case "Patch": return <Bug className="h-4 w-4" />;
-      default: return <GitCommit className="h-4 w-4" />;
+      case "Major":
+        return <Star className="h-4 w-4" />;
+      case "Minor":
+        return <Plus className="h-4 w-4" />;
+      case "Patch":
+        return <Bug className="h-4 w-4" />;
+      default:
+        return <GitCommit className="h-4 w-4" />;
     }
   };
 
@@ -154,7 +162,9 @@ export default function ChangelogPage() {
             <GitCommit className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Changelog & Release Notes</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Changelog & Release Notes
+            </h1>
             <p className="text-muted-foreground">
               Track all updates, new features, and improvements to Bullyproof
             </p>
@@ -193,12 +203,15 @@ export default function ChangelogPage() {
                     {getTypeIcon(release.type)}
                   </div>
                   <div>
-                    <CardTitle className="text-xl">Version {release.version}</CardTitle>
+                    <CardTitle className="text-xl">
+                      Version {release.version}
+                    </CardTitle>
                     <CardDescription>
-                      Released on {new Date(release.date).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                      Released on{" "}
+                      {new Date(release.date).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
                       })}
                     </CardDescription>
                   </div>
@@ -214,7 +227,10 @@ export default function ChangelogPage() {
                 <h4 className="font-medium mb-2">Key Highlights</h4>
                 <ul className="space-y-1">
                   {release.highlights.map((highlight, idx) => (
-                    <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                    <li
+                      key={idx}
+                      className="text-sm text-muted-foreground flex items-start gap-2"
+                    >
                       <Star className="h-3 w-3 text-yellow-500 mt-1 flex-shrink-0" />
                       {highlight}
                     </li>
@@ -228,8 +244,11 @@ export default function ChangelogPage() {
                   <div key={category}>
                     <h4 className="font-medium mb-2">{category}</h4>
                     <ul className="space-y-1">
-                      {items.map((item, idx) => (
-                        <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                      {(items as string[]).map((item, idx) => (
+                        <li
+                          key={idx}
+                          className="text-sm text-muted-foreground flex items-start gap-2"
+                        >
                           <div className="w-1.5 h-1.5 bg-primary rounded-full mt-2 flex-shrink-0" />
                           {item}
                         </li>
@@ -268,9 +287,12 @@ export default function ChangelogPage() {
                 <Calendar className="h-4 w-4" />
               </div>
               <div className="flex-1">
-                <div className="font-medium">Version 2.5.0 - February 15, 2024</div>
+                <div className="font-medium">
+                  Version 2.5.0 - February 15, 2024
+                </div>
                 <div className="text-sm text-muted-foreground">
-                  Major update with advanced analytics, new mobile features, and enhanced security
+                  Major update with advanced analytics, new mobile features, and
+                  enhanced security
                 </div>
               </div>
               <Badge variant="outline">Planned</Badge>
@@ -280,7 +302,9 @@ export default function ChangelogPage() {
                 <Calendar className="h-4 w-4" />
               </div>
               <div className="flex-1">
-                <div className="font-medium">Version 2.4.2 - January 30, 2024</div>
+                <div className="font-medium">
+                  Version 2.4.2 - January 30, 2024
+                </div>
                 <div className="text-sm text-muted-foreground">
                   Bug fixes and performance improvements
                 </div>
