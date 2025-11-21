@@ -14,7 +14,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <TooltipProvider>
         <NextThemesProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="light"
           enableSystem
           disableTransitionOnChange
           enableColorScheme
