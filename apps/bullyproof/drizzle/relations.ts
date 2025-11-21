@@ -1,9 +1,7 @@
 import { relations } from "drizzle-orm/relations";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import {
   schoolLevels,
   schoolYears,
-  usersInAuth, // eslint-disable-line @typescript-eslint/no-unused-vars
   userProfile,
   schools,
   classes,
@@ -28,6 +26,7 @@ import {
   teacherSlideNotes,
   lessonSlideNotes,
 } from "./schema";
+import { authUsers as usersInAuth } from "drizzle-orm/supabase";
 
 export const schoolYearsRelations = relations(schoolYears, ({ one, many }) => ({
   schoolLevel: one(schoolLevels, {
