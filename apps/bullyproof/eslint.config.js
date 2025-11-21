@@ -4,6 +4,9 @@ import { nextJsConfig } from "@workspace/eslint-config/next-js";
 export default [
   ...nextJsConfig,
   {
+    ignores: ["drizzle/schema.ts", "drizzle/relations.ts", "drizzle/**/*.ts"],
+  },
+  {
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
