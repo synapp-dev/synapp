@@ -1,16 +1,13 @@
 import { db } from "@/server/db/drizzle";
 import { schoolInvites, schools, userProfile } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc } from "drizzle-orm";
+import { randomUUID } from "crypto";
 
 export const invitesRepo = {
   getAll: () => db.select().from(schoolInvites),
 
   getById: (id: string) =>
-    db
-      .select()
-      .from(schoolInvites)
-      .where(eq(schoolInvites.id, id))
-      .limit(1),
+    db.select().from(schoolInvites).where(eq(schoolInvites.id, id)).limit(1),
 
   getBySchoolId: (schoolId: string) =>
     db
@@ -55,14 +52,17 @@ export const invitesRepo = {
   }) =>
     db
       .insert(schoolInvites)
-      .values(data)
+      .values({ ...data, token: randomUUID() } as any)
       .returning(),
 
-  update: (id: string, data: {
-    status?: "PENDING" | "ACCEPTED" | "CANCELLED" | "EXPIRED";
-    expiresAt?: string;
-    metadata?: Record<string, any>;
-  }) =>
+  update: (
+    id: string,
+    data: {
+      status?: "PENDING" | "ACCEPTED" | "CANCELLED" | "EXPIRED";
+      expiresAt?: string;
+      metadata?: Record<string, any>;
+    }
+  ) =>
     db
       .update(schoolInvites)
       .set(data)
@@ -70,19 +70,14 @@ export const invitesRepo = {
       .returning(),
 
   delete: (id: string) =>
-    db
-      .delete(schoolInvites)
-      .where(eq(schoolInvites.id, id)),
+    db.delete(schoolInvites).where(eq(schoolInvites.id, id)),
 
   getPendingByEmail: (email: string) =>
     db
       .select()
       .from(schoolInvites)
       .where(
-        and(
-          eq(schoolInvites.email, email),
-          eq(schoolInvites.status, "PENDING")
-        )
+        and(eq(schoolInvites.email, email), eq(schoolInvites.status, "PENDING"))
       )
       .orderBy(desc(schoolInvites.createdAt)),
 };

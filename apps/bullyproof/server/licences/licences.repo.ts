@@ -6,11 +6,7 @@ export const licencesRepo = {
   getAll: () => db.select().from(schoolLicences),
 
   getById: (id: string) =>
-    db
-      .select()
-      .from(schoolLicences)
-      .where(eq(schoolLicences.id, id))
-      .limit(1),
+    db.select().from(schoolLicences).where(eq(schoolLicences.id, id)).limit(1),
 
   getBySchoolId: (schoolId: string) =>
     db
@@ -33,7 +29,7 @@ export const licencesRepo = {
       })
       .from(schoolLicences)
       .leftJoin(schools, eq(schoolLicences.schoolId, schools.id))
-      .leftJoin(userProfile, eq(schoolLicences.createdByUserId, userProfile.id))
+      .leftJoin(userProfile, eq(schoolLicences.createdBy, userProfile.id))
       .where(eq(schoolLicences.id, id))
       .limit(1);
 
@@ -48,27 +44,38 @@ export const licencesRepo = {
 
   create: (data: {
     schoolId: string;
-    status: "DRAFT" | "PENDING" | "ACTIVE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
+    status:
+      | "DRAFT"
+      | "PENDING"
+      | "ACTIVE"
+      | "SUSPENDED"
+      | "EXPIRED"
+      | "CANCELLED";
     startDate: string;
     endDate: string;
     maxUsers?: number;
     features?: Record<string, any>;
     createdByUserId: string;
     metadata?: Record<string, any>;
-  }) =>
-    db
-      .insert(schoolLicences)
-      .values(data)
-      .returning(),
+  }) => db.insert(schoolLicences).values(data).returning(),
 
-  update: (id: string, data: {
-    status?: "DRAFT" | "PENDING" | "ACTIVE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
-    startDate?: string;
-    endDate?: string;
-    maxUsers?: number;
-    features?: Record<string, any>;
-    metadata?: Record<string, any>;
-  }) =>
+  update: (
+    id: string,
+    data: {
+      status?:
+        | "DRAFT"
+        | "PENDING"
+        | "ACTIVE"
+        | "SUSPENDED"
+        | "EXPIRED"
+        | "CANCELLED";
+      startDate?: string;
+      endDate?: string;
+      maxUsers?: number;
+      features?: Record<string, any>;
+      metadata?: Record<string, any>;
+    }
+  ) =>
     db
       .update(schoolLicences)
       .set(data)
@@ -76,9 +83,7 @@ export const licencesRepo = {
       .returning(),
 
   delete: (id: string) =>
-    db
-      .delete(schoolLicences)
-      .where(eq(schoolLicences.id, id)),
+    db.delete(schoolLicences).where(eq(schoolLicences.id, id)),
 
   getActiveBySchoolId: (schoolId: string) =>
     db
