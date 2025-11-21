@@ -35,7 +35,7 @@ export function SchoolStoreProvider({ school }: SchoolStoreProviderProps) {
         bannerUrl: school.bannerUrl,
         avatarUrl: school.avatarUrl,
         sector: detailed?.sector ?? null,
-        levels: (detailed?.levels as string[] | null) ?? null,
+        levels: (detailed?.levels as unknown as string[] | null) ?? null,
         state: detailed?.state ?? null,
       });
     } else {
