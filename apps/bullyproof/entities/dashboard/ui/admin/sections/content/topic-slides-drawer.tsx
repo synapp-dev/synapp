@@ -8,15 +8,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Loader2, FileText, Image, Video } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 
-type Topic = typeof topics.$inferSelect & { 
-  stage?: any; 
-  slides?: Array<typeof topicSlides.$inferSelect> 
+type Topic = typeof topics.$inferSelect & {
+  stage?: any;
+  slides?: Array<typeof topicSlides.$inferSelect>;
 };
 
 interface TopicSlidesDrawerProps {
@@ -49,11 +54,13 @@ export function TopicSlidesDrawer({
         if (result.data) {
           setTopic(result.data);
         } else if (result.error) {
-          setError(result.error);
+          setError(result.error.message ?? "Failed to fetch topic");
         }
       } catch (err) {
         console.error("Failed to fetch topic:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch topic");
+        setError(
+          err instanceof Error ? err.message : "Failed to fetch topic details"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -111,7 +118,9 @@ export function TopicSlidesDrawer({
             <div className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center gap-4">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Loading slides...</p>
+                <p className="text-sm text-muted-foreground">
+                  Loading slides...
+                </p>
               </div>
             </div>
           ) : error ? (
@@ -184,7 +193,8 @@ export function TopicSlidesDrawer({
                             className="w-full h-full"
                           />
                         </div>
-                        {(slide.videoStartS !== null || slide.videoEndS !== null) && (
+                        {(slide.videoStartS !== null ||
+                          slide.videoEndS !== null) && (
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             {slide.videoStartS !== null && (
                               <span>Start: {slide.videoStartS}s</span>
@@ -216,4 +226,3 @@ export function TopicSlidesDrawer({
     </Sheet>
   );
 }
-
