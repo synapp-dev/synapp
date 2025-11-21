@@ -23,7 +23,7 @@ export const schoolServerApi = {
       return apiFetch<School[]>(`/schools${query ? `?${query}` : ""}`);
     },
     schoolBySlug(slug: string): Promise<ApiResult<School | null>> {
-      return apiFetch<School | null>(`/schools/${encodeURIComponent(slug)}`);
+      return apiFetch<School | null>(`/schools/${slug}`);
     },
   },
   post: {

@@ -13,6 +13,8 @@ export async function GET(
     }
 
     const { id } = await params;
+
+    console.log("school slug hit", id);
     const data = await schoolService.getSchoolBySlug({ userId }, id);
     if (!data) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
