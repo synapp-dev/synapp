@@ -80,8 +80,8 @@ export function LmsSummaryCards({ lmsSummary }: LmsSummaryCardsProps) {
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-sm">
-                {getIcon(item.data.title)}
-                <span>{item.data.title}</span>
+                {getIcon((item.data as any).title)}
+                <span>{(item.data as any).title}</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
@@ -89,7 +89,10 @@ export function LmsSummaryCards({ lmsSummary }: LmsSummaryCardsProps) {
                 {item.data.title === "Completion Rate" ? (
                   <div className="space-y-2">
                     <div className="text-3xl font-bold">{item.data.value}%</div>
-                    <Progress value={item.data.value} className="h-2" />
+                    <Progress
+                      value={(item.data as any).value}
+                      className="h-2"
+                    />
                     <p className="text-xs text-muted-foreground">
                       {item.data.subtitle}
                     </p>

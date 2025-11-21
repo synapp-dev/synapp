@@ -142,44 +142,47 @@ export function ComplianceChecklist({ compliance }: ComplianceChecklistProps) {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  {getIcon(item.data.title)}
-                  <span>{item.data.title}</span>
+                  {getIcon((item.data as any).title)}
+                  <span>{(item.data as any).title}</span>
                 </div>
-                {item.data.status && getStatusBadge(item.data.status)}
+                {(item.data as any).status &&
+                  getStatusBadge((item.data as any).status)}
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-3">
-                {item.data.value !== undefined ? (
+                {(item.data as any).value !== undefined ? (
                   <div className="flex items-center justify-between">
                     <span className="text-2xl font-bold">
-                      {item.data.value.toLocaleString()}
+                      {(item.data as any).value.toLocaleString()}
                     </span>
-                    {getStatusIcon(item.data.status || "compliant")}
+                    {getStatusIcon((item.data as any).status || "compliant")}
                   </div>
                 ) : (
                   <div className="flex items-center justify-between">
                     <span className="text-lg font-semibold">
-                      {item.data.value || item.data.description}
+                      {(item.data as any).value ||
+                        (item.data as any).description}
                     </span>
-                    {getStatusIcon(item.data.status)}
+                    {getStatusIcon((item.data as any).status)}
                   </div>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  {item.data.subtitle || item.data.description}
+                  {(item.data as any).subtitle ||
+                    (item.data as any).description}
                 </p>
-                {item.data.title === "Anomalies Detected" &&
-                  item.data.value > 0 && (
+                {(item.data as any).title === "Anomalies Detected" &&
+                  (item.data as any).value > 0 && (
                     <Badge variant="destructive" className="text-xs">
                       Requires Attention
                     </Badge>
                   )}
-                {item.data.title === "Last Security Review" && (
+                {(item.data as any).title === "Last Security Review" && (
                   <Badge
                     variant="default"
                     className="text-xs bg-blue-100 text-blue-800"
                   >
-                    {new Date(item.data.value).toLocaleDateString()}
+                    {new Date((item.data as any).value).toLocaleDateString()}
                   </Badge>
                 )}
               </div>
