@@ -49,6 +49,8 @@ export const useSchoolStore = create<SchoolStoreState>()(
       name: "school-store",
       // Only persist the lastAccessedSchool, not the currentSchool (which should come from URL)
       partialize: (state) => ({ lastAccessedSchool: state.lastAccessedSchool }),
+      // Skip hydration during SSR to prevent React 19 compatibility issues
+      skipHydration: true,
     }
   )
 );

@@ -5,47 +5,40 @@ import { useSchoolStore } from "@/stores/school-store";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 
 interface SchoolStoreProviderProps {
-  school: {
-    id: string;
-    name: string;
-    slug: string;
-    bannerUrl?: string | null;
-    avatarUrl?: string | null;
-  } | null;
+  slug: string | null;
 }
 
-export function SchoolStoreProvider({ school }: SchoolStoreProviderProps) {
+export function SchoolStoreProvider({ slug }: SchoolStoreProviderProps) {
   const setCurrentSchool = useSchoolStore((state) => state.setCurrentSchool);
   const clearCurrentSchool = useSchoolStore(
     (state) => state.clearCurrentSchool
   );
 
-  // Fetch enriched school details (sector, levels, state) by slug when available
-  const { data: detailed } = useSchoolBySlugQuery(school?.slug, {
-    enabled: !!school?.slug,
+  // Fetch school details by slug
+  const { data: school, isLoading, error } = useSchoolBySlugQuery(slug ?? null, {
+    enabled: !!slug,
   });
 
   useEffect(() => {
     if (school) {
-      // Merge basic server-provided fields with detailed client-fetched fields when available
       setCurrentSchool({
-        id: school.id,
-        name: school.name,
-        slug: school.slug,
-        bannerUrl: school.bannerUrl,
-        avatarUrl: school.avatarUrl,
-        sector: detailed?.sector ?? null,
-        levels: (detailed?.levels as unknown as string[] | null) ?? null,
-        state: detailed?.state ?? null,
+        id: school.id ?? "",
+        name: school.name ?? "",
+        slug: school.slug ?? slug ?? "",
+        bannerUrl: school.bannerUrl ?? null,
+        avatarUrl: school.avatarUrl ?? null,
+        sector: school.sector ?? null,
+        levels: (school.levels as unknown as string[] | null) ?? null,
+        state: school.state ?? null,
       });
-    } else {
+    } else if (!isLoading && !slug) {
+      // Only clear if we're not loading and there's no slug
       clearCurrentSchool();
     }
   }, [
     school,
-    detailed?.sector,
-    detailed?.levels,
-    detailed?.state,
+    slug,
+    isLoading,
     setCurrentSchool,
     clearCurrentSchool,
   ]);
