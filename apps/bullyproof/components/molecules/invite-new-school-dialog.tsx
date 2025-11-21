@@ -92,7 +92,7 @@ export function InviteNewSchoolDialog({
   type FormValues = z.infer<typeof schema>;
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema as any),
     defaultValues: {
       name: "",
       state: "",
