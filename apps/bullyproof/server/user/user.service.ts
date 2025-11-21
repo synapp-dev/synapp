@@ -70,8 +70,8 @@ export const userService = {
 
     // Check if user already exists
     const { data: existingUsers } = await adminClient.auth.admin.listUsers();
-    const existingUser = existingUsers.users.find(
-      (u) => u.email === data.email
+    const existingUser = existingUsers?.users?.find(
+      (u: { email?: string }) => u.email === data.email
     );
 
     let userId: string;
@@ -113,7 +113,9 @@ export const userService = {
 
       if (inviteError) {
         // Log but don't fail - user is created, they can request a new link
-        console.error(`Failed to send magic link email: ${inviteError.message}`);
+        console.error(
+          `Failed to send magic link email: ${inviteError.message}`
+        );
       }
     }
 
@@ -146,8 +148,3 @@ export const userService = {
     };
   },
 };
-
-
-
-
-

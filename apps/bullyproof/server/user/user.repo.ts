@@ -12,7 +12,7 @@ export const userRepo = {
       typeof params.search === "string" && params.search.trim().length > 0;
 
     // Base query to get all users with their roles and schools
-    let query = db
+    const baseQuery = db
       .select({
         user: userProfile,
         role: roles,
@@ -25,22 +25,22 @@ export const userRepo = {
       .leftJoin(schools, eq(userRoles.schoolId, schools.id));
 
     // Apply search filter if provided
-    if (hasSearch) {
-      const searchTerm = `%${params.search.trim()}%`;
-      query = query.where(
-        or(
-          ilike(userProfile.firstName, searchTerm),
-          ilike(userProfile.lastName, searchTerm),
-          ilike(userProfile.email, searchTerm)
-        ) as any
-      );
-    }
+    const searchTerm = hasSearch ? `%${params.search!.trim()}%` : null;
+    const queryWithSearch = hasSearch
+      ? baseQuery.where(
+          or(
+            ilike(userProfile.firstName, searchTerm!),
+            ilike(userProfile.lastName, searchTerm!),
+            ilike(userProfile.email, searchTerm!)
+          ) as any
+        )
+      : baseQuery;
 
-    // Order by user name
-    query = query.orderBy(asc(userProfile.firstName), asc(userProfile.lastName));
-
-    // Apply pagination
-    const rows = await query.limit(params.limit).offset(params.offset);
+    // Order by user name and apply pagination
+    const rows = await queryWithSearch
+      .orderBy(asc(userProfile.firstName), asc(userProfile.lastName))
+      .limit(params.limit)
+      .offset(params.offset);
 
     // Group results by user
     const userMap = new Map<
@@ -123,4 +123,3 @@ export const userRepo = {
     return Array.from(userMap.values());
   },
 };
-
