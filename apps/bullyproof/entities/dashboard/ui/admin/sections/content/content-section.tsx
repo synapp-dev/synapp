@@ -21,15 +21,22 @@ export function ContentSection() {
       try {
         setIsLoading(true);
         setError(null);
-        const result = await curriculumApi.stages.list({ limit: 100, offset: 0 });
+        const result = await curriculumApi.stages.list({
+          limit: 100,
+          offset: 0,
+        });
         if (result.data) {
           setStages(result.data);
         } else if (result.error) {
-          setError(result.error);
+          setError(result.error.message ?? "Failed to fetch curriculum stages");
         }
       } catch (err) {
         console.error("Failed to fetch curriculum stages:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch curriculum stages");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch curriculum stages"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -48,7 +55,9 @@ export function ContentSection() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading curriculum stages...</p>
+          <p className="text-sm text-muted-foreground">
+            Loading curriculum stages...
+          </p>
         </div>
       </div>
     );
@@ -73,7 +82,9 @@ export function ContentSection() {
         <CardContent className="pt-6">
           <div className="text-center text-muted-foreground">
             <p className="font-medium">No curriculum stages found</p>
-            <p className="text-sm mt-2">There are no curriculum stages available.</p>
+            <p className="text-sm mt-2">
+              There are no curriculum stages available.
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -92,4 +103,3 @@ export function ContentSection() {
     </div>
   );
 }
-
