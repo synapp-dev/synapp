@@ -5,23 +5,30 @@ import { useRouter } from "next/navigation";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { curriculumStages, topics } from "@/server/db/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, ArrowLeft, BookOpen, FileText } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { TopicSlidesDrawer } from "./topic-slides-drawer";
 
-type Stage = typeof curriculumStages.$inferSelect & { years?: Array<{
-  id: string;
-  code: string;
-  displayName: string;
-  sortIndex: number;
-  level: {
+type Stage = typeof curriculumStages.$inferSelect & {
+  years?: Array<{
     id: string;
-    name: string;
-    key: string;
-  };
-}> };
+    code: string;
+    displayName: string;
+    sortIndex: number;
+    level: {
+      id: string;
+      name: string;
+      key: string;
+    };
+  }>;
+};
 
 type Topic = typeof topics.$inferSelect;
 
@@ -50,11 +57,17 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
         if (result.data) {
           setStage(result.data);
         } else if (result.error) {
-          setError(result.error);
+          setError(
+            result.error.message ?? "Failed to fetch curriculum stage details"
+          );
         }
       } catch (err) {
         console.error("Failed to fetch curriculum stage:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch curriculum stage");
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch curriculum stage details"
+        );
       } finally {
         setIsLoading(false);
       }
@@ -88,7 +101,9 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading curriculum stage...</p>
+          <p className="text-sm text-muted-foreground">
+            Loading curriculum stage...
+          </p>
         </div>
       </div>
     );
@@ -132,7 +147,9 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
           <CardContent className="pt-6">
             <div className="text-center text-muted-foreground">
               <p className="font-medium">Stage not found</p>
-              <p className="text-sm mt-2">The curriculum stage you're looking for doesn't exist.</p>
+              <p className="text-sm mt-2">
+                The curriculum stage you're looking for doesn't exist.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -143,10 +160,7 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
   return (
     <div className="space-y-6">
       {/* Back Button */}
-      <Button
-        variant="ghost"
-        onClick={() => router.push("/admin/content")}
-      >
+      <Button variant="ghost" onClick={() => router.push("/admin/content")}>
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Stages
       </Button>
@@ -162,9 +176,7 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
             {stage.code}
           </Badge>
           {stage.sortIndex !== null && (
-            <Badge variant="outline">
-              Order: {stage.sortIndex}
-            </Badge>
+            <Badge variant="outline">Order: {stage.sortIndex}</Badge>
           )}
         </div>
       </div>
@@ -186,13 +198,17 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
             </div>
             {stage.sortIndex !== null && (
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Sort Order</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Sort Order
+                </p>
                 <p className="text-base">{stage.sortIndex}</p>
               </div>
             )}
             {stage.createdAt && (
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Created</p>
+                <p className="text-sm font-medium text-muted-foreground">
+                  Created
+                </p>
                 <p className="text-base">
                   {new Date(stage.createdAt).toLocaleDateString()}
                 </p>
@@ -274,8 +290,8 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                           topic.status === "published"
                             ? "default"
                             : topic.status === "draft"
-                            ? "secondary"
-                            : "outline"
+                              ? "secondary"
+                              : "outline"
                         }
                       >
                         {topic.status}
@@ -298,4 +314,3 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
     </div>
   );
 }
-
