@@ -19,6 +19,10 @@ export function Breadcrumb() {
   // Split the pathname into segments
   const pathSegments = pathname.split("/").filter(Boolean);
 
+  // Check if we're in a schools/[slug] route
+  const isSchoolRoute =
+    pathSegments[0] === "schools" && pathSegments.length > 1;
+
   // Build breadcrumb items
   const breadcrumbItems = [];
   let currentPath = "";
@@ -27,8 +31,8 @@ export function Breadcrumb() {
     const segment = pathSegments[i];
     currentPath += `/${segment}`;
 
-    // Special handling for school slug
-    if (i === 1 && segment && currentSchool) {
+    // Special handling for school slug - only if we're in schools/[slug] route
+    if (isSchoolRoute && i === 1 && segment && currentSchool) {
       // Replace school slug with actual school name
       breadcrumbItems.push({
         label: currentSchool.name,
