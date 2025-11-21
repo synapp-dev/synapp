@@ -9,10 +9,6 @@ export function MeLoader() {
     console.error("Error loading user profile:", error);
   }
 
-  if (currentUser) {
-    console.log("User loaded at MeLoader:", currentUser);
-  }
-
   // The useCurrentUser hook automatically populates the me store
   // No need for manual loading logic - React Query handles it
   return null;
