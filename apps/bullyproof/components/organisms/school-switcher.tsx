@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import * as React from "react";
 import { Button } from "@workspace/ui/components/button";
 import {
   SidebarMenu,
@@ -61,7 +62,24 @@ export function SchoolSwitcher() {
 
   // School store
   const activeSchoolFromStore = useSchoolStore((s) => s.getActiveSchool());
+  const currentSchool = useSchoolStore((s) => s.currentSchool);
+  const lastAccessedSchool = useSchoolStore((s) => s.lastAccessedSchool);
   const setLastAccessedSchool = useSchoolStore((s) => s.setLastAccessedSchool);
+  const clearCurrentSchool = useSchoolStore((s) => s.clearCurrentSchool);
+  const clearLastAccessedSchool = useSchoolStore(
+    (s) => s.clearLastAccessedSchool
+  );
+
+  // Handler to toggle school selection
+  const handleSchoolToggle = useCallback(() => {
+    if (selectedSchool) {
+      // If clicking the same school, deselect it
+      clearCurrentSchool();
+      clearLastAccessedSchool();
+      setSelectedSchool(null);
+      router.push("/dashboard");
+    }
+  }, [selectedSchool, clearCurrentSchool, clearLastAccessedSchool, router]);
 
   // Check if user is platform admin or support
   const isPlatformAdmin = useIsPlatformAdmin();
@@ -99,21 +117,19 @@ export function SchoolSwitcher() {
   const isLoading = isPlatformAdmin ? allSchoolsLoading : mySchoolsLoading;
   const error = isPlatformAdmin ? allSchoolsError : mySchoolsError;
 
-  // Check if user has access to only one school
-  const hasOnlyOneSchool = schools.length === 1;
+  // Check if user has access to only one school (based on base list, not search results)
+  // This prevents the component from switching between popover and simple button during search
+  const baseSchools = isPlatformAdmin ? allSchools : mySchools;
+  const hasOnlyOneSchool = baseSchools.length === 1;
 
   // Keep local selectedSchool in sync with store or URL context
   useEffect(() => {
-    // Prefer store active school if available
-    if (activeSchoolFromStore) {
-      setSelectedSchool(activeSchoolFromStore as School);
-      return;
-    }
-
-    // If on a /schools/[slug] path but store not yet hydrated, try to infer from list
+    // Check if we're on a school page first
     const match = pathname?.match(/\/schools\/(.+?)(?:[/?#]|$)/);
     const slugFromPath = match ? decodeURIComponent(match[1]!) : null;
+
     if (slugFromPath && schools.length > 0) {
+      // If on a school page, try to find the school from the list
       const fromList = schools.find(
         (s) =>
           typeof (s as any).slug === "string" &&
@@ -125,8 +141,16 @@ export function SchoolSwitcher() {
       }
     }
 
-    // Otherwise do not force-select; keep whatever is currently selected
-  }, [activeSchoolFromStore, pathname, schools]);
+    // If not on a school page, only use currentSchool (not lastAccessedSchool fallback)
+    // This ensures deselected schools don't reappear
+    if (currentSchool) {
+      setSelectedSchool(currentSchool as School);
+      return;
+    }
+
+    // If currentSchool is null, clear selection (don't use lastAccessedSchool)
+    setSelectedSchool(null);
+  }, [currentSchool, pathname, schools]);
 
   // Debug: log whenever the selected school changes
   useEffect(() => {
@@ -224,6 +248,7 @@ export function SchoolSwitcher() {
           <SidebarMenuButton
             tooltip={selectedSchool?.name || "School"}
             className="w-full flex items-center gap-2 justify-start group/school-switcher py-6"
+            onClick={handleSchoolToggle}
           >
             {state === "expanded" ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -241,24 +266,42 @@ export function SchoolSwitcher() {
                   <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
                     {(() => {
                       const st = (selectedSchool as any)?.state;
-                      const stateText = st ? (typeof st === "string" ? st.toUpperCase() : (st as any)?.name || "") : "";
-                      
-                      const sectorText = String(((selectedSchool as any)?.sector ?? "") as string);
-                      
-                      const lvls = (selectedSchool as any)?.levels as string[] | undefined;
+                      const stateText = st
+                        ? typeof st === "string"
+                          ? st.toUpperCase()
+                          : (st as any)?.name || ""
+                        : "";
+
+                      const sectorText = String(
+                        ((selectedSchool as any)?.sector ?? "") as string
+                      );
+
+                      const lvls = (selectedSchool as any)?.levels as
+                        | string[]
+                        | undefined;
                       let levelsText = "";
                       if (Array.isArray(lvls) && lvls.length > 0) {
-                        const lower = lvls.map((s) => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
-                        const hasPrimary = lower.some((s) => s.includes("primary"));
-                        const hasSecondary = lower.some((s) => s.includes("secondary"));
+                        const lower = lvls.map((s) =>
+                          typeof s === "string"
+                            ? s.toLowerCase()
+                            : String(s).toLowerCase()
+                        );
+                        const hasPrimary = lower.some((s) =>
+                          s.includes("primary")
+                        );
+                        const hasSecondary = lower.some((s) =>
+                          s.includes("secondary")
+                        );
                         if (hasPrimary && hasSecondary) levelsText = "P-12";
                         else if (hasPrimary) levelsText = "Primary";
                         else if (hasSecondary) levelsText = "Secondary";
                         else levelsText = lvls.join(", ");
                       }
-                      
-                      const parts = [stateText, sectorText, levelsText].filter(Boolean);
-                      
+
+                      const parts = [stateText, sectorText, levelsText].filter(
+                        Boolean
+                      );
+
                       return parts.map((part, index) => (
                         <div key={index} className="flex items-center gap-1">
                           <div className="truncate">{part}</div>
@@ -292,49 +335,79 @@ export function SchoolSwitcher() {
                 {state === "expanded" ? (
                   <>
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      
                       {selectedSchool?.name ? (
                         <Image
-                        src={"https://i.imgur.com/8TMyB0x.png"}
-                        alt={selectedSchool?.name || "School"}
-                        width={100}
-                        height={100}
-                        className="object-cover w-5 h-auto opacity-100"
-                      />
-                      ) : (
-                        <School 
-                          className="size-5 text-muted-foreground"
+                          src={"https://i.imgur.com/8TMyB0x.png"}
+                          alt={selectedSchool?.name || "School"}
+                          width={100}
+                          height={100}
+                          className="object-cover w-5 h-auto opacity-100"
                         />
+                      ) : (
+                        <School className="size-5 text-muted-foreground" />
                       )}
-                      
+
                       <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
-                        <h3 className={cn("font-medium truncate", selectedSchool?.name ? "text-foreground" : "text-muted-foreground")}>
+                        <h3
+                          className={cn(
+                            "font-medium truncate",
+                            selectedSchool?.name
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          )}
+                        >
                           {selectedSchool?.name || "Select a school!"}
                         </h3>
                         <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
                           {(() => {
                             const st = (selectedSchool as any)?.state;
-                            const stateText = st ? (typeof st === "string" ? st.toUpperCase() : (st as any)?.name || "") : "";
-                            
-                            const sectorText = String(((selectedSchool as any)?.sector ?? "") as string);
-                            
-                            const lvls = (selectedSchool as any)?.levels as string[] | undefined;
+                            const stateText = st
+                              ? typeof st === "string"
+                                ? st.toUpperCase()
+                                : (st as any)?.name || ""
+                              : "";
+
+                            const sectorText = String(
+                              ((selectedSchool as any)?.sector ?? "") as string
+                            );
+
+                            const lvls = (selectedSchool as any)?.levels as
+                              | string[]
+                              | undefined;
                             let levelsText = "";
                             if (Array.isArray(lvls) && lvls.length > 0) {
-                              const lower = lvls.map((s) => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
-                              const hasPrimary = lower.some((s) => s.includes("primary"));
-                              const hasSecondary = lower.some((s) => s.includes("secondary"));
-                              if (hasPrimary && hasSecondary) levelsText = "P-12";
+                              const lower = lvls.map((s) =>
+                                typeof s === "string"
+                                  ? s.toLowerCase()
+                                  : String(s).toLowerCase()
+                              );
+                              const hasPrimary = lower.some((s) =>
+                                s.includes("primary")
+                              );
+                              const hasSecondary = lower.some((s) =>
+                                s.includes("secondary")
+                              );
+                              if (hasPrimary && hasSecondary)
+                                levelsText = "P-12";
                               else if (hasPrimary) levelsText = "Primary";
                               else if (hasSecondary) levelsText = "Secondary";
                               else levelsText = lvls.join(", ");
                             }
-                            
-                            const parts = [stateText, sectorText, levelsText].filter(Boolean);
-                            
+
+                            const parts = [
+                              stateText,
+                              sectorText,
+                              levelsText,
+                            ].filter(Boolean);
+
                             return parts.map((part, index) => (
-                              <div key={index} className="flex items-center gap-1">
-                                <div className="truncate capitalize">{part}</div>
+                              <div
+                                key={index}
+                                className="flex items-center gap-1"
+                              >
+                                <div className="truncate capitalize">
+                                  {part}
+                                </div>
                                 {index < parts.length - 1 && (
                                   <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
                                 )}
@@ -406,78 +479,151 @@ export function SchoolSwitcher() {
                   );
                 })()}
                 <CommandList>
-                  <CommandEmpty>No schools found.</CommandEmpty>
-                  <CommandGroup>
-                    {/* Keep previous items visible while searching; spinner is inside input */}
-                    {schools.map((school) => (
-                      <CommandItem
-                        key={school.id}
-                        value={school.name || ""}
-                        onSelect={() => {
-                          setSelectedSchool(school);
-                          setOpen(false);
-                          // Persist last accessed immediately for non-school pages
-                          setLastAccessedSchool({
-                            id: school.id as string,
-                            name: school.name as string,
-                            slug: (school as any).slug as string,
-                            bannerUrl: (school as any).bannerUrl ?? null,
-                            avatarUrl: (school as any).avatarUrl ?? null,
-                          });
-                          // Navigate to the school route
-                          const slug =
-                            typeof (school as any).slug === "string"
-                              ? (school as any).slug
-                              : "";
-                          if (slug) {
-                            router.push(`/schools/${slug}/home`);
-                          }
-                        }}
-                        className="flex items-center gap-2"
-                      >
-                        <SchoolIcon className="h-4 w-4" />
-                        <div className="flex flex-col flex-1 min-w-0">
-                          <span className="font-medium truncate">
-                            {school.name}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            {(() => {
-                              const st = (school as any)?.state;
-                              const stateText = st ? (typeof st === "string" ? st.toUpperCase() : (st as any)?.name || "") : "";
-                              
-                              const sectorText = String(((school as any)?.sector ?? "") as string);
-                              
-                              const lvls = (school as any)?.levels as string[] | undefined;
-                              let levelsText = "";
-                              if (Array.isArray(lvls) && lvls.length > 0) {
-                                const lower = lvls.map((s) => typeof s === 'string' ? s.toLowerCase() : String(s).toLowerCase());
-                                const hasPrimary = lower.some((s) => s.includes("primary"));
-                                const hasSecondary = lower.some((s) => s.includes("secondary"));
-                                if (hasPrimary && hasSecondary) levelsText = "P-12";
-                                else if (hasPrimary) levelsText = "Primary";
-                                else if (hasSecondary) levelsText = "Secondary";
-                                else levelsText = lvls.join(", ");
-                              }
-                              
-                              const parts = [stateText, sectorText, levelsText].filter(Boolean);
-                              
-                              return parts.map((part, index) => (
-                                <div key={index} className="flex items-center gap-1">
-                                  <span className="text-muted-foreground text-xs truncate capitalize">{part}</span>
+                  {(() => {
+                    // Check if we're currently searching/loading
+                    const isSearching =
+                      isPlatformAdmin &&
+                      search.trim().length >= 2 &&
+                      (search !== debouncedSearch || searching);
+                    return (
+                      <CommandEmpty>
+                        {isSearching ? "Loading..." : "No schools found."}
+                      </CommandEmpty>
+                    );
+                  })()}
+                  {(() => {
+                    // Helper function to render a school item
+                    const renderSchoolItem = (
+                      school: School,
+                      isSelected: boolean
+                    ) => {
+                      const st = (school as any)?.state;
+                      const stateText = st
+                        ? typeof st === "string"
+                          ? st.toUpperCase()
+                          : (st as any)?.name || ""
+                        : "";
+
+                      const sectorText = String(
+                        ((school as any)?.sector ?? "") as string
+                      );
+
+                      const lvls = (school as any)?.levels as
+                        | string[]
+                        | undefined;
+                      let levelsText = "";
+                      if (Array.isArray(lvls) && lvls.length > 0) {
+                        const lower = lvls.map((s) =>
+                          typeof s === "string"
+                            ? s.toLowerCase()
+                            : String(s).toLowerCase()
+                        );
+                        const hasPrimary = lower.some((s) =>
+                          s.includes("primary")
+                        );
+                        const hasSecondary = lower.some((s) =>
+                          s.includes("secondary")
+                        );
+                        if (hasPrimary && hasSecondary) levelsText = "P-12";
+                        else if (hasPrimary) levelsText = "Primary";
+                        else if (hasSecondary) levelsText = "Secondary";
+                        else levelsText = lvls.join(", ");
+                      }
+
+                      const parts = [stateText, sectorText, levelsText].filter(
+                        Boolean
+                      );
+
+                      return (
+                        <CommandItem
+                          key={school.id}
+                          value={school.name || ""}
+                          onSelect={() => {
+                            // If clicking the same school that's already selected, deselect it
+                            if (isSelected) {
+                              clearCurrentSchool();
+                              clearLastAccessedSchool();
+                              setSelectedSchool(null);
+                              setOpen(false);
+                              router.push("/dashboard");
+                              return;
+                            }
+
+                            setSelectedSchool(school);
+                            setOpen(false);
+                            // Persist last accessed immediately for non-school pages
+                            setLastAccessedSchool({
+                              id: school.id as string,
+                              name: school.name as string,
+                              slug: (school as any).slug as string,
+                              bannerUrl: (school as any).bannerUrl ?? null,
+                              avatarUrl: (school as any).avatarUrl ?? null,
+                            });
+                            // Navigate to the school route
+                            const slug =
+                              typeof (school as any).slug === "string"
+                                ? (school as any).slug
+                                : "";
+                            if (slug) {
+                              router.push(`/schools/${slug}/home`);
+                            }
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <SchoolIcon className="h-4 w-4" />
+                          <div className="flex flex-col flex-1 min-w-0">
+                            <span className="font-medium truncate">
+                              {school.name}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              {parts.map((part, index) => (
+                                <div
+                                  key={index}
+                                  className="flex items-center gap-1"
+                                >
+                                  <span className="text-muted-foreground text-xs truncate capitalize">
+                                    {part}
+                                  </span>
                                   {index < parts.length - 1 && (
                                     <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
                                   )}
                                 </div>
-                              ));
-                            })()}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                        {selectedSchool?.id === school.id && (
-                          <Check className="h-4 w-4 text-primary" />
+                          {isSelected && (
+                            <Check className="h-4 w-4 text-primary" />
+                          )}
+                        </CommandItem>
+                      );
+                    };
+
+                    // Filter out selected school from the list if it exists
+                    const filteredSchools = selectedSchool
+                      ? schools.filter((s) => s.id !== selectedSchool.id)
+                      : schools;
+
+                    return (
+                      <>
+                        {/* Show selected school at the top if it exists */}
+                        {selectedSchool && (
+                          <CommandGroup heading="Current school">
+                            {renderSchoolItem(selectedSchool, true)}
+                          </CommandGroup>
                         )}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
+                        {/* Show remaining schools */}
+                        {filteredSchools.length > 0 && (
+                          <CommandGroup
+                            heading={selectedSchool ? "Suggested" : undefined}
+                          >
+                            {filteredSchools.map((school) =>
+                              renderSchoolItem(school, false)
+                            )}
+                          </CommandGroup>
+                        )}
+                      </>
+                    );
+                  })()}
                 </CommandList>
               </Command>
             </PopoverContent>

@@ -141,7 +141,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const platformItems = React.useMemo(() => {
     // Filter out Admin menu if user is not a platform admin
-    return data.navBullyproof.filter(item => {
+    return data.navBullyproof.filter((item) => {
       if (item.title === "Admin" && !isPlatformAdmin) {
         return false;
       }
@@ -155,6 +155,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return match ? match[1] : null;
   }, [pathname]);
 
+  // Subscribe to school store to get reactive updates
+  const activeSchool = useSchoolStore((s) => s.getActiveSchool());
+  const currentSchool = useSchoolStore((s) => s.currentSchool);
+
+  // Determine if a school is selected - check both store and pathname
+  const hasSchoolSelected = React.useMemo(() => {
+    // If we're on a school page, consider it selected
+    if (schoolSlugFromPath) return true;
+    // Only show school links if currentSchool is explicitly set
+    // Don't fall back to lastAccessedSchool when user has deselected
+    return !!currentSchool;
+  }, [schoolSlugFromPath, currentSchool]);
+
   // Get the active school slug for URL generation
   // Only use store state on client side to avoid hydration mismatch
   const [activeSchoolSlug, setActiveSchoolSlug] = React.useState<string | null>(
@@ -164,14 +177,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   React.useEffect(() => {
     // On client side, update with store state if not on a school page
     if (!schoolSlugFromPath) {
-      const currentSchool = useSchoolStore.getState().currentSchool;
-      const lastAccessedSchool = useSchoolStore.getState().lastAccessedSchool;
-      const activeSchool = currentSchool || lastAccessedSchool;
-      setActiveSchoolSlug(activeSchool?.slug || null);
+      const activeSchoolFromStore = activeSchool;
+      setActiveSchoolSlug(activeSchoolFromStore?.slug || null);
     } else {
       setActiveSchoolSlug(schoolSlugFromPath);
     }
-  }, [schoolSlugFromPath]);
+  }, [schoolSlugFromPath, activeSchool]);
 
   const withSlug = React.useCallback(
     (items: Array<any>) =>
@@ -189,8 +200,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       })),
     [activeSchoolSlug]
   );
-
-  
 
   const isLive = useLiveLessonStore((s) => s.isLive);
   const liveUrl = useLiveLessonStore((s) => s.getUrl());
@@ -240,18 +249,43 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <ScrollArea className="h-full">
           <NavMain items={platformItemsWithLive} title="Platform" />
 
-
           <Separator className="my-2" />
 
           <div className="-space-y-2">
             <SchoolSwitcher />
 
-            <div className="space-y-4">
-              <NavMain items={withSlug(data.navSchoolMain)} />
-              <NavMain items={withSlug(data.navPeople)} title="People" />
-              <NavMain items={withSlug(data.navCurriculum)} title="Curriculum" />
-              <NavMain items={withSlug(data.navData)} title="Data" />
-            </div>
+            {/* Only show school-specific navigation when a school is selected */}
+            {hasSchoolSelected && (
+              <div className="space-y-4" key={activeSchoolSlug}>
+                {/* navSchoolMain: 3 items, no title - starts at 0 */}
+                <NavMain
+                  items={withSlug(data.navSchoolMain)}
+                  enableStaggeredAnimation
+                  startIndex={0}
+                />
+                {/* navPeople: 2 items, has title - title at 3, items at 4-5 */}
+                <NavMain
+                  items={withSlug(data.navPeople)}
+                  title="People"
+                  enableStaggeredAnimation
+                  startIndex={3}
+                />
+                {/* navCurriculum: 3 items, has title - title at 6, items at 7-9 */}
+                <NavMain
+                  items={withSlug(data.navCurriculum)}
+                  title="Curriculum"
+                  enableStaggeredAnimation
+                  startIndex={6}
+                />
+                {/* navData: 1 item, has title - title at 10, item at 11 */}
+                <NavMain
+                  items={withSlug(data.navData)}
+                  title="Data"
+                  enableStaggeredAnimation
+                  startIndex={10}
+                />
+              </div>
+            )}
           </div>
         </ScrollArea>
       </SidebarContent>
