@@ -6,17 +6,13 @@ export const rolesRepo = {
   getAll: () => db.select().from(roles),
 
   getById: (id: string) =>
-    db
-      .select()
-      .from(roles)
-      .where(eq(roles.id, id))
-      .limit(1),
+    db.select().from(roles).where(eq(roles.id, id)).limit(1),
 
   getByScope: (scope: string) =>
     db
       .select()
       .from(roles)
-      .where(eq(roles.scope, scope))
+      .where(eq(roles.scopeId, scope))
       .orderBy(asc(roles.name)),
 
   getUserRoles: (userId: string) =>
@@ -32,15 +28,8 @@ export const rolesRepo = {
       .where(eq(userRoles.userId, userId))
       .orderBy(asc(roles.name)),
 
-  assignRole: (data: {
-    userId: string;
-    roleId: string;
-    schoolId?: string;
-  }) =>
-    db
-      .insert(userRoles)
-      .values(data)
-      .returning(),
+  assignRole: (data: { userId: string; roleId: string; schoolId?: string }) =>
+    db.insert(userRoles).values(data).returning(),
 
   removeRole: (userId: string, roleId: string, schoolId?: string) => {
     const whereConditions = [
@@ -52,9 +41,7 @@ export const rolesRepo = {
       whereConditions.push(eq(userRoles.schoolId, schoolId));
     }
 
-    return db
-      .delete(userRoles)
-      .where(and(...whereConditions));
+    return db.delete(userRoles).where(and(...whereConditions));
   },
 
   getUsersByRole: (roleId: string, schoolId?: string) => {
@@ -85,22 +72,17 @@ export const rolesRepo = {
   }) =>
     db
       .insert(roles)
-      .values(data)
+      .values({ ...data, scopeId: data.scope } as any)
       .returning(),
 
-  update: (id: string, data: {
-    name?: string;
-    key?: string;
-    description?: string;
-  }) =>
-    db
-      .update(roles)
-      .set(data)
-      .where(eq(roles.id, id))
-      .returning(),
+  update: (
+    id: string,
+    data: {
+      name?: string;
+      key?: string;
+      description?: string;
+    }
+  ) => db.update(roles).set(data).where(eq(roles.id, id)).returning(),
 
-  delete: (id: string) =>
-    db
-      .delete(roles)
-      .where(eq(roles.id, id)),
+  delete: (id: string) => db.delete(roles).where(eq(roles.id, id)),
 };

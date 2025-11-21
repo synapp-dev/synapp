@@ -6,11 +6,7 @@ export const topicsRepo = {
   getAll: () => db.select().from(topics),
 
   getById: (id: string) =>
-    db
-      .select()
-      .from(topics)
-      .where(eq(topics.id, id))
-      .limit(1),
+    db.select().from(topics).where(eq(topics.id, id)).limit(1),
 
   getByStageId: (stageId: string) =>
     db
@@ -52,8 +48,18 @@ export const topicsRepo = {
     offset?: number;
   }) => {
     const { search, stageId, limit = 50, offset = 0 } = params;
-    
-    let query = db
+
+    const conditions = [];
+
+    if (stageId) {
+      conditions.push(eq(topics.stageId, stageId));
+    }
+
+    if (search) {
+      conditions.push(ilike(topics.title, `%${search}%`));
+    }
+
+    const baseQuery = db
       .select({
         topic: topics,
         stage: curriculumStages,
@@ -61,20 +67,10 @@ export const topicsRepo = {
       .from(topics)
       .innerJoin(curriculumStages, eq(topics.stageId, curriculumStages.id));
 
-    if (stageId) {
-      query = query.where(eq(topics.stageId, stageId));
-    }
+    const query =
+      conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
 
-    if (search) {
-      query = query.where(
-        ilike(topics.title, `%${search}%`)
-      );
-    }
-
-    return query
-      .orderBy(asc(topics.title))
-      .limit(limit)
-      .offset(offset);
+    return query.orderBy(asc(topics.title)).limit(limit).offset(offset);
   },
 
   create: (data: {
@@ -82,25 +78,16 @@ export const topicsRepo = {
     title: string;
     description?: string;
     officialNotes?: string;
-  }) =>
-    db
-      .insert(topics)
-      .values(data)
-      .returning(),
+  }) => db.insert(topics).values(data).returning(),
 
-  update: (id: string, data: {
-    title?: string;
-    description?: string;
-    officialNotes?: string;
-  }) =>
-    db
-      .update(topics)
-      .set(data)
-      .where(eq(topics.id, id))
-      .returning(),
+  update: (
+    id: string,
+    data: {
+      title?: string;
+      description?: string;
+      officialNotes?: string;
+    }
+  ) => db.update(topics).set(data).where(eq(topics.id, id)).returning(),
 
-  delete: (id: string) =>
-    db
-      .delete(topics)
-      .where(eq(topics.id, id)),
+  delete: (id: string) => db.delete(topics).where(eq(topics.id, id)),
 };
