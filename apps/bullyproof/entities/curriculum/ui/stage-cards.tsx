@@ -1,11 +1,29 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Badge } from "@workspace/ui/components/badge";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { BookOpen } from "lucide-react";
 import type { curriculumStages } from "@/server/db/schema";
 
-type Stage = typeof curriculumStages.$inferSelect;
+type Stage = typeof curriculumStages.$inferSelect & {
+  years?: Array<{
+    id: string;
+    code: string;
+    displayName: string;
+    sortIndex: number;
+    level: {
+      id: string;
+      name: string;
+      key: string;
+    };
+  }>;
+};
 
 interface StageCardsProps {
   stages: Stage[];
@@ -30,18 +48,21 @@ export function StageCards({ stages, onStageClick }: StageCardsProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-muted-foreground">Code</span>
-                  <span className="text-sm font-mono font-semibold">{stage.code}</span>
-                </div>
-                {stage.sortIndex !== null && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">Order</span>
-                    <span className="text-sm font-semibold">{stage.sortIndex}</span>
+              {stage.years && stage.years.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {stage.years.map((year) => (
+                      <Badge key={year.id} variant="outline">
+                        {year.displayName}
+                      </Badge>
+                    ))}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  No year levels assigned
+                </div>
+              )}
             </CardContent>
           </Card>
         </StaggeredAnimation>
@@ -49,4 +70,3 @@ export function StageCards({ stages, onStageClick }: StageCardsProps) {
     </div>
   );
 }
-
