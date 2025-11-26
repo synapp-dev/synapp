@@ -14,7 +14,6 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, ArrowLeft, BookOpen, FileText } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
-import { TopicSlidesDrawer } from "./topic-slides-drawer";
 
 type Stage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
@@ -43,8 +42,6 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -54,12 +51,14 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
         setIsLoading(true);
         setError(null);
         const result = await curriculumApi.stages.byCode(slug);
-        if (result.data) {
-          setStage(result.data);
-        } else if (result.error) {
+        if (result.error) {
           setError(
             result.error.message ?? "Failed to fetch curriculum stage details"
           );
+        } else if (result.data) {
+          setStage(result.data);
+        } else {
+          setError("Failed to fetch curriculum stage details");
         }
       } catch (err) {
         console.error("Failed to fetch curriculum stage:", err);
@@ -96,6 +95,14 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
     fetchTopics();
   }, [stage?.id]);
 
+  const handleTopicClick = (topic: Topic) => {
+    // Navigate to topic page using T{stageOrder} format
+    // If stageOrder is null, we can't navigate (shouldn't happen in practice)
+    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
+      router.push(`/admin/content/curriculum/${slug}/T${topic.stageOrder}`);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -114,7 +121,7 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
       <div className="space-y-4">
         <Button
           variant="ghost"
-          onClick={() => router.push("/admin/content")}
+          onClick={() => router.push("/admin/content/curriculum")}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -268,10 +275,7 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                 <div
                   key={topic.id}
                   className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50 transition-colors cursor-pointer"
-                  onClick={() => {
-                    setSelectedTopicId(topic.id);
-                    setIsDrawerOpen(true);
-                  }}
+                  onClick={() => handleTopicClick(topic)}
                 >
                   <div className="flex items-center gap-3 flex-1">
                     {topic.stageOrder !== null && (
@@ -304,13 +308,6 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
           )}
         </CardContent>
       </Card>
-
-      {/* Topic Slides Drawer */}
-      <TopicSlidesDrawer
-        topicId={selectedTopicId}
-        open={isDrawerOpen}
-        onOpenChange={setIsDrawerOpen}
-      />
     </div>
   );
 }

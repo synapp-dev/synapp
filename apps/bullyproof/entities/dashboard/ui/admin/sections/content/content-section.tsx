@@ -8,7 +8,19 @@ import type { curriculumStages } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Loader2 } from "lucide-react";
 
-type Stage = typeof curriculumStages.$inferSelect;
+type Stage = typeof curriculumStages.$inferSelect & {
+  years?: Array<{
+    id: string;
+    code: string;
+    displayName: string;
+    sortIndex: number;
+    level: {
+      id: string;
+      name: string;
+      key: string;
+    };
+  }>;
+};
 
 export function ContentSection() {
   const router = useRouter();
@@ -26,7 +38,20 @@ export function ContentSection() {
           offset: 0,
         });
         if (result.data) {
-          setStages(result.data);
+          // Fetch years for each stage
+          const stagesWithYears = await Promise.all(
+            result.data.map(async (stage) => {
+              const stageResult = await curriculumApi.stages.byId(stage.id);
+              if (stageResult.data && stageResult.data.years) {
+                return {
+                  ...stage,
+                  years: stageResult.data.years,
+                };
+              }
+              return stage;
+            })
+          );
+          setStages(stagesWithYears);
         } else if (result.error) {
           setError(result.error.message ?? "Failed to fetch curriculum stages");
         }
@@ -47,7 +72,7 @@ export function ContentSection() {
 
   const handleStageClick = (stage: Stage) => {
     // Navigate to stage detail page using the stage code as slug
-    router.push(`/admin/content/${stage.code}`);
+    router.push(`/admin/content/curriculum/${stage.code}`);
   };
 
   if (isLoading) {
