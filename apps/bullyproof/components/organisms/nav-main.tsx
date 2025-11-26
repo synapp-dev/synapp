@@ -103,6 +103,7 @@ export function NavMain({
               asChild
               defaultOpen={itemActive}
               className="group/collapsible"
+              key={item.title}
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>

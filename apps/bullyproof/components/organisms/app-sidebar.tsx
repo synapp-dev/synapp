@@ -248,9 +248,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <ScrollArea className="h-full">
           <NavMain items={platformItemsWithLive} title="Platform" />
-
           <Separator className="my-2" />
-
           <div className="-space-y-2">
             <SchoolSwitcher />
 
