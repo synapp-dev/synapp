@@ -10,8 +10,10 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Switch } from "@workspace/ui/components/switch";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function Settings() {
+  usePageTitle(["settings"]);
   return (
     <div className="space-y-6 p-6">
       <h1 className="text-3xl font-bold">Settings</h1>

@@ -14,8 +14,10 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Calendar, Mail, MapPin, Phone } from "lucide-react";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function Profile() {
+  usePageTitle(["profile"]);
   return (
     <div className="space-y-6 p-6">
       <h1 className="text-3xl font-bold">Profile</h1>

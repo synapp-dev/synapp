@@ -10,8 +10,10 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function WelcomePage() {
+  usePageTitle(["welcome"]);
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
 

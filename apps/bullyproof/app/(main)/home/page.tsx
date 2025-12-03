@@ -12,8 +12,10 @@ import {
   CardContent,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function Home() {
+  usePageTitle(["home"]);
   // Example Zustand store usage
   const { count, increment, decrement, reset } = useExampleStore();
 

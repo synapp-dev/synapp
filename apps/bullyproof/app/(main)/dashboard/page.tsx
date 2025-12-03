@@ -3,8 +3,10 @@
 import { AdminDashboard } from "@/entities/dashboard/ui/admin/admin-dashboard";
 import { TeacherDashboard } from "@/entities/dashboard/ui/teacher/teacher-dashboard";
 import { useIsPlatformAdmin, useIsTeacher } from "@/entities/me/model/store";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function DashboardPage() {
+  usePageTitle(["dashboard"]);
   const isPlatformAdmin = useIsPlatformAdmin();
   const isTeacher = useIsTeacher();
 
