@@ -21,6 +21,18 @@ async function withAuth(init?: RequestInit): Promise<RequestInit> {
   return { ...init, headers };
 }
 
+// Export helper function to get auth token for use with FormData requests
+export async function getAuthHeaders(): Promise<Headers> {
+  const headers = new Headers();
+  const supabase = createBrowserClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return headers;
+}
+
 export async function apiFetch<T>(
   path: string,
   init?: RequestInit
