@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
@@ -18,6 +18,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Loader2, FileText, Image, Video } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
+import { isYouTubeUrl, convertToYouTubeEmbedUrl } from "@/utils/youtube";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -184,33 +185,56 @@ export function TopicSlidesDrawer({
                         )}
                       </div>
                     )}
-                    {slide.kind === "video" && slide.videoUrl && (
-                      <div className="space-y-2">
-                        <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
-                          <video
-                            src={slide.videoUrl}
-                            controls
-                            className="w-full h-full"
-                          />
-                        </div>
-                        {(slide.videoStartS !== null ||
-                          slide.videoEndS !== null) && (
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            {slide.videoStartS !== null && (
-                              <span>Start: {slide.videoStartS}s</span>
+                    {slide.kind === "video" &&
+                      slide.videoUrl &&
+                      (() => {
+                        const isYouTube = isYouTubeUrl(slide.videoUrl);
+                        const embedUrl = isYouTube
+                          ? convertToYouTubeEmbedUrl(
+                              slide.videoUrl,
+                              slide.videoStartS ?? null,
+                              slide.videoEndS ?? null
+                            )
+                          : null;
+
+                        return (
+                          <div className="space-y-2">
+                            <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
+                              {isYouTube && embedUrl ? (
+                                <iframe
+                                  src={embedUrl}
+                                  className="w-full h-full"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                  title={`Video content for slide ${slide.orderIndex}`}
+                                />
+                              ) : (
+                                <video
+                                  src={slide.videoUrl}
+                                  controls
+                                  className="w-full h-full"
+                                />
+                              )}
+                            </div>
+                            {(slide.videoStartS !== null ||
+                              slide.videoEndS !== null) && (
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                {slide.videoStartS !== null && (
+                                  <span>Start: {slide.videoStartS}s</span>
+                                )}
+                                {slide.videoEndS !== null && (
+                                  <span>End: {slide.videoEndS}s</span>
+                                )}
+                              </div>
                             )}
-                            {slide.videoEndS !== null && (
-                              <span>End: {slide.videoEndS}s</span>
+                            {slide.officialNotes && (
+                              <p className="text-sm text-muted-foreground">
+                                {slide.officialNotes}
+                              </p>
                             )}
                           </div>
-                        )}
-                        {slide.officialNotes && (
-                          <p className="text-sm text-muted-foreground">
-                            {slide.officialNotes}
-                          </p>
-                        )}
-                      </div>
-                    )}
+                        );
+                      })()}
                     {slide.durationSec !== null && (
                       <div className="text-xs text-muted-foreground">
                         Duration: {slide.durationSec}s

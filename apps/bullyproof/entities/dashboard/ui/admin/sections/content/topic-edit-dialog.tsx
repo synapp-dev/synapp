@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
+import { isYouTubeUrl, convertToYouTubeEmbedUrl } from "@/utils/youtube";
 import {
   Select,
   SelectContent,
@@ -158,7 +159,9 @@ export function TopicEditDialog({
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    setSlides([...slides, newSlide].sort((a, b) => a.orderIndex - b.orderIndex));
+    setSlides(
+      [...slides, newSlide].sort((a, b) => a.orderIndex - b.orderIndex)
+    );
     setEditingSlideId(newSlide.id);
   };
 
@@ -171,7 +174,9 @@ export function TopicEditDialog({
       console.log("Saving slides:", slides);
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
-      alert("Slide changes saved! (Note: Backend API endpoints needed for persistence)");
+      alert(
+        "Slide changes saved! (Note: Backend API endpoints needed for persistence)"
+      );
     } catch (err) {
       console.error("Failed to save slides:", err);
       alert("Failed to save slides. Please check console for details.");
@@ -353,30 +358,55 @@ function SlidePreview({ slide }: { slide: Slide }) {
           )}
         </div>
       )}
-      {slide.kind === "video" && slide.videoUrl && (
-        <div className="space-y-2">
-          <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
-            <video
-              src={slide.videoUrl}
-              controls
-              className="w-full h-full"
-            />
-          </div>
-          {(slide.videoStartS !== null || slide.videoEndS !== null) && (
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              {slide.videoStartS !== null && (
-                <span>Start: {slide.videoStartS}s</span>
+      {slide.kind === "video" &&
+        slide.videoUrl &&
+        (() => {
+          const isYouTube = isYouTubeUrl(slide.videoUrl);
+          const embedUrl = isYouTube
+            ? convertToYouTubeEmbedUrl(
+                slide.videoUrl,
+                slide.videoStartS ?? null,
+                slide.videoEndS ?? null
+              )
+            : null;
+
+          return (
+            <div className="space-y-2">
+              <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
+                {isYouTube && embedUrl ? (
+                  <iframe
+                    src={embedUrl}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title={`Video content for slide ${slide.orderIndex}`}
+                  />
+                ) : (
+                  <video
+                    src={slide.videoUrl}
+                    controls
+                    className="w-full h-full"
+                  />
+                )}
+              </div>
+              {(slide.videoStartS !== null || slide.videoEndS !== null) && (
+                <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                  {slide.videoStartS !== null && (
+                    <span>Start: {slide.videoStartS}s</span>
+                  )}
+                  {slide.videoEndS !== null && (
+                    <span>End: {slide.videoEndS}s</span>
+                  )}
+                </div>
               )}
-              {slide.videoEndS !== null && <span>End: {slide.videoEndS}s</span>}
+              {slide.officialNotes && (
+                <p className="text-sm text-muted-foreground">
+                  Notes: {slide.officialNotes}
+                </p>
+              )}
             </div>
-          )}
-          {slide.officialNotes && (
-            <p className="text-sm text-muted-foreground">
-              Notes: {slide.officialNotes}
-            </p>
-          )}
-        </div>
-      )}
+          );
+        })()}
       {slide.durationSec !== null && (
         <div className="text-xs text-muted-foreground">
           Duration: {slide.durationSec}s
@@ -402,12 +432,8 @@ function SlideEditForm({
   const [videoStartS, setVideoStartS] = useState(
     slide.videoStartS?.toString() ?? ""
   );
-  const [videoEndS, setVideoEndS] = useState(
-    slide.videoEndS?.toString() ?? ""
-  );
-  const [officialNotes, setOfficialNotes] = useState(
-    slide.officialNotes ?? ""
-  );
+  const [videoEndS, setVideoEndS] = useState(slide.videoEndS?.toString() ?? "");
+  const [officialNotes, setOfficialNotes] = useState(slide.officialNotes ?? "");
   const [durationSec, setDurationSec] = useState(
     slide.durationSec?.toString() ?? ""
   );
@@ -514,15 +540,33 @@ function SlideEditForm({
               />
             </div>
           </div>
-          {videoUrl && (
-            <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
-              <video
-                src={videoUrl}
-                controls
-                className="w-full h-full"
-              />
-            </div>
-          )}
+          {videoUrl &&
+            (() => {
+              const isYouTube = isYouTubeUrl(videoUrl);
+              const embedUrl = isYouTube
+                ? convertToYouTubeEmbedUrl(
+                    videoUrl,
+                    videoStartS ? parseInt(videoStartS) : null,
+                    videoEndS ? parseInt(videoEndS) : null
+                  )
+                : null;
+
+              return (
+                <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
+                  {isYouTube && embedUrl ? (
+                    <iframe
+                      src={embedUrl}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title="Video preview"
+                    />
+                  ) : (
+                    <video src={videoUrl} controls className="w-full h-full" />
+                  )}
+                </div>
+              );
+            })()}
         </div>
       )}
 
@@ -555,4 +599,3 @@ function SlideEditForm({
     </div>
   );
 }
-
