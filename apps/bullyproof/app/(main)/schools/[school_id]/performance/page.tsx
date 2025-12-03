@@ -9,26 +9,32 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Progress } from "@workspace/ui/components/progress";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Target, 
-  Users, 
-  BookOpen, 
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "performance",
+]);
+import {
+  TrendingUp,
+  TrendingDown,
+  Target,
+  Users,
+  BookOpen,
   AlertTriangle,
   CheckCircle,
   Clock,
   Award,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
 } from "lucide-react";
 
 export default async function PerformancePage({
@@ -104,10 +110,14 @@ export default async function PerformancePage({
 
   const getImpactColor = (impact: string) => {
     switch (impact) {
-      case "high": return "bg-green-100 text-green-800";
-      case "medium": return "bg-yellow-100 text-yellow-800";
-      case "low": return "bg-blue-100 text-blue-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "high":
+        return "bg-green-100 text-green-800";
+      case "medium":
+        return "bg-yellow-100 text-yellow-800";
+      case "low":
+        return "bg-blue-100 text-blue-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -116,7 +126,9 @@ export default async function PerformancePage({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Performance Dashboard - {school?.name}</h1>
+          <h1 className="text-3xl font-bold">
+            Performance Dashboard - {school?.name}
+          </h1>
           <p className="text-muted-foreground">
             Track your school's anti-bullying program effectiveness
           </p>
@@ -148,7 +160,9 @@ export default async function PerformancePage({
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{performanceMetrics.overallScore}%</div>
+            <div className="text-2xl font-bold">
+              {performanceMetrics.overallScore}%
+            </div>
             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-green-600" />
               <span className="text-green-600">+5% from last month</span>
@@ -158,11 +172,15 @@ export default async function PerformancePage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bullying Incidents</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Bullying Incidents
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{performanceMetrics.bullyingIncidents}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {performanceMetrics.bullyingIncidents}
+            </div>
             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
               <TrendingDown className="h-3 w-3 text-green-600" />
               <span className="text-green-600">-25% from last month</span>
@@ -172,11 +190,15 @@ export default async function PerformancePage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Student Engagement</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Student Engagement
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{performanceMetrics.studentEngagement}%</div>
+            <div className="text-2xl font-bold">
+              {performanceMetrics.studentEngagement}%
+            </div>
             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-green-600" />
               <span className="text-green-600">+12% from last month</span>
@@ -186,11 +208,15 @@ export default async function PerformancePage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Lesson Completion</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Lesson Completion
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{performanceMetrics.lessonCompletion}%</div>
+            <div className="text-2xl font-bold">
+              {performanceMetrics.lessonCompletion}%
+            </div>
             <div className="flex items-center space-x-1 text-xs text-muted-foreground">
               <TrendingUp className="h-3 w-3 text-green-600" />
               <span className="text-green-600">+15% from last month</span>
@@ -221,7 +247,7 @@ export default async function PerformancePage({
                 </div>
               </div>
               <Progress value={75} className="h-2" />
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Student Engagement</span>
                 <div className="flex items-center space-x-2">
@@ -230,16 +256,18 @@ export default async function PerformancePage({
                 </div>
               </div>
               <Progress value={92} className="h-2" />
-              
+
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Teacher Satisfaction</span>
+                <span className="text-sm font-medium">
+                  Teacher Satisfaction
+                </span>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-muted-foreground">+8%</span>
                   <TrendingUp className="h-4 w-4 text-green-600" />
                 </div>
               </div>
               <Progress value={89} className="h-2" />
-              
+
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Lesson Completion</span>
                 <div className="flex items-center space-x-2">
@@ -258,31 +286,41 @@ export default async function PerformancePage({
               <PieChart className="h-5 w-5" />
               <span>Grade Performance</span>
             </CardTitle>
-            <CardDescription>
-              Performance scores by grade level
-            </CardDescription>
+            <CardDescription>Performance scores by grade level</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {gradePerformance.map((grade) => {
                 const TrendIcon = getTrendIcon(grade.trend);
                 return (
-                  <div key={grade.grade} className="flex items-center justify-between">
+                  <div
+                    key={grade.grade}
+                    className="flex items-center justify-between"
+                  >
                     <div className="flex items-center space-x-3">
-                      <span className="text-sm font-medium w-16">{grade.grade}</span>
+                      <span className="text-sm font-medium w-16">
+                        {grade.grade}
+                      </span>
                       <div className="w-24 bg-gray-200 rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-blue-600 h-2 rounded-full"
                           style={{ width: `${grade.score}%` }}
                         />
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium">{grade.score}%</span>
+                      <span className="text-sm font-medium">
+                        {grade.score}%
+                      </span>
                       <div className="flex items-center space-x-1">
-                        <TrendIcon className={`h-3 w-3 ${getTrendColor(grade.trend)}`} />
-                        <span className={`text-xs ${getTrendColor(grade.trend)}`}>
-                          {grade.trend > 0 ? '+' : ''}{grade.trend}%
+                        <TrendIcon
+                          className={`h-3 w-3 ${getTrendColor(grade.trend)}`}
+                        />
+                        <span
+                          className={`text-xs ${getTrendColor(grade.trend)}`}
+                        >
+                          {grade.trend > 0 ? "+" : ""}
+                          {grade.trend}%
                         </span>
                       </div>
                     </div>
@@ -306,15 +344,21 @@ export default async function PerformancePage({
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">Attendance Rate</span>
-              <span className="text-sm font-medium">{performanceMetrics.attendanceRate}%</span>
+              <span className="text-sm font-medium">
+                {performanceMetrics.attendanceRate}%
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Behavior Improvement</span>
-              <span className="text-sm font-medium">{performanceMetrics.behaviorImprovement}%</span>
+              <span className="text-sm font-medium">
+                {performanceMetrics.behaviorImprovement}%
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Parent Satisfaction</span>
-              <span className="text-sm font-medium">{performanceMetrics.parentSatisfaction}%</span>
+              <span className="text-sm font-medium">
+                {performanceMetrics.parentSatisfaction}%
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -329,15 +373,21 @@ export default async function PerformancePage({
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">Lesson Completion</span>
-              <span className="text-sm font-medium">{performanceMetrics.lessonCompletion}%</span>
+              <span className="text-sm font-medium">
+                {performanceMetrics.lessonCompletion}%
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Student Engagement</span>
-              <span className="text-sm font-medium">{performanceMetrics.studentEngagement}%</span>
+              <span className="text-sm font-medium">
+                {performanceMetrics.studentEngagement}%
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Teacher Satisfaction</span>
-              <span className="text-sm font-medium">{performanceMetrics.teacherSatisfaction}%</span>
+              <span className="text-sm font-medium">
+                {performanceMetrics.teacherSatisfaction}%
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -352,7 +402,9 @@ export default async function PerformancePage({
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-sm">Bullying Incidents</span>
-              <span className="text-sm font-medium text-green-600">{performanceMetrics.bullyingIncidents}</span>
+              <span className="text-sm font-medium text-green-600">
+                {performanceMetrics.bullyingIncidents}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm">Incident Resolution</span>
@@ -380,7 +432,10 @@ export default async function PerformancePage({
         <CardContent>
           <div className="space-y-4">
             {recentAchievements.map((achievement) => (
-              <div key={achievement.id} className="flex items-start space-x-4 p-4 border rounded-lg">
+              <div
+                key={achievement.id}
+                className="flex items-start space-x-4 p-4 border rounded-lg"
+              >
                 <div className="p-2 bg-green-100 rounded-full">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                 </div>
@@ -391,7 +446,9 @@ export default async function PerformancePage({
                       {achievement.impact} impact
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">{achievement.description}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {achievement.description}
+                  </p>
                   <div className="flex items-center space-x-2 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     <span>{achievement.date}</span>
@@ -426,14 +483,15 @@ export default async function PerformancePage({
               <div className="flex-1">
                 <h4 className="font-medium">Focus on Grade 5 Performance</h4>
                 <p className="text-sm text-muted-foreground">
-                  Grade 5 shows a slight decline in performance. Consider additional support and resources.
+                  Grade 5 shows a slight decline in performance. Consider
+                  additional support and resources.
                 </p>
                 <Button variant="outline" size="sm" className="mt-2">
                   View Details
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex items-start space-x-4 p-4 border rounded-lg">
               <div className="p-2 bg-blue-100 rounded-full">
                 <Users className="h-5 w-5 text-blue-600" />
@@ -441,7 +499,8 @@ export default async function PerformancePage({
               <div className="flex-1">
                 <h4 className="font-medium">Enhance Parent Engagement</h4>
                 <p className="text-sm text-muted-foreground">
-                  Parent satisfaction could be improved with more communication and involvement opportunities.
+                  Parent satisfaction could be improved with more communication
+                  and involvement opportunities.
                 </p>
                 <Button variant="outline" size="sm" className="mt-2">
                   View Details

@@ -8,14 +8,14 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,22 +23,25 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import { 
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "reports"]);
+import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
-import { 
-  FileText, 
-  Download, 
-  Calendar, 
-  TrendingUp, 
-  Users, 
+import {
+  FileText,
+  Download,
+  Calendar,
+  TrendingUp,
+  Users,
   AlertTriangle,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
 } from "lucide-react";
 
 export default async function ReportsPage({
@@ -129,10 +132,10 @@ export default async function ReportsPage({
       "Grade 7": 89,
     },
     incidentTypes: {
-      "Physical": 15,
-      "Verbal": 28,
-      "Cyber": 12,
-      "Social": 18,
+      Physical: 15,
+      Verbal: 28,
+      Cyber: 12,
+      Social: 18,
     },
   };
 
@@ -169,16 +172,16 @@ export default async function ReportsPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ready to Download</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Ready to Download
+            </CardTitle>
             <Download className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {recentReports.filter(r => r.status === "completed").length}
+              {recentReports.filter((r) => r.status === "completed").length}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Available now
-            </p>
+            <p className="text-xs text-muted-foreground">Available now</p>
           </CardContent>
         </Card>
 
@@ -189,24 +192,22 @@ export default async function ReportsPage({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {recentReports.filter(r => r.status === "processing").length}
+              {recentReports.filter((r) => r.status === "processing").length}
             </div>
-            <p className="text-xs text-muted-foreground">
-              In progress
-            </p>
+            <p className="text-xs text-muted-foreground">In progress</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Last Generated</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Last Generated
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">2</div>
-            <p className="text-xs text-muted-foreground">
-              Days ago
-            </p>
+            <p className="text-xs text-muted-foreground">Days ago</p>
           </CardContent>
         </Card>
       </div>
@@ -224,19 +225,30 @@ export default async function ReportsPage({
             {reportTypes.map((reportType) => {
               const Icon = reportType.icon;
               return (
-                <Card key={reportType.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                <Card
+                  key={reportType.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center space-x-3">
                       <div className="p-2 bg-blue-100 rounded-lg">
                         <Icon className="h-5 w-5 text-blue-600" />
                       </div>
                       <div className="flex-1">
-                        <CardTitle className="text-sm">{reportType.name}</CardTitle>
-                        <Badge 
-                          variant={reportType.status === "ready" ? "default" : "secondary"}
+                        <CardTitle className="text-sm">
+                          {reportType.name}
+                        </CardTitle>
+                        <Badge
+                          variant={
+                            reportType.status === "ready"
+                              ? "default"
+                              : "secondary"
+                          }
                           className="text-xs"
                         >
-                          {reportType.status === "ready" ? "Ready" : "Generating"}
+                          {reportType.status === "ready"
+                            ? "Ready"
+                            : "Generating"}
                         </Badge>
                       </div>
                     </div>
@@ -270,20 +282,23 @@ export default async function ReportsPage({
               <BarChart3 className="h-5 w-5" />
               <span>Bullying Trends (6 Months)</span>
             </CardTitle>
-            <CardDescription>
-              Monthly incident count over time
-            </CardDescription>
+            <CardDescription>Monthly incident count over time</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Incidents</span>
-                <span className="text-sm text-muted-foreground">-33% vs last period</span>
+                <span className="text-sm text-muted-foreground">
+                  -33% vs last period
+                </span>
               </div>
               <div className="h-32 bg-gray-50 rounded-lg flex items-end justify-between p-4">
                 {chartData.bullyingTrends.data.map((value, index) => (
-                  <div key={index} className="flex flex-col items-center space-y-2">
-                    <div 
+                  <div
+                    key={index}
+                    className="flex flex-col items-center space-y-2"
+                  >
+                    <div
                       className="bg-blue-500 rounded-t w-8 transition-all duration-300"
                       style={{ height: `${(value / 15) * 100}%` }}
                     />
@@ -304,26 +319,31 @@ export default async function ReportsPage({
               <PieChart className="h-5 w-5" />
               <span>Engagement by Grade</span>
             </CardTitle>
-            <CardDescription>
-              Student participation rates
-            </CardDescription>
+            <CardDescription>Student participation rates</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {Object.entries(chartData.engagementByGrade).map(([grade, percentage]) => (
-                <div key={grade} className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{grade}</span>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${percentage}%` }}
-                      />
+              {Object.entries(chartData.engagementByGrade).map(
+                ([grade, percentage]) => (
+                  <div
+                    key={grade}
+                    className="flex items-center justify-between"
+                  >
+                    <span className="text-sm font-medium">{grade}</span>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-24 bg-gray-200 rounded-full h-2">
+                        <div
+                          className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                      <span className="text-sm text-muted-foreground w-8">
+                        {percentage}%
+                      </span>
                     </div>
-                    <span className="text-sm text-muted-foreground w-8">{percentage}%</span>
                   </div>
-                </div>
-              ))}
+                )
+              )}
             </div>
           </CardContent>
         </Card>
@@ -333,9 +353,7 @@ export default async function ReportsPage({
       <Card>
         <CardHeader>
           <CardTitle>Recent Reports</CardTitle>
-          <CardDescription>
-            Your latest generated reports
-          </CardDescription>
+          <CardDescription>Your latest generated reports</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -361,8 +379,10 @@ export default async function ReportsPage({
                   <TableCell>{report.date}</TableCell>
                   <TableCell>{report.size}</TableCell>
                   <TableCell>
-                    <Badge 
-                      variant={report.status === "completed" ? "default" : "secondary"}
+                    <Badge
+                      variant={
+                        report.status === "completed" ? "default" : "secondary"
+                      }
                     >
                       {report.status === "completed" ? "Ready" : "Processing"}
                     </Badge>
@@ -409,10 +429,18 @@ export default async function ReportsPage({
                     <SelectValue placeholder="Select report type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="bullying-trends">Bullying Trends</SelectItem>
-                    <SelectItem value="engagement">Student Engagement</SelectItem>
-                    <SelectItem value="teacher-performance">Teacher Performance</SelectItem>
-                    <SelectItem value="incident-analysis">Incident Analysis</SelectItem>
+                    <SelectItem value="bullying-trends">
+                      Bullying Trends
+                    </SelectItem>
+                    <SelectItem value="engagement">
+                      Student Engagement
+                    </SelectItem>
+                    <SelectItem value="teacher-performance">
+                      Teacher Performance
+                    </SelectItem>
+                    <SelectItem value="incident-analysis">
+                      Incident Analysis
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>

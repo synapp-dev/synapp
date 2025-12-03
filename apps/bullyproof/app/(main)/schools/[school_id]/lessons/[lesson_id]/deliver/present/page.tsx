@@ -1,4 +1,12 @@
 import { PresentationMode } from "@/components/organisms/presentation-mode";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "lessons",
+  "deliver",
+  "present",
+]);
 
 export default async function LessonDeliverPresentPage({
   params,
@@ -9,4 +17,3 @@ export default async function LessonDeliverPresentPage({
 
   return <PresentationMode lessonId={lesson_id} />;
 }
-

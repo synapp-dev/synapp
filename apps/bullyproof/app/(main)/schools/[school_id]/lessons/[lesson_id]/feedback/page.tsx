@@ -1,5 +1,11 @@
 import { LessonFeedbackForm } from "@/components/organisms/lesson-feedback-form";
+import { generateMetadataFromSegments } from "@/utils/metadata";
 
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "lessons",
+  "feedback",
+]);
 
 export default async function LessonFeedbackPage({
   params,

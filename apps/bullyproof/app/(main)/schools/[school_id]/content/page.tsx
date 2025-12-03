@@ -6,6 +6,9 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { createServerClient } from "@/utils/supabase/server";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "content"]);
 
 export default async function ContentPage() {
   const supabase = await createServerClient();

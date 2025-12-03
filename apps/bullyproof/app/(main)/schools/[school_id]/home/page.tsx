@@ -10,6 +10,9 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Progress } from "@workspace/ui/components/progress";
 import { Users, GraduationCap, TrendingUp, AlertTriangle } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "home"]);
 
 export default async function HomePage({
   params,
@@ -67,7 +70,9 @@ export default async function HomePage({
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Students
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -80,33 +85,35 @@ export default async function HomePage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Teachers</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Teachers
+            </CardTitle>
             <GraduationCap className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalTeachers}</div>
-            <p className="text-xs text-muted-foreground">
-              +3 new this month
-            </p>
+            <p className="text-xs text-muted-foreground">+3 new this month</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Classes</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Active Classes
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.activeClasses}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all grades
-            </p>
+            <p className="text-xs text-muted-foreground">Across all grades</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Incidents This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Incidents This Month
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -134,9 +141,7 @@ export default async function HomePage({
                 <span>{stats.engagementRate}%</span>
               </div>
               <Progress value={stats.engagementRate} className="h-2" />
-              <p className="text-xs text-muted-foreground">
-                Target: 90%
-              </p>
+              <p className="text-xs text-muted-foreground">Target: 90%</p>
             </div>
           </CardContent>
         </Card>
@@ -167,9 +172,7 @@ export default async function HomePage({
       <Card>
         <CardHeader>
           <CardTitle>Recent Activity</CardTitle>
-          <CardDescription>
-            Latest updates from your school
-          </CardDescription>
+          <CardDescription>Latest updates from your school</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -195,9 +198,7 @@ export default async function HomePage({
       <Card>
         <CardHeader>
           <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>
-            Common tasks and shortcuts
-          </CardDescription>
+          <CardDescription>Common tasks and shortcuts</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,5 +1,18 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { BookOpen, FileText, ClipboardCheck } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "lessons",
+  "prepare",
+]);
 
 export default async function LessonPreparePage({
   params,
@@ -14,7 +27,8 @@ export default async function LessonPreparePage({
       <div>
         <h1 className="text-3xl font-bold mb-2">Prepare Lesson</h1>
         <p className="text-muted-foreground">
-          Get ready for your lesson. Review materials, check resources, and prepare for delivery.
+          Get ready for your lesson. Review materials, check resources, and
+          prepare for delivery.
         </p>
       </div>
 
@@ -100,4 +114,3 @@ export default async function LessonPreparePage({
     </div>
   );
 }
-

@@ -10,14 +10,14 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { 
+import {
   Tabs,
   TabsContent,
   TabsList,
@@ -25,18 +25,21 @@ import {
 } from "@workspace/ui/components/tabs";
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { 
-  Settings, 
-  School, 
-  Bell, 
-  Shield, 
-  Users, 
-  Mail, 
-  Globe, 
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "settings"]);
+import {
+  Settings,
+  School,
+  Bell,
+  Shield,
+  Users,
+  Mail,
+  Globe,
   Save,
   AlertTriangle,
   CheckCircle,
-  Info
+  Info,
 } from "lucide-react";
 
 export default async function SettingsPage({
@@ -113,11 +116,17 @@ export default async function SettingsPage({
             <School className="h-4 w-4" />
             <span>General</span>
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center space-x-2">
+          <TabsTrigger
+            value="notifications"
+            className="flex items-center space-x-2"
+          >
             <Bell className="h-4 w-4" />
             <span>Notifications</span>
           </TabsTrigger>
-          <TabsTrigger value="integrations" className="flex items-center space-x-2">
+          <TabsTrigger
+            value="integrations"
+            className="flex items-center space-x-2"
+          >
             <Globe className="h-4 w-4" />
             <span>Integrations</span>
           </TabsTrigger>
@@ -143,32 +152,32 @@ export default async function SettingsPage({
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="school-name">School Name</Label>
-                  <Input 
-                    id="school-name" 
+                  <Input
+                    id="school-name"
                     defaultValue={schoolSettings.name}
                     readOnly
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="school-email">Contact Email</Label>
-                  <Input 
-                    id="school-email" 
+                  <Input
+                    id="school-email"
                     defaultValue={schoolSettings.email}
                     readOnly
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="school-phone">Phone Number</Label>
-                  <Input 
-                    id="school-phone" 
+                  <Input
+                    id="school-phone"
                     defaultValue={schoolSettings.phone}
                     readOnly
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="school-website">Website</Label>
-                  <Input 
-                    id="school-website" 
+                  <Input
+                    id="school-website"
                     defaultValue={schoolSettings.website}
                     readOnly
                   />
@@ -176,8 +185,8 @@ export default async function SettingsPage({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="school-address">Address</Label>
-                <Textarea 
-                  id="school-address" 
+                <Textarea
+                  id="school-address"
                   defaultValue={schoolSettings.address}
                   readOnly
                 />
@@ -196,24 +205,24 @@ export default async function SettingsPage({
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="established">Established</Label>
-                  <Input 
-                    id="established" 
+                  <Input
+                    id="established"
                     defaultValue={schoolSettings.established}
                     readOnly
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="enrollment">Enrollment</Label>
-                  <Input 
-                    id="enrollment" 
+                  <Input
+                    id="enrollment"
                     defaultValue={schoolSettings.enrollment.toString()}
                     readOnly
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="grades">Grade Levels</Label>
-                  <Input 
-                    id="grades" 
+                  <Input
+                    id="grades"
                     defaultValue={schoolSettings.grades}
                     readOnly
                   />
@@ -221,8 +230,8 @@ export default async function SettingsPage({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="principal">Principal</Label>
-                <Input 
-                  id="principal" 
+                <Input
+                  id="principal"
                   defaultValue={schoolSettings.principal}
                   readOnly
                 />
@@ -246,10 +255,18 @@ export default async function SettingsPage({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="America/New_York">Eastern Time</SelectItem>
-                      <SelectItem value="America/Chicago">Central Time</SelectItem>
-                      <SelectItem value="America/Denver">Mountain Time</SelectItem>
-                      <SelectItem value="America/Los_Angeles">Pacific Time</SelectItem>
+                      <SelectItem value="America/New_York">
+                        Eastern Time
+                      </SelectItem>
+                      <SelectItem value="America/Chicago">
+                        Central Time
+                      </SelectItem>
+                      <SelectItem value="America/Denver">
+                        Mountain Time
+                      </SelectItem>
+                      <SelectItem value="America/Los_Angeles">
+                        Pacific Time
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -292,7 +309,9 @@ export default async function SettingsPage({
                       Receive notifications via email
                     </p>
                   </div>
-                  <Switch defaultChecked={notificationSettings.emailNotifications} />
+                  <Switch
+                    defaultChecked={notificationSettings.emailNotifications}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -301,7 +320,9 @@ export default async function SettingsPage({
                       Get notified when new incidents are reported
                     </p>
                   </div>
-                  <Switch defaultChecked={notificationSettings.incidentAlerts} />
+                  <Switch
+                    defaultChecked={notificationSettings.incidentAlerts}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -319,7 +340,9 @@ export default async function SettingsPage({
                       Notifications about teacher activities
                     </p>
                   </div>
-                  <Switch defaultChecked={notificationSettings.teacherUpdates} />
+                  <Switch
+                    defaultChecked={notificationSettings.teacherUpdates}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -328,7 +351,9 @@ export default async function SettingsPage({
                       Send notifications to parents
                     </p>
                   </div>
-                  <Switch defaultChecked={notificationSettings.parentNotifications} />
+                  <Switch
+                    defaultChecked={notificationSettings.parentNotifications}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -337,7 +362,9 @@ export default async function SettingsPage({
                       Alerts about system maintenance
                     </p>
                   </div>
-                  <Switch defaultChecked={notificationSettings.systemMaintenance} />
+                  <Switch
+                    defaultChecked={notificationSettings.systemMaintenance}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
@@ -346,7 +373,9 @@ export default async function SettingsPage({
                       Receive product updates and tips
                     </p>
                   </div>
-                  <Switch defaultChecked={notificationSettings.marketingEmails} />
+                  <Switch
+                    defaultChecked={notificationSettings.marketingEmails}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -375,8 +404,16 @@ export default async function SettingsPage({
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={integrationSettings.googleWorkspace ? "default" : "secondary"}>
-                      {integrationSettings.googleWorkspace ? "Connected" : "Not Connected"}
+                    <Badge
+                      variant={
+                        integrationSettings.googleWorkspace
+                          ? "default"
+                          : "secondary"
+                      }
+                    >
+                      {integrationSettings.googleWorkspace
+                        ? "Connected"
+                        : "Not Connected"}
                     </Badge>
                     <Button variant="outline" size="sm">
                       Configure
@@ -391,8 +428,16 @@ export default async function SettingsPage({
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={integrationSettings.microsoftTeams ? "default" : "secondary"}>
-                      {integrationSettings.microsoftTeams ? "Connected" : "Not Connected"}
+                    <Badge
+                      variant={
+                        integrationSettings.microsoftTeams
+                          ? "default"
+                          : "secondary"
+                      }
+                    >
+                      {integrationSettings.microsoftTeams
+                        ? "Connected"
+                        : "Not Connected"}
                     </Badge>
                     <Button variant="outline" size="sm">
                       Configure
@@ -407,7 +452,11 @@ export default async function SettingsPage({
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={integrationSettings.zoom ? "default" : "secondary"}>
+                    <Badge
+                      variant={
+                        integrationSettings.zoom ? "default" : "secondary"
+                      }
+                    >
                       {integrationSettings.zoom ? "Connected" : "Not Connected"}
                     </Badge>
                     <Button variant="outline" size="sm">
@@ -423,8 +472,14 @@ export default async function SettingsPage({
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={integrationSettings.canvas ? "default" : "secondary"}>
-                      {integrationSettings.canvas ? "Connected" : "Not Connected"}
+                    <Badge
+                      variant={
+                        integrationSettings.canvas ? "default" : "secondary"
+                      }
+                    >
+                      {integrationSettings.canvas
+                        ? "Connected"
+                        : "Not Connected"}
                     </Badge>
                     <Button variant="outline" size="sm">
                       Configure
@@ -439,8 +494,16 @@ export default async function SettingsPage({
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={integrationSettings.parentPortal ? "default" : "secondary"}>
-                      {integrationSettings.parentPortal ? "Connected" : "Not Connected"}
+                    <Badge
+                      variant={
+                        integrationSettings.parentPortal
+                          ? "default"
+                          : "secondary"
+                      }
+                    >
+                      {integrationSettings.parentPortal
+                        ? "Connected"
+                        : "Not Connected"}
                     </Badge>
                     <Button variant="outline" size="sm">
                       Configure
@@ -474,7 +537,11 @@ export default async function SettingsPage({
                     </p>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Badge variant={securitySettings.twoFactorAuth ? "default" : "secondary"}>
+                    <Badge
+                      variant={
+                        securitySettings.twoFactorAuth ? "default" : "secondary"
+                      }
+                    >
                       {securitySettings.twoFactorAuth ? "Enabled" : "Disabled"}
                     </Badge>
                     <Button variant="outline" size="sm">

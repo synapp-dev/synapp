@@ -8,8 +8,15 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar";
 import { Users, GraduationCap, BookOpen, Plus } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "classes"]);
 
 export default async function ClassesPage({
   params,
@@ -113,28 +120,28 @@ export default async function ClassesPage({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{classes.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Active classes
-            </p>
+            <p className="text-xs text-muted-foreground">Active classes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Students
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalStudents}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all classes
-            </p>
+            <p className="text-xs text-muted-foreground">Across all classes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Completion</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avg. Completion
+            </CardTitle>
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -149,12 +156,17 @@ export default async function ClassesPage({
       {/* Classes Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {classes.map((classItem) => (
-          <Card key={classItem.id} className="hover:shadow-md transition-shadow">
+          <Card
+            key={classItem.id}
+            className="hover:shadow-md transition-shadow"
+          >
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{classItem.name}</CardTitle>
-                <Badge 
-                  variant={classItem.status === "active" ? "default" : "destructive"}
+                <Badge
+                  variant={
+                    classItem.status === "active" ? "default" : "destructive"
+                  }
                 >
                   {classItem.status === "active" ? "Active" : "Needs Attention"}
                 </Badge>
@@ -169,7 +181,10 @@ export default async function ClassesPage({
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={`/api/placeholder/32/32`} />
                   <AvatarFallback>
-                    {classItem.teacher.split(" ").map(n => n[0]).join("")}
+                    {classItem.teacher
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -199,7 +214,7 @@ export default async function ClassesPage({
                   <span>{classItem.completionRate}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${classItem.completionRate}%` }}
                   />

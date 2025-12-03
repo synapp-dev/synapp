@@ -9,33 +9,36 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { 
+import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs";
-import { 
-  LibraryBig, 
-  Upload, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  BookOpen, 
-  Video, 
-  FileText, 
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "resources"]);
+import {
+  LibraryBig,
+  Upload,
+  Search,
+  Filter,
+  Download,
+  Eye,
+  BookOpen,
+  Video,
+  FileText,
   Image,
   Play,
   File,
-  Plus
+  Plus,
 } from "lucide-react";
 
 export default async function ResourcesPage({
@@ -82,7 +85,8 @@ export default async function ResourcesPage({
     {
       id: 1,
       title: "Understanding Bullying - Video Series",
-      description: "A comprehensive 5-part video series explaining different types of bullying and their impact.",
+      description:
+        "A comprehensive 5-part video series explaining different types of bullying and their impact.",
       type: "video",
       category: "Videos",
       duration: "15:30",
@@ -96,7 +100,8 @@ export default async function ResourcesPage({
     {
       id: 2,
       title: "Anti-Bullying Worksheet Pack",
-      description: "Printable worksheets for grades 3-6 covering empathy, conflict resolution, and kindness.",
+      description:
+        "Printable worksheets for grades 3-6 covering empathy, conflict resolution, and kindness.",
       type: "worksheet",
       category: "Worksheets",
       pages: 12,
@@ -110,7 +115,8 @@ export default async function ResourcesPage({
     {
       id: 3,
       title: "Digital Citizenship Presentation",
-      description: "Interactive presentation about online safety and responsible digital behavior.",
+      description:
+        "Interactive presentation about online safety and responsible digital behavior.",
       type: "presentation",
       category: "Presentations",
       slides: 28,
@@ -124,7 +130,8 @@ export default async function ResourcesPage({
     {
       id: 4,
       title: "Kindness Challenge Poster Set",
-      description: "Visual posters promoting kindness and inclusion for classroom display.",
+      description:
+        "Visual posters promoting kindness and inclusion for classroom display.",
       type: "image",
       category: "Images",
       format: "PNG",
@@ -138,7 +145,8 @@ export default async function ResourcesPage({
     {
       id: 5,
       title: "Conflict Resolution Role-Play Scripts",
-      description: "Ready-to-use scripts for role-playing exercises in conflict resolution.",
+      description:
+        "Ready-to-use scripts for role-playing exercises in conflict resolution.",
       type: "worksheet",
       category: "Worksheets",
       pages: 8,
@@ -152,7 +160,8 @@ export default async function ResourcesPage({
     {
       id: 6,
       title: "Bullying Prevention Training Module",
-      description: "Comprehensive training module for teachers on recognizing and preventing bullying.",
+      description:
+        "Comprehensive training module for teachers on recognizing and preventing bullying.",
       type: "video",
       category: "Videos",
       duration: "32:15",
@@ -170,22 +179,32 @@ export default async function ResourcesPage({
 
   const getResourceIcon = (type: string) => {
     switch (type) {
-      case "video": return Video;
-      case "worksheet": return FileText;
-      case "presentation": return BookOpen;
-      case "image": return Image;
-      default: return File;
-    };
+      case "video":
+        return Video;
+      case "worksheet":
+        return FileText;
+      case "presentation":
+        return BookOpen;
+      case "image":
+        return Image;
+      default:
+        return File;
+    }
   };
 
   const getResourceColor = (type: string) => {
     switch (type) {
-      case "video": return "bg-red-100 text-red-600";
-      case "worksheet": return "bg-blue-100 text-blue-600";
-      case "presentation": return "bg-green-100 text-green-600";
-      case "image": return "bg-purple-100 text-purple-600";
-      default: return "bg-gray-100 text-gray-600";
-    };
+      case "video":
+        return "bg-red-100 text-red-600";
+      case "worksheet":
+        return "bg-blue-100 text-blue-600";
+      case "presentation":
+        return "bg-green-100 text-green-600";
+      case "image":
+        return "bg-purple-100 text-purple-600";
+      default:
+        return "bg-gray-100 text-gray-600";
+    }
   };
 
   return (
@@ -208,29 +227,31 @@ export default async function ResourcesPage({
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Resources</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Resources
+            </CardTitle>
             <LibraryBig className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{resources.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Available materials
-            </p>
+            <p className="text-xs text-muted-foreground">Available materials</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Downloads</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Downloads
+            </CardTitle>
             <Download className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {resources.reduce((sum, resource) => sum + resource.downloads, 0).toLocaleString()}
+              {resources
+                .reduce((sum, resource) => sum + resource.downloads, 0)
+                .toLocaleString()}
             </div>
-            <p className="text-xs text-muted-foreground">
-              All time
-            </p>
+            <p className="text-xs text-muted-foreground">All time</p>
           </CardContent>
         </Card>
 
@@ -240,10 +261,10 @@ export default async function ResourcesPage({
             <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{resourceCategories.length}</div>
-            <p className="text-xs text-muted-foreground">
-              Resource types
-            </p>
+            <div className="text-2xl font-bold">
+              {resourceCategories.length}
+            </div>
+            <p className="text-xs text-muted-foreground">Resource types</p>
           </CardContent>
         </Card>
 
@@ -254,11 +275,12 @@ export default async function ResourcesPage({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(resources.reduce((sum, resource) => sum + resource.rating, 0) / resources.length).toFixed(1)}
+              {(
+                resources.reduce((sum, resource) => sum + resource.rating, 0) /
+                resources.length
+              ).toFixed(1)}
             </div>
-            <p className="text-xs text-muted-foreground">
-              Out of 5 stars
-            </p>
+            <p className="text-xs text-muted-foreground">Out of 5 stars</p>
           </CardContent>
         </Card>
       </div>
@@ -276,15 +298,22 @@ export default async function ResourcesPage({
             {resourceCategories.map((category) => {
               const Icon = category.icon;
               return (
-                <Card key={category.id} className="hover:shadow-md transition-shadow cursor-pointer">
+                <Card
+                  key={category.id}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center space-x-3">
                       <div className={`p-2 rounded-lg ${category.color}`}>
                         <Icon className="h-5 w-5" />
                       </div>
                       <div className="flex-1">
-                        <CardTitle className="text-sm">{category.name}</CardTitle>
-                        <p className="text-xs text-muted-foreground">{category.count} resources</p>
+                        <CardTitle className="text-sm">
+                          {category.name}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          {category.count} resources
+                        </p>
                       </div>
                     </div>
                   </CardHeader>
@@ -306,10 +335,7 @@ export default async function ResourcesPage({
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search resources..."
-                className="pl-10"
-              />
+              <Input placeholder="Search resources..." className="pl-10" />
             </div>
             <Select>
               <SelectTrigger className="w-full sm:w-[180px]">
@@ -347,15 +373,22 @@ export default async function ResourcesPage({
         {resources.map((resource) => {
           const Icon = getResourceIcon(resource.type);
           return (
-            <Card key={resource.id} className="hover:shadow-md transition-shadow">
+            <Card
+              key={resource.id}
+              className="hover:shadow-md transition-shadow"
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-lg ${getResourceColor(resource.type)}`}>
+                    <div
+                      className={`p-2 rounded-lg ${getResourceColor(resource.type)}`}
+                    >
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="flex-1">
-                      <CardTitle className="text-lg">{resource.title}</CardTitle>
+                      <CardTitle className="text-lg">
+                        {resource.title}
+                      </CardTitle>
                       <CardDescription className="line-clamp-2">
                         {resource.description}
                       </CardDescription>
@@ -373,7 +406,9 @@ export default async function ResourcesPage({
                   </div>
                   <div>
                     <p className="text-muted-foreground">Downloads</p>
-                    <p className="font-medium">{resource.downloads.toLocaleString()}</p>
+                    <p className="font-medium">
+                      {resource.downloads.toLocaleString()}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Rating</p>
@@ -449,14 +484,22 @@ export default async function ResourcesPage({
             {featuredResources.map((resource) => {
               const Icon = getResourceIcon(resource.type);
               return (
-                <div key={resource.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                  <div className={`p-2 rounded-lg ${getResourceColor(resource.type)}`}>
+                <div
+                  key={resource.id}
+                  className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50"
+                >
+                  <div
+                    className={`p-2 rounded-lg ${getResourceColor(resource.type)}`}
+                  >
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{resource.title}</p>
+                    <p className="text-sm font-medium truncate">
+                      {resource.title}
+                    </p>
                     <p className="text-xs text-muted-foreground">
-                      {resource.downloads.toLocaleString()} downloads • {resource.rating}/5
+                      {resource.downloads.toLocaleString()} downloads •{" "}
+                      {resource.rating}/5
                     </p>
                   </div>
                   <Button size="sm" variant="outline">

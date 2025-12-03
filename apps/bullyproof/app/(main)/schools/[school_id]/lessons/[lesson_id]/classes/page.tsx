@@ -1,14 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table";
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
 import { User, AlertCircle, StickyNote, Users } from "lucide-react";
 import { Label } from "@workspace/ui/components/label";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 interface Student {
   id: string;
@@ -20,6 +34,7 @@ interface Student {
 }
 
 export default function LessonClassesPage() {
+  usePageTitle(["schools", "lessons", "classes"]);
   const [useAttendance, setUseAttendance] = useState(true);
   const [students, setStudents] = useState<Student[]>([
     {
@@ -117,7 +132,7 @@ export default function LessonClassesPage() {
             Manage your class roster, track attendance, and add student notes.
           </p>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch
@@ -136,7 +151,9 @@ export default function LessonClassesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Students
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
@@ -153,7 +170,9 @@ export default function LessonClassesPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <User className="h-5 w-5 text-green-600" />
-              <span className="text-3xl font-bold text-green-600">{presentCount}</span>
+              <span className="text-3xl font-bold text-green-600">
+                {presentCount}
+              </span>
             </div>
           </CardContent>
         </Card>
@@ -178,7 +197,8 @@ export default function LessonClassesPage() {
         <CardHeader>
           <CardTitle>Class Roster</CardTitle>
           <CardDescription>
-            Review accommodations, track attendance, and add quick notes for each student
+            Review accommodations, track attendance, and add quick notes for
+            each student
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -220,11 +240,17 @@ export default function LessonClassesPage() {
                           }
                         />
                         {student.attendance ? (
-                          <Badge variant="outline" className="border-green-200 text-green-700 bg-green-50">
+                          <Badge
+                            variant="outline"
+                            className="border-green-200 text-green-700 bg-green-50"
+                          >
                             Present
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="border-orange-200 text-orange-700 bg-orange-50">
+                          <Badge
+                            variant="outline"
+                            className="border-orange-200 text-orange-700 bg-orange-50"
+                          >
                             Absent
                           </Badge>
                         )}
@@ -279,14 +305,18 @@ export default function LessonClassesPage() {
         </CardHeader>
         <CardContent>
           <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-            <li>Review each student's accommodations before starting the lesson</li>
+            <li>
+              Review each student's accommodations before starting the lesson
+            </li>
             <li>Use quick notes to track specific behaviors or observations</li>
             <li>Mark attendance to keep accurate records</li>
-            <li>Notes are saved automatically and will be visible in lesson history</li>
+            <li>
+              Notes are saved automatically and will be visible in lesson
+              history
+            </li>
           </ul>
         </CardContent>
       </Card>
     </div>
   );
 }
-

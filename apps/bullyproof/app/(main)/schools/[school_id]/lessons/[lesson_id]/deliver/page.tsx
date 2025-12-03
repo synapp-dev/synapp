@@ -18,12 +18,14 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function LessonDeliverPage({
   params,
 }: {
   params: Promise<{ school_id: string; lesson_id: string }>;
 }) {
+  usePageTitle(["schools", "lessons", "deliver"]);
   const { school_id, lesson_id } = use(params);
   const [presentDialogOpen, setPresentDialogOpen] = useState(false);
   const [controlsDialogOpen, setControlsDialogOpen] = useState(false);

@@ -1,8 +1,25 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Clock, Users, FileText, BookOpen, Calendar, Edit } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
+import { generateMetadataFromSegment } from "@/utils/metadata";
+import { Metadata } from "next";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ school_id: string; lesson_id: string }>;
+}): Promise<Metadata> {
+  const { lesson_id } = await params;
+  return generateMetadataFromSegment(lesson_id);
+}
 
 export default async function LessonOverviewPage({
   params,
@@ -14,7 +31,8 @@ export default async function LessonOverviewPage({
   // Dummy data
   const lessonData = {
     title: "Understanding Bullying Behaviors",
-    summary: "This lesson introduces students to the concept of bullying, helping them identify different types of bullying behavior and understand their impact on individuals and communities.",
+    summary:
+      "This lesson introduces students to the concept of bullying, helping them identify different types of bullying behavior and understand their impact on individuals and communities.",
     objectives: [
       "Identify the three main types of bullying behavior",
       "Understand the impact of bullying on victims",
@@ -48,16 +66,30 @@ export default async function LessonOverviewPage({
       { name: "Mason Lee", initials: "ML" },
     ],
     lastEdited: "2 hours ago by Sarah Johnson",
-    lastEditedNotes: "Updated objectives section to include bystander intervention strategies. Adjusted time estimate to 45 minutes based on class discussion needs.",
+    lastEditedNotes:
+      "Updated objectives section to include bystander intervention strategies. Adjusted time estimate to 45 minutes based on class discussion needs.",
     recentActivity: [
-      { action: "Lesson scheduled", user: "Sarah Johnson", time: "2 hours ago" },
-      { action: "Objectives updated", user: "Sarah Johnson", time: "3 hours ago" },
+      {
+        action: "Lesson scheduled",
+        user: "Sarah Johnson",
+        time: "2 hours ago",
+      },
+      {
+        action: "Objectives updated",
+        user: "Sarah Johnson",
+        time: "3 hours ago",
+      },
       { action: "Materials added", user: "Michael Chen", time: "1 day ago" },
-      { action: "Class roster updated", user: "Sarah Johnson", time: "2 days ago" },
+      {
+        action: "Class roster updated",
+        user: "Sarah Johnson",
+        time: "2 days ago",
+      },
     ],
     nextAction: {
       title: "Review Lesson Materials",
-      description: "Before delivery, please review all materials and ensure the projector is functioning properly.",
+      description:
+        "Before delivery, please review all materials and ensure the projector is functioning properly.",
       dueBy: "Tomorrow at 9:00 AM",
     },
   };
@@ -67,7 +99,9 @@ export default async function LessonOverviewPage({
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">{lessonData.title}</h1>
-        <p className="text-muted-foreground">Lesson ID: {lesson_id} • School ID: {school_id}</p>
+        <p className="text-muted-foreground">
+          Lesson ID: {lesson_id} • School ID: {school_id}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -149,7 +183,9 @@ export default async function LessonOverviewPage({
                 <Users className="h-5 w-5" />
                 Class Roster Snapshot
               </CardTitle>
-              <CardDescription>{lessonData.classRoster.length} students enrolled</CardDescription>
+              <CardDescription>
+                {lessonData.classRoster.length} students enrolled
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">

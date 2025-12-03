@@ -1,19 +1,31 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
-import { 
-  Clock, 
-  User, 
-  Plus, 
-  Edit, 
-  Play, 
-  Square, 
-  Download, 
+import {
+  Clock,
+  User,
+  Plus,
+  Edit,
+  Play,
+  Square,
+  Download,
   Calendar,
   MessageSquare,
   CheckCircle2,
-  XCircle
+  XCircle,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "lessons",
+  "history",
+]);
 
 export default async function LessonHistoryPage({
   params,
@@ -30,8 +42,12 @@ export default async function LessonHistoryPage({
       event: "lesson_completed",
       title: "Lesson Completed",
       description: "All classes have completed the lesson",
-      initiator: { name: "Sarah Johnson", initials: "SJ", email: "sarah.johnson@school.edu" },
-      metadata: { classesCompleted: 3, totalClasses: 3 }
+      initiator: {
+        name: "Sarah Johnson",
+        initials: "SJ",
+        email: "sarah.johnson@school.edu",
+      },
+      metadata: { classesCompleted: 3, totalClasses: 3 },
     },
     {
       id: 2,
@@ -39,8 +55,12 @@ export default async function LessonHistoryPage({
       event: "lesson_stopped",
       title: "Lesson Stopped",
       description: "Lesson delivery stopped for Class A",
-      initiator: { name: "Michael Chen", initials: "MC", email: "michael.chen@school.edu" },
-      metadata: { className: "Class A", duration: "32 minutes" }
+      initiator: {
+        name: "Michael Chen",
+        initials: "MC",
+        email: "michael.chen@school.edu",
+      },
+      metadata: { className: "Class A", duration: "32 minutes" },
     },
     {
       id: 3,
@@ -48,8 +68,12 @@ export default async function LessonHistoryPage({
       event: "lesson_started",
       title: "Lesson Started",
       description: "Started delivery for Class A",
-      initiator: { name: "Michael Chen", initials: "MC", email: "michael.chen@school.edu" },
-      metadata: { className: "Class A" }
+      initiator: {
+        name: "Michael Chen",
+        initials: "MC",
+        email: "michael.chen@school.edu",
+      },
+      metadata: { className: "Class A" },
     },
     {
       id: 4,
@@ -57,8 +81,12 @@ export default async function LessonHistoryPage({
       event: "lesson_exported",
       title: "Lesson Data Exported",
       description: "Exported lesson data and analytics",
-      initiator: { name: "Sarah Johnson", initials: "SJ", email: "sarah.johnson@school.edu" },
-      metadata: { format: "CSV", fileName: "lesson-analytics-2024.csv" }
+      initiator: {
+        name: "Sarah Johnson",
+        initials: "SJ",
+        email: "sarah.johnson@school.edu",
+      },
+      metadata: { format: "CSV", fileName: "lesson-analytics-2024.csv" },
     },
     {
       id: 5,
@@ -66,8 +94,12 @@ export default async function LessonHistoryPage({
       event: "lesson_updated",
       title: "Lesson Updated",
       description: "Updated class roster and added supplementary materials",
-      initiator: { name: "Sarah Johnson", initials: "SJ", email: "sarah.johnson@school.edu" },
-      metadata: { changes: ["class_roster", "materials"] }
+      initiator: {
+        name: "Sarah Johnson",
+        initials: "SJ",
+        email: "sarah.johnson@school.edu",
+      },
+      metadata: { changes: ["class_roster", "materials"] },
     },
     {
       id: 6,
@@ -75,8 +107,12 @@ export default async function LessonHistoryPage({
       event: "lesson_scheduled",
       title: "Lesson Scheduled",
       description: "Scheduled lesson for delivery",
-      initiator: { name: "Michael Chen", initials: "MC", email: "michael.chen@school.edu" },
-      metadata: { scheduledDate: "2024-01-15", classes: 3 }
+      initiator: {
+        name: "Michael Chen",
+        initials: "MC",
+        email: "michael.chen@school.edu",
+      },
+      metadata: { scheduledDate: "2024-01-15", classes: 3 },
     },
     {
       id: 7,
@@ -84,9 +120,13 @@ export default async function LessonHistoryPage({
       event: "lesson_created",
       title: "Lesson Created",
       description: "Initial lesson creation",
-      initiator: { name: "Sarah Johnson", initials: "SJ", email: "sarah.johnson@school.edu" },
-      metadata: { lessonTitle: "Understanding Bullying Behaviors" }
-    }
+      initiator: {
+        name: "Sarah Johnson",
+        initials: "SJ",
+        email: "sarah.johnson@school.edu",
+      },
+      metadata: { lessonTitle: "Understanding Bullying Behaviors" },
+    },
   ];
 
   const getEventIcon = (eventType: string) => {
@@ -110,7 +150,9 @@ export default async function LessonHistoryPage({
     }
   };
 
-  const getEventBadgeVariant = (eventType: string): "default" | "secondary" | "outline" | "destructive" => {
+  const getEventBadgeVariant = (
+    eventType: string
+  ): "default" | "secondary" | "outline" | "destructive" => {
     switch (eventType) {
       case "lesson_completed":
         return "default";
@@ -139,24 +181,25 @@ export default async function LessonHistoryPage({
     const minutes = Math.floor(diff / (1000 * 60));
 
     if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
-    if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
-    if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+    if (minutes < 60)
+      return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
+    if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+    if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`;
+
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
     });
   };
 
   const formatDateTime = (date: Date) => {
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
     });
   };
 
@@ -190,7 +233,7 @@ export default async function LessonHistoryPage({
           <div className="relative">
             {/* Timeline Line */}
             <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border"></div>
-            
+
             {/* Timeline Items */}
             <div className="space-y-6">
               {auditLog.map((item, index) => (
@@ -210,14 +253,19 @@ export default async function LessonHistoryPage({
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <h3 className="font-semibold">{item.title}</h3>
-                          <Badge variant={getEventBadgeVariant(item.event)} className="text-xs">
-                            {item.event.replace('lesson_', '').replace('_', ' ')}
+                          <Badge
+                            variant={getEventBadgeVariant(item.event)}
+                            className="text-xs"
+                          >
+                            {item.event
+                              .replace("lesson_", "")
+                              .replace("_", " ")}
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mb-3">
                           {item.description}
                         </p>
-                        
+
                         {/* Initiator */}
                         <div className="flex items-center gap-2 mb-2">
                           <Avatar className="h-6 w-6">
@@ -225,7 +273,9 @@ export default async function LessonHistoryPage({
                               {item.initiator.initials}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-sm font-medium">{item.initiator.name}</span>
+                          <span className="text-sm font-medium">
+                            {item.initiator.name}
+                          </span>
                           <span className="text-xs text-muted-foreground">
                             {item.initiator.email}
                           </span>
@@ -234,11 +284,17 @@ export default async function LessonHistoryPage({
                         {/* Metadata */}
                         {item.metadata && (
                           <div className="flex flex-wrap gap-2 mt-2">
-                            {Object.entries(item.metadata).map(([key, value]) => (
-                              <Badge key={key} variant="outline" className="text-xs">
-                                {key}: {String(value)}
-                              </Badge>
-                            ))}
+                            {Object.entries(item.metadata).map(
+                              ([key, value]) => (
+                                <Badge
+                                  key={key}
+                                  variant="outline"
+                                  className="text-xs"
+                                >
+                                  {key}: {String(value)}
+                                </Badge>
+                              )
+                            )}
                           </div>
                         )}
                       </div>
@@ -263,4 +319,3 @@ export default async function LessonHistoryPage({
     </div>
   );
 }
-

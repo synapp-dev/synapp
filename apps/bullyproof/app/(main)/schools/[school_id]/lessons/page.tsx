@@ -9,12 +9,14 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { LessonWizard } from "@/components/organisms/lesson-wizard";
+import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function LessonsPage({
   params,
 }: {
   params: Promise<{ school_id: string }>;
 }) {
+  usePageTitle(["schools", "lessons"]);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [schoolId, setSchoolId] = useState<string>("");
 

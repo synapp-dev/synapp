@@ -6,6 +6,9 @@ import {
 } from "@workspace/ui/components/card";
 import type { Tables } from "@/types/supabase";
 import { schoolServerApi } from "@/entities/school/api/server-endpoints";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools"]);
 
 export default async function SchoolsPage() {
   const { data: schools, error } = await schoolServerApi.get.schools();

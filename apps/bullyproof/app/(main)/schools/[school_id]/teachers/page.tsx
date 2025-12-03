@@ -8,9 +8,13 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar";
 import { Input } from "@workspace/ui/components/input";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -20,6 +24,9 @@ import {
 } from "@workspace/ui/components/table";
 import { Users, UserPlus, Mail, Phone, Calendar, Search } from "lucide-react";
 import Link from "next/link";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["schools", "teachers"]);
 
 export default async function TeachersPage({
   params,
@@ -30,7 +37,8 @@ export default async function TeachersPage({
   const { data: school } = await schoolServerApi.get.schoolBySlug(school_id);
 
   // Helper function to convert teacher names to URL-friendly slugs
-  const getTeacherSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-');
+  const getTeacherSlug = (name: string) =>
+    name.toLowerCase().replace(/\s+/g, "-");
 
   // Mock data for teachers
   const teachers = [
@@ -111,10 +119,14 @@ export default async function TeachersPage({
     },
   ];
 
-  const activeTeachers = teachers.filter(t => t.status === "active").length;
-  const totalStudents = teachers.reduce((sum, teacher) => sum + teacher.students, 0);
+  const activeTeachers = teachers.filter((t) => t.status === "active").length;
+  const totalStudents = teachers.reduce(
+    (sum, teacher) => sum + teacher.students,
+    0
+  );
   const averageCompletion = Math.round(
-    teachers.reduce((sum, teacher) => sum + teacher.completionRate, 0) / teachers.length
+    teachers.reduce((sum, teacher) => sum + teacher.completionRate, 0) /
+      teachers.length
   );
 
   return (
@@ -137,7 +149,9 @@ export default async function TeachersPage({
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Teachers</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Teachers
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -150,20 +164,22 @@ export default async function TeachersPage({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Students</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Students
+            </CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{totalStudents}</div>
-            <p className="text-xs text-muted-foreground">
-              Across all classes
-            </p>
+            <p className="text-xs text-muted-foreground">Across all classes</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg. Completion</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Avg. Completion
+            </CardTitle>
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -181,7 +197,7 @@ export default async function TeachersPage({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {teachers.filter(t => t.status === "on_leave").length}
+              {teachers.filter((t) => t.status === "on_leave").length}
             </div>
             <p className="text-xs text-muted-foreground">
               Currently unavailable
@@ -196,10 +212,7 @@ export default async function TeachersPage({
           <div className="flex items-center space-x-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search teachers..."
-                className="pl-10"
-              />
+              <Input placeholder="Search teachers..." className="pl-10" />
             </div>
             <Button variant="outline">Filter</Button>
             <Button variant="outline">Sort</Button>
@@ -211,9 +224,7 @@ export default async function TeachersPage({
       <Card>
         <CardHeader>
           <CardTitle>All Teachers</CardTitle>
-          <CardDescription>
-            Complete list of teaching staff
-          </CardDescription>
+          <CardDescription>Complete list of teaching staff</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -237,11 +248,14 @@ export default async function TeachersPage({
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={teacher.avatar} />
                         <AvatarFallback>
-                          {teacher.name.split(" ").map(n => n[0]).join("")}
+                          {teacher.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <Link 
+                        <Link
                           href={`/schools/${school_id}/teachers/${getTeacherSlug(teacher.name)}`}
                           className="font-medium hover:text-blue-600 hover:underline"
                         >
@@ -275,9 +289,11 @@ export default async function TeachersPage({
                   </TableCell>
                   <TableCell>
                     <div className="space-y-1">
-                      <div className="text-sm font-medium">{teacher.completionRate}%</div>
+                      <div className="text-sm font-medium">
+                        {teacher.completionRate}%
+                      </div>
                       <div className="w-full bg-gray-200 rounded-full h-1.5">
-                        <div 
+                        <div
                           className="bg-blue-600 h-1.5 rounded-full"
                           style={{ width: `${teacher.completionRate}%` }}
                         />
@@ -285,8 +301,10 @@ export default async function TeachersPage({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge 
-                      variant={teacher.status === "active" ? "default" : "secondary"}
+                    <Badge
+                      variant={
+                        teacher.status === "active" ? "default" : "secondary"
+                      }
                     >
                       {teacher.status === "active" ? "Active" : "On Leave"}
                     </Badge>
@@ -325,11 +343,14 @@ export default async function TeachersPage({
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={teacher.avatar} />
                   <AvatarFallback>
-                    {teacher.name.split(" ").map(n => n[0]).join("")}
+                    {teacher.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
-                  <Link 
+                  <Link
                     href={`/schools/${school_id}/teachers/${getTeacherSlug(teacher.name)}`}
                     className="text-lg font-semibold hover:text-blue-600 hover:underline"
                   >
@@ -337,8 +358,10 @@ export default async function TeachersPage({
                   </Link>
                   <CardDescription>{teacher.role}</CardDescription>
                 </div>
-                <Badge 
-                  variant={teacher.status === "active" ? "default" : "secondary"}
+                <Badge
+                  variant={
+                    teacher.status === "active" ? "default" : "secondary"
+                  }
                 >
                   {teacher.status === "active" ? "Active" : "On Leave"}
                 </Badge>
@@ -388,7 +411,7 @@ export default async function TeachersPage({
                   <span>{teacher.completionRate}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
+                  <div
                     className="bg-blue-600 h-2 rounded-full"
                     style={{ width: `${teacher.completionRate}%` }}
                   />

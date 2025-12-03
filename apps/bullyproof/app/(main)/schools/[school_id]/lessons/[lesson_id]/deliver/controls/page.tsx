@@ -1,4 +1,12 @@
 import { ControlMode } from "@/components/organisms/control-mode";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "lessons",
+  "deliver",
+  "controls",
+]);
 
 export default async function LessonDeliverControlsPage({
   params,
@@ -9,4 +17,3 @@ export default async function LessonDeliverControlsPage({
 
   return <ControlMode lessonId={lesson_id} />;
 }
-
