@@ -7,18 +7,25 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  Users, 
-  Shield, 
-  FileText, 
+import {
+  Users,
+  Shield,
+  FileText,
   BarChart3,
   Download,
   Eye,
   Lock,
   AlertTriangle,
   CheckCircle,
-  Database
+  Database,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "support",
+  "roles",
+  "government",
+]);
 
 export default function GovernmentPage() {
   const complianceResources = [
@@ -26,7 +33,8 @@ export default function GovernmentPage() {
       id: 1,
       title: "Data Privacy Compliance Report",
       type: "Compliance Report",
-      description: "Comprehensive report on data privacy and protection measures",
+      description:
+        "Comprehensive report on data privacy and protection measures",
       category: "Privacy",
       lastUpdated: "2 days ago",
     },
@@ -93,7 +101,9 @@ export default function GovernmentPage() {
             <Users className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Government Viewer Resources</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Government Viewer Resources
+            </h1>
             <p className="text-muted-foreground">
               Compliance reporting and oversight tools for government agencies
             </p>
@@ -107,7 +117,9 @@ export default function GovernmentPage() {
           <Card key={index}>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">{status.value}</div>
-              <div className="text-sm text-muted-foreground">{status.label}</div>
+              <div className="text-sm text-muted-foreground">
+                {status.label}
+              </div>
               <div className="text-xs text-green-600 mt-1">{status.status}</div>
             </CardContent>
           </Card>
@@ -137,7 +149,9 @@ export default function GovernmentPage() {
                       <Badge variant="outline">{access.level}</Badge>
                     </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">{access.description}</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    {access.description}
+                  </p>
                   <Button size="sm" className="w-full">
                     Request Access
                   </Button>
@@ -159,7 +173,10 @@ export default function GovernmentPage() {
         <CardContent>
           <div className="space-y-4">
             {complianceResources.map((resource) => (
-              <div key={resource.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div
+                key={resource.id}
+                className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
                 <div className="p-2 bg-muted rounded">
                   <FileText className="h-5 w-5" />
                 </div>
@@ -169,9 +186,13 @@ export default function GovernmentPage() {
                     <Badge variant="outline">{resource.type}</Badge>
                     <Badge variant="secondary">{resource.category}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {resource.description}
+                  </p>
                   <div className="flex items-center gap-4">
-                    <span className="text-xs text-muted-foreground">Updated {resource.lastUpdated}</span>
+                    <span className="text-xs text-muted-foreground">
+                      Updated {resource.lastUpdated}
+                    </span>
                     <Button variant="ghost" size="sm" className="h-auto p-0">
                       View Report
                     </Button>

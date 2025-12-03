@@ -7,18 +7,25 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  Shield, 
-  Settings, 
-  Users, 
+import {
+  Shield,
+  Settings,
+  Users,
   BarChart3,
   Wrench,
   FileText,
   MessageCircle,
   AlertTriangle,
   Database,
-  Code
+  Code,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "support",
+  "roles",
+  "bullyproof-staff",
+]);
 
 export default function BullyproofStaffPage() {
   const staffResources = [
@@ -99,7 +106,9 @@ export default function BullyproofStaffPage() {
             <Shield className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Bullyproof Staff Resources</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Bullyproof Staff Resources
+            </h1>
             <p className="text-muted-foreground">
               Internal resources and tools for Bullyproof team members
             </p>
@@ -113,7 +122,9 @@ export default function BullyproofStaffPage() {
           <Card key={index}>
             <CardContent className="p-4">
               <div className="text-2xl font-bold">{metric.value}</div>
-              <div className="text-sm text-muted-foreground">{metric.label}</div>
+              <div className="text-sm text-muted-foreground">
+                {metric.label}
+              </div>
               <div className="text-xs text-blue-600 mt-1">{metric.change}</div>
             </CardContent>
           </Card>
@@ -125,7 +136,10 @@ export default function BullyproofStaffPage() {
         {staffActions.map((action, index) => {
           const Icon = action.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={index}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-muted rounded-lg">
@@ -133,7 +147,9 @@ export default function BullyproofStaffPage() {
                   </div>
                   <div>
                     <CardTitle className="text-sm">{action.title}</CardTitle>
-                    <CardDescription className="text-xs">{action.description}</CardDescription>
+                    <CardDescription className="text-xs">
+                      {action.description}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -151,14 +167,15 @@ export default function BullyproofStaffPage() {
       <Card>
         <CardHeader>
           <CardTitle>Internal Documentation</CardTitle>
-          <CardDescription>
-            Staff-only resources and procedures
-          </CardDescription>
+          <CardDescription>Staff-only resources and procedures</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {staffResources.map((resource) => (
-              <div key={resource.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div
+                key={resource.id}
+                className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
                 <div className="p-2 bg-muted rounded">
                   <FileText className="h-5 w-5" />
                 </div>
@@ -168,7 +185,9 @@ export default function BullyproofStaffPage() {
                     <Badge variant="outline">{resource.type}</Badge>
                     <Badge variant="destructive">{resource.access}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {resource.description}
+                  </p>
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary">{resource.category}</Badge>
                     <Button variant="ghost" size="sm" className="h-auto p-0">
@@ -202,7 +221,9 @@ export default function BullyproofStaffPage() {
             </div>
             <div className="flex items-center gap-2 text-blue-600">
               <Database className="h-4 w-4" />
-              <span className="text-sm">Performance optimization scheduled</span>
+              <span className="text-sm">
+                Performance optimization scheduled
+              </span>
             </div>
             <Button variant="outline" size="sm" className="w-full">
               View All Alerts

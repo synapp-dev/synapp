@@ -7,17 +7,24 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  Building, 
-  Users, 
-  Settings, 
+import {
+  Building,
+  Users,
+  Settings,
   BarChart3,
   Shield,
   FileText,
   Download,
   MessageCircle,
-  AlertTriangle
+  AlertTriangle,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "support",
+  "roles",
+  "school-admins",
+]);
 
 export default function SchoolAdminsPage() {
   const adminResources = [
@@ -25,21 +32,24 @@ export default function SchoolAdminsPage() {
       id: 1,
       title: "School-Wide Analytics Dashboard",
       type: "Guide",
-      description: "Understanding and using the comprehensive analytics dashboard",
+      description:
+        "Understanding and using the comprehensive analytics dashboard",
       category: "Analytics",
     },
     {
       id: 2,
       title: "User Management Best Practices",
       type: "Video",
-      description: "How to effectively manage teachers, students, and permissions",
+      description:
+        "How to effectively manage teachers, students, and permissions",
       category: "User Management",
     },
     {
       id: 3,
       title: "Compliance and Reporting",
       type: "Article",
-      description: "Meeting regulatory requirements and generating compliance reports",
+      description:
+        "Meeting regulatory requirements and generating compliance reports",
       category: "Compliance",
     },
     {
@@ -94,9 +104,12 @@ export default function SchoolAdminsPage() {
             <Building className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">School Administrator Resources</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              School Administrator Resources
+            </h1>
             <p className="text-muted-foreground">
-              Administrative tools and resources for managing your school's Bullyproof implementation
+              Administrative tools and resources for managing your school's
+              Bullyproof implementation
             </p>
           </div>
         </div>
@@ -120,7 +133,10 @@ export default function SchoolAdminsPage() {
         {adminActions.map((action, index) => {
           const Icon = action.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={index}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-muted rounded-lg">
@@ -128,7 +144,9 @@ export default function SchoolAdminsPage() {
                   </div>
                   <div>
                     <CardTitle className="text-sm">{action.title}</CardTitle>
-                    <CardDescription className="text-xs">{action.description}</CardDescription>
+                    <CardDescription className="text-xs">
+                      {action.description}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -153,7 +171,10 @@ export default function SchoolAdminsPage() {
         <CardContent>
           <div className="space-y-4">
             {adminResources.map((resource) => (
-              <div key={resource.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div
+                key={resource.id}
+                className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
                 <div className="p-2 bg-muted rounded">
                   <FileText className="h-5 w-5" />
                 </div>
@@ -163,7 +184,9 @@ export default function SchoolAdminsPage() {
                     <Badge variant="outline">{resource.type}</Badge>
                     <Badge variant="secondary">{resource.category}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {resource.description}
+                  </p>
                   <Button variant="ghost" size="sm" className="h-auto p-0">
                     View Resource
                   </Button>
@@ -179,9 +202,7 @@ export default function SchoolAdminsPage() {
         <Card>
           <CardHeader>
             <CardTitle>System Status</CardTitle>
-            <CardDescription>
-              Current system status and alerts
-            </CardDescription>
+            <CardDescription>Current system status and alerts</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2 text-green-600">
@@ -190,7 +211,9 @@ export default function SchoolAdminsPage() {
             </div>
             <div className="flex items-center gap-2 text-yellow-600">
               <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm">Scheduled maintenance: Sunday 2AM-4AM</span>
+              <span className="text-sm">
+                Scheduled maintenance: Sunday 2AM-4AM
+              </span>
             </div>
             <Button variant="outline" size="sm" className="w-full">
               View Detailed Status

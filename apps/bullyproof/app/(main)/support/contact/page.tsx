@@ -10,18 +10,21 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Label } from "@workspace/ui/components/label";
-import { 
-  Mail, 
-  MessageCircle, 
-  Phone, 
+import {
+  Mail,
+  MessageCircle,
+  Phone,
   Clock,
   Send,
   CheckCircle,
   AlertTriangle,
   Users,
   BookOpen,
-  Settings
+  Settings,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "contact"]);
 
 export default function ContactPage() {
   const contactMethods = [
@@ -61,10 +64,26 @@ export default function ContactPage() {
   ];
 
   const priorityLevels = [
-    { value: "low", label: "Low", description: "General questions or minor issues" },
-    { value: "medium", label: "Medium", description: "Important issues affecting workflow" },
-    { value: "high", label: "High", description: "Critical issues affecting system usage" },
-    { value: "urgent", label: "Urgent", description: "System down or data loss" },
+    {
+      value: "low",
+      label: "Low",
+      description: "General questions or minor issues",
+    },
+    {
+      value: "medium",
+      label: "Medium",
+      description: "Important issues affecting workflow",
+    },
+    {
+      value: "high",
+      label: "High",
+      description: "Critical issues affecting system usage",
+    },
+    {
+      value: "urgent",
+      label: "Urgent",
+      description: "System down or data loss",
+    },
   ];
 
   return (
@@ -76,7 +95,9 @@ export default function ContactPage() {
             <Mail className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Contact Support</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Contact Support
+            </h1>
             <p className="text-muted-foreground">
               Get help from our support team through multiple channels
             </p>
@@ -89,7 +110,10 @@ export default function ContactPage() {
         {contactMethods.map((method, index) => {
           const Icon = method.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={index}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${method.color}`}>
@@ -104,7 +128,9 @@ export default function ContactPage() {
               <CardContent className="pt-0">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Response Time:</span>
+                    <span className="text-muted-foreground">
+                      Response Time:
+                    </span>
                     <span className="font-medium">{method.responseTime}</span>
                   </div>
                   <div className="flex justify-between">
@@ -113,8 +139,11 @@ export default function ContactPage() {
                   </div>
                 </div>
                 <Button className="w-full mt-3">
-                  {method.title === "Email Support" ? "Send Email" : 
-                   method.title === "Live Chat" ? "Start Chat" : "Call Now"}
+                  {method.title === "Email Support"
+                    ? "Send Email"
+                    : method.title === "Live Chat"
+                      ? "Start Chat"
+                      : "Call Now"}
                 </Button>
               </CardContent>
             </Card>
@@ -127,17 +156,15 @@ export default function ContactPage() {
         <CardHeader>
           <CardTitle>Send us a Message</CardTitle>
           <CardDescription>
-            Fill out the form below and we'll get back to you as soon as possible
+            Fill out the form below and we'll get back to you as soon as
+            possible
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name *</Label>
-              <Input
-                id="name"
-                placeholder="Enter your full name"
-              />
+              <Input id="name" placeholder="Enter your full name" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email Address *</Label>
@@ -196,9 +223,7 @@ export default function ContactPage() {
               <Send className="h-4 w-4 mr-2" />
               Send Message
             </Button>
-            <Button variant="outline">
-              Save Draft
-            </Button>
+            <Button variant="outline">Save Draft</Button>
           </div>
         </CardContent>
       </Card>
@@ -242,7 +267,9 @@ export default function ContactPage() {
               </div>
               <div>
                 <div className="font-medium">Urgent</div>
-                <div className="text-sm text-muted-foreground">Within 2 hours</div>
+                <div className="text-sm text-muted-foreground">
+                  Within 2 hours
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -251,7 +278,9 @@ export default function ContactPage() {
               </div>
               <div>
                 <div className="font-medium">High</div>
-                <div className="text-sm text-muted-foreground">Within 4 hours</div>
+                <div className="text-sm text-muted-foreground">
+                  Within 4 hours
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -260,7 +289,9 @@ export default function ContactPage() {
               </div>
               <div>
                 <div className="font-medium">Medium/Low</div>
-                <div className="text-sm text-muted-foreground">Within 24 hours</div>
+                <div className="text-sm text-muted-foreground">
+                  Within 24 hours
+                </div>
               </div>
             </div>
           </CardContent>
@@ -280,9 +311,12 @@ export default function ContactPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
               <div>
-                <div className="font-medium text-red-900">Critical System Issues</div>
+                <div className="font-medium text-red-900">
+                  Critical System Issues
+                </div>
                 <div className="text-sm text-red-700 mt-1">
-                  For system outages, data loss, or security incidents, contact our emergency support line.
+                  For system outages, data loss, or security incidents, contact
+                  our emergency support line.
                 </div>
                 <div className="text-sm font-medium text-red-900 mt-2">
                   Emergency Line: 1-800-BULLYPROOF (24/7)

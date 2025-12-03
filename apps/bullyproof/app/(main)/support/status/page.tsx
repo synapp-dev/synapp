@@ -7,16 +7,19 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  Activity, 
-  CheckCircle, 
-  AlertTriangle, 
+import {
+  Activity,
+  CheckCircle,
+  AlertTriangle,
   XCircle,
   Clock,
   RefreshCw,
   ExternalLink,
-  Bell
+  Bell,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "status"]);
 
 export default function StatusPage() {
   const services = [
@@ -79,7 +82,8 @@ export default function StatusPage() {
       startTime: "2024-01-20 14:30 UTC",
       endTime: "2024-01-20 16:45 UTC",
       duration: "2h 15m",
-      description: "Some email notifications were delayed due to email service provider issues.",
+      description:
+        "Some email notifications were delayed due to email service provider issues.",
       impact: "~15% of users affected",
     },
     {
@@ -90,7 +94,8 @@ export default function StatusPage() {
       startTime: "2024-01-18 09:15 UTC",
       endTime: "2024-01-18 11:30 UTC",
       duration: "2h 15m",
-      description: "Analytics dashboard experienced slower loading times for large datasets.",
+      description:
+        "Analytics dashboard experienced slower loading times for large datasets.",
       impact: "~8% of users affected",
     },
     {
@@ -101,26 +106,35 @@ export default function StatusPage() {
       startTime: "2024-01-15 02:00 UTC",
       endTime: "2024-01-15 04:00 UTC",
       duration: "2h 0m",
-      description: "Planned maintenance window for system updates and improvements.",
+      description:
+        "Planned maintenance window for system updates and improvements.",
       impact: "All services temporarily unavailable",
     },
   ];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "Operational": return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "Degraded": return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-      case "Outage": return <XCircle className="h-4 w-4 text-red-600" />;
-      default: return <Clock className="h-4 w-4 text-gray-600" />;
+      case "Operational":
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case "Degraded":
+        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
+      case "Outage":
+        return <XCircle className="h-4 w-4 text-red-600" />;
+      default:
+        return <Clock className="h-4 w-4 text-gray-600" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Operational": return "bg-green-100 text-green-600";
-      case "Degraded": return "bg-yellow-100 text-yellow-600";
-      case "Outage": return "bg-red-100 text-red-600";
-      default: return "bg-gray-100 text-gray-600";
+      case "Operational":
+        return "bg-green-100 text-green-600";
+      case "Degraded":
+        return "bg-yellow-100 text-yellow-600";
+      case "Outage":
+        return "bg-red-100 text-red-600";
+      default:
+        return "bg-gray-100 text-gray-600";
     }
   };
 
@@ -155,9 +169,12 @@ export default function StatusPage() {
               <CheckCircle className="h-8 w-8" />
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-600">All Systems Operational</div>
+              <div className="text-2xl font-bold text-green-600">
+                All Systems Operational
+              </div>
               <div className="text-muted-foreground">
-                All core services are running normally. Last updated 2 minutes ago.
+                All core services are running normally. Last updated 2 minutes
+                ago.
               </div>
             </div>
           </div>
@@ -175,18 +192,27 @@ export default function StatusPage() {
         <CardContent>
           <div className="space-y-4">
             {services.map((service, index) => (
-              <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+              <div
+                key={index}
+                className="flex items-center justify-between p-4 border rounded-lg"
+              >
                 <div className="flex items-center gap-4">
                   {getStatusIcon(service.status)}
                   <div>
                     <div className="font-medium">{service.name}</div>
-                    <div className="text-sm text-muted-foreground">{service.description}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {service.description}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <div className="text-sm font-medium">Uptime: {service.uptime}</div>
-                    <div className="text-xs text-muted-foreground">Response: {service.responseTime}</div>
+                    <div className="text-sm font-medium">
+                      Uptime: {service.uptime}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Response: {service.responseTime}
+                    </div>
                   </div>
                   <Badge className={getStatusColor(service.status)}>
                     {service.status}
@@ -213,7 +239,9 @@ export default function StatusPage() {
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <div className="font-medium">{incident.title}</div>
-                    <div className="text-sm text-muted-foreground">{incident.description}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {incident.description}
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Badge variant="outline">{incident.severity}</Badge>
@@ -224,13 +252,16 @@ export default function StatusPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-muted-foreground mt-3">
                   <div>
-                    <span className="font-medium">Duration:</span> {incident.duration}
+                    <span className="font-medium">Duration:</span>{" "}
+                    {incident.duration}
                   </div>
                   <div>
-                    <span className="font-medium">Impact:</span> {incident.impact}
+                    <span className="font-medium">Impact:</span>{" "}
+                    {incident.impact}
                   </div>
                   <div>
-                    <span className="font-medium">Resolved:</span> {incident.endTime}
+                    <span className="font-medium">Resolved:</span>{" "}
+                    {incident.endTime}
                   </div>
                 </div>
               </div>
@@ -244,9 +275,7 @@ export default function StatusPage() {
         <Card>
           <CardHeader>
             <CardTitle>Status Notifications</CardTitle>
-            <CardDescription>
-              Stay informed about system status
-            </CardDescription>
+            <CardDescription>Stay informed about system status</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button variant="outline" className="w-full justify-start">
@@ -267,9 +296,7 @@ export default function StatusPage() {
         <Card>
           <CardHeader>
             <CardTitle>Performance Metrics</CardTitle>
-            <CardDescription>
-              Key performance indicators
-            </CardDescription>
+            <CardDescription>Key performance indicators</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">

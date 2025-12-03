@@ -6,29 +6,33 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  Users, 
-  GraduationCap, 
-  Shield, 
+import {
+  Users,
+  GraduationCap,
+  Shield,
   Building,
   ArrowRight,
   BookOpen,
   MessageCircle,
-  Settings
+  Settings,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "roles"]);
 
 export default function RolesPage() {
   const roles = [
     {
       id: "teachers",
       title: "Teachers",
-      description: "Resources and guides for teachers using Bullyproof in their classrooms",
+      description:
+        "Resources and guides for teachers using Bullyproof in their classrooms",
       icon: GraduationCap,
       features: [
         "Class management",
         "Student progress tracking",
         "Lesson delivery",
-        "Parent communication"
+        "Parent communication",
       ],
       link: "/support/roles/teachers",
       color: "bg-blue-100 text-blue-600",
@@ -36,13 +40,14 @@ export default function RolesPage() {
     {
       id: "school-admins",
       title: "School Administrators",
-      description: "Administrative tools and best practices for school-wide implementation",
+      description:
+        "Administrative tools and best practices for school-wide implementation",
       icon: Building,
       features: [
         "School-wide analytics",
         "User management",
         "Policy configuration",
-        "Reporting and compliance"
+        "Reporting and compliance",
       ],
       link: "/support/roles/school-admins",
       color: "bg-green-100 text-green-600",
@@ -50,13 +55,14 @@ export default function RolesPage() {
     {
       id: "bullyproof-staff",
       title: "Bullyproof Staff",
-      description: "Internal resources for Bullyproof team members and support staff",
+      description:
+        "Internal resources for Bullyproof team members and support staff",
       icon: Shield,
       features: [
         "System administration",
         "Customer support",
         "Technical troubleshooting",
-        "Feature development"
+        "Feature development",
       ],
       link: "/support/roles/bullyproof-staff",
       color: "bg-purple-100 text-purple-600",
@@ -64,13 +70,14 @@ export default function RolesPage() {
     {
       id: "government",
       title: "Government Viewers",
-      description: "Access and reporting tools for government oversight and compliance",
+      description:
+        "Access and reporting tools for government oversight and compliance",
       icon: Users,
       features: [
         "Compliance reporting",
         "Data access protocols",
         "Audit trails",
-        "Privacy controls"
+        "Privacy controls",
       ],
       link: "/support/roles/government",
       color: "bg-orange-100 text-orange-600",
@@ -81,9 +88,12 @@ export default function RolesPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Role-Specific Help</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Role-Specific Help
+        </h1>
         <p className="text-muted-foreground">
-          Find resources tailored to your specific role and responsibilities in Bullyproof.
+          Find resources tailored to your specific role and responsibilities in
+          Bullyproof.
         </p>
       </div>
 
@@ -111,7 +121,10 @@ export default function RolesPage() {
                   <h4 className="font-medium mb-2">Key Features:</h4>
                   <ul className="space-y-1">
                     {role.features.map((feature, index) => (
-                      <li key={index} className="text-sm text-muted-foreground flex items-center gap-2">
+                      <li
+                        key={index}
+                        className="text-sm text-muted-foreground flex items-center gap-2"
+                      >
                         <div className="w-1.5 h-1.5 bg-primary rounded-full" />
                         {feature}
                       </li>
@@ -145,7 +158,9 @@ export default function RolesPage() {
                 <BookOpen className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">Getting Started Guide</div>
-                  <div className="text-sm text-muted-foreground">Essential first steps</div>
+                  <div className="text-sm text-muted-foreground">
+                    Essential first steps
+                  </div>
                 </div>
               </div>
             </Button>
@@ -154,7 +169,9 @@ export default function RolesPage() {
                 <MessageCircle className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">Community Forum</div>
-                  <div className="text-sm text-muted-foreground">Connect with other users</div>
+                  <div className="text-sm text-muted-foreground">
+                    Connect with other users
+                  </div>
                 </div>
               </div>
             </Button>
@@ -163,7 +180,9 @@ export default function RolesPage() {
                 <Settings className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">Account Settings</div>
-                  <div className="text-sm text-muted-foreground">Manage your preferences</div>
+                  <div className="text-sm text-muted-foreground">
+                    Manage your preferences
+                  </div>
                 </div>
               </div>
             </Button>

@@ -7,17 +7,24 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  GraduationCap, 
-  Users, 
-  BookOpen, 
+import {
+  GraduationCap,
+  Users,
+  BookOpen,
   MessageCircle,
   Settings,
   BarChart3,
   FileText,
   Video,
-  Download
+  Download,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments([
+  "support",
+  "roles",
+  "teachers",
+]);
 
 export default function TeachersPage() {
   const resources = [
@@ -26,7 +33,8 @@ export default function TeachersPage() {
       title: "Setting Up Your First Class",
       type: "Video Tutorial",
       duration: "8 min",
-      description: "Learn how to create and manage your first class in Bullyproof",
+      description:
+        "Learn how to create and manage your first class in Bullyproof",
       difficulty: "Beginner",
     },
     {
@@ -34,7 +42,8 @@ export default function TeachersPage() {
       title: "Student Progress Tracking",
       type: "Guide",
       duration: "12 min",
-      description: "Understand how to monitor and track student progress effectively",
+      description:
+        "Understand how to monitor and track student progress effectively",
       difficulty: "Intermediate",
     },
     {
@@ -42,7 +51,8 @@ export default function TeachersPage() {
       title: "Parent Communication Best Practices",
       type: "Article",
       duration: "6 min",
-      description: "Tips for effective communication with parents about student progress",
+      description:
+        "Tips for effective communication with parents about student progress",
       difficulty: "Beginner",
     },
     {
@@ -91,9 +101,12 @@ export default function TeachersPage() {
             <GraduationCap className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Teacher Resources</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Teacher Resources
+            </h1>
             <p className="text-muted-foreground">
-              Everything you need to effectively use Bullyproof in your classroom
+              Everything you need to effectively use Bullyproof in your
+              classroom
             </p>
           </div>
         </div>
@@ -104,7 +117,10 @@ export default function TeachersPage() {
         {quickActions.map((action, index) => {
           const Icon = action.icon;
           return (
-            <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={index}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-muted rounded-lg">
@@ -112,7 +128,9 @@ export default function TeachersPage() {
                   </div>
                   <div>
                     <CardTitle className="text-sm">{action.title}</CardTitle>
-                    <CardDescription className="text-xs">{action.description}</CardDescription>
+                    <CardDescription className="text-xs">
+                      {action.description}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
@@ -137,7 +155,10 @@ export default function TeachersPage() {
         <CardContent>
           <div className="space-y-4">
             {resources.map((resource) => (
-              <div key={resource.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+              <div
+                key={resource.id}
+                className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+              >
                 <div className="p-2 bg-muted rounded">
                   {resource.type === "Video Tutorial" ? (
                     <Video className="h-5 w-5" />
@@ -153,7 +174,9 @@ export default function TeachersPage() {
                     <Badge variant="outline">{resource.type}</Badge>
                     <Badge variant="secondary">{resource.difficulty}</Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {resource.description}
+                  </p>
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     <span>{resource.duration}</span>
                     <Button variant="ghost" size="sm" className="h-auto p-0">
@@ -203,11 +226,19 @@ export default function TeachersPage() {
             <div className="space-y-3">
               <div className="p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm font-medium text-blue-900">Pro Tip</p>
-                <p className="text-sm text-blue-700">Use the progress dashboard to identify students who need additional support early.</p>
+                <p className="text-sm text-blue-700">
+                  Use the progress dashboard to identify students who need
+                  additional support early.
+                </p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-green-900">Best Practice</p>
-                <p className="text-sm text-green-700">Set up regular parent communication schedules to keep families informed.</p>
+                <p className="text-sm font-medium text-green-900">
+                  Best Practice
+                </p>
+                <p className="text-sm text-green-700">
+                  Set up regular parent communication schedules to keep families
+                  informed.
+                </p>
               </div>
             </div>
           </CardContent>

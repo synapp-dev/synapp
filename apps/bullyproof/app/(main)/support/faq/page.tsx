@@ -8,22 +8,25 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
-import { 
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@workspace/ui/components/accordion";
-import { 
-  HelpCircle, 
-  Search, 
-  MessageCircle, 
-  BookOpen, 
-  Users, 
+import {
+  HelpCircle,
+  Search,
+  MessageCircle,
+  BookOpen,
+  Users,
   Shield,
   TrendingUp,
-  Star
+  Star,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "faq"]);
 
 export default function FaqPage() {
   // Mock FAQ data
@@ -62,28 +65,32 @@ export default function FaqPage() {
     {
       id: 1,
       question: "How do I get started with Bullyproof?",
-      answer: "Getting started is easy! First, create your account, then follow our onboarding wizard to set up your school profile and invite teachers.",
+      answer:
+        "Getting started is easy! First, create your account, then follow our onboarding wizard to set up your school profile and invite teachers.",
       category: "Getting Started",
       helpful: 24,
     },
     {
       id: 2,
       question: "How do I invite teachers to my school?",
-      answer: "You can invite teachers by going to the Teachers section and clicking 'Invite Teacher'. Enter their email address and they'll receive an invitation.",
+      answer:
+        "You can invite teachers by going to the Teachers section and clicking 'Invite Teacher'. Enter their email address and they'll receive an invitation.",
       category: "User Management",
       helpful: 18,
     },
     {
       id: 3,
       question: "Is my data secure?",
-      answer: "Yes, we take security seriously. All data is encrypted in transit and at rest, and we comply with educational data privacy standards.",
+      answer:
+        "Yes, we take security seriously. All data is encrypted in transit and at rest, and we comply with educational data privacy standards.",
       category: "Security & Privacy",
       helpful: 31,
     },
     {
       id: 4,
       question: "How do I generate reports?",
-      answer: "Navigate to the Reports section where you can generate various reports including performance analytics, incident summaries, and more.",
+      answer:
+        "Navigate to the Reports section where you can generate various reports including performance analytics, incident summaries, and more.",
       category: "Analytics & Reports",
       helpful: 15,
     },
@@ -93,7 +100,9 @@ export default function FaqPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Frequently Asked Questions</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Frequently Asked Questions
+        </h1>
         <p className="text-muted-foreground">
           Find answers to common questions about using Bullyproof.
         </p>
@@ -104,10 +113,7 @@ export default function FaqPage() {
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search FAQs..."
-              className="pl-10"
-            />
+            <Input placeholder="Search FAQs..." className="pl-10" />
           </div>
         </CardContent>
       </Card>
@@ -117,7 +123,10 @@ export default function FaqPage() {
         {faqCategories.map((category) => {
           const Icon = category.icon;
           return (
-            <Card key={category.id} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={category.id}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${category.color}`}>

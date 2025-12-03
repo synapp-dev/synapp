@@ -17,6 +17,9 @@ import {
   Filter,
   Calendar,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "changelog"]);
 
 export default function ChangelogPage() {
   const releases = [

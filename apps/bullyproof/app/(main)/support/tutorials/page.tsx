@@ -7,22 +7,26 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  BookOpen, 
-  Play, 
-  Clock, 
-  Users, 
+import {
+  BookOpen,
+  Play,
+  Clock,
+  Users,
   Star,
   Download,
-  ExternalLink
+  ExternalLink,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "tutorials"]);
 
 export default function TutorialsPage() {
   const tutorials = [
     {
       id: 1,
       title: "Getting Started with Bullyproof",
-      description: "Learn the basics of setting up your school and managing users",
+      description:
+        "Learn the basics of setting up your school and managing users",
       duration: "15 min",
       difficulty: "Beginner",
       rating: 4.8,
@@ -33,7 +37,8 @@ export default function TutorialsPage() {
     {
       id: 2,
       title: "Setting Up Classes and Students",
-      description: "Step-by-step guide to organizing your classes and student data",
+      description:
+        "Step-by-step guide to organizing your classes and student data",
       duration: "12 min",
       difficulty: "Beginner",
       rating: 4.6,
@@ -55,7 +60,8 @@ export default function TutorialsPage() {
     {
       id: 4,
       title: "Advanced Security Settings",
-      description: "Configure advanced security and privacy settings for your school",
+      description:
+        "Configure advanced security and privacy settings for your school",
       duration: "18 min",
       difficulty: "Advanced",
       rating: 4.7,
@@ -78,9 +84,12 @@ export default function TutorialsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Tutorials & Guides</h1>
+        <h1 className="text-3xl font-bold tracking-tight">
+          Tutorials & Guides
+        </h1>
         <p className="text-muted-foreground">
-          Learn how to use Bullyproof with our comprehensive tutorials and guides.
+          Learn how to use Bullyproof with our comprehensive tutorials and
+          guides.
         </p>
       </div>
 
@@ -100,7 +109,10 @@ export default function TutorialsPage() {
       {/* Tutorials Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {tutorials.map((tutorial) => (
-          <Card key={tutorial.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+          <Card
+            key={tutorial.id}
+            className="overflow-hidden hover:shadow-lg transition-shadow"
+          >
             <div className="aspect-video bg-muted relative">
               <div className="absolute inset-0 flex items-center justify-center">
                 <Play className="h-12 w-12 text-muted-foreground" />
@@ -154,9 +166,7 @@ export default function TutorialsPage() {
       <Card>
         <CardHeader>
           <CardTitle>Quick Links</CardTitle>
-          <CardDescription>
-            Popular resources and documentation
-          </CardDescription>
+          <CardDescription>Popular resources and documentation</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -165,7 +175,9 @@ export default function TutorialsPage() {
                 <BookOpen className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">User Manual</div>
-                  <div className="text-sm text-muted-foreground">Complete reference guide</div>
+                  <div className="text-sm text-muted-foreground">
+                    Complete reference guide
+                  </div>
                 </div>
               </div>
             </Button>
@@ -174,7 +186,9 @@ export default function TutorialsPage() {
                 <Download className="h-5 w-5" />
                 <div className="text-left">
                   <div className="font-medium">Download Center</div>
-                  <div className="text-sm text-muted-foreground">Templates and resources</div>
+                  <div className="text-sm text-muted-foreground">
+                    Templates and resources
+                  </div>
                 </div>
               </div>
             </Button>

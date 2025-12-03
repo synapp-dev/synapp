@@ -6,10 +6,10 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  HelpCircle, 
-  BookOpen, 
-  Users, 
+import {
+  HelpCircle,
+  BookOpen,
+  Users,
   Download,
   MessageCircle,
   Bug,
@@ -19,8 +19,11 @@ import {
   ArrowRight,
   Star,
   Clock,
-  Shield
+  Shield,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support"]);
 
 export default function SupportPage() {
   const quickLinks = [
@@ -115,9 +118,12 @@ export default function SupportPage() {
             <HelpCircle className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Welcome to Support</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Welcome to Support
+            </h1>
             <p className="text-muted-foreground">
-              Get help, find resources, and connect with the Bullyproof community
+              Get help, find resources, and connect with the Bullyproof
+              community
             </p>
           </div>
         </div>
@@ -136,11 +142,16 @@ export default function SupportPage() {
             {systemInfo.map((info, index) => {
               const Icon = info.icon;
               return (
-                <div key={index} className="flex items-center gap-3 p-3 border rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center gap-3 p-3 border rounded-lg"
+                >
                   <Icon className={`h-5 w-5 ${info.color}`} />
                   <div>
                     <div className="font-medium">{info.title}</div>
-                    <div className="text-sm text-muted-foreground">{info.status}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {info.status}
+                    </div>
                   </div>
                 </div>
               );
@@ -162,7 +173,10 @@ export default function SupportPage() {
             {quickLinks.map((link, index) => {
               const Icon = link.icon;
               return (
-                <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+                <Card
+                  key={index}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${link.color}`}>
@@ -170,7 +184,9 @@ export default function SupportPage() {
                       </div>
                       <div>
                         <CardTitle className="text-sm">{link.title}</CardTitle>
-                        <CardDescription className="text-xs">{link.description}</CardDescription>
+                        <CardDescription className="text-xs">
+                          {link.description}
+                        </CardDescription>
                       </div>
                     </div>
                   </CardHeader>
@@ -202,15 +218,22 @@ export default function SupportPage() {
             {supportActions.map((action, index) => {
               const Icon = action.icon;
               return (
-                <Card key={index} className="hover:shadow-md transition-shadow cursor-pointer">
+                <Card
+                  key={index}
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                >
                   <CardHeader className="pb-3">
                     <div className="flex items-center gap-3">
                       <div className={`p-2 rounded-lg ${action.color}`}>
                         <Icon className="h-5 w-5" />
                       </div>
                       <div>
-                        <CardTitle className="text-sm">{action.title}</CardTitle>
-                        <CardDescription className="text-xs">{action.description}</CardDescription>
+                        <CardTitle className="text-sm">
+                          {action.title}
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          {action.description}
+                        </CardDescription>
                       </div>
                     </div>
                   </CardHeader>
@@ -234,9 +257,7 @@ export default function SupportPage() {
         <Card>
           <CardHeader>
             <CardTitle>Popular Resources</CardTitle>
-            <CardDescription>
-              Most accessed help materials
-            </CardDescription>
+            <CardDescription>Most accessed help materials</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button variant="outline" className="w-full justify-start">
@@ -286,9 +307,7 @@ export default function SupportPage() {
       <Card>
         <CardHeader>
           <CardTitle>Support Highlights</CardTitle>
-          <CardDescription>
-            Recent activity and system updates
-          </CardDescription>
+          <CardDescription>Recent activity and system updates</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

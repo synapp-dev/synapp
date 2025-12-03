@@ -8,86 +8,99 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
-import { 
-  BookOpen, 
-  Search, 
+import {
+  BookOpen,
+  Search,
   FileText,
   Users,
   Shield,
   BarChart3,
   Settings,
-  MessageCircle
+  MessageCircle,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "glossary"]);
 
 export default function GlossaryPage() {
   const glossaryTerms = [
     {
       id: 1,
       term: "Analytics Dashboard",
-      definition: "A comprehensive view of school performance metrics, student progress, and system usage statistics.",
+      definition:
+        "A comprehensive view of school performance metrics, student progress, and system usage statistics.",
       category: "Analytics",
       related: ["Reports", "Metrics", "Performance"],
     },
     {
       id: 2,
       term: "Bullying Incident",
-      definition: "Any reported or detected instance of bullying behavior within the school environment, tracked and managed through the system.",
+      definition:
+        "Any reported or detected instance of bullying behavior within the school environment, tracked and managed through the system.",
       category: "Incidents",
       related: ["Reporting", "Behavior", "Safety"],
     },
     {
       id: 3,
       term: "Class Management",
-      definition: "Tools and features for organizing students into classes, managing class rosters, and tracking class-specific progress.",
+      definition:
+        "Tools and features for organizing students into classes, managing class rosters, and tracking class-specific progress.",
       category: "Management",
       related: ["Students", "Teachers", "Organization"],
     },
     {
       id: 4,
       term: "Compliance Reporting",
-      definition: "Automated generation of reports required for educational compliance and regulatory requirements.",
+      definition:
+        "Automated generation of reports required for educational compliance and regulatory requirements.",
       category: "Compliance",
       related: ["Reports", "Regulations", "Standards"],
     },
     {
       id: 5,
       term: "Data Privacy",
-      definition: "Protection and secure handling of student and school data in accordance with educational privacy laws.",
+      definition:
+        "Protection and secure handling of student and school data in accordance with educational privacy laws.",
       category: "Security",
       related: ["Privacy", "Security", "Protection"],
     },
     {
       id: 6,
       term: "Parent Portal",
-      definition: "Secure access point for parents to view their child's progress, receive updates, and communicate with teachers.",
+      definition:
+        "Secure access point for parents to view their child's progress, receive updates, and communicate with teachers.",
       category: "Communication",
       related: ["Parents", "Updates", "Progress"],
     },
     {
       id: 7,
       term: "Progress Tracking",
-      definition: "Monitoring and recording of student academic and behavioral progress over time.",
+      definition:
+        "Monitoring and recording of student academic and behavioral progress over time.",
       category: "Tracking",
       related: ["Students", "Progress", "Monitoring"],
     },
     {
       id: 8,
       term: "Role-Based Access",
-      definition: "Security system that grants different levels of access based on user roles (teacher, admin, parent, etc.).",
+      definition:
+        "Security system that grants different levels of access based on user roles (teacher, admin, parent, etc.).",
       category: "Security",
       related: ["Access", "Permissions", "Roles"],
     },
     {
       id: 9,
       term: "School Administrator",
-      definition: "User role with full access to school settings, user management, and system configuration.",
+      definition:
+        "User role with full access to school settings, user management, and system configuration.",
       category: "Roles",
       related: ["Admin", "Management", "Settings"],
     },
     {
       id: 10,
       term: "Student Profile",
-      definition: "Comprehensive record of a student's information, progress, and interactions within the system.",
+      definition:
+        "Comprehensive record of a student's information, progress, and interactions within the system.",
       category: "Profiles",
       related: ["Students", "Records", "Information"],
     },
@@ -115,9 +128,12 @@ export default function GlossaryPage() {
             <BookOpen className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Glossary & Key Terms</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Glossary & Key Terms
+            </h1>
             <p className="text-muted-foreground">
-              Definitions and explanations of key terms used throughout Bullyproof
+              Definitions and explanations of key terms used throughout
+              Bullyproof
             </p>
           </div>
         </div>
@@ -128,10 +144,7 @@ export default function GlossaryPage() {
         <CardContent className="pt-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search terms..."
-              className="pl-10"
-            />
+            <Input placeholder="Search terms..." className="pl-10" />
           </div>
         </CardContent>
       </Card>
@@ -193,17 +206,33 @@ export default function GlossaryPage() {
             <div className="space-y-2">
               <h4 className="font-medium">User Roles</h4>
               <div className="space-y-1 text-sm text-muted-foreground">
-                <div>• <strong>Teacher:</strong> Classroom management and student progress</div>
-                <div>• <strong>Admin:</strong> School-wide settings and user management</div>
-                <div>• <strong>Parent:</strong> View child's progress and communicate</div>
+                <div>
+                  • <strong>Teacher:</strong> Classroom management and student
+                  progress
+                </div>
+                <div>
+                  • <strong>Admin:</strong> School-wide settings and user
+                  management
+                </div>
+                <div>
+                  • <strong>Parent:</strong> View child's progress and
+                  communicate
+                </div>
               </div>
             </div>
             <div className="space-y-2">
               <h4 className="font-medium">System Features</h4>
               <div className="space-y-1 text-sm text-muted-foreground">
-                <div>• <strong>Analytics:</strong> Performance metrics and reporting</div>
-                <div>• <strong>Tracking:</strong> Student progress monitoring</div>
-                <div>• <strong>Communication:</strong> Parent and teacher updates</div>
+                <div>
+                  • <strong>Analytics:</strong> Performance metrics and
+                  reporting
+                </div>
+                <div>
+                  • <strong>Tracking:</strong> Student progress monitoring
+                </div>
+                <div>
+                  • <strong>Communication:</strong> Parent and teacher updates
+                </div>
               </div>
             </div>
           </div>

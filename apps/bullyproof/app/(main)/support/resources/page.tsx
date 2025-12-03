@@ -7,18 +7,21 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { 
-  Download, 
-  FileText, 
-  Image, 
+import {
+  Download,
+  FileText,
+  Image,
   Video,
   Archive,
   BookOpen,
   Shield,
   Users,
   Settings,
-  BarChart3
+  BarChart3,
 } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["support", "resources"]);
 
 export default function ResourcesPage() {
   const resourceCategories = [
@@ -62,7 +65,8 @@ export default function ResourcesPage() {
       title: "Bullyproof Implementation Guide",
       type: "PDF Guide",
       size: "2.4 MB",
-      description: "Comprehensive guide for implementing Bullyproof in your school",
+      description:
+        "Comprehensive guide for implementing Bullyproof in your school",
       downloads: 1247,
       updated: "2 weeks ago",
       icon: FileText,
@@ -82,7 +86,8 @@ export default function ResourcesPage() {
       title: "Parent Communication Templates",
       type: "Document Pack",
       size: "1.2 MB",
-      description: "Ready-to-use email and letter templates for parent communication",
+      description:
+        "Ready-to-use email and letter templates for parent communication",
       downloads: 2156,
       updated: "3 days ago",
       icon: FileText,
@@ -92,7 +97,8 @@ export default function ResourcesPage() {
       title: "Analytics Dashboard Guide",
       type: "Interactive Guide",
       size: "5.1 MB",
-      description: "Interactive guide to understanding and using analytics features",
+      description:
+        "Interactive guide to understanding and using analytics features",
       downloads: 634,
       updated: "1 week ago",
       icon: BarChart3,
@@ -129,9 +135,12 @@ export default function ResourcesPage() {
             <Download className="h-6 w-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Downloadable Resources</h1>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Downloadable Resources
+            </h1>
             <p className="text-muted-foreground">
-              Templates, guides, and documents to help you get the most out of Bullyproof
+              Templates, guides, and documents to help you get the most out of
+              Bullyproof
             </p>
           </div>
         </div>
@@ -142,7 +151,10 @@ export default function ResourcesPage() {
         {resourceCategories.map((category) => {
           const Icon = category.icon;
           return (
-            <Card key={category.id} className="hover:shadow-md transition-shadow cursor-pointer">
+            <Card
+              key={category.id}
+              className="hover:shadow-md transition-shadow cursor-pointer"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${category.color}`}>
@@ -150,12 +162,16 @@ export default function ResourcesPage() {
                   </div>
                   <div>
                     <CardTitle className="text-lg">{category.title}</CardTitle>
-                    <CardDescription>{category.count} resources</CardDescription>
+                    <CardDescription>
+                      {category.count} resources
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
-                <p className="text-sm text-muted-foreground mb-3">{category.description}</p>
+                <p className="text-sm text-muted-foreground mb-3">
+                  {category.description}
+                </p>
                 <Button size="sm" className="w-full">
                   Browse Resources
                 </Button>
@@ -178,7 +194,10 @@ export default function ResourcesPage() {
             {featuredResources.map((resource) => {
               const Icon = resource.icon;
               return (
-                <div key={resource.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div
+                  key={resource.id}
+                  className="flex items-start gap-4 p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                >
                   <div className="p-2 bg-muted rounded">
                     <Icon className="h-5 w-5" />
                   </div>
@@ -188,7 +207,9 @@ export default function ResourcesPage() {
                       <Badge variant="outline">{resource.type}</Badge>
                       <Badge variant="secondary">{resource.size}</Badge>
                     </div>
-                    <p className="text-sm text-muted-foreground mb-2">{resource.description}</p>
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {resource.description}
+                    </p>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground">
                       <span>{resource.downloads} downloads</span>
                       <span>Updated {resource.updated}</span>
@@ -218,13 +239,17 @@ export default function ResourcesPage() {
                   </div>
                   <div>
                     <CardTitle className="text-sm">{download.title}</CardTitle>
-                    <CardDescription className="text-xs">{download.description}</CardDescription>
+                    <CardDescription className="text-xs">
+                      {download.description}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{download.downloads} downloads</span>
+                  <span className="text-xs text-muted-foreground">
+                    {download.downloads} downloads
+                  </span>
                   <Button size="sm">
                     <Download className="h-4 w-4 mr-1" />
                     Download
@@ -247,13 +272,11 @@ export default function ResourcesPage() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              We're always looking to add new resources that help our schools succeed. 
-              If you need a specific template, guide, or document that isn't available, 
-              let us know and we'll work to create it for you.
+              We're always looking to add new resources that help our schools
+              succeed. If you need a specific template, guide, or document that
+              isn't available, let us know and we'll work to create it for you.
             </p>
-            <Button className="w-full">
-              Request New Resource
-            </Button>
+            <Button className="w-full">Request New Resource</Button>
           </div>
         </CardContent>
       </Card>
