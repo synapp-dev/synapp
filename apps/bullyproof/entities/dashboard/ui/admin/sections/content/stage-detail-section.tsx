@@ -5,15 +5,47 @@ import { useRouter } from "next/navigation";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { curriculumStages, topics } from "@/server/db/schema";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
+import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { Loader2, ArrowLeft, BookOpen, FileText } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  BookOpen,
+  FileText,
+  Image as ImageIcon,
+  Video,
+  Check,
+  BadgeCheck,
+} from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
+import { Separator } from "@workspace/ui/components/separator";
+import Image from "next/image";
+import { getSlideImagePublicUrl } from "@/utils/supabase/upload";
+
+// Component to handle thumbnail image with error fallback
+function ThumbnailImage({ src, alt }: { src: string; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className="w-14 h-14 flex-shrink-0 rounded-md bg-muted flex items-center justify-center">
+        <FileText className="h-5 w-5 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-14 h-14 flex-shrink-0 rounded-md overflow-hidden bg-muted">
+      <Image
+        src={src}
+        alt={alt}
+        fill
+        className="object-cover"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
 
 type Stage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
@@ -31,6 +63,20 @@ type Stage = typeof curriculumStages.$inferSelect & {
 
 type Topic = typeof topics.$inferSelect;
 
+type TopicSlide = {
+  id: string;
+  topicId: string;
+  orderIndex: number;
+  kind: "text" | "image" | "video";
+  imageUrl: string | null;
+  videoUrl: string | null;
+  textHtml: string | null;
+};
+
+type TopicWithSlides = Topic & {
+  slides?: TopicSlide[];
+};
+
 interface StageDetailSectionProps {
   slug: string;
 }
@@ -38,7 +84,7 @@ interface StageDetailSectionProps {
 export function StageDetailSection({ slug }: StageDetailSectionProps) {
   const router = useRouter();
   const [stage, setStage] = useState<Stage | null>(null);
-  const [topics, setTopics] = useState<Topic[]>([]);
+  const [topics, setTopics] = useState<TopicWithSlides[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingTopics, setIsLoadingTopics] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +129,25 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
         setIsLoadingTopics(true);
         const result = await topicsApi.get.list({ stageId: stage.id });
         if (result.data) {
-          setTopics(result.data);
+          // Fetch slides for each topic in parallel
+          const topicsWithSlides = await Promise.all(
+            result.data.map(async (topic) => {
+              try {
+                const topicResult = await topicsApi.get.byId(topic.id);
+                if (topicResult.data?.slides) {
+                  return { ...topic, slides: topicResult.data.slides };
+                }
+                return { ...topic, slides: [] };
+              } catch (err) {
+                console.error(
+                  `Failed to fetch slides for topic ${topic.id}:`,
+                  err
+                );
+                return { ...topic, slides: [] };
+              }
+            })
+          );
+          setTopics(topicsWithSlides);
         }
       } catch (err) {
         console.error("Failed to fetch topics:", err);
@@ -95,12 +159,78 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
     fetchTopics();
   }, [stage?.id]);
 
-  const handleTopicClick = (topic: Topic) => {
+  const handleTopicClick = (topic: TopicWithSlides) => {
     // Navigate to topic page using T{stageOrder} format
     // If stageOrder is null, we can't navigate (shouldn't happen in practice)
     if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
       router.push(`/admin/content/curriculum/${slug}/T${topic.stageOrder}`);
     }
+  };
+
+  const getSlideStats = (topic: TopicWithSlides) => {
+    // Sort slides by orderIndex to ensure correct order
+    const slides = (topic.slides || []).sort(
+      (a, b) => a.orderIndex - b.orderIndex
+    );
+    const totalSlides = slides.length;
+    const imageSlides = slides.filter((s) => s.kind === "image").length;
+    const videoSlides = slides.filter((s) => s.kind === "video").length;
+
+    // Find the first image slide by orderIndex (not just any image slide)
+    const firstImageSlide = slides.find(
+      (s) => s.kind === "image" && s.imageUrl
+    );
+
+    // Generate public URL for thumbnail if we have an image slide
+    let thumbnailUrl: string | null = null;
+    if (firstImageSlide && stage) {
+      // Extract stage number from stage.code (e.g., "S1" -> 1)
+      const stageNumberMatch = stage.code.match(/^S(\d+)$/);
+      const stageNumber = stageNumberMatch
+        ? parseInt(stageNumberMatch[1], 10)
+        : null;
+
+      // Get topic number from topic.stageOrder
+      const topicNumber = topic.stageOrder;
+
+      if (stageNumber !== null && topicNumber !== null) {
+        // Extract file extension from imageUrl or default to "jpg"
+        let fileExtension = "jpg";
+        if (firstImageSlide.imageUrl) {
+          const urlMatch = firstImageSlide.imageUrl.match(
+            /\.([a-zA-Z0-9]+)(?:\?|$)/
+          );
+          if (urlMatch) {
+            fileExtension = urlMatch[1];
+          }
+        }
+
+        thumbnailUrl = getSlideImagePublicUrl(
+          firstImageSlide.id,
+          stageNumber,
+          topicNumber,
+          fileExtension
+        );
+
+        // Debug logging (can be removed later)
+        console.log("Thumbnail URL generation:", {
+          slideId: firstImageSlide.id,
+          stageNumber,
+          topicNumber,
+          fileExtension,
+          thumbnailUrl,
+          slideOrderIndex: firstImageSlide.orderIndex,
+        });
+      }
+    }
+
+    return {
+      totalSlides,
+      imageSlides,
+      videoSlides,
+      firstImageSlide,
+      thumbnailUrl,
+    };
   };
 
   if (isLoading) {
@@ -173,141 +303,110 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
       </Button>
 
       {/* Stage Header */}
-      <div className="space-y-2">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <BookOpen className="h-6 w-6 text-primary" />
           <h1 className="text-3xl font-bold tracking-tight">{stage.name}</h1>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="font-mono">
-            {stage.code}
-          </Badge>
-          {stage.sortIndex !== null && (
-            <Badge variant="outline">Order: {stage.sortIndex}</Badge>
-          )}
-        </div>
-      </div>
-
-      {/* Stage Details */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Stage Information</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Code</p>
-              <p className="text-base font-mono">{stage.code}</p>
-            </div>
-            <div>
-              <p className="text-sm font-medium text-muted-foreground">Name</p>
-              <p className="text-base">{stage.name}</p>
-            </div>
-            {stage.sortIndex !== null && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Sort Order
-                </p>
-                <p className="text-base">{stage.sortIndex}</p>
-              </div>
-            )}
-            {stage.createdAt && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">
-                  Created
-                </p>
-                <p className="text-base">
-                  {new Date(stage.createdAt).toLocaleDateString()}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Years Card */}
         {stage.years && stage.years.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Linked School Years</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {stage.years.map((year) => (
-                  <div
-                    key={year.id}
-                    className="flex items-center justify-between p-2 rounded-md border"
-                  >
-                    <div>
-                      <p className="font-medium">{year.displayName}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {year.level.name} • {year.code}
-                      </p>
-                    </div>
-                    <Badge variant="outline">{year.code}</Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex items-center gap-3">
+            {stage.years.map((year) => (
+              <Badge
+                key={year.id}
+                variant="secondary"
+                className="px-4 py-2 text-base"
+              >
+                {year.displayName}
+              </Badge>
+            ))}
+          </div>
         )}
       </div>
 
+      <Separator />
+
       {/* Topics Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Topics
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoadingTopics ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            </div>
-          ) : topics.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p className="text-sm">No topics found for this stage.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {topics.map((topic) => (
-                <div
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <FileText className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Topics</h2>
+        </div>
+
+        {isLoadingTopics ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        ) : topics.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">No topics found for this stage.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {topics.map((topic) => {
+              const { totalSlides, imageSlides, videoSlides, thumbnailUrl } =
+                getSlideStats(topic);
+              return (
+                <Card
                   key={topic.id}
-                  className="flex items-center justify-between p-3 rounded-md border hover:bg-accent/50 transition-colors cursor-pointer"
+                  className="cursor-pointer hover:bg-accent/50 transition-colors p-0"
                   onClick={() => handleTopicClick(topic)}
                 >
-                  <div className="flex items-center gap-3 flex-1">
-                    {topic.stageOrder !== null && (
-                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
-                        {topic.stageOrder}
+                  <CardContent className="flex items-center gap-3">
+                    {/* Thumbnail */}
+                    {thumbnailUrl ? (
+                      <ThumbnailImage src={thumbnailUrl} alt={topic.title} />
+                    ) : (
+                      <div className="w-14 h-14 flex-shrink-0 rounded-md bg-muted flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
                       </div>
                     )}
-                    <div className="flex-1">
-                      <p className="font-medium">{topic.title}</p>
+
+                    {/* Topic Info */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {topic.stageOrder !== null && (
+                        <div className="flex items-center justify-center w-7 h-7 rounded-full bg-primary/10 text-primary font-semibold text-xs flex-shrink-0">
+                          {topic.stageOrder}
+                        </div>
+                      )}
+                      <div className="flex items-center flex-1 min-w-0 gap-2">
+                        <p className="font-medium truncate">{topic.title}</p>
+                        {topic.status === "published" && (
+                          <BadgeCheck className=" text-blue-500 size-5" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {topic.status && (
-                      <Badge
-                        variant={
-                          topic.status === "published"
-                            ? "default"
-                            : topic.status === "draft"
-                              ? "secondary"
-                              : "outline"
-                        }
-                      >
-                        {topic.status}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+                    {/* Slide Stats */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="text-xs text-muted-foreground">
+                        {totalSlides} {totalSlides === 1 ? "slide" : "slides"}
+                      </div>
+                      {imageSlides > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="gap-1 text-xs py-0 px-1.5 h-5"
+                        >
+                          <ImageIcon className="h-2.5 w-2.5" />
+                          {imageSlides}
+                        </Badge>
+                      )}
+                      {videoSlides > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="gap-1 text-xs py-0 px-1.5 h-5"
+                        >
+                          <Video className="h-2.5 w-2.5" />
+                          {videoSlides}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
