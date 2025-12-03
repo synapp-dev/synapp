@@ -26,6 +26,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { useMutation } from "@tanstack/react-query";
+import { schoolApi } from "@/entities/school/api/endpoints";
 
 type InviteNewSchoolDialogProps = {
   open: boolean;
@@ -351,19 +352,14 @@ export function InviteNewSchoolDialog({
   const isFirst = step === 0;
   const isLast = step === steps.length - 1;
 
-  // POST to /api/schools/invite using TanStack Query
+  // POST to /api/schools/invite using TanStack Query and API client
   const inviteMutation = useMutation({
     mutationFn: async (payload: any) => {
-      const res = await fetch("/api/schools/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(json?.error || "Failed to invite school");
+      const result = await schoolApi.post.inviteSchool(payload);
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to invite school");
       }
-      return json;
+      return result.data;
     },
   });
 

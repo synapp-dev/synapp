@@ -15,6 +15,8 @@ import {
   TrendingUp,
   ShieldCheck,
   TvMinimalPlay,
+  Wrench,
+  Apple,
 } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
@@ -51,12 +53,12 @@ const data = {
     //   icon: BadgeCheck,
     //   isActive: false,
     // },
-    // {
-    //   title: "Welcome",
-    //   url: "/welcome",
-    //   icon: Apple,
-    //   isActive: false,
-    // },
+    {
+      title: "Welcome",
+      url: "/welcome",
+      icon: Apple,
+      isActive: false,
+    },
     {
       title: "Dashboard",
       url: "/dashboard",
@@ -87,6 +89,12 @@ const data = {
       title: "Settings",
       url: "/settings",
       icon: Settings,
+      isActive: false,
+    },
+    {
+      title: "Setup",
+      url: "/setup",
+      icon: Wrench,
       isActive: false,
     },
   ],

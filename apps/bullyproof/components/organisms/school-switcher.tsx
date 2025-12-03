@@ -56,6 +56,7 @@ export function SchoolSwitcher() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const [mounted, setMounted] = useState(false);
   const { state } = useSidebar();
   const router = useRouter();
   const pathname = usePathname();
@@ -64,6 +65,7 @@ export function SchoolSwitcher() {
   const activeSchoolFromStore = useSchoolStore((s) => s.getActiveSchool());
   const currentSchool = useSchoolStore((s) => s.currentSchool);
   const lastAccessedSchool = useSchoolStore((s) => s.lastAccessedSchool);
+  const setCurrentSchool = useSchoolStore((s) => s.setCurrentSchool);
   const setLastAccessedSchool = useSchoolStore((s) => s.setLastAccessedSchool);
   const clearCurrentSchool = useSchoolStore((s) => s.clearCurrentSchool);
   const clearLastAccessedSchool = useSchoolStore(
@@ -122,8 +124,15 @@ export function SchoolSwitcher() {
   const baseSchools = isPlatformAdmin ? allSchools : mySchools;
   const hasOnlyOneSchool = baseSchools.length === 1;
 
+  // Ensure component is mounted on client side
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Keep local selectedSchool in sync with store or URL context
   useEffect(() => {
+    // Don't run during SSR or before mount
+    if (!mounted) return;
     // Check if we're on a school page first
     const match = pathname?.match(/\/schools\/(.+?)(?:[/?#]|$)/);
     const slugFromPath = match ? decodeURIComponent(match[1]!) : null;
@@ -148,9 +157,57 @@ export function SchoolSwitcher() {
       return;
     }
 
+    // Auto-select single school if user has only one school and none is selected
+    if (
+      hasOnlyOneSchool &&
+      !currentSchool &&
+      !slugFromPath &&
+      baseSchools.length > 0 &&
+      !isLoading
+    ) {
+      const singleSchool = baseSchools[0];
+      if (singleSchool) {
+        const schoolData = {
+          id: singleSchool.id as string,
+          name: singleSchool.name as string,
+          slug: (singleSchool as any).slug as string,
+          bannerUrl: (singleSchool as any).bannerUrl ?? null,
+          avatarUrl: (singleSchool as any).avatarUrl ?? null,
+          sector: (singleSchool as any).sector ?? null,
+          levels: (singleSchool as any).levels ?? null,
+          state: (singleSchool as any).state ?? null,
+        };
+        setCurrentSchool(schoolData);
+        setSelectedSchool(singleSchool);
+        // Navigate to the school's home page if not already on a school-specific page
+        // Use setTimeout to ensure navigation happens after state updates and avoid SSR issues
+        const slug =
+          typeof (singleSchool as any).slug === "string"
+            ? (singleSchool as any).slug
+            : "";
+        if (slug && typeof window !== "undefined") {
+          // Use setTimeout to avoid navigation during render
+          setTimeout(() => {
+            router.push(`/schools/${slug}/home`);
+          }, 0);
+        }
+        return;
+      }
+    }
+
     // If currentSchool is null, clear selection (don't use lastAccessedSchool)
     setSelectedSchool(null);
-  }, [currentSchool, pathname, schools]);
+  }, [
+    currentSchool,
+    pathname,
+    schools,
+    hasOnlyOneSchool,
+    baseSchools,
+    setCurrentSchool,
+    router,
+    mounted,
+    isLoading,
+  ]);
 
   // Debug: log whenever the selected school changes
   useEffect(() => {
@@ -272,20 +329,26 @@ export function SchoolSwitcher() {
                           : (st as any)?.name || ""
                         : "";
 
-                      const sectorText = String(
-                        ((selectedSchool as any)?.sector ?? "") as string
-                      );
+                      // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
+                      const sector = (selectedSchool as any)?.sector;
+                      const sectorText =
+                        typeof sector === "string"
+                          ? sector
+                          : sector && typeof sector === "object"
+                            ? (sector as any)?.name || ""
+                            : "";
 
-                      const lvls = (selectedSchool as any)?.levels as
-                        | string[]
-                        | undefined;
+                      // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
+                      const lvls = (selectedSchool as any)?.levels;
                       let levelsText = "";
                       if (Array.isArray(lvls) && lvls.length > 0) {
-                        const lower = lvls.map((s) =>
-                          typeof s === "string"
-                            ? s.toLowerCase()
-                            : String(s).toLowerCase()
+                        // Extract names if objects, or use strings directly
+                        const levelNames = lvls.map((lvl) =>
+                          typeof lvl === "string"
+                            ? lvl
+                            : (lvl as any)?.name || (lvl as any)?.key || ""
                         );
+                        const lower = levelNames.map((s) => s.toLowerCase());
                         const hasPrimary = lower.some((s) =>
                           s.includes("primary")
                         );
@@ -295,7 +358,7 @@ export function SchoolSwitcher() {
                         if (hasPrimary && hasSecondary) levelsText = "P-12";
                         else if (hasPrimary) levelsText = "Primary";
                         else if (hasSecondary) levelsText = "Secondary";
-                        else levelsText = lvls.join(", ");
+                        else levelsText = levelNames.join(", ");
                       }
 
                       const parts = [stateText, sectorText, levelsText].filter(
@@ -367,19 +430,29 @@ export function SchoolSwitcher() {
                                 : (st as any)?.name || ""
                               : "";
 
-                            const sectorText = String(
-                              ((selectedSchool as any)?.sector ?? "") as string
-                            );
+                            // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
+                            const sector = (selectedSchool as any)?.sector;
+                            const sectorText =
+                              typeof sector === "string"
+                                ? sector
+                                : sector && typeof sector === "object"
+                                  ? (sector as any)?.name || ""
+                                  : "";
 
-                            const lvls = (selectedSchool as any)?.levels as
-                              | string[]
-                              | undefined;
+                            // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
+                            const lvls = (selectedSchool as any)?.levels;
                             let levelsText = "";
                             if (Array.isArray(lvls) && lvls.length > 0) {
-                              const lower = lvls.map((s) =>
-                                typeof s === "string"
-                                  ? s.toLowerCase()
-                                  : String(s).toLowerCase()
+                              // Extract names if objects, or use strings directly
+                              const levelNames = lvls.map((lvl) =>
+                                typeof lvl === "string"
+                                  ? lvl
+                                  : (lvl as any)?.name ||
+                                    (lvl as any)?.key ||
+                                    ""
+                              );
+                              const lower = levelNames.map((s) =>
+                                s.toLowerCase()
                               );
                               const hasPrimary = lower.some((s) =>
                                 s.includes("primary")
@@ -391,7 +464,7 @@ export function SchoolSwitcher() {
                                 levelsText = "P-12";
                               else if (hasPrimary) levelsText = "Primary";
                               else if (hasSecondary) levelsText = "Secondary";
-                              else levelsText = lvls.join(", ");
+                              else levelsText = levelNames.join(", ");
                             }
 
                             const parts = [
@@ -504,20 +577,26 @@ export function SchoolSwitcher() {
                           : (st as any)?.name || ""
                         : "";
 
-                      const sectorText = String(
-                        ((school as any)?.sector ?? "") as string
-                      );
+                      // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
+                      const sector = (school as any)?.sector;
+                      const sectorText =
+                        typeof sector === "string"
+                          ? sector
+                          : sector && typeof sector === "object"
+                            ? (sector as any)?.name || ""
+                            : "";
 
-                      const lvls = (school as any)?.levels as
-                        | string[]
-                        | undefined;
+                      // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
+                      const lvls = (school as any)?.levels;
                       let levelsText = "";
                       if (Array.isArray(lvls) && lvls.length > 0) {
-                        const lower = lvls.map((s) =>
-                          typeof s === "string"
-                            ? s.toLowerCase()
-                            : String(s).toLowerCase()
+                        // Extract names if objects, or use strings directly
+                        const levelNames = lvls.map((lvl) =>
+                          typeof lvl === "string"
+                            ? lvl
+                            : (lvl as any)?.name || (lvl as any)?.key || ""
                         );
+                        const lower = levelNames.map((s) => s.toLowerCase());
                         const hasPrimary = lower.some((s) =>
                           s.includes("primary")
                         );
@@ -527,7 +606,7 @@ export function SchoolSwitcher() {
                         if (hasPrimary && hasSecondary) levelsText = "P-12";
                         else if (hasPrimary) levelsText = "Primary";
                         else if (hasSecondary) levelsText = "Secondary";
-                        else levelsText = lvls.join(", ");
+                        else levelsText = levelNames.join(", ");
                       }
 
                       const parts = [stateText, sectorText, levelsText].filter(
