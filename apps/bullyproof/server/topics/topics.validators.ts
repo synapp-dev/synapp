@@ -35,3 +35,38 @@ export const getTopicByIdSchema = z.object({
 });
 
 export type GetTopicByIdParams = z.infer<typeof getTopicByIdSchema>;
+
+// Schema for creating a slide
+export const createSlideSchema = z.object({
+  topicId: z.string().trim().min(1).max(500),
+  orderIndex: z.number().int().min(0),
+  kind: z.enum(["text", "image", "video"]).default("image"),
+  imageUrl: z.union([z.string().url(), z.null()]).optional(),
+  videoUrl: z.union([z.string().url(), z.null()]).optional(),
+  textHtml: z.union([z.string(), z.null()]).optional().default(""),
+  videoStartS: z.union([z.number(), z.null()]).optional(),
+  videoEndS: z.union([z.number(), z.null()]).optional(),
+});
+
+export type CreateSlideParams = z.infer<typeof createSlideSchema>;
+
+// Schema for updating a slide
+export const updateSlideSchema = z.object({
+  kind: z.enum(["text", "image", "video"]).optional(),
+  imageUrl: z.union([z.string().url(), z.null()]).optional(),
+  videoUrl: z.union([z.string().url(), z.null()]).optional(),
+  textHtml: z.union([z.string(), z.null()]).optional(),
+  videoStartS: z.union([z.number(), z.null()]).optional(),
+  videoEndS: z.union([z.number(), z.null()]).optional(),
+  orderIndex: z.number().int().min(0).optional(),
+});
+
+export type UpdateSlideParams = z.infer<typeof updateSlideSchema>;
+
+// Schema for reordering slides
+export const reorderSlidesSchema = z.object({
+  topicId: z.string().trim().min(1).max(500),
+  slideIds: z.array(z.string().trim().min(1).max(500)).min(1),
+});
+
+export type ReorderSlidesParams = z.infer<typeof reorderSlidesSchema>;
