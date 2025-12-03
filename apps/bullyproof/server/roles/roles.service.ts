@@ -29,9 +29,9 @@ async function assertCanManageRoles(ctx: AuthContext) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Only platform admins can manage roles
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
@@ -44,13 +44,13 @@ async function assertCanViewRoles(ctx: AuthContext) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins and school admins can view roles
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
-  if (roles.school.some(role => role.roleKey === "SCHOOL_ADMIN")) {
+  if (roles.school.some((role) => role.roleKey === "SCHOOL_ADMIN")) {
     return;
   }
 
@@ -72,7 +72,7 @@ export const rolesService = {
   async getRoleById(ctx: AuthContext, params: unknown) {
     const { id } = getRoleByIdSchema.parse(params);
     await assertCanViewRoles(ctx);
-    
+
     const role = await rolesRepo.getById(id);
     return role[0] ?? null;
   },
@@ -80,7 +80,7 @@ export const rolesService = {
   async getUserRoles(ctx: AuthContext, params: unknown) {
     const { userId } = getUserRolesSchema.parse(params);
     await assertCanViewRoles(ctx);
-    
+
     return await rolesRepo.getUserRoles(userId);
   },
 
@@ -125,7 +125,7 @@ export const rolesService = {
 
   async getUsersByRole(ctx: AuthContext, roleId: string, schoolId?: string) {
     await assertCanViewRoles(ctx);
-    
+
     return await rolesRepo.getUsersByRole(roleId, schoolId);
   },
 };

@@ -21,7 +21,7 @@ async function assertCanListSchools(ctx: AuthContext) {
   }
   // Extend with real RBAC (e.g., require specific roles/permissions)
   const roles = await getUserScopedRoles(ctx.userId);
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
   if (roles.school.length === 0) {
@@ -37,7 +37,7 @@ async function assertCanCreateSchool(ctx: AuthContext) {
   const roles = await getUserScopedRoles(ctx.userId);
   // Only platform admins can create schools
   if (
-    roles.platform.includes("BULLYPROOF_ADMIN") ||
+    roles.platform.includes("PLATFORM_ADMIN") ||
     roles.platform.includes("PLATFORM_ADMIN")
   ) {
     return;
@@ -60,14 +60,14 @@ export const schoolService = {
   async createSchool(ctx: AuthContext, params: unknown) {
     await assertCanCreateSchool(ctx);
     const data: CreateSchoolParams = createSchoolSchema.parse(params);
-    
+
     // Extract levelIds before creating school (repo doesn't need them)
     const { levelIds, ...schoolData } = data;
-    
+
     // Create the school
     const result = await schoolRepo.create(schoolData);
     const createdSchool = result[0];
-    
+
     // Create school level assignments
     if (levelIds && levelIds.length > 0) {
       await db.insert(schoolLevelAssignments).values(
@@ -77,7 +77,7 @@ export const schoolService = {
         }))
       );
     }
-    
+
     return createdSchool;
   },
 };

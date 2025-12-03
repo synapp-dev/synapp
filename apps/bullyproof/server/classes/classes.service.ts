@@ -23,17 +23,21 @@ async function assertCanManageClasses(ctx: AuthContext, schoolId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can manage all classes
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
   // School admins/teachers can manage classes in their schools
-  if (schoolId && roles.school.some(role => 
-    role.schoolId === schoolId && 
-    (role.roleKey === "SCHOOL_ADMIN" || role.roleKey === "TEACHER")
-  )) {
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) =>
+        role.schoolId === schoolId &&
+        (role.roleKey === "SCHOOL_ADMIN" || role.roleKey === "TEACHER")
+    )
+  ) {
     return;
   }
 
@@ -46,14 +50,14 @@ async function assertCanViewClasses(ctx: AuthContext, schoolId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can view all classes
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
   // School users can view classes in their schools
-  if (schoolId && roles.school.some(role => role.schoolId === schoolId)) {
+  if (schoolId && roles.school.some((role) => role.schoolId === schoolId)) {
     return;
   }
 
@@ -75,14 +79,14 @@ export const classesService = {
 
   async getClassById(ctx: AuthContext, params: unknown) {
     const { id } = getClassByIdSchema.parse(params);
-    
+
     const classData = await classesRepo.getById(id);
     if (!classData[0]) {
       return null;
     }
 
     await assertCanViewClasses(ctx, classData[0].schoolId);
-    
+
     return await classesRepo.getWithYears(id);
   },
 
@@ -102,7 +106,7 @@ export const classesService = {
 
   async updateClass(ctx: AuthContext, id: string, params: unknown) {
     const data: UpdateClassParams = updateClassSchema.parse(params);
-    
+
     const existingClass = await classesRepo.getById(id);
     if (!existingClass[0]) {
       throw new Error("Class not found");

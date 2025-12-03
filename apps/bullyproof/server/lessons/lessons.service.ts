@@ -23,9 +23,9 @@ async function assertCanManageLessons(ctx: AuthContext, teacherId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can manage all lessons
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
@@ -35,7 +35,7 @@ async function assertCanManageLessons(ctx: AuthContext, teacherId?: string) {
   }
 
   // School admins can manage lessons in their schools
-  if (roles.school.some(role => role.roleKey === "SCHOOL_ADMIN")) {
+  if (roles.school.some((role) => role.roleKey === "SCHOOL_ADMIN")) {
     return;
   }
 
@@ -48,9 +48,9 @@ async function assertCanViewLessons(ctx: AuthContext, teacherId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can view all lessons
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
@@ -86,14 +86,14 @@ export const lessonsService = {
 
   async getLessonById(ctx: AuthContext, params: unknown) {
     const { id } = getLessonByIdSchema.parse(params);
-    
+
     const lessonData = await lessonsRepo.getById(id);
     if (!lessonData[0]) {
       return null;
     }
 
     await assertCanViewLessons(ctx, lessonData[0].createdByUserId);
-    
+
     return await lessonsRepo.getWithDetails(id);
   },
 
@@ -111,7 +111,7 @@ export const lessonsService = {
 
   async updateLesson(ctx: AuthContext, id: string, params: unknown) {
     const data: UpdateLessonParams = updateLessonSchema.parse(params);
-    
+
     const existingLesson = await lessonsRepo.getById(id);
     if (!existingLesson[0]) {
       throw new Error("Lesson not found");

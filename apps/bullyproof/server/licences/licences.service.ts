@@ -23,17 +23,19 @@ async function assertCanManageLicences(ctx: AuthContext, schoolId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can manage all licences
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
   // School admins can manage licences for their schools
-  if (schoolId && roles.school.some(role => 
-    role.schoolId === schoolId && 
-    role.roleKey === "SCHOOL_ADMIN"
-  )) {
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+    )
+  ) {
     return;
   }
 
@@ -46,17 +48,19 @@ async function assertCanViewLicences(ctx: AuthContext, schoolId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can view all licences
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
   // School admins can view licences for their schools
-  if (schoolId && roles.school.some(role => 
-    role.schoolId === schoolId && 
-    role.roleKey === "SCHOOL_ADMIN"
-  )) {
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+    )
+  ) {
     return;
   }
 
@@ -78,14 +82,14 @@ export const licencesService = {
 
   async getLicenceById(ctx: AuthContext, params: unknown) {
     const { id } = getLicenceByIdSchema.parse(params);
-    
+
     const licenceData = await licencesRepo.getById(id);
     if (!licenceData[0]) {
       return null;
     }
 
     await assertCanViewLicences(ctx, licenceData[0].schoolId);
-    
+
     return await licencesRepo.getWithDetails(id);
   },
 
@@ -103,7 +107,7 @@ export const licencesService = {
 
   async updateLicence(ctx: AuthContext, id: string, params: unknown) {
     const data: UpdateLicenceParams = updateLicenceSchema.parse(params);
-    
+
     const existingLicence = await licencesRepo.getById(id);
     if (!existingLicence[0]) {
       throw new Error("Licence not found");
@@ -129,7 +133,7 @@ export const licencesService = {
 
   async getActiveLicenceBySchoolId(ctx: AuthContext, schoolId: string) {
     await assertCanViewLicences(ctx, schoolId);
-    
+
     const activeLicence = await licencesRepo.getActiveBySchoolId(schoolId);
     return activeLicence[0] ?? null;
   },

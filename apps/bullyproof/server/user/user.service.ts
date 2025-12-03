@@ -23,7 +23,7 @@ async function assertCanListAllUsers(ctx: AuthContext) {
 
   // Only platform admins can list all users
   if (
-    roles.platform.includes("BULLYPROOF_ADMIN") ||
+    roles.platform.includes("PLATFORM_ADMIN") ||
     roles.platform.includes("PLATFORM_ADMIN")
   ) {
     return;
@@ -41,7 +41,7 @@ async function assertCanCreateUsers(ctx: AuthContext) {
 
   // Only platform admins can create users
   if (
-    roles.platform.includes("BULLYPROOF_ADMIN") ||
+    roles.platform.includes("PLATFORM_ADMIN") ||
     roles.platform.includes("PLATFORM_ADMIN")
   ) {
     return;

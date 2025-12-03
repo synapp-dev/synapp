@@ -25,17 +25,19 @@ async function assertCanManageInvites(ctx: AuthContext, schoolId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can manage all invites
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
   // School admins can manage invites for their schools
-  if (schoolId && roles.school.some(role => 
-    role.schoolId === schoolId && 
-    role.roleKey === "SCHOOL_ADMIN"
-  )) {
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+    )
+  ) {
     return;
   }
 
@@ -48,17 +50,19 @@ async function assertCanViewInvites(ctx: AuthContext, schoolId?: string) {
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
-  
+
   // Platform admins can view all invites
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
   // School admins can view invites for their schools
-  if (schoolId && roles.school.some(role => 
-    role.schoolId === schoolId && 
-    role.roleKey === "SCHOOL_ADMIN"
-  )) {
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+    )
+  ) {
     return;
   }
 
@@ -84,14 +88,14 @@ export const invitesService = {
 
   async getInviteById(ctx: AuthContext, params: unknown) {
     const { id } = getInviteByIdSchema.parse(params);
-    
+
     const inviteData = await invitesRepo.getById(id);
     if (!inviteData[0]) {
       return null;
     }
 
     await assertCanViewInvites(ctx, inviteData[0].schoolId);
-    
+
     return await invitesRepo.getWithDetails(id);
   },
 
@@ -109,7 +113,7 @@ export const invitesService = {
 
   async updateInvite(ctx: AuthContext, id: string, params: unknown) {
     const data: UpdateInviteParams = updateInviteSchema.parse(params);
-    
+
     const existingInvite = await invitesRepo.getById(id);
     if (!existingInvite[0]) {
       throw new Error("Invite not found");
@@ -135,7 +139,7 @@ export const invitesService = {
 
   async acceptInvite(ctx: AuthContext, params: unknown) {
     const { id, userId } = acceptInviteSchema.parse(params);
-    
+
     const inviteData = await invitesRepo.getById(id);
     if (!inviteData[0]) {
       throw new Error("Invite not found");
@@ -148,10 +152,10 @@ export const invitesService = {
 
     // Update invite status
     const updatedInvite = await invitesRepo.update(id, { status: "ACCEPTED" });
-    
+
     // TODO: Here you would typically create the user role assignment
     // This would involve calling the roles service to assign the role
-    
+
     return await invitesRepo.getWithDetails(id);
   },
 };

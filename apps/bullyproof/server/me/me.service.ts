@@ -28,7 +28,7 @@ async function assertCanAccessUserProfile(
 
   // Check if user has platform admin role
   const roles = await getUserScopedRoles(ctx.userId);
-  if (roles.platform.includes("BULLYPROOF_ADMIN")) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
@@ -53,7 +53,7 @@ export const meService = {
     }
 
     const roles = await getUserScopedRoles(ctx.userId);
-    if (!roles.platform.includes("BULLYPROOF_ADMIN")) {
+    if (!roles.platform.includes("PLATFORM_ADMIN")) {
       throw new Error("Unauthorized to search users by email");
     }
 
