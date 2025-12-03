@@ -17,6 +17,9 @@ import {
   CardContent,
 } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["admin"]);
 
 const adminItems = [
   {

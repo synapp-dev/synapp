@@ -7,6 +7,9 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { GraduationCap, BookOpenText } from "lucide-react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
+
+export const metadata = generateMetadataFromSegments(["admin", "content"]);
 
 export default function AdminContentPage() {
   return (

@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
+import {
+  meApi,
+  type UserWithRolesAndSchools,
+} from "@/entities/me/api/endpoints";
 import {
   Card,
   CardContent,
@@ -9,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
+import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Table,
   TableBody,
@@ -18,13 +22,22 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { Badge } from "@workspace/ui/components/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import { Search, Users, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
 
 export default function AdminUsersPage() {
+  usePageTitle(["admin", "users"]);
   const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,20 +167,27 @@ export default function AdminUsersPage() {
               <TableBody>
                 {users.map((user) => {
                   // Combine all roles (platform + school roles)
-                  const allRoles: Array<{ name: string; isAdmin: boolean }> = [];
-                  
+                  const allRoles: Array<{ name: string; isAdmin: boolean }> =
+                    [];
+
                   // Add platform roles
                   user.platformRoles.forEach((role) => {
-                    const isAdmin = role.includes("ADMIN") || role.includes("admin");
+                    const isAdmin =
+                      role.includes("ADMIN") || role.includes("admin");
                     allRoles.push({ name: role, isAdmin });
                   });
-                  
+
                   // Add school roles (deduplicate by role key)
                   const schoolRoleKeys = new Set<string>();
                   user.schoolRoles.forEach((schoolRole) => {
-                    if (schoolRole.roleKey && !schoolRoleKeys.has(schoolRole.roleKey)) {
+                    if (
+                      schoolRole.roleKey &&
+                      !schoolRoleKeys.has(schoolRole.roleKey)
+                    ) {
                       schoolRoleKeys.add(schoolRole.roleKey);
-                      const isAdmin = schoolRole.roleKey.includes("ADMIN") || schoolRole.roleKey.includes("admin");
+                      const isAdmin =
+                        schoolRole.roleKey.includes("ADMIN") ||
+                        schoolRole.roleKey.includes("admin");
                       allRoles.push({ name: schoolRole.roleKey, isAdmin });
                     }
                   });
@@ -183,7 +203,9 @@ export default function AdminUsersPage() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <div className="font-medium">{getFullName(user)}</div>
+                            <div className="font-medium">
+                              {getFullName(user)}
+                            </div>
                             {user.firstName && user.lastName && (
                               <div className="text-sm text-muted-foreground">
                                 {user.email}
@@ -199,7 +221,11 @@ export default function AdminUsersPage() {
                         <div className="flex flex-wrap gap-1">
                           {allRoles.length > 0 ? (
                             allRoles.map((role, idx) => (
-                              <Badge key={idx} variant="default" className="flex items-center gap-1">
+                              <Badge
+                                key={idx}
+                                variant="default"
+                                className="flex items-center gap-1"
+                              >
                                 {role.isAdmin ? (
                                   <ShieldCheck className="h-3 w-3" />
                                 ) : (
@@ -209,7 +235,9 @@ export default function AdminUsersPage() {
                               </Badge>
                             ))
                           ) : (
-                            <span className="text-sm text-muted-foreground">None</span>
+                            <span className="text-sm text-muted-foreground">
+                              None
+                            </span>
                           )}
                         </div>
                       </TableCell>
@@ -217,7 +245,10 @@ export default function AdminUsersPage() {
                         <div className="space-y-1 max-w-md">
                           {user.schoolRoles.length > 0 ? (
                             user.schoolRoles.map((schoolRole, idx) => (
-                              <div key={idx} className="flex items-center gap-2">
+                              <div
+                                key={idx}
+                                className="flex items-center gap-2"
+                              >
                                 <Users className="h-3 w-3 text-muted-foreground" />
                                 <Badge variant="outline" className="text-xs">
                                   {schoolRole.schoolName || "Unknown School"}
@@ -225,7 +256,9 @@ export default function AdminUsersPage() {
                               </div>
                             ))
                           ) : (
-                            <span className="text-sm text-muted-foreground">None</span>
+                            <span className="text-sm text-muted-foreground">
+                              None
+                            </span>
                           )}
                         </div>
                       </TableCell>
