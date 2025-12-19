@@ -78,15 +78,8 @@ export const userService = {
 
     if (existingUser) {
       userId = existingUser.id;
-      // User exists, send them a magic link invite email
-      const { error: inviteError } =
-        await adminClient.auth.admin.inviteUserByEmail(data.email, {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/callback`,
-        });
-
-      if (inviteError) {
-        throw new Error(`Failed to send magic link: ${inviteError.message}`);
-      }
+      // User already exists - no need to send magic link, they can log in normally
+      // Just return the userId so the role can be assigned
     } else {
       // Create new user and send invite email
       const { data: newUser, error: createError } =

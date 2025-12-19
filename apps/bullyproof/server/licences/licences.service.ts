@@ -10,6 +10,8 @@ import {
 } from "./licences.validators";
 import { licencesRepo } from "./licences.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { userService } from "../user/user.service";
+import { rolesRepo } from "../roles/roles.repo";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -97,8 +99,85 @@ export const licencesService = {
     const data: CreateLicenceParams = createLicenceSchema.parse(params);
     await assertCanManageLicences(ctx, data.schoolId);
 
+    // Calculate start and end dates from durationYears
+    const startDate = new Date();
+    startDate.setHours(0, 0, 0, 0); // Start of today
+    
+    const endDate = new Date();
+    endDate.setFullYear(endDate.getFullYear() + data.durationYears);
+    endDate.setHours(23, 59, 59, 999); // End of the target day
+
+    // Format dates as ISO datetime strings
+    const startDateISO = startDate.toISOString();
+    const endDateISO = endDate.toISOString();
+
+    // Extract email from metadata
+    const email =
+      data.metadata?.mainSchoolEmail &&
+      typeof data.metadata.mainSchoolEmail === "string"
+        ? data.metadata.mainSchoolEmail.trim()
+        : null;
+
+    // If no email provided, check if school has existing licences
+    if (!email) {
+      const existingLicences = await licencesRepo.getBySchoolId(data.schoolId);
+      if (existingLicences.length === 0) {
+        throw new Error(
+          "School licence email is required when creating the first licence for a school"
+        );
+      }
+      // School has existing licences, continue with licence creation
+    } else {
+      // Email provided - create/find user and assign role
+      try {
+        // Find or create user with the email
+        const { userId } = await userService.createUserWithMagicLink(
+          ctx,
+          { email }
+        );
+
+        // Get SCHOOL_LICENCE role by key
+        const schoolLicenceRole = await rolesRepo.getByKey("SCHOOL_LICENCE");
+        if (!schoolLicenceRole[0]) {
+          throw new Error("SCHOOL_LICENCE role not found");
+        }
+
+        // Check if user already has this role for this school
+        const existingRole = await rolesRepo.hasRole(
+          userId,
+          schoolLicenceRole[0].id,
+          data.schoolId
+        );
+
+        // Assign role if not already assigned
+        if (existingRole.length === 0) {
+          await rolesRepo.assignRole({
+            userId,
+            roleId: schoolLicenceRole[0].id,
+            schoolId: data.schoolId,
+            roleScope: "school",
+          });
+        }
+      } catch (error: any) {
+        // Re-throw with more context if it's not already a user-friendly error
+        if (error.message && error.message.includes("required")) {
+          throw error;
+        }
+        throw new Error(
+          `Failed to create user and assign role: ${error.message || "Unknown error"}`
+        );
+      }
+    }
+
+    // Create the licence with calculated dates
     const newLicence = await licencesRepo.create({
-      ...data,
+      schoolId: data.schoolId,
+      status: data.status,
+      startDate: startDateISO,
+      endDate: endDateISO,
+      maxUsers: data.maxUsers,
+      features: data.features,
+      metadata: data.metadata,
       createdByUserId: ctx.userId!,
     });
 
