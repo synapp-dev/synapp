@@ -1,11 +1,208 @@
-import { generateMetadataFromSegments } from "@/utils/metadata";
+"use client";
 
-export const metadata = generateMetadataFromSegments([
-  "admin",
-  "content",
-  "certification",
-]);
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Badge } from "@workspace/ui/components/badge";
+import { Award, Clock, Users, BookOpen, Loader2 } from "lucide-react";
+import { certificationApi } from "@/entities/certification/api/endpoints";
+import type { certificationStages } from "@/server/db/schema";
+
+type Stage = typeof certificationStages.$inferSelect & {
+  topicCount?: number;
+};
 
 export default function CertificationPage() {
-  return <div>CertificationPage</div>;
+  const [mainStage, setMainStage] = useState<Stage | null>(null);
+  const [otherStages, setOtherStages] = useState<Stage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchStages = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch all stages
+        const stagesResult = await certificationApi.stages.list();
+        if (!stagesResult.data) {
+          setError(
+            stagesResult.error?.message ??
+              "Failed to fetch certification stages"
+          );
+          return;
+        }
+
+        // Find the main stage (code "C")
+        const main = stagesResult.data.find((stage) => stage.code === "C");
+        if (main) {
+          // Fetch with topic count
+          const mainResult = await certificationApi.stages.byCode("C");
+          if (mainResult.data) {
+            setMainStage(mainResult.data);
+          } else {
+            setMainStage(main);
+          }
+        }
+
+        // Get other stages (not "C")
+        const others = stagesResult.data.filter((stage) => stage.code !== "C");
+        setOtherStages(others);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStages();
+  }, []);
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Certification Courses
+          </h2>
+          <p className="text-muted-foreground">
+            Manage and view certification courses for the platform.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-destructive">{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold tracking-tight">
+          Certification Courses
+        </h2>
+        <p className="text-muted-foreground">
+          Manage and view certification courses for the platform.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-12">
+        {/* Active Certification Course */}
+        {mainStage && (
+          <Link href={`/admin/content/certification/${mainStage.code}`}>
+            <Card className="border-2 transition-shadow hover:shadow-md cursor-pointer">
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <Award className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-xl">
+                        Active Certification Course
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="text-base mt-2">
+                      {mainStage.name}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="default" className="bg-green-600">
+                    Active
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Course Stats */}
+                  <div className="grid grid-cols-3 gap-4 pt-2">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Code</p>
+                        <p className="text-sm font-medium">{mainStage.code}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Topics</p>
+                        <p className="text-sm font-medium">
+                          {mainStage.topicCount ?? 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        )}
+
+        {/* Other Certification Courses */}
+        {otherStages.length > 0 && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-lg font-semibold tracking-tight">
+                Other Certification Courses
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Browse additional certification programs available on the
+                platform.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {otherStages.map((stage) => (
+                <Link
+                  key={stage.id}
+                  href={`/admin/content/certification/${stage.code}`}
+                >
+                  <Card className="transition-shadow hover:shadow-md cursor-pointer">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-1 flex-1">
+                          <CardTitle className="text-base">
+                            {stage.name}
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            Certification program: {stage.code}
+                          </CardDescription>
+                        </div>
+                        <Badge variant="outline">Available</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-6 text-sm">
+                        <div className="flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-muted-foreground">
+                            Code: {stage.code}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

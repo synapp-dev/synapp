@@ -1,11 +1,22 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import { toast } from "sonner";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
+import { certificationApi } from "@/entities/certification/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
+import type {
+  certificationTopics,
+  certificationSlides,
+} from "@/server/db/schema";
+import {
+  QuizSlideEditor,
+  type QuizData,
+} from "@/components/organisms/quiz-slide-editor";
+import { FileQuestion, MessageCircleQuestion } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -62,6 +73,10 @@ import {
   TooltipTrigger,
   TooltipContent,
 } from "@workspace/ui/components/tooltip";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@workspace/ui/components/radio-group";
 import { uploadSlideImage } from "@/utils/supabase/upload";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 
@@ -70,25 +85,48 @@ type Topic = typeof topics.$inferSelect & {
   slides?: Array<typeof topicSlides.$inferSelect>;
 };
 
+type CertificationTopic = typeof certificationTopics.$inferSelect & {
+  slides?: Array<typeof certificationSlides.$inferSelect>;
+};
+
+type TopicContext = "curriculum" | "certification";
+
 interface TopicDetailSectionProps {
-  stageSlug: string;
-  topicSlug: string;
+  context?: TopicContext; // Default to curriculum for backward compatibility
+  // For curriculum
+  stageSlug?: string;
+  topicSlug?: string;
+  // For certification
+  topicId?: string;
+  stageCode?: string; // For certification, needed for file paths
 }
 
 export function TopicDetailSection({
+  context = "curriculum",
   stageSlug,
   topicSlug,
+  topicId,
+  stageCode,
 }: TopicDetailSectionProps) {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Detect if we're on a certification page by checking the URL path
+  // Check if path contains "/admin/content/certification"
+  const isCertificationFromUrl = pathname.includes(
+    "/admin/content/certification"
+  );
+  const isCertification = context === "certification" || isCertificationFromUrl;
   const [stage, setStage] = useState<any | null>(null);
-  const [topic, setTopic] = useState<Topic | null>(null);
+  const [topic, setTopic] = useState<Topic | CertificationTopic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const slideGalleryRef = useRef<HTMLDivElement>(null);
+  const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
   const [showTypeChangeDialog, setShowTypeChangeDialog] = useState(false);
   const [pendingTypeChange, setPendingTypeChange] = useState<
-    "image" | "video" | null
+    "image" | "video" | "quiz" | null
   >(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -114,7 +152,9 @@ export function TopicDetailSection({
   const [isDeletingSlide, setIsDeletingSlide] = useState(false);
 
   // Local state for slides (working copy)
-  const [localSlides, setLocalSlides] = useState<SlideData[]>([]);
+  // ExtendedSlideData is the same as SlideData (which now includes quizData)
+  type ExtendedSlideData = SlideData;
+  const [localSlides, setLocalSlides] = useState<ExtendedSlideData[]>([]);
   const [pendingFileUploads, setPendingFileUploads] = useState<
     Map<string, File>
   >(new Map());
@@ -129,7 +169,7 @@ export function TopicDetailSection({
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
     null
   );
-  const [originalSlides, setOriginalSlides] = useState<SlideData[]>([]);
+  const [originalSlides, setOriginalSlides] = useState<ExtendedSlideData[]>([]);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [showChangesDialog, setShowChangesDialog] = useState(false);
   const [pendingSave, setPendingSave] = useState(false);
@@ -189,6 +229,49 @@ export function TopicDetailSection({
     };
   }, [hasUnsavedChanges]);
 
+  // Handle wheel event for horizontal scrolling in slide gallery
+  // Use callback ref to set up event listener when element is mounted
+  const setGalleryRef = useCallback((element: HTMLDivElement | null) => {
+    // Clean up previous listener if ref changes
+    if (slideGalleryRef.current && wheelHandlerRef.current) {
+      slideGalleryRef.current.removeEventListener(
+        "wheel",
+        wheelHandlerRef.current
+      );
+    }
+
+    slideGalleryRef.current = element;
+
+    if (!element) {
+      wheelHandlerRef.current = null;
+      return;
+    }
+
+    // Create handler function
+    const handleWheel = (e: WheelEvent) => {
+      // The event is attached to the gallery element, so it will only fire for events on it or its children
+      // Convert vertical scroll to horizontal scroll
+      e.preventDefault();
+      e.stopPropagation();
+      element.scrollLeft += e.deltaY;
+    };
+
+    wheelHandlerRef.current = handleWheel;
+    element.addEventListener("wheel", handleWheel, { passive: false });
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (slideGalleryRef.current && wheelHandlerRef.current) {
+        slideGalleryRef.current.removeEventListener(
+          "wheel",
+          wheelHandlerRef.current
+        );
+      }
+    };
+  }, []);
+
   // Wrapper for safe navigation that checks for unsaved changes
   const safeNavigate = useCallback(
     (url: string) => {
@@ -224,78 +307,118 @@ export function TopicDetailSection({
   const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
   const setSlideUrl = useTopicSlidesCacheStore((state) => state.setSlideUrl);
 
-  // Parse topic slug (e.g., "T1" -> order 1)
-  const topicOrder = topicSlug.startsWith("T")
+  // Parse topic slug (e.g., "T1" -> order 1) - only for curriculum
+  const topicOrder = topicSlug?.startsWith("T")
     ? parseInt(topicSlug.substring(1), 10)
     : null;
 
   useEffect(() => {
-    if (!stageSlug || !topicOrder) return;
+    if (isCertification) {
+      // Certification flow
+      if (!topicId) return;
+    } else {
+      // Curriculum flow
+      if (!stageSlug || !topicOrder) return;
+    }
 
     const fetchData = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Fetch stage
-        const stageResult = await curriculumApi.stages.byCode(stageSlug);
-        if (!stageResult.data) {
-          setError(
-            stageResult.error?.message ?? "Failed to fetch curriculum stage"
-          );
-          return;
-        }
-        setStage(stageResult.data);
+        if (isCertification) {
+          // Certification flow: fetch topic directly by ID
+          const topicResult = await certificationApi.topics.byId(topicId!);
+          if (!topicResult.data) {
+            setError(
+              topicResult.error?.message ??
+                "Failed to fetch certification topic"
+            );
+            return;
+          }
 
-        // Fetch topics for this stage
-        const topicsResult = await topicsApi.get.list({
-          stageId: stageResult.data.id,
-        });
-        if (!topicsResult.data) {
-          setError(topicsResult.error?.message ?? "Failed to fetch topics");
-          return;
-        }
-
-        // Find topic by stageOrder
-        // URL format is T1, T2, etc., so we match stageOrder exactly
-        // (stageOrder is typically 1-indexed based on display)
-        const foundTopic = topicsResult.data.find(
-          (t) => t.stageOrder === topicOrder
-        );
-
-        if (!foundTopic) {
-          setError(`Topic with order ${topicOrder} not found`);
-          return;
-        }
-
-        // Fetch full topic details with slides
-        const topicResult = await topicsApi.get.byId(foundTopic.id);
-        if (topicResult.data) {
           setTopic(topicResult.data);
-          // Initialize local slides state
-          const initialSlides =
-            topicResult.data.slides
-              ?.sort((a, b) => a.orderIndex - b.orderIndex)
+
+          // Fetch slides separately
+          const slidesResult = await certificationApi.topics.slides.list(
+            topicId!
+          );
+          if (slidesResult.data) {
+            const initialSlides: ExtendedSlideData[] = slidesResult.data
+              .sort((a, b) => a.orderIndex - b.orderIndex)
               .map((slide) => ({
                 id: slide.id,
-                kind: slide.kind as "text" | "image" | "video",
+                kind: slide.kind as SlideData["kind"],
                 orderIndex: slide.orderIndex,
                 textHtml: slide.textHtml ?? null,
                 imageUrl: slide.imageUrl ?? null,
                 videoUrl: slide.videoUrl ?? null,
                 videoStartS: slide.videoStartS ?? null,
                 videoEndS: slide.videoEndS ?? null,
-                effectiveNotes: slide.officialNotes ?? null,
-              })) ?? [];
-          setLocalSlides(initialSlides);
-          setOriginalSlides(JSON.parse(JSON.stringify(initialSlides))); // Deep copy for comparison
-          setHasUnsavedChanges(false);
-          setDeletedSlideIds(new Set());
-          setPendingFileUploads(new Map());
+                quizData: (slide as any).quizData as QuizData | null,
+                effectiveNotes: (slide as any).officialNotes ?? null,
+              }));
+            setLocalSlides(initialSlides);
+            setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
+            setHasUnsavedChanges(false);
+            setDeletedSlideIds(new Set());
+            setPendingFileUploads(new Map());
+          }
         } else {
-          setError(
-            topicResult.error?.message ?? "Failed to fetch topic details"
+          // Curriculum flow: fetch stage, then topics, then find by order
+          const stageResult = await curriculumApi.stages.byCode(stageSlug!);
+          if (!stageResult.data) {
+            setError(
+              stageResult.error?.message ?? "Failed to fetch curriculum stage"
+            );
+            return;
+          }
+          setStage(stageResult.data);
+
+          const topicsResult = await topicsApi.get.list({
+            stageId: stageResult.data.id,
+          });
+          if (!topicsResult.data) {
+            setError(topicsResult.error?.message ?? "Failed to fetch topics");
+            return;
+          }
+
+          const foundTopic = topicsResult.data.find(
+            (t) => t.stageOrder === topicOrder
           );
+
+          if (!foundTopic) {
+            setError(`Topic with order ${topicOrder} not found`);
+            return;
+          }
+
+          const topicResult = await topicsApi.get.byId(foundTopic.id);
+          if (topicResult.data) {
+            setTopic(topicResult.data);
+            const initialSlides =
+              topicResult.data.slides
+                ?.sort((a, b) => a.orderIndex - b.orderIndex)
+                .map((slide) => ({
+                  id: slide.id,
+                  kind: slide.kind as "text" | "image" | "video",
+                  orderIndex: slide.orderIndex,
+                  textHtml: slide.textHtml ?? null,
+                  imageUrl: slide.imageUrl ?? null,
+                  videoUrl: slide.videoUrl ?? null,
+                  videoStartS: slide.videoStartS ?? null,
+                  videoEndS: slide.videoEndS ?? null,
+                  effectiveNotes: slide.officialNotes ?? null,
+                })) ?? [];
+            setLocalSlides(initialSlides);
+            setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
+            setHasUnsavedChanges(false);
+            setDeletedSlideIds(new Set());
+            setPendingFileUploads(new Map());
+          } else {
+            setError(
+              topicResult.error?.message ?? "Failed to fetch topic details"
+            );
+          }
         }
       } catch (err) {
         console.error("Failed to fetch topic:", err);
@@ -308,7 +431,7 @@ export function TopicDetailSection({
     };
 
     fetchData();
-  }, [stageSlug, topicOrder]);
+  }, [isCertification, stageSlug, topicOrder, topicId]);
 
   // Use local slides instead of topic.slides
   const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
@@ -317,6 +440,10 @@ export function TopicDetailSection({
   const canGoNext = currentSlideIndex < slides.length - 1;
   const isImageOrVideo =
     currentSlide?.kind === "image" || currentSlide?.kind === "video";
+  const isImageVideoOrQuiz =
+    currentSlide?.kind === "image" ||
+    currentSlide?.kind === "video" ||
+    (isCertification && currentSlide?.kind === "quiz");
 
   // Sync URL values with current slide and clear errors
   useEffect(() => {
@@ -334,12 +461,49 @@ export function TopicDetailSection({
   ]);
 
   const handleTypeChange = (newType: string) => {
-    if (
-      newType !== currentSlide?.kind &&
-      (newType === "image" || newType === "video")
-    ) {
-      setPendingTypeChange(newType as "image" | "video");
-      setShowTypeChangeDialog(true);
+    if (newType !== currentSlide?.kind) {
+      if (newType === "quiz" && isCertification) {
+        // Quiz type change - no confirmation needed, just update
+        if (!currentSlide) return;
+        const updatedSlides: ExtendedSlideData[] = localSlides.map((slide) => {
+          if (slide.id !== currentSlide.id) return slide;
+          return {
+            ...slide,
+            kind: "quiz" as const,
+            quizData: slide.quizData || {
+              question: "",
+              answers: [
+                { id: `answer_${Date.now()}_1`, text: "", isCorrect: false },
+                { id: `answer_${Date.now()}_2`, text: "", isCorrect: false },
+              ],
+            },
+            imageUrl: null,
+            videoUrl: null,
+            textHtml: null,
+          };
+        });
+        setLocalSlides(updatedSlides);
+        setHasUnsavedChanges(true);
+      } else if (newType === "image" || newType === "video") {
+        setPendingTypeChange(newType as "image" | "video");
+        setShowTypeChangeDialog(true);
+      } else if (newType === "text" && !isCertification) {
+        // Text type for curriculum - handle directly
+        if (!currentSlide) return;
+        const updatedSlides = localSlides.map((slide) => {
+          if (slide.id !== currentSlide.id) return slide;
+          return {
+            ...slide,
+            kind: "text" as const,
+            textHtml: slide.textHtml || "",
+            imageUrl: null,
+            videoUrl: null,
+            quizData: null,
+          };
+        });
+        setLocalSlides(updatedSlides);
+        setHasUnsavedChanges(true);
+      }
     }
   };
 
@@ -523,6 +687,16 @@ export function TopicDetailSection({
     if (isLoading || error || slides.length === 0) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't interfere if user is typing in an input, textarea, or contenteditable element
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         goToPrevious();
@@ -764,7 +938,7 @@ export function TopicDetailSection({
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Create new slide in local state
-    const newSlide: SlideData = {
+    const newSlide: ExtendedSlideData = {
       id: tempId,
       kind: "image",
       orderIndex: insertAfterIndex + 1, // Will be reordered below
@@ -774,6 +948,7 @@ export function TopicDetailSection({
       videoStartS: null,
       videoEndS: null,
       effectiveNotes: null,
+      quizData: null,
     };
 
     // Insert slide at correct position (after insertAfterIndex)
@@ -821,18 +996,47 @@ export function TopicDetailSection({
     setShowDeleteDialog(false);
   };
 
-  // Validate that all new slides have images or videos
+  // Validate that all new slides have images, videos, or quiz data
   const validateNewSlides = (): { isValid: boolean; message?: string } => {
     const newSlides = localSlides.filter(
       (s) => s.id.startsWith("temp_") && !deletedSlideIds.has(s.id)
     );
 
     for (const slide of newSlides) {
+      const extendedSlide = slide as ExtendedSlideData;
       const hasFileUpload = pendingFileUploads.has(slide.id);
       const hasImageUrl = !!slide.imageUrl;
       const hasVideoUrl = !!slide.videoUrl;
+      const hasQuizData =
+        isCertification &&
+        extendedSlide.kind === "quiz" &&
+        extendedSlide.quizData;
+      const hasTextHtml =
+        !isCertification && slide.kind === "text" && slide.textHtml;
 
-      if (!hasFileUpload && !hasImageUrl && !hasVideoUrl) {
+      if (slide.kind === "quiz" && isCertification) {
+        // Quiz slides need valid quiz data
+        if (
+          !hasQuizData ||
+          !extendedSlide.quizData?.question ||
+          extendedSlide.quizData.answers.length < 2
+        ) {
+          return {
+            isValid: false,
+            message:
+              "Quiz slides must have a question and at least 2 answer options.",
+          };
+        }
+      } else if (slide.kind === "text" && !isCertification) {
+        // Text slides need textHtml
+        if (!hasTextHtml) {
+          return {
+            isValid: false,
+            message: "Text slides must have content.",
+          };
+        }
+      } else if (!hasFileUpload && !hasImageUrl && !hasVideoUrl) {
+        // Image/video slides need an image or video
         return {
           isValid: false,
           message:
@@ -966,19 +1170,31 @@ export function TopicDetailSection({
 
   // Actual save function (called after confirmation)
   const performSave = async () => {
-    if (!topic || !stage || isSaving) return;
+    if (!topic || isSaving) return;
+    if (!isCertification && !stage) return;
 
     setIsSaving(true);
     setUploadError(null);
 
     try {
-      // Extract stage number from stage.code (e.g., "S1" -> 1)
-      const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-      if (!stageNumberMatch) {
-        throw new Error("Invalid stage code format");
+      // Extract stage code/number for file paths
+      let stageCodeForPath: string;
+      let topicNumber: number | null | undefined;
+
+      if (isCertification) {
+        // For certification, use stageCode prop or extract from topic
+        stageCodeForPath = stageCode || (topic as any).stage?.code || "C";
+        topicNumber = (topic as CertificationTopic).stageOrder;
+      } else {
+        // For curriculum, extract stage number from stage.code (e.g., "S1" -> 1)
+        const stageNumberMatch = (stage as any).code.match(/^S(\d+)$/);
+        if (!stageNumberMatch) {
+          throw new Error("Invalid stage code format");
+        }
+        stageCodeForPath = `s${parseInt(stageNumberMatch[1], 10)}`;
+        topicNumber = (topic as Topic).stageOrder;
       }
-      const stageNumber = parseInt(stageNumberMatch[1], 10);
-      const topicNumber = topic.stageOrder;
+
       if (topicNumber === null || topicNumber === undefined) {
         throw new Error("Topic stageOrder is missing");
       }
@@ -997,6 +1213,7 @@ export function TopicDetailSection({
       const slideIds: string[] = [];
 
       for (const slide of sortedSlides) {
+        const extendedSlide = slide as ExtendedSlideData;
         if (slide.id.startsWith("temp_")) {
           // New slide - include tempId so server can map files
           const createData: any = {
@@ -1009,6 +1226,10 @@ export function TopicDetailSection({
             videoStartS: slide.videoStartS || null,
             videoEndS: slide.videoEndS || null,
           };
+          // Add quiz data for certification
+          if (isCertification && extendedSlide.quizData) {
+            createData.quizData = extendedSlide.quizData;
+          }
           creates.push(createData);
         } else {
           // Existing slide - check if it has a pending file upload
@@ -1025,6 +1246,16 @@ export function TopicDetailSection({
             videoStartS: slide.videoStartS || null,
             videoEndS: slide.videoEndS || null,
           };
+          // Add quiz data for certification
+          if (isCertification) {
+            updateData.quizData = extendedSlide.quizData || null;
+            // Clear imageUrl and videoUrl for quiz slides (database constraint)
+            if (slide.kind === "quiz") {
+              updateData.imageUrl = null;
+              updateData.videoUrl = null;
+              updateData.textHtml = null;
+            }
+          }
           updates.push(updateData);
           slideIds.push(slide.id);
         }
@@ -1058,30 +1289,68 @@ export function TopicDetailSection({
       }
 
       // Step 3: Call bulk save API with FormData
-      const result = await topicsApi.slides.bulkSave(formData);
+      const result = isCertification
+        ? await certificationApi.topics.slides.bulkSave(topic.id, formData)
+        : await topicsApi.slides.bulkSave(formData);
 
       if (result.error) {
         throw new Error(result.error.message || "Failed to save changes");
       }
 
       // Step 4: Update local state with server response
-      if (result.data && "topic" in result.data && result.data.topic) {
-        setTopic(result.data.topic);
-        const updatedSlides =
-          result.data.topic.slides
-            ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
-            .map((slide: any) => ({
-              id: slide.id,
-              kind: slide.kind as "text" | "image" | "video",
-              orderIndex: slide.orderIndex,
-              textHtml: slide.textHtml ?? null,
-              imageUrl: slide.imageUrl ?? null,
-              videoUrl: slide.videoUrl ?? null,
-              videoStartS: slide.videoStartS ?? null,
-              videoEndS: slide.videoEndS ?? null,
-              effectiveNotes: slide.officialNotes ?? null,
-            })) ?? [];
-        setLocalSlides(updatedSlides);
+      let updatedSlides: ExtendedSlideData[] = [];
+
+      if (result.data) {
+        // Update topic if it's included in the response, otherwise keep existing topic
+        // Merge response topic with existing topic to preserve fields like title
+        if ("topic" in result.data && result.data.topic) {
+          // If the response topic has all necessary fields, use it
+          // Otherwise, merge it with the existing topic to preserve fields like title
+          const responseTopic = result.data.topic;
+          if (topic && (!responseTopic.title || !responseTopic.stageOrder)) {
+            // Merge: keep existing topic fields, update with response fields (especially slides)
+            setTopic({
+              ...topic,
+              ...responseTopic,
+              slides: responseTopic.slides || topic.slides,
+            });
+          } else {
+            // Response has full topic data, use it directly
+            setTopic(responseTopic);
+          }
+        }
+
+        // Update slides from response if available
+        const responseTopic =
+          "topic" in result.data && result.data.topic
+            ? result.data.topic
+            : topic; // Fallback to current topic if not in response
+
+        if (responseTopic?.slides) {
+          updatedSlides =
+            responseTopic.slides
+              ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+              .map((slide: any) => ({
+                id: slide.id,
+                kind: slide.kind as
+                  | "text"
+                  | "image"
+                  | "video"
+                  | "quiz"
+                  | "test",
+                orderIndex: slide.orderIndex,
+                textHtml: slide.textHtml ?? null,
+                imageUrl: slide.imageUrl ?? null,
+                videoUrl: slide.videoUrl ?? null,
+                videoStartS: slide.videoStartS ?? null,
+                videoEndS: slide.videoEndS ?? null,
+                effectiveNotes: slide.officialNotes ?? null,
+                quizData: isCertification
+                  ? (slide.quizData as QuizData | null)
+                  : null,
+              })) ?? [];
+          setLocalSlides(updatedSlides);
+        }
 
         // Invalidate cache for slides that had files uploaded
         // For existing slides with file uploads
@@ -1116,7 +1385,10 @@ export function TopicDetailSection({
         setSlideRefreshKey((prev) => prev + 1);
 
         // Update original slides to match current state
-        setOriginalSlides(JSON.parse(JSON.stringify(updatedSlides)));
+        // Use updatedSlides if available, otherwise use current localSlides
+        const slidesToSave =
+          updatedSlides.length > 0 ? updatedSlides : localSlides;
+        setOriginalSlides(JSON.parse(JSON.stringify(slidesToSave)));
 
         // Show success feedback on button
         setShowSaveSuccess(true);
@@ -1146,7 +1418,8 @@ export function TopicDetailSection({
 
   // Handle save button click - validate first, then show confirmation
   const handleBulkSave = () => {
-    if (!topic || !stage || isSaving || !hasUnsavedChanges) return;
+    if (!topic || isSaving || !hasUnsavedChanges) return;
+    if (!isCertification && !stage) return;
 
     // Step 1: Validate new slides
     const validation = validateNewSlides();
@@ -1316,6 +1589,23 @@ export function TopicDetailSection({
               <p className="text-sm mt-2">
                 This topic doesn't have any slides yet.
               </p>
+              <Button
+                onClick={() => handleCreateSlide(-1)}
+                disabled={isCreatingSlide}
+                className="mt-6"
+              >
+                {isCreatingSlide ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating slide...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add First Slide
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -1325,12 +1615,66 @@ export function TopicDetailSection({
           <div className="grid grid-cols-5 gap-6">
             {/* Current Slide Preview - 3/5 width */}
             <div className="col-span-3">
-              <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden bg-background">
-                <SlideRenderer
-                  key={`${currentSlide.id}-${slideRefreshKey}`}
-                  slide={currentSlide}
-                  className="w-full h-full"
-                />
+              <div className="relative w-full aspect-video rounded-lg shadow-lg overflow-hidden bg-background p-8 flex flex-col">
+                {currentSlide.kind === "quiz" ? (
+                  <>
+                    {/* Bullyproof Logo - Top Center */}
+                    <div className="absolute top-4 left-1/2 transform -translate-x-1/2">
+                      <Image
+                        src="/images/bullyproof-logo.svg"
+                        alt="Bullyproof"
+                        width={168}
+                        height={45}
+                        className="h-11 w-auto"
+                      />
+                    </div>
+                    <div className="flex flex-col h-full justify-center space-y-4 pt-4">
+                      {/* Question - Centered and Bold */}
+                      <div className="text-center">
+                        <h2 className="text-2xl font-bold">
+                          {(currentSlide as ExtendedSlideData).quizData
+                            ?.question || "Question"}
+                        </h2>
+                      </div>
+                      {/* Answers - Single Column Grid with Radio Buttons */}
+                      <div className="flex justify-center">
+                        <RadioGroup
+                          className="w-full max-w-md space-y-0"
+                          disabled
+                        >
+                          {(
+                            currentSlide as ExtendedSlideData
+                          ).quizData?.answers.map(
+                            (answer: any, index: number) => (
+                              <div
+                                key={answer.id || index}
+                                className="flex items-center space-x-3 p-3 border rounded-md bg-card"
+                              >
+                                <RadioGroupItem
+                                  value={answer.id || `answer-${index}`}
+                                  id={answer.id || `answer-${index}`}
+                                />
+                                <Label
+                                  htmlFor={answer.id || `answer-${index}`}
+                                  className="flex-1 cursor-pointer"
+                                >
+                                  {answer.text || `Answer ${index + 1}`}
+                                </Label>
+                              </div>
+                            )
+                          ) || []}
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <SlideRenderer
+                    key={`${currentSlide.id}-${slideRefreshKey}`}
+                    slide={currentSlide}
+                    className="w-full h-full"
+                    isCertification={isCertification}
+                  />
+                )}
               </div>
             </div>
 
@@ -1376,7 +1720,8 @@ export function TopicDetailSection({
                     className="mt-0 flex-1 flex flex-col"
                   >
                     <div className="space-y-4 flex-shrink-0">
-                      {isImageOrVideo && (
+                      {(isImageOrVideo ||
+                        (isCertification && currentSlide.kind === "quiz")) && (
                         <div className="space-y-2">
                           <Label>Slide Type</Label>
                           <Select
@@ -1387,8 +1732,12 @@ export function TopicDetailSection({
                               <div className="flex items-center gap-2">
                                 {currentSlide.kind === "image" ? (
                                   <ImageIcon className="h-4 w-4" />
-                                ) : (
+                                ) : currentSlide.kind === "video" ? (
                                   <VideoIcon className="h-4 w-4" />
+                                ) : currentSlide.kind === "quiz" ? (
+                                  <FileQuestion className="h-4 w-4" />
+                                ) : (
+                                  <FileText className="h-4 w-4" />
                                 )}
                                 <span className="capitalize">
                                   {currentSlide.kind}
@@ -1396,6 +1745,14 @@ export function TopicDetailSection({
                               </div>
                             </SelectTrigger>
                             <SelectContent>
+                              {!isCertification && (
+                                <SelectItem value="text">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    Text
+                                  </div>
+                                </SelectItem>
+                              )}
                               <SelectItem value="image">
                                 <div className="flex items-center gap-2">
                                   <ImageIcon className="h-4 w-4" />
@@ -1408,8 +1765,38 @@ export function TopicDetailSection({
                                   Video
                                 </div>
                               </SelectItem>
+                              {isCertification && (
+                                <SelectItem value="quiz">
+                                  <div className="flex items-center gap-2">
+                                    <FileQuestion className="h-4 w-4" />
+                                    Quiz
+                                  </div>
+                                </SelectItem>
+                              )}
                             </SelectContent>
                           </Select>
+                        </div>
+                      )}
+
+                      {/* Quiz Editor */}
+                      {isCertification && currentSlide.kind === "quiz" && (
+                        <div className="space-y-4 flex-shrink-0">
+                          <QuizSlideEditor
+                            quizData={
+                              (currentSlide as ExtendedSlideData).quizData ||
+                              null
+                            }
+                            onChange={(quizData) => {
+                              if (!currentSlide) return;
+                              const updatedSlides = localSlides.map((slide) =>
+                                slide.id === currentSlide.id
+                                  ? { ...slide, quizData: quizData || null }
+                                  : slide
+                              );
+                              setLocalSlides(updatedSlides);
+                              setHasUnsavedChanges(true);
+                            }}
+                          />
                         </div>
                       )}
 
@@ -1579,20 +1966,13 @@ export function TopicDetailSection({
 
               {/* Slide Gallery */}
               <div
-                ref={slideGalleryRef}
+                ref={setGalleryRef}
                 className="flex gap-4 overflow-x-auto overflow-y-visible py-3 px-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent relative"
                 onDragOver={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                 }}
                 onDragLeave={handleSlideDragLeave}
-                onWheel={(e) => {
-                  // Convert vertical scroll to horizontal scroll
-                  if (slideGalleryRef.current) {
-                    e.preventDefault();
-                    slideGalleryRef.current.scrollLeft += e.deltaY;
-                  }
-                }}
                 onMouseLeave={() => {
                   // Clear all hover states when leaving the gallery
                   setHoveredSlideIndex(null);
@@ -1748,13 +2128,25 @@ export function TopicDetailSection({
                           aspectRatio: "16 / 9",
                         }}
                       >
-                        <div className="w-full h-full">
-                          <SlideRenderer
-                            key={`${slide.id}-${slideRefreshKey}`}
-                            slide={slide}
-                            className="w-full h-full"
-                            thumbnailOnly={true}
-                          />
+                        <div className="w-full h-full relative">
+                          {slide.kind === "quiz" ? (
+                            <div className="w-full h-full flex items-center justify-center bg-muted pb-4">
+                              <div className="flex items-center gap-2">
+                                <MessageCircleQuestion className="h-6 w-6 text-muted-foreground" />
+                                <span className="text-base font-medium text-muted-foreground">
+                                  Quiz
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <SlideRenderer
+                              key={`${slide.id}-${slideRefreshKey}`}
+                              slide={slide}
+                              className="w-full h-full"
+                              thumbnailOnly={true}
+                              isCertification={isCertification}
+                            />
+                          )}
                         </div>
                         <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
                           Slide {slide.orderIndex + 1}
@@ -1762,56 +2154,55 @@ export function TopicDetailSection({
                       </button>
 
                       {/* Add slide button - appears centered between slides after 300ms hover */}
-                      {index < slides.length - 1 && (
-                        <div
-                          className="flex-shrink-0 flex items-center justify-center transition-all duration-200"
-                          style={{
-                            width: showAddButtonForSlide ? "48px" : "0px",
-                            opacity: showAddButtonForSlide ? 1 : 0,
-                            // transform: showAddButtonForSlide
-                            //   ? "padding-left(16px)"
-                            //   : "padding-left(0)",
-                          }}
-                          onMouseEnter={() => {
-                            // Cancel any pending hide timeout
-                            if (hideButtonTimeoutRef.current) {
-                              clearTimeout(hideButtonTimeoutRef.current);
-                              hideButtonTimeoutRef.current = null;
-                            }
-                            // Keep button visible when hovering over it
-                            setShowAddButton(index);
-                          }}
-                          onMouseLeave={() => {
-                            // Hide button after a short delay
-                            if (hideButtonTimeoutRef.current) {
-                              clearTimeout(hideButtonTimeoutRef.current);
-                            }
-                            hideButtonTimeoutRef.current = setTimeout(() => {
-                              setShowAddButton(null);
-                            }, 200);
-                          }}
-                        >
-                          {showAddButtonForSlide && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleCreateSlide(index);
-                                  }}
-                                  disabled={isCreatingSlide}
-                                  className="h-10 w-12 rounded-lg bg-background/50 border-2 border-dashed border-muted-foreground/40 shadow-sm flex items-center justify-center hover:bg-background/80 hover:border-muted-foreground/60 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait ml-4"
-                                >
-                                  <Plus className="h-5 w-5 text-muted-foreground" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>Add slide</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
-                        </div>
-                      )}
+                      {/* Show after every slide, including the last one */}
+                      <div
+                        className="flex-shrink-0 flex items-center justify-center transition-all duration-200"
+                        style={{
+                          width: showAddButtonForSlide ? "48px" : "0px",
+                          opacity: showAddButtonForSlide ? 1 : 0,
+                          // transform: showAddButtonForSlide
+                          //   ? "padding-left(16px)"
+                          //   : "padding-left(0)",
+                        }}
+                        onMouseEnter={() => {
+                          // Cancel any pending hide timeout
+                          if (hideButtonTimeoutRef.current) {
+                            clearTimeout(hideButtonTimeoutRef.current);
+                            hideButtonTimeoutRef.current = null;
+                          }
+                          // Keep button visible when hovering over it
+                          setShowAddButton(index);
+                        }}
+                        onMouseLeave={() => {
+                          // Hide button after a short delay
+                          if (hideButtonTimeoutRef.current) {
+                            clearTimeout(hideButtonTimeoutRef.current);
+                          }
+                          hideButtonTimeoutRef.current = setTimeout(() => {
+                            setShowAddButton(null);
+                          }, 200);
+                        }}
+                      >
+                        {showAddButtonForSlide && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreateSlide(index);
+                                }}
+                                disabled={isCreatingSlide}
+                                className="h-10 w-12 rounded-lg bg-background/50 border-2 border-dashed border-muted-foreground/40 shadow-sm flex items-center justify-center hover:bg-background/80 hover:border-muted-foreground/60 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait ml-4"
+                              >
+                                <Plus className="h-5 w-5 text-muted-foreground" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Add slide</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
 
                       {/* Drop zone after slide (only show after last slide for drag and drop) */}
                       {index === slides.length - 1 && (
