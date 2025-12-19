@@ -17,9 +17,9 @@ import {
   json,
   inet,
   bigint,
-  pgPolicy,
-  integer,
   date,
+  integer,
+  pgPolicy,
   primaryKey,
   pgView,
   pgEnum,
@@ -302,26 +302,6 @@ export const schoolSectors = pgTable(
       "school_sectors_key_chk",
       sql`key = ANY (ARRAY['government'::text, 'catholic'::text, 'independent'::text])`
     ),
-  ]
-);
-
-export const schoolYears = pgTable(
-  "school_years",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    code: text().notNull(),
-    displayName: text("display_name").notNull(),
-    levelId: uuid("level_id").notNull(),
-    sortIndex: smallint("sort_index").notNull(),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.levelId],
-      foreignColumns: [schoolLevels.id],
-      name: "school_years_level_id_fkey",
-    }),
-    unique("school_years_code_key").on(table.code),
-    unique("school_years_sort_index_key").on(table.sortIndex),
   ]
 );
 
@@ -756,6 +736,7 @@ export const sessionsInAuth = auth.table(
     refreshTokenHmacKey: text("refresh_token_hmac_key"),
     // You can use { mode: "bigint" } if numbers are exceeding js number limitations
     refreshTokenCounter: bigint("refresh_token_counter", { mode: "number" }),
+    scopes: text(),
   },
   (table) => [
     index("sessions_not_after_idx").using(
@@ -785,6 +766,493 @@ export const sessionsInAuth = auth.table(
       foreignColumns: [usersInAuth.id],
       name: "sessions_user_id_fkey",
     }).onDelete("cascade"),
+    check("sessions_scopes_length", sql`char_length(scopes) <= 4096`),
+  ]
+);
+
+export const scopes = pgTable(
+  "scopes",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    name: text().notNull(),
+    description: text(),
+  },
+  (table) => [unique("scopes_name_key").on(table.name)]
+);
+
+export const roles = pgTable(
+  "roles",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    scopeId: uuid("scope_id").notNull(),
+    name: text().notNull(),
+    description: text(),
+    key: text(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.scopeId],
+      foreignColumns: [scopes.id],
+      name: "roles_scope_id_fkey",
+    }).onDelete("cascade"),
+    unique("roles_scope_id_name_key").on(table.scopeId, table.name),
+    unique("roles_key_key").on(table.key),
+  ]
+);
+
+export const schools = pgTable(
+  "schools",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    name: text().notNull(),
+    code: text(),
+    stateId: uuid("state_id"),
+    sectorId: uuid("sector_id"),
+    emailDomain: text("email_domain"),
+    address: text(),
+    joinedAt: timestamp("joined_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    }).defaultNow(),
+    slug: text(),
+    bannerUrl: text("banner_url"),
+    avatarUrl: text("avatar_url"),
+  },
+  (table) => [
+    index("idx_schools_sector_id").using(
+      "btree",
+      table.sectorId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_schools_state_id").using(
+      "btree",
+      table.stateId.asc().nullsLast().op("uuid_ops")
+    ),
+    uniqueIndex("ux_schools_name_lower").using("btree", sql`lower(name)`),
+    foreignKey({
+      columns: [table.sectorId],
+      foreignColumns: [schoolSectors.id],
+      name: "schools_sector_id_fkey",
+    }),
+    foreignKey({
+      columns: [table.stateId],
+      foreignColumns: [states.id],
+      name: "schools_state_id_fkey",
+    }),
+    unique("schools_code_key").on(table.code),
+    unique("schools_slug_key").on(table.slug),
+  ]
+);
+
+export const schoolLicences = pgTable(
+  "school_licences",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid("school_id").notNull(),
+    startsAt: date("starts_at")
+      .default(sql`CURRENT_DATE`)
+      .notNull(),
+    endsAt: date("ends_at")
+      .default(sql`(CURRENT_DATE + '3 years'::interval)`)
+      .notNull(),
+    autoRenew: boolean("auto_renew").default(false).notNull(),
+    status: licenceStatus().default("PENDING").notNull(),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    planLength: integer("plan_length").default(3).notNull(),
+  },
+  (table) => [
+    index("ix_licences_school").using(
+      "btree",
+      table.schoolId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("ix_licences_status").using(
+      "btree",
+      table.status.asc().nullsLast().op("enum_ops")
+    ),
+    uniqueIndex("uq_school_active_or_pending_licence")
+      .using("btree", table.schoolId.asc().nullsLast().op("uuid_ops"))
+      .where(
+        sql`(status = ANY (ARRAY['PENDING'::licence_status, 'ACTIVE'::licence_status]))`
+      ),
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: "school_licences_school_id_fkey",
+    }).onDelete("cascade"),
+    check(
+      "school_licences_plan_length_check",
+      sql`(plan_length >= 1) AND (plan_length <= 5)`
+    ),
+  ]
+);
+
+export const schoolInvites = pgTable(
+  "school_invites",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    schoolId: uuid("school_id").notNull(),
+    email: text().notNull(),
+    roleKey: text("role_key").notNull(),
+    token: text().notNull(),
+    status: inviteStatus().default("PENDING").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    acceptedAt: timestamp("accepted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    userId: uuid("user_id"),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("ix_school_invites_email").using("btree", sql`lower(email)`),
+    index("ix_school_invites_school").using(
+      "btree",
+      table.schoolId.asc().nullsLast().op("uuid_ops")
+    ),
+    uniqueIndex("uq_school_invites_pending")
+      .using("btree", sql`school_id`, sql`lower(email)`, sql`role_key`)
+      .where(sql`(status = 'PENDING'::invite_status)`),
+    foreignKey({
+      columns: [table.schoolId],
+      foreignColumns: [schools.id],
+      name: "school_invites_school_id_fkey",
+    }).onDelete("cascade"),
+    check(
+      "school_invites_email_check",
+      sql`POSITION(('@'::text) IN (email)) > 1`
+    ),
+  ]
+);
+
+export const oauthAuthorizationsInAuth = auth.table(
+  "oauth_authorizations",
+  {
+    id: uuid().notNull(),
+    authorizationId: text("authorization_id").notNull(),
+    clientId: uuid("client_id").notNull(),
+    userId: uuid("user_id"),
+    redirectUri: text("redirect_uri").notNull(),
+    scope: text().notNull(),
+    state: text(),
+    resource: text(),
+    codeChallenge: text("code_challenge"),
+    codeChallengeMethod: codeChallengeMethodInAuth("code_challenge_method"),
+    responseType: oauthResponseTypeInAuth("response_type")
+      .default("code")
+      .notNull(),
+    status: oauthAuthorizationStatusInAuth().default("pending").notNull(),
+    authorizationCode: text("authorization_code"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" })
+      .default(sql`(now() + '00:03:00'::interval)`)
+      .notNull(),
+    approvedAt: timestamp("approved_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    nonce: text(),
+  },
+  (table) => [
+    index("oauth_auth_pending_exp_idx")
+      .using("btree", table.expiresAt.asc().nullsLast().op("timestamptz_ops"))
+      .where(sql`(status = 'pending'::auth.oauth_authorization_status)`),
+    foreignKey({
+      columns: [table.clientId],
+      foreignColumns: [oauthClientsInAuth.id],
+      name: "oauth_authorizations_client_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [usersInAuth.id],
+      name: "oauth_authorizations_user_id_fkey",
+    }).onDelete("cascade"),
+    check(
+      "oauth_authorizations_authorization_code_length",
+      sql`char_length(authorization_code) <= 255`
+    ),
+    check(
+      "oauth_authorizations_code_challenge_length",
+      sql`char_length(code_challenge) <= 128`
+    ),
+    check(
+      "oauth_authorizations_expires_at_future",
+      sql`expires_at > created_at`
+    ),
+    check("oauth_authorizations_nonce_length", sql`char_length(nonce) <= 255`),
+    check(
+      "oauth_authorizations_redirect_uri_length",
+      sql`char_length(redirect_uri) <= 2048`
+    ),
+    check(
+      "oauth_authorizations_resource_length",
+      sql`char_length(resource) <= 2048`
+    ),
+    check("oauth_authorizations_scope_length", sql`char_length(scope) <= 4096`),
+    check("oauth_authorizations_state_length", sql`char_length(state) <= 4096`),
+  ]
+);
+
+export const oauthConsentsInAuth = auth.table(
+  "oauth_consents",
+  {
+    id: uuid().notNull(),
+    userId: uuid("user_id").notNull(),
+    clientId: uuid("client_id").notNull(),
+    scopes: text().notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    index("oauth_consents_active_client_idx")
+      .using("btree", table.clientId.asc().nullsLast().op("uuid_ops"))
+      .where(sql`(revoked_at IS NULL)`),
+    index("oauth_consents_active_user_client_idx")
+      .using(
+        "btree",
+        table.userId.asc().nullsLast().op("uuid_ops"),
+        table.clientId.asc().nullsLast().op("uuid_ops")
+      )
+      .where(sql`(revoked_at IS NULL)`),
+    index("oauth_consents_user_order_idx").using(
+      "btree",
+      table.userId.asc().nullsLast().op("timestamptz_ops"),
+      table.grantedAt.desc().nullsFirst().op("timestamptz_ops")
+    ),
+    foreignKey({
+      columns: [table.clientId],
+      foreignColumns: [oauthClientsInAuth.id],
+      name: "oauth_consents_client_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [usersInAuth.id],
+      name: "oauth_consents_user_id_fkey",
+    }).onDelete("cascade"),
+    check(
+      "oauth_consents_revoked_after_granted",
+      sql`(revoked_at IS NULL) OR (revoked_at >= granted_at)`
+    ),
+    check("oauth_consents_scopes_length", sql`char_length(scopes) <= 2048`),
+    check(
+      "oauth_consents_scopes_not_empty",
+      sql`char_length(TRIM(BOTH FROM scopes)) > 0`
+    ),
+  ]
+);
+
+export const certificationUserAnswers = pgTable(
+  "certification_user_answers",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    userId: uuid("user_id").notNull(),
+    stageId: uuid("stage_id").notNull(),
+    topicId: uuid("topic_id").notNull(),
+    slideId: uuid("slide_id").notNull(),
+    answerId: text("answer_id"),
+    isCorrect: boolean("is_correct").notNull(),
+    timeTaken: integer("time_taken"),
+    answeredAt: timestamp("answered_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_certification_user_answers_slide").using(
+      "btree",
+      table.slideId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_certification_user_answers_user_stage").using(
+      "btree",
+      table.userId.asc().nullsLast().op("uuid_ops"),
+      table.stageId.asc().nullsLast().op("uuid_ops")
+    ),
+    foreignKey({
+      columns: [table.slideId],
+      foreignColumns: [certificationSlides.id],
+      name: "certification_user_answers_slide_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.stageId],
+      foreignColumns: [certificationStages.id],
+      name: "certification_user_answers_stage_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.topicId],
+      foreignColumns: [certificationTopics.id],
+      name: "certification_user_answers_topic_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [usersInAuth.id],
+      name: "certification_user_answers_user_id_fkey",
+    }).onDelete("cascade"),
+    pgPolicy("certification_user_answers_admin_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+      using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)`,
+    }),
+    pgPolicy("certification_user_answers_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_user_answers_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_user_answers_update", {
+      as: "permissive",
+      for: "update",
+      to: ["authenticated"],
+    }),
+  ]
+);
+
+export const certificationUserProgress = pgTable(
+  "certification_user_progress",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    userId: uuid("user_id").notNull(),
+    stageId: uuid("stage_id").notNull(),
+    status: text().default("started").notNull(),
+    progressPercentage: integer("progress_percentage").default(0).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.stageId],
+      foreignColumns: [certificationStages.id],
+      name: "certification_user_progress_stage_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [usersInAuth.id],
+      name: "certification_user_progress_user_id_fkey",
+    }).onDelete("cascade"),
+    unique("certification_user_progress_user_stage").on(
+      table.userId,
+      table.stageId
+    ),
+    pgPolicy("certification_user_progress_admin_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+      using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)`,
+    }),
+    pgPolicy("certification_user_progress_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_user_progress_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_user_progress_update", {
+      as: "permissive",
+      for: "update",
+      to: ["authenticated"],
+    }),
+    check(
+      "certification_user_progress_status_check",
+      sql`status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text])`
+    ),
+  ]
+);
+
+export const oauthClientStatesInAuth = auth.table(
+  "oauth_client_states",
+  {
+    id: uuid().notNull(),
+    providerType: text("provider_type").notNull(),
+    codeVerifier: text("code_verifier"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+  },
+  (table) => [
+    index("idx_oauth_client_states_created_at").using(
+      "btree",
+      table.createdAt.asc().nullsLast().op("timestamptz_ops")
+    ),
+  ]
+);
+
+export const topics = pgTable(
+  "topics",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    stageId: uuid("stage_id").notNull(),
+    title: text().notNull(),
+    status: text().default("draft").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    officialNotes: text("official_notes"),
+    stageOrder: smallint("stage_order"),
+  },
+  (table) => [
+    uniqueIndex("ux_topics_stage_title").using(
+      "btree",
+      sql`stage_id`,
+      sql`lower(title)`
+    ),
+    foreignKey({
+      columns: [table.stageId],
+      foreignColumns: [curriculumStages.id],
+      name: "topics_stage_id_fkey",
+    }).onDelete("restrict"),
+    check(
+      "topics_status_check",
+      sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`
+    ),
+  ]
+);
+
+export const schoolYears = pgTable(
+  "school_years",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    code: text().notNull(),
+    displayName: text("display_name").notNull(),
+    levelId: uuid("level_id").notNull(),
+    sortIndex: smallint("sort_index").notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.levelId],
+      foreignColumns: [schoolLevels.id],
+      name: "school_years_level_id_fkey",
+    }),
+    unique("school_years_code_key").on(table.code),
+    unique("school_years_sort_index_key").on(table.sortIndex),
   ]
 );
 
@@ -810,16 +1278,6 @@ export const curriculumStages = pgTable(
   ]
 );
 
-export const scopes = pgTable(
-  "scopes",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    name: text().notNull(),
-    description: text(),
-  },
-  (table) => [unique("scopes_name_key").on(table.name)]
-);
-
 export const classes = pgTable(
   "classes",
   {
@@ -836,6 +1294,10 @@ export const classes = pgTable(
       .notNull(),
   },
   (table) => [
+    index("idx_classes_school_id").using(
+      "btree",
+      table.schoolId.asc().nullsLast().op("uuid_ops")
+    ),
     uniqueIndex("ux_classes_school_name").using(
       "btree",
       sql`school_id`,
@@ -893,57 +1355,6 @@ export const lessons = pgTable(
     check(
       "lessons_status_check",
       sql`status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text])`
-    ),
-  ]
-);
-
-export const roles = pgTable(
-  "roles",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    scopeId: uuid("scope_id").notNull(),
-    name: text().notNull(),
-    description: text(),
-    key: text(),
-  },
-  (table) => [
-    foreignKey({
-      columns: [table.scopeId],
-      foreignColumns: [scopes.id],
-      name: "roles_scope_id_fkey",
-    }).onDelete("cascade"),
-    unique("roles_scope_id_name_key").on(table.scopeId, table.name),
-    unique("roles_key_key").on(table.key),
-  ]
-);
-
-export const topics = pgTable(
-  "topics",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    stageId: uuid("stage_id").notNull(),
-    title: text().notNull(),
-    status: text().default("draft").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-    officialNotes: text("official_notes"),
-    stageOrder: smallint("stage_order"),
-  },
-  (table) => [
-    uniqueIndex("ux_topics_stage_title").using(
-      "btree",
-      sql`stage_id`,
-      sql`lower(title)`
-    ),
-    foreignKey({
-      columns: [table.stageId],
-      foreignColumns: [curriculumStages.id],
-      name: "topics_stage_id_fkey",
-    }).onDelete("restrict"),
-    check(
-      "topics_status_check",
-      sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`
     ),
   ]
 );
@@ -1030,55 +1441,6 @@ export const schoolLevels = pgTable(
   ]
 );
 
-export const topicSlides = pgTable(
-  "topic_slides",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    topicId: uuid("topic_id").notNull(),
-    orderIndex: integer("order_index").notNull(),
-    kind: text().notNull(),
-    textHtml: text("text_html"),
-    imageUrl: text("image_url"),
-    videoUrl: text("video_url"),
-    videoStartS: integer("video_start_s"),
-    videoEndS: integer("video_end_s"),
-    officialNotes: text("official_notes"),
-    durationSec: integer("duration_sec"),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("idx_topic_slides_topic_order").using(
-      "btree",
-      table.topicId.asc().nullsLast().op("int4_ops"),
-      table.orderIndex.asc().nullsLast().op("uuid_ops")
-    ),
-    uniqueIndex("topic_slides_topic_order_uniq").using(
-      "btree",
-      table.topicId.asc().nullsLast().op("int4_ops"),
-      table.orderIndex.asc().nullsLast().op("uuid_ops")
-    ),
-    foreignKey({
-      columns: [table.topicId],
-      foreignColumns: [topics.id],
-      name: "topic_slides_topic_id_fkey",
-    }).onDelete("cascade"),
-    unique("topic_slides_unique_order").on(table.topicId, table.orderIndex),
-    check(
-      "topic_slides_kind_check",
-      sql`kind = ANY (ARRAY['text'::text, 'image'::text, 'video'::text])`
-    ),
-    check(
-      "topic_slides_payload_chk",
-      sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (image_url IS NOT NULL) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (video_url IS NOT NULL) AND (text_html IS NULL))`
-    ),
-  ]
-);
-
 export const userRoles = pgTable(
   "user_roles",
   {
@@ -1097,6 +1459,13 @@ export const userRoles = pgTable(
       "btree",
       table.schoolId.asc().nullsLast().op("uuid_ops")
     ),
+    index("idx_user_roles_school_role")
+      .using(
+        "btree",
+        table.schoolId.asc().nullsLast().op("uuid_ops"),
+        table.roleId.asc().nullsLast().op("uuid_ops")
+      )
+      .where(sql`(school_id IS NOT NULL)`),
     index("idx_user_roles_user_id").using(
       "btree",
       table.userId.asc().nullsLast().op("uuid_ops")
@@ -1133,6 +1502,60 @@ export const userRoles = pgTable(
       "user_roles_scope_coherence_chk",
       sql`((role_scope = 'platform'::text) AND (school_id IS NULL)) OR ((role_scope = 'school'::text) AND (school_id IS NOT NULL))`
     ),
+  ]
+);
+
+export const lessonSessions = pgTable(
+  "lesson_sessions",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    lessonId: uuid("lesson_id").notNull(),
+    startedBy: uuid("started_by").notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    index("lesson_sessions_lesson_idx").using(
+      "btree",
+      table.lessonId.asc().nullsLast().op("uuid_ops")
+    ),
+    foreignKey({
+      columns: [table.lessonId],
+      foreignColumns: [lessons.id],
+      name: "lesson_sessions_lesson_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.startedBy],
+      foreignColumns: [usersInAuth.id],
+      name: "lesson_sessions_started_by_fkey",
+    }),
+    pgPolicy("sessions_delete", {
+      as: "permissive",
+      for: "delete",
+      to: ["public"],
+      using: sql`(has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid) OR has_any_role(ARRAY['SCHOOL_ADMIN'::text], ( SELECT lessons.school_id
+   FROM lessons
+  WHERE (lessons.id = lesson_sessions.lesson_id))) OR (EXISTS ( SELECT 1
+   FROM lessons l
+  WHERE ((l.id = lesson_sessions.lesson_id) AND (l.created_by_user_id = auth.uid())))))`,
+    }),
+    pgPolicy("sessions_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["public"],
+    }),
+    pgPolicy("sessions_select", {
+      as: "permissive",
+      for: "select",
+      to: ["public"],
+    }),
+    pgPolicy("sessions_update", {
+      as: "permissive",
+      for: "update",
+      to: ["public"],
+    }),
   ]
 );
 
@@ -1205,118 +1628,20 @@ export const lessonEvents = pgTable(
   ]
 );
 
-export const lessonSessions = pgTable(
-  "lesson_sessions",
+export const topicSlides = pgTable(
+  "topic_slides",
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
-    lessonId: uuid("lesson_id").notNull(),
-    startedBy: uuid("started_by").notNull(),
-    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-    endedAt: timestamp("ended_at", { withTimezone: true, mode: "string" }),
-  },
-  (table) => [
-    index("lesson_sessions_lesson_idx").using(
-      "btree",
-      table.lessonId.asc().nullsLast().op("uuid_ops")
-    ),
-    foreignKey({
-      columns: [table.lessonId],
-      foreignColumns: [lessons.id],
-      name: "lesson_sessions_lesson_id_fkey",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.startedBy],
-      foreignColumns: [usersInAuth.id],
-      name: "lesson_sessions_started_by_fkey",
-    }),
-    pgPolicy("sessions_delete", {
-      as: "permissive",
-      for: "delete",
-      to: ["public"],
-      using: sql`(has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid) OR has_any_role(ARRAY['SCHOOL_ADMIN'::text], ( SELECT lessons.school_id
-   FROM lessons
-  WHERE (lessons.id = lesson_sessions.lesson_id))) OR (EXISTS ( SELECT 1
-   FROM lessons l
-  WHERE ((l.id = lesson_sessions.lesson_id) AND (l.created_by_user_id = auth.uid())))))`,
-    }),
-    pgPolicy("sessions_insert", {
-      as: "permissive",
-      for: "insert",
-      to: ["public"],
-    }),
-    pgPolicy("sessions_select", {
-      as: "permissive",
-      for: "select",
-      to: ["public"],
-    }),
-    pgPolicy("sessions_update", {
-      as: "permissive",
-      for: "update",
-      to: ["public"],
-    }),
-  ]
-);
-
-export const schoolInvites = pgTable(
-  "school_invites",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    schoolId: uuid("school_id").notNull(),
-    email: text().notNull(),
-    roleKey: text("role_key").notNull(),
-    token: text().notNull(),
-    status: inviteStatus().default("PENDING").notNull(),
-    sentAt: timestamp("sent_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-    acceptedAt: timestamp("accepted_at", {
-      withTimezone: true,
-      mode: "string",
-    }),
-    userId: uuid("user_id"),
-    createdBy: uuid("created_by"),
-    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
-      .defaultNow()
-      .notNull(),
-  },
-  (table) => [
-    index("ix_school_invites_email").using("btree", sql`lower(email)`),
-    index("ix_school_invites_school").using(
-      "btree",
-      table.schoolId.asc().nullsLast().op("uuid_ops")
-    ),
-    uniqueIndex("uq_school_invites_pending")
-      .using("btree", sql`school_id`, sql`lower(email)`, sql`role_key`)
-      .where(sql`(status = 'PENDING'::invite_status)`),
-    foreignKey({
-      columns: [table.schoolId],
-      foreignColumns: [schools.id],
-      name: "school_invites_school_id_fkey",
-    }).onDelete("cascade"),
-    check(
-      "school_invites_email_check",
-      sql`POSITION(('@'::text) IN (email)) > 1`
-    ),
-  ]
-);
-
-export const schoolLicences = pgTable(
-  "school_licences",
-  {
-    id: uuid().defaultRandom().primaryKey().notNull(),
-    schoolId: uuid("school_id").notNull(),
-    plan: text().default("STANDARD").notNull(),
-    startsAt: date("starts_at")
-      .default(sql`CURRENT_DATE`)
-      .notNull(),
-    endsAt: date("ends_at")
-      .default(sql`(CURRENT_DATE + '3 years'::interval)`)
-      .notNull(),
-    autoRenew: boolean("auto_renew").default(false).notNull(),
-    status: licenceStatus().default("PENDING").notNull(),
-    createdBy: uuid("created_by"),
+    topicId: uuid("topic_id").notNull(),
+    orderIndex: integer("order_index").notNull(),
+    kind: text().notNull(),
+    textHtml: text("text_html"),
+    imageUrl: text("image_url"),
+    videoUrl: text("video_url"),
+    videoStartS: integer("video_start_s"),
+    videoEndS: integer("video_end_s"),
+    officialNotes: text("official_notes"),
+    durationSec: integer("duration_sec"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
@@ -1325,186 +1650,199 @@ export const schoolLicences = pgTable(
       .notNull(),
   },
   (table) => [
-    index("ix_licences_school").using(
+    index("idx_topic_slides_topic_order").using(
       "btree",
-      table.schoolId.asc().nullsLast().op("uuid_ops")
+      table.topicId.asc().nullsLast().op("int4_ops"),
+      table.orderIndex.asc().nullsLast().op("uuid_ops")
     ),
-    index("ix_licences_status").using(
+    uniqueIndex("topic_slides_topic_order_uniq").using(
       "btree",
-      table.status.asc().nullsLast().op("enum_ops")
+      table.topicId.asc().nullsLast().op("int4_ops"),
+      table.orderIndex.asc().nullsLast().op("uuid_ops")
     ),
-    uniqueIndex("uq_school_active_or_pending_licence")
-      .using("btree", table.schoolId.asc().nullsLast().op("uuid_ops"))
-      .where(
-        sql`(status = ANY (ARRAY['PENDING'::licence_status, 'ACTIVE'::licence_status]))`
-      ),
     foreignKey({
-      columns: [table.schoolId],
-      foreignColumns: [schools.id],
-      name: "school_licences_school_id_fkey",
+      columns: [table.topicId],
+      foreignColumns: [topics.id],
+      name: "topic_slides_topic_id_fkey",
     }).onDelete("cascade"),
+    unique("topic_slides_unique_order").on(table.topicId, table.orderIndex),
+    check(
+      "topic_slides_kind_check",
+      sql`kind = ANY (ARRAY['text'::text, 'image'::text, 'video'::text])`
+    ),
+    check(
+      "topic_slides_payload_chk",
+      sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (text_html IS NULL))`
+    ),
   ]
 );
 
-export const schools = pgTable(
-  "schools",
+export const certificationSlides = pgTable(
+  "certification_slides",
   {
     id: uuid().defaultRandom().primaryKey().notNull(),
-    name: text().notNull(),
-    code: text(),
-    stateId: uuid("state_id"),
-    sectorId: uuid("sector_id"),
-    emailDomain: text("email_domain"),
-    address: text(),
-    joinedAt: timestamp("joined_at", { withTimezone: true, mode: "string" }),
-    createdAt: timestamp("created_at", {
-      withTimezone: true,
-      mode: "string",
-    }).defaultNow(),
-    slug: text(),
-    bannerUrl: text("banner_url"),
-    avatarUrl: text("avatar_url"),
-  },
-  (table) => [
-    index("idx_schools_sector_id").using(
-      "btree",
-      table.sectorId.asc().nullsLast().op("uuid_ops")
-    ),
-    index("idx_schools_state_id").using(
-      "btree",
-      table.stateId.asc().nullsLast().op("uuid_ops")
-    ),
-    uniqueIndex("ux_schools_name_lower").using("btree", sql`lower(name)`),
-    foreignKey({
-      columns: [table.sectorId],
-      foreignColumns: [schoolSectors.id],
-      name: "schools_sector_id_fkey",
-    }),
-    foreignKey({
-      columns: [table.stateId],
-      foreignColumns: [states.id],
-      name: "schools_state_id_fkey",
-    }),
-    unique("schools_code_key").on(table.code),
-    unique("schools_slug_key").on(table.slug),
-  ]
-);
-
-export const oauthAuthorizationsInAuth = auth.table(
-  "oauth_authorizations",
-  {
-    id: uuid().notNull(),
-    authorizationId: text("authorization_id").notNull(),
-    clientId: uuid("client_id").notNull(),
-    userId: uuid("user_id"),
-    redirectUri: text("redirect_uri").notNull(),
-    scope: text().notNull(),
-    state: text(),
-    resource: text(),
-    codeChallenge: text("code_challenge"),
-    codeChallengeMethod: codeChallengeMethodInAuth("code_challenge_method"),
-    responseType: oauthResponseTypeInAuth("response_type")
-      .default("code")
-      .notNull(),
-    status: oauthAuthorizationStatusInAuth().default("pending").notNull(),
-    authorizationCode: text("authorization_code"),
+    topicId: uuid("topic_id").notNull(),
+    orderIndex: integer("order_index").notNull(),
+    kind: text().notNull(),
+    textHtml: text("text_html"),
+    imageUrl: text("image_url"),
+    videoUrl: text("video_url"),
+    videoStartS: integer("video_start_s"),
+    videoEndS: integer("video_end_s"),
+    officialNotes: text("official_notes"),
+    durationSec: integer("duration_sec"),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
-    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" })
-      .default(sql`(now() + '00:03:00'::interval)`)
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
       .notNull(),
-    approvedAt: timestamp("approved_at", {
-      withTimezone: true,
-      mode: "string",
-    }),
+    quizData: jsonb("quiz_data"),
   },
   (table) => [
-    index("oauth_auth_pending_exp_idx")
-      .using("btree", table.expiresAt.asc().nullsLast().op("timestamptz_ops"))
-      .where(sql`(status = 'pending'::auth.oauth_authorization_status)`),
+    uniqueIndex("certification_slides_topic_order_uniq").using(
+      "btree",
+      table.topicId.asc().nullsLast().op("int4_ops"),
+      table.orderIndex.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_certification_slides_topic_order").using(
+      "btree",
+      table.topicId.asc().nullsLast().op("int4_ops"),
+      table.orderIndex.asc().nullsLast().op("int4_ops")
+    ),
     foreignKey({
-      columns: [table.clientId],
-      foreignColumns: [oauthClientsInAuth.id],
-      name: "oauth_authorizations_client_id_fkey",
+      columns: [table.topicId],
+      foreignColumns: [certificationTopics.id],
+      name: "certification_slides_topic_id_fkey",
     }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.userId],
-      foreignColumns: [usersInAuth.id],
-      name: "oauth_authorizations_user_id_fkey",
-    }).onDelete("cascade"),
+    unique("certification_slides_unique_order").on(
+      table.topicId,
+      table.orderIndex
+    ),
+    pgPolicy("certification_slides_delete", {
+      as: "permissive",
+      for: "delete",
+      to: ["authenticated"],
+      using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)`,
+    }),
+    pgPolicy("certification_slides_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_slides_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_slides_update", {
+      as: "permissive",
+      for: "update",
+      to: ["authenticated"],
+    }),
     check(
-      "oauth_authorizations_authorization_code_length",
-      sql`char_length(authorization_code) <= 255`
+      "certification_slides_kind_check",
+      sql`kind = ANY (ARRAY['image'::text, 'video'::text, 'quiz'::text, 'test'::text])`
     ),
     check(
-      "oauth_authorizations_code_challenge_length",
-      sql`char_length(code_challenge) <= 128`
+      "certification_slides_payload_chk",
+      sql`((kind = 'image'::text) AND (image_url IS NOT NULL) AND (video_url IS NULL) AND (text_html IS NULL) AND (quiz_data IS NULL)) OR ((kind = 'video'::text) AND (video_url IS NOT NULL) AND (image_url IS NULL) AND (text_html IS NULL) AND (quiz_data IS NULL)) OR ((kind = 'quiz'::text) AND (quiz_data IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL) AND (text_html IS NULL)) OR ((kind = 'test'::text) AND (image_url IS NULL) AND (video_url IS NULL))`
     ),
-    check(
-      "oauth_authorizations_expires_at_future",
-      sql`expires_at > created_at`
-    ),
-    check(
-      "oauth_authorizations_redirect_uri_length",
-      sql`char_length(redirect_uri) <= 2048`
-    ),
-    check(
-      "oauth_authorizations_resource_length",
-      sql`char_length(resource) <= 2048`
-    ),
-    check("oauth_authorizations_scope_length", sql`char_length(scope) <= 4096`),
-    check("oauth_authorizations_state_length", sql`char_length(state) <= 4096`),
   ]
 );
 
-export const oauthConsentsInAuth = auth.table(
-  "oauth_consents",
+export const certificationTopics = pgTable(
+  "certification_topics",
   {
-    id: uuid().notNull(),
-    userId: uuid("user_id").notNull(),
-    clientId: uuid("client_id").notNull(),
-    scopes: text().notNull(),
-    grantedAt: timestamp("granted_at", { withTimezone: true, mode: "string" })
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    stageId: uuid("stage_id").notNull(),
+    title: text().notNull(),
+    status: text().default("draft").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .defaultNow()
       .notNull(),
-    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
+    officialNotes: text("official_notes"),
+    stageOrder: smallint("stage_order"),
   },
   (table) => [
-    index("oauth_consents_active_client_idx")
-      .using("btree", table.clientId.asc().nullsLast().op("uuid_ops"))
-      .where(sql`(revoked_at IS NULL)`),
-    index("oauth_consents_active_user_client_idx")
-      .using(
-        "btree",
-        table.userId.asc().nullsLast().op("uuid_ops"),
-        table.clientId.asc().nullsLast().op("uuid_ops")
-      )
-      .where(sql`(revoked_at IS NULL)`),
-    index("oauth_consents_user_order_idx").using(
+    uniqueIndex("ux_certification_topics_stage_title").using(
       "btree",
-      table.userId.asc().nullsLast().op("timestamptz_ops"),
-      table.grantedAt.desc().nullsFirst().op("timestamptz_ops")
+      sql`stage_id`,
+      sql`lower(title)`
     ),
     foreignKey({
-      columns: [table.clientId],
-      foreignColumns: [oauthClientsInAuth.id],
-      name: "oauth_consents_client_id_fkey",
-    }).onDelete("cascade"),
-    foreignKey({
-      columns: [table.userId],
-      foreignColumns: [usersInAuth.id],
-      name: "oauth_consents_user_id_fkey",
-    }).onDelete("cascade"),
+      columns: [table.stageId],
+      foreignColumns: [certificationStages.id],
+      name: "certification_topics_stage_id_fkey",
+    }).onDelete("restrict"),
+    pgPolicy("certification_topics_delete", {
+      as: "permissive",
+      for: "delete",
+      to: ["authenticated"],
+      using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)`,
+    }),
+    pgPolicy("certification_topics_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_topics_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_topics_update", {
+      as: "permissive",
+      for: "update",
+      to: ["authenticated"],
+    }),
     check(
-      "oauth_consents_revoked_after_granted",
-      sql`(revoked_at IS NULL) OR (revoked_at >= granted_at)`
+      "certification_topics_status_check",
+      sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`
     ),
-    check("oauth_consents_scopes_length", sql`char_length(scopes) <= 2048`),
-    check(
-      "oauth_consents_scopes_not_empty",
-      sql`char_length(TRIM(BOTH FROM scopes)) > 0`
-    ),
+  ]
+);
+
+export const certificationStages = pgTable(
+  "certification_stages",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    code: text().notNull(),
+    name: text().notNull(),
+    sortIndex: smallint("sort_index").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    unique("certification_stages_code_key").on(table.code),
+    unique("certification_stages_name_key").on(table.name),
+    unique("certification_stages_sort_index_key").on(table.sortIndex),
+    pgPolicy("certification_stages_delete", {
+      as: "permissive",
+      for: "delete",
+      to: ["authenticated"],
+      using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)`,
+    }),
+    pgPolicy("certification_stages_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_stages_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_stages_update", {
+      as: "permissive",
+      for: "update",
+      to: ["authenticated"],
+    }),
+    check("certification_stages_code_chk", sql`code ~ '^C[0-9]*$'::text`),
   ]
 );
 
@@ -1536,34 +1874,6 @@ export const schoolLevelAssignments = pgTable(
     primaryKey({
       columns: [table.schoolId, table.levelId],
       name: "school_level_assignments_pkey",
-    }),
-  ]
-);
-
-export const lessonClasses = pgTable(
-  "lesson_classes",
-  {
-    lessonId: uuid("lesson_id").notNull(),
-    classId: uuid("class_id").notNull(),
-  },
-  (table) => [
-    index("idx_lesson_classes_class_id").using(
-      "btree",
-      table.classId.asc().nullsLast().op("uuid_ops")
-    ),
-    foreignKey({
-      columns: [table.classId],
-      foreignColumns: [classes.id],
-      name: "lesson_classes_class_id_fkey",
-    }).onDelete("restrict"),
-    foreignKey({
-      columns: [table.lessonId],
-      foreignColumns: [lessons.id],
-      name: "lesson_classes_lesson_id_fkey",
-    }).onDelete("cascade"),
-    primaryKey({
-      columns: [table.lessonId, table.classId],
-      name: "lesson_classes_pkey",
     }),
   ]
 );
@@ -1632,6 +1942,34 @@ export const classYears = pgTable(
   ]
 );
 
+export const lessonClasses = pgTable(
+  "lesson_classes",
+  {
+    lessonId: uuid("lesson_id").notNull(),
+    classId: uuid("class_id").notNull(),
+  },
+  (table) => [
+    index("idx_lesson_classes_class_id").using(
+      "btree",
+      table.classId.asc().nullsLast().op("uuid_ops")
+    ),
+    foreignKey({
+      columns: [table.classId],
+      foreignColumns: [classes.id],
+      name: "lesson_classes_class_id_fkey",
+    }).onDelete("restrict"),
+    foreignKey({
+      columns: [table.lessonId],
+      foreignColumns: [lessons.id],
+      name: "lesson_classes_lesson_id_fkey",
+    }).onDelete("cascade"),
+    primaryKey({
+      columns: [table.lessonId, table.classId],
+      name: "lesson_classes_pkey",
+    }),
+  ]
+);
+
 export const teacherSlideNotes = pgTable(
   "teacher_slide_notes",
   {
@@ -1687,6 +2025,41 @@ export const lessonSlideNotes = pgTable(
     }),
   ]
 );
+export const vSchoolsStatistics = pgView("v_schools_statistics", {
+  id: uuid(),
+  name: text(),
+  // You can use { mode: "bigint" } if numbers are exceeding js number limitations
+  teacherCount: bigint("teacher_count", { mode: "number" }),
+  // You can use { mode: "bigint" } if numbers are exceeding js number limitations
+  classCount: bigint("class_count", { mode: "number" }),
+  // You can use { mode: "bigint" } if numbers are exceeding js number limitations
+  schoolAdminCount: bigint("school_admin_count", { mode: "number" }),
+  // You can use { mode: "bigint" } if numbers are exceeding js number limitations
+  schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
+  activeLicence: boolean("active_licence"),
+}).as(
+  sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, EXISTS(SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status) AS active_licence FROM schools s`
+);
+
+export const vStageThresholds = pgView("v_stage_thresholds", {
+  stageId: uuid("stage_id"),
+  minSortIndex: smallint("min_sort_index"),
+  maxSortIndex: smallint("max_sort_index"),
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT s.id AS stage_id, min(y.sort_index) AS min_sort_index, max(y.sort_index) AS max_sort_index FROM curriculum_stages s JOIN stage_year_links l ON l.stage_id = s.id JOIN school_years y ON y.id = l.school_year_id GROUP BY s.id`
+  );
+
+export const vSchoolLevelBadge = pgView("v_school_level_badge", {
+  schoolId: uuid("school_id"),
+  levelBadge: text("level_badge"),
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT s.id AS school_id, CASE WHEN count(*) FILTER (WHERE sl.key = 'primary'::text) = 1 AND count(*) FILTER (WHERE sl.key = 'secondary'::text) = 1 THEN 'P–12'::text WHEN COALESCE(bool_or(sl.key = 'primary'::text), false) THEN 'Primary'::text WHEN COALESCE(bool_or(sl.key = 'secondary'::text), false) THEN 'Secondary'::text ELSE 'Unknown'::text END AS level_badge FROM schools s LEFT JOIN school_level_assignments sla ON sla.school_id = s.id LEFT JOIN school_levels sl ON sl.id = sla.level_id GROUP BY s.id`
+  );
+
 export const vSchoolYears = pgView("v_school_years", {
   id: uuid(),
   code: text(),
@@ -1695,24 +2068,11 @@ export const vSchoolYears = pgView("v_school_years", {
   sortIndex: smallint("sort_index"),
   levelKey: text("level_key"),
   levelName: text("level_name"),
-}).as(
-  sql`SELECT y.id, y.code, y.display_name, y.level_id, y.sort_index, sl.key AS level_key, sl.name AS level_name FROM school_years y JOIN school_levels sl ON sl.id = y.level_id`
-);
-
-export const schoolLevelBadge = pgView("school_level_badge", {
-  schoolId: uuid("school_id"),
-  levelBadge: text("level_badge"),
-}).as(
-  sql`SELECT s.id AS school_id, CASE WHEN count(*) FILTER (WHERE sl.key = 'primary'::text) = 1 AND count(*) FILTER (WHERE sl.key = 'secondary'::text) = 1 THEN 'P–12'::text WHEN COALESCE(bool_or(sl.key = 'primary'::text), false) THEN 'Primary'::text WHEN COALESCE(bool_or(sl.key = 'secondary'::text), false) THEN 'Secondary'::text ELSE 'Unknown'::text END AS level_badge FROM schools s LEFT JOIN school_level_assignments sla ON sla.school_id = s.id LEFT JOIN school_levels sl ON sl.id = sla.level_id GROUP BY s.id`
-);
-
-export const vStageThresholds = pgView("v_stage_thresholds", {
-  stageId: uuid("stage_id"),
-  minSortIndex: smallint("min_sort_index"),
-  maxSortIndex: smallint("max_sort_index"),
-}).as(
-  sql`SELECT s.id AS stage_id, min(y.sort_index) AS min_sort_index, max(y.sort_index) AS max_sort_index FROM curriculum_stages s JOIN stage_year_links l ON l.stage_id = s.id JOIN school_years y ON y.id = l.school_year_id GROUP BY s.id`
-);
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT y.id, y.code, y.display_name, y.level_id, y.sort_index, sl.key AS level_key, sl.name AS level_name FROM school_years y JOIN school_levels sl ON sl.id = y.level_id`
+  );
 
 export const vLessonSlidesEffective = pgView("v_lesson_slides_effective", {
   lessonId: uuid("lesson_id"),
@@ -1727,23 +2087,11 @@ export const vLessonSlidesEffective = pgView("v_lesson_slides_effective", {
   videoEndS: integer("video_end_s"),
   effectiveNotes: text("effective_notes"),
   teacherUserId: uuid("teacher_user_id"),
-}).as(
-  sql`SELECT l.id AS lesson_id, l.topic_id, ts.id AS topic_slide_id, ts.order_index, ts.kind, ts.text_html, ts.image_url, ts.video_url, ts.video_start_s, ts.video_end_s, COALESCE(lsn.notes_richtext, tsn.notes_richtext, ts.official_notes, t.official_notes) AS effective_notes, l.created_by_user_id AS teacher_user_id FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id LEFT JOIN lesson_slide_notes lsn ON lsn.lesson_id = l.id AND lsn.topic_slide_id = ts.id LEFT JOIN teacher_slide_notes tsn ON tsn.teacher_user_id = l.created_by_user_id AND tsn.topic_slide_id = ts.id ORDER BY l.id, ts.order_index`
-);
-
-export const vCurriculumStagesYears = pgView("v_curriculum_stages_years", {
-  stageId: uuid("stage_id"),
-  stageCode: text("stage_code"),
-  stageName: text("stage_name"),
-  yearCodes: text("year_codes"),
-  yearNames: text("year_names"),
-  yearCodeRange: text("year_code_range"),
-  yearNameRange: text("year_name_range"),
-  minSortIndex: smallint("min_sort_index"),
-  maxSortIndex: smallint("max_sort_index"),
-}).as(
-  sql`WITH yrs AS ( SELECT s.id AS stage_id, s.code AS stage_code, s.name AS stage_name, array_agg(y.code ORDER BY y.sort_index) AS year_codes, array_agg(y.display_name ORDER BY y.sort_index) AS year_names, min(y.sort_index) AS min_sort_index, max(y.sort_index) AS max_sort_index FROM curriculum_stages s LEFT JOIN stage_year_links l ON l.stage_id = s.id LEFT JOIN school_years y ON y.id = l.school_year_id GROUP BY s.id, s.code, s.name ) SELECT stage_id, stage_code, stage_name, year_codes, year_names, CASE WHEN array_length(year_codes, 1) IS NULL THEN NULL::text WHEN array_length(year_codes, 1) = 1 THEN year_codes[1] ELSE (year_codes[1] || '–'::text) || year_codes[array_length(year_codes, 1)] END AS year_code_range, CASE WHEN array_length(year_names, 1) IS NULL THEN NULL::text WHEN array_length(year_names, 1) = 1 THEN year_names[1] ELSE (year_names[1] || ' – '::text) || year_names[array_length(year_names, 1)] END AS year_name_range, min_sort_index, max_sort_index FROM yrs ORDER BY min_sort_index, stage_code`
-);
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT l.id AS lesson_id, l.topic_id, ts.id AS topic_slide_id, ts.order_index, ts.kind, ts.text_html, ts.image_url, ts.video_url, ts.video_start_s, ts.video_end_s, COALESCE(lsn.notes_richtext, tsn.notes_richtext, ts.official_notes, t.official_notes) AS effective_notes, l.created_by_user_id AS teacher_user_id FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id LEFT JOIN lesson_slide_notes lsn ON lsn.lesson_id = l.id AND lsn.topic_slide_id = ts.id LEFT JOIN teacher_slide_notes tsn ON tsn.teacher_user_id = l.created_by_user_id AND tsn.topic_slide_id = ts.id ORDER BY l.id, ts.order_index`
+  );
 
 export const vClassesYears = pgView("v_classes_years", {
   id: uuid(),
@@ -1755,17 +2103,37 @@ export const vClassesYears = pgView("v_classes_years", {
   yearNameRange: text("year_name_range"),
   levelKey: text("level_key"),
   levelName: text("level_name"),
-}).as(
-  sql`WITH yrs AS ( SELECT c.id, c.school_id, c.name, array_agg(y.code ORDER BY y.sort_index) AS year_codes, array_agg(y.display_name ORDER BY y.sort_index) AS year_names, min(y.sort_index) AS min_sort, max(y.sort_index) AS max_sort, min(sl.key) AS level_key, min(sl.name) AS level_name FROM classes c LEFT JOIN class_years cy ON cy.class_id = c.id LEFT JOIN school_years y ON y.id = cy.school_year_id LEFT JOIN school_levels sl ON sl.id = y.level_id GROUP BY c.id, c.school_id, c.name ) SELECT id, school_id, name, year_codes, year_names, CASE WHEN array_length(year_codes, 1) IS NULL THEN NULL::text WHEN array_length(year_codes, 1) = 1 THEN year_codes[1] ELSE (year_codes[1] || '–'::text) || year_codes[array_length(year_codes, 1)] END AS year_code_range, CASE WHEN array_length(year_names, 1) IS NULL THEN NULL::text WHEN array_length(year_names, 1) = 1 THEN year_names[1] ELSE (year_names[1] || ' – '::text) || year_names[array_length(year_names, 1)] END AS year_name_range, level_key, level_name FROM yrs ORDER BY name`
-);
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`WITH yrs AS ( SELECT c.id, c.school_id, c.name, array_agg(y.code ORDER BY y.sort_index) AS year_codes, array_agg(y.display_name ORDER BY y.sort_index) AS year_names, min(y.sort_index) AS min_sort, max(y.sort_index) AS max_sort, min(sl.key) AS level_key, min(sl.name) AS level_name FROM classes c LEFT JOIN class_years cy ON cy.class_id = c.id LEFT JOIN school_years y ON y.id = cy.school_year_id LEFT JOIN school_levels sl ON sl.id = y.level_id GROUP BY c.id, c.school_id, c.name ) SELECT id, school_id, name, year_codes, year_names, CASE WHEN array_length(year_codes, 1) IS NULL THEN NULL::text WHEN array_length(year_codes, 1) = 1 THEN year_codes[1] ELSE (year_codes[1] || '–'::text) || year_codes[array_length(year_codes, 1)] END AS year_code_range, CASE WHEN array_length(year_names, 1) IS NULL THEN NULL::text WHEN array_length(year_names, 1) = 1 THEN year_names[1] ELSE (year_names[1] || ' – '::text) || year_names[array_length(year_names, 1)] END AS year_name_range, level_key, level_name FROM yrs ORDER BY name`
+  );
+
+export const vCurriculumStagesYears = pgView("v_curriculum_stages_years", {
+  stageId: uuid("stage_id"),
+  stageCode: text("stage_code"),
+  stageName: text("stage_name"),
+  yearCodes: text("year_codes"),
+  yearNames: text("year_names"),
+  yearCodeRange: text("year_code_range"),
+  yearNameRange: text("year_name_range"),
+  minSortIndex: smallint("min_sort_index"),
+  maxSortIndex: smallint("max_sort_index"),
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`WITH yrs AS ( SELECT s.id AS stage_id, s.code AS stage_code, s.name AS stage_name, array_agg(y.code ORDER BY y.sort_index) AS year_codes, array_agg(y.display_name ORDER BY y.sort_index) AS year_names, min(y.sort_index) AS min_sort_index, max(y.sort_index) AS max_sort_index FROM curriculum_stages s LEFT JOIN stage_year_links l ON l.stage_id = s.id LEFT JOIN school_years y ON y.id = l.school_year_id GROUP BY s.id, s.code, s.name ) SELECT stage_id, stage_code, stage_name, year_codes, year_names, CASE WHEN array_length(year_codes, 1) IS NULL THEN NULL::text WHEN array_length(year_codes, 1) = 1 THEN year_codes[1] ELSE (year_codes[1] || '–'::text) || year_codes[array_length(year_codes, 1)] END AS year_code_range, CASE WHEN array_length(year_names, 1) IS NULL THEN NULL::text WHEN array_length(year_names, 1) = 1 THEN year_names[1] ELSE (year_names[1] || ' – '::text) || year_names[array_length(year_names, 1)] END AS year_name_range, min_sort_index, max_sort_index FROM yrs ORDER BY min_sort_index, stage_code`
+  );
 
 export const vLessonAllowedSlides = pgView("v_lesson_allowed_slides", {
   lessonId: uuid("lesson_id"),
   topicSlideId: uuid("topic_slide_id"),
   orderIndex: integer("order_index"),
-}).as(
-  sql`SELECT l.id AS lesson_id, ts.id AS topic_slide_id, ts.order_index FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id`
-);
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT l.id AS lesson_id, ts.id AS topic_slide_id, ts.order_index FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id`
+  );
 
 export const vSchoolsEnriched = pgView("v_schools_enriched", {
   id: uuid(),
@@ -1779,9 +2147,11 @@ export const vSchoolsEnriched = pgView("v_schools_enriched", {
   state: jsonb(),
   sector: jsonb(),
   levels: jsonb(),
-}).as(
-  sql`SELECT sch.id, sch.name, sch.code, sch.slug, sch.email_domain, sch.address, sch.joined_at, sch.created_at, CASE WHEN st.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', st.id, 'code', st.code, 'name', st.name) END AS state, CASE WHEN sec.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', sec.id, 'key', sec.key, 'name', sec.name) END AS sector, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', lvl.id, 'key', lvl.key, 'name', lvl.name) ORDER BY lvl.key) AS jsonb_agg FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id), '[]'::jsonb) AS levels FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id`
-);
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT sch.id, sch.name, sch.code, sch.slug, sch.email_domain, sch.address, sch.joined_at, sch.created_at, CASE WHEN st.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', st.id, 'code', st.code, 'name', st.name) END AS state, CASE WHEN sec.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', sec.id, 'key', sec.key, 'name', sec.name) END AS sector, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', lvl.id, 'key', lvl.key, 'name', lvl.name) ORDER BY lvl.key) AS jsonb_agg FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id), '[]'::jsonb) AS levels FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id`
+  );
 
 export const vSchoolsReadable = pgView("v_schools_readable", {
   id: uuid(),
@@ -1817,6 +2187,8 @@ export const vUserProfileExpanded = pgView("v_user_profile_expanded", {
   metadata: jsonb(),
   platformRoles: text("platform_roles"),
   schoolRoles: jsonb("school_roles"),
-}).as(
-  sql`SELECT up.id, up.first_name, up.last_name, TRIM(BOTH ' '::text FROM concat(up.first_name, ' ', up.last_name)) AS full_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'roleKey', r.key)) FILTER (WHERE ur.role_scope = 'school'::text), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`
-);
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT up.id, up.first_name, up.last_name, TRIM(BOTH ' '::text FROM concat(up.first_name, ' ', up.last_name)) AS full_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'roleKey', r.key)) FILTER (WHERE ur.role_scope = 'school'::text), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`
+  );
