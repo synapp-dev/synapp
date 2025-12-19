@@ -15,6 +15,13 @@ export const rolesRepo = {
       .where(eq(roles.scopeId, scope))
       .orderBy(asc(roles.name)),
 
+  getByKey: (key: string) =>
+    db
+      .select()
+      .from(roles)
+      .where(eq(roles.key, key))
+      .limit(1),
+
   getUserRoles: (userId: string) =>
     db
       .select({
@@ -28,8 +35,33 @@ export const rolesRepo = {
       .where(eq(userRoles.userId, userId))
       .orderBy(asc(roles.name)),
 
-  assignRole: (data: { userId: string; roleId: string; schoolId?: string }) =>
-    db.insert(userRoles).values(data).returning(),
+  assignRole: (data: {
+    userId: string;
+    roleId: string;
+    schoolId?: string;
+    roleScope?: string;
+  }) =>
+    db
+      .insert(userRoles)
+      .values({
+        ...data,
+        roleScope:
+          data.roleScope || (data.schoolId ? "school" : "platform"),
+      })
+      .returning(),
+
+  hasRole: (userId: string, roleId: string, schoolId: string) =>
+    db
+      .select()
+      .from(userRoles)
+      .where(
+        and(
+          eq(userRoles.userId, userId),
+          eq(userRoles.roleId, roleId),
+          eq(userRoles.schoolId, schoolId)
+        )
+      )
+      .limit(1),
 
   removeRole: (userId: string, roleId: string, schoolId?: string) => {
     const whereConditions = [

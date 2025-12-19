@@ -56,12 +56,14 @@ export const classesRepo = {
     room?: string;
     studentCap?: number;
     active?: boolean;
+    startYear?: string;
   }) =>
     db
       .insert(classes)
       .values({
         ...data,
         active: data.active ?? true,
+        startYear: data.startYear ? new Date(data.startYear) : undefined,
       })
       .returning(),
 

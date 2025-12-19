@@ -1,5 +1,11 @@
 import { db } from "@/server/db/drizzle";
-import { vSchoolsReadable, schools, userRoles, roles } from "@/server/db/schema";
+import {
+  vSchoolsReadable,
+  vSchoolsStatistics,
+  schools,
+  userRoles,
+  roles,
+} from "@/server/db/schema";
 import { asc, desc, eq, ilike, inArray, sql, and } from "drizzle-orm";
 
 export const schoolRepo = {
@@ -13,81 +19,50 @@ export const schoolRepo = {
     const hasSearch =
       typeof params.search === "string" && params.search.trim().length > 0;
 
-    // Get TEACHER role ID first
-    const teacherRole = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.key, "TEACHER"))
-      .limit(1);
-
-    const teacherRoleId = teacherRole[0]?.id;
-
-    // Base query with teacher count using LEFT JOIN
-    const baseQuery = teacherRoleId
-      ? db
-          .select({
-            id: vSchoolsReadable.id,
-            name: vSchoolsReadable.name,
-            code: vSchoolsReadable.code,
-            stateId: vSchoolsReadable.stateId,
-            sectorId: vSchoolsReadable.sectorId,
-            emailDomain: vSchoolsReadable.emailDomain,
-            address: vSchoolsReadable.address,
-            joinedAt: vSchoolsReadable.joinedAt,
-            createdAt: vSchoolsReadable.createdAt,
-            slug: vSchoolsReadable.slug,
-            bannerUrl: vSchoolsReadable.bannerUrl,
-            avatarUrl: vSchoolsReadable.avatarUrl,
-            state: vSchoolsReadable.state,
-            sector: vSchoolsReadable.sector,
-            levels: vSchoolsReadable.levels,
-            teacherCount: sql<number>`COALESCE(COUNT(DISTINCT ${userRoles.userId}), 0)`.as("teacher_count"),
-          })
-          .from(vSchoolsReadable)
-          .leftJoin(
-            userRoles,
-            and(
-              eq(userRoles.schoolId, vSchoolsReadable.id),
-              eq(userRoles.roleId, teacherRoleId)
-            )
-          )
-          .groupBy(
-            vSchoolsReadable.id,
-            vSchoolsReadable.name,
-            vSchoolsReadable.code,
-            vSchoolsReadable.stateId,
-            vSchoolsReadable.sectorId,
-            vSchoolsReadable.emailDomain,
-            vSchoolsReadable.address,
-            vSchoolsReadable.joinedAt,
-            vSchoolsReadable.createdAt,
-            vSchoolsReadable.slug,
-            vSchoolsReadable.bannerUrl,
-            vSchoolsReadable.avatarUrl,
-            vSchoolsReadable.state,
-            vSchoolsReadable.sector,
-            vSchoolsReadable.levels
-          )
-      : db
-          .select({
-            id: vSchoolsReadable.id,
-            name: vSchoolsReadable.name,
-            code: vSchoolsReadable.code,
-            stateId: vSchoolsReadable.stateId,
-            sectorId: vSchoolsReadable.sectorId,
-            emailDomain: vSchoolsReadable.emailDomain,
-            address: vSchoolsReadable.address,
-            joinedAt: vSchoolsReadable.joinedAt,
-            createdAt: vSchoolsReadable.createdAt,
-            slug: vSchoolsReadable.slug,
-            bannerUrl: vSchoolsReadable.bannerUrl,
-            avatarUrl: vSchoolsReadable.avatarUrl,
-            state: vSchoolsReadable.state,
-            sector: vSchoolsReadable.sector,
-            levels: vSchoolsReadable.levels,
-            teacherCount: sql<number>`0`.as("teacher_count"),
-          })
-          .from(vSchoolsReadable);
+    // Base query with statistics from v_schools_statistics view
+    const baseQuery = db
+      .select({
+        id: vSchoolsReadable.id,
+        name: vSchoolsReadable.name,
+        code: vSchoolsReadable.code,
+        stateId: vSchoolsReadable.stateId,
+        sectorId: vSchoolsReadable.sectorId,
+        emailDomain: vSchoolsReadable.emailDomain,
+        address: vSchoolsReadable.address,
+        joinedAt: vSchoolsReadable.joinedAt,
+        createdAt: vSchoolsReadable.createdAt,
+        slug: vSchoolsReadable.slug,
+        bannerUrl: vSchoolsReadable.bannerUrl,
+        avatarUrl: vSchoolsReadable.avatarUrl,
+        state: vSchoolsReadable.state,
+        sector: vSchoolsReadable.sector,
+        levels: vSchoolsReadable.levels,
+        teacherCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.teacherCount}, 0)`.as(
+            "teacher_count"
+          ),
+        classCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.classCount}, 0)`.as(
+            "class_count"
+          ),
+        schoolAdminCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.schoolAdminCount}, 0)`.as(
+            "school_admin_count"
+          ),
+        schoolLicenceCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.schoolLicenceCount}, 0)`.as(
+            "school_licence_count"
+          ),
+        activeLicence:
+          sql<boolean>`COALESCE(${vSchoolsStatistics.activeLicence}, false)`.as(
+            "active_licence"
+          ),
+      })
+      .from(vSchoolsReadable)
+      .leftJoin(
+        vSchoolsStatistics,
+        eq(vSchoolsStatistics.id, vSchoolsReadable.id)
+      );
 
     if (!hasSearch) {
       const rows = await baseQuery
@@ -141,32 +116,24 @@ export const schoolRepo = {
   async findUniqueSlug(baseSlug: string): Promise<string> {
     let slug = baseSlug;
     let counter = 1;
-    
+
     while (true) {
       const existing = await db
         .select({ id: schools.id })
         .from(schools)
         .where(eq(schools.slug, slug))
         .limit(1);
-      
+
       if (existing.length === 0) {
         return slug;
       }
-      
+
       slug = `${baseSlug}-${counter}`;
       counter++;
     }
   },
 
-  async create(data: {
-    name: string;
-    stateId: string;
-    sectorId: string;
-    emailDomain?: string;
-    address?: string;
-    bannerUrl?: string;
-    avatarUrl?: string;
-  }) {
+  async create(data: { name: string; stateId: string; sectorId: string }) {
     const baseSlug = this.generateSlug(data.name);
     const uniqueSlug = await this.findUniqueSlug(baseSlug);
 
@@ -176,10 +143,6 @@ export const schoolRepo = {
         name: data.name,
         stateId: data.stateId,
         sectorId: data.sectorId,
-        emailDomain: data.emailDomain || null,
-        address: data.address || null,
-        bannerUrl: data.bannerUrl || null,
-        avatarUrl: data.avatarUrl || null,
         slug: uniqueSlug,
       })
       .returning();

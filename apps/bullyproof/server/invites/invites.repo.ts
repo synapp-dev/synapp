@@ -47,12 +47,17 @@ export const invitesRepo = {
     email: string;
     roleKey: string;
     invitedByUserId: string;
+    userId?: string;
     expiresAt?: string;
     metadata?: Record<string, any>;
   }) =>
     db
       .insert(schoolInvites)
-      .values({ ...data, token: randomUUID() } as any)
+      .values({
+        ...data,
+        createdBy: data.invitedByUserId,
+        token: randomUUID(),
+      } as any)
       .returning(),
 
   update: (
