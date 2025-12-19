@@ -4,8 +4,7 @@ import { z } from "zod";
 export const createLicenceSchema = z.object({
   schoolId: z.string().trim().min(1).max(500),
   status: z.enum(["DRAFT", "PENDING", "ACTIVE", "SUSPENDED", "EXPIRED", "CANCELLED"]),
-  startDate: z.string().datetime(),
-  endDate: z.string().datetime(),
+  durationYears: z.number().int().min(1).max(10),
   maxUsers: z.number().int().min(1).max(10000).optional(),
   features: z.record(z.string(), z.unknown()).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
@@ -29,8 +28,8 @@ export type UpdateLicenceParams = z.infer<typeof updateLicenceSchema>;
 export const listLicencesSchema = z.object({
   schoolId: z.string().trim().min(1).max(500).optional(),
   status: z.enum(["DRAFT", "PENDING", "ACTIVE", "SUSPENDED", "EXPIRED", "CANCELLED"]).optional(),
-  limit: z.number().int().min(1).max(100).optional().default(50),
-  offset: z.number().int().min(0).max(10000).optional().default(0),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  offset: z.coerce.number().int().min(0).max(10000).optional().default(0),
 });
 
 export type ListLicencesParams = z.infer<typeof listLicencesSchema>;

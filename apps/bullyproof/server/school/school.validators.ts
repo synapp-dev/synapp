@@ -36,10 +36,6 @@ export const createSchoolSchema = z.object({
   stateId: z.string().uuid("Invalid state ID"),
   sectorId: z.string().uuid("Invalid sector ID"),
   levelIds: z.array(z.string().uuid("Invalid level ID")).min(1, "At least one school level is required"),
-  emailDomain: z.string().max(255).optional().nullable(),
-  address: z.string().max(500).optional().nullable(),
-  bannerUrl: z.string().url("Invalid banner URL").optional().nullable().or(z.literal("")),
-  avatarUrl: z.string().url("Invalid avatar URL").optional().nullable().or(z.literal("")),
 });
 
 export type CreateSchoolParams = z.infer<typeof createSchoolSchema>;
