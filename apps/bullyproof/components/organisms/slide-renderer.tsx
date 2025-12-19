@@ -3,13 +3,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
+import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import {
   isYouTubeUrl,
   convertToYouTubeEmbedUrl,
   getYouTubeThumbnailUrl,
 } from "@/utils/youtube";
+import type { QuizData } from "./quiz-slide-editor";
 
-export type SlideKind = "text" | "image" | "video";
+export type SlideKind = "text" | "image" | "video" | "quiz" | "test";
 
 export interface SlideData {
   id: string;
@@ -21,6 +23,7 @@ export interface SlideData {
   videoStartS?: number | null;
   videoEndS?: number | null;
   effectiveNotes?: string | null;
+  quizData?: QuizData | null;
 }
 
 interface SlideRendererProps {
@@ -30,6 +33,8 @@ interface SlideRendererProps {
   forceRefresh?: boolean;
   // If true, shows thumbnail/preview only (no controls, no playback) - useful for galleries
   thumbnailOnly?: boolean;
+  // If true, uses certification slides cache store instead of topic slides cache store
+  isCertification?: boolean;
 }
 
 export function SlideRenderer({
@@ -37,19 +42,45 @@ export function SlideRenderer({
   className,
   forceRefresh = false,
   thumbnailOnly = false,
+  isCertification = false,
 }: SlideRendererProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
+
+  // Use appropriate cache store based on context
+  const topicGetSlideUrl = useTopicSlidesCacheStore(
+    (state) => state.getSlideUrl
+  );
+  const certificationGetSlideUrl = useCertificationSlidesCacheStore(
+    (state) => state.getSlideUrl
+  );
+  const getSlideUrl = isCertification
+    ? certificationGetSlideUrl
+    : topicGetSlideUrl;
+
   // Subscribe to cache changes for this specific slide
-  const cachedUrl = useTopicSlidesCacheStore(
+  const topicCachedUrl = useTopicSlidesCacheStore(
     (state) => state.cache[slide.id]?.url ?? null
   );
-  const loading = useTopicSlidesCacheStore(
+  const certificationCachedUrl = useCertificationSlidesCacheStore(
+    (state) => state.cache[slide.id]?.url ?? null
+  );
+  const cachedUrl = isCertification ? certificationCachedUrl : topicCachedUrl;
+
+  const topicLoading = useTopicSlidesCacheStore(
     (state) => state.loading[slide.id] ?? false
   );
-  const error = useTopicSlidesCacheStore(
+  const certificationLoading = useCertificationSlidesCacheStore(
+    (state) => state.loading[slide.id] ?? false
+  );
+  const loading = isCertification ? certificationLoading : topicLoading;
+
+  const topicError = useTopicSlidesCacheStore(
     (state) => state.errors[slide.id] ?? null
   );
+  const certificationError = useCertificationSlidesCacheStore(
+    (state) => state.errors[slide.id] ?? null
+  );
+  const error = isCertification ? certificationError : topicError;
 
   // Fetch signed URL for image slides using cache
   useEffect(() => {
@@ -264,6 +295,22 @@ export function SlideRenderer({
               controls
               className="max-w-full max-h-full rounded-lg shadow-lg"
             />
+          </div>
+        );
+
+      case "quiz":
+        // Quiz slides are rendered as text with quiz data formatted as HTML
+        // This is handled by converting quiz to text in the component using SlideRenderer
+        return (
+          <div className="flex items-center justify-center h-full w-full">
+            <div className="text-foreground">Quiz slide</div>
+          </div>
+        );
+
+      case "test":
+        return (
+          <div className="flex items-center justify-center h-full w-full">
+            <div className="text-foreground">Test slide</div>
           </div>
         );
 

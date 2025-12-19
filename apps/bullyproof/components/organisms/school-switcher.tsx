@@ -493,7 +493,7 @@ export function SchoolSwitcher() {
                     {selectedSchool?.name ? (
                       <ArrowLeftRight className="flex-shrink-0 group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300" />
                     ) : (
-                      <Pointer className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
+                      <MousePointer2 className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
                     )}
                   </>
                 ) : (

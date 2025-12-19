@@ -17,6 +17,7 @@ import {
   TvMinimalPlay,
   Wrench,
   Apple,
+  BadgeCheck,
 } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
@@ -47,12 +48,12 @@ const data = {
       icon: ShieldCheck,
       isActive: false,
     },
-    // {
-    //   title: "AP Certification",
-    //   url: "/ap-certification",
-    //   icon: BadgeCheck,
-    //   isActive: false,
-    // },
+    {
+      title: "AP Certification",
+      url: "/ap-certification",
+      icon: BadgeCheck,
+      isActive: false,
+    },
     {
       title: "Welcome",
       url: "/welcome",
