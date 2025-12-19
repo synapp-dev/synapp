@@ -28,8 +28,7 @@ export const licencesApi = {
     create(payload: {
       schoolId: string;
       status: "DRAFT" | "PENDING" | "ACTIVE" | "SUSPENDED" | "EXPIRED" | "CANCELLED";
-      startDate: string;
-      endDate: string;
+      durationYears: number;
       maxUsers?: number;
       features?: Record<string, any>;
       metadata?: Record<string, any>;

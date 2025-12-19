@@ -68,10 +68,32 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    console.log("[INVITE API] POST /api/invites - Request received:", {
+      userId,
+      body: { ...body, email: body.email }, // Log email but be careful with sensitive data
+    });
+
     const newInvite = await invitesService.createInvite({ userId }, body);
+
+    console.log("[INVITE API] POST /api/invites - Success:", {
+      inviteId: newInvite?.id,
+      email: newInvite?.email,
+    });
+
     return NextResponse.json(newInvite, { status: 201 });
   } catch (e: any) {
-    console.error(e);
+    console.error("[INVITE API] POST /api/invites - Error:", {
+      error: e,
+      message: e?.message,
+      name: e?.name,
+      stack: e?.stack,
+      code: e?.code,
+      detail: e?.detail,
+      hint: e?.hint,
+      constraint: e?.constraint,
+      table: e?.table,
+      column: e?.column,
+    });
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status: 500 }

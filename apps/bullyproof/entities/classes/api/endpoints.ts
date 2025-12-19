@@ -36,6 +36,7 @@ export const classesApi = {
       studentCap?: number;
       active?: boolean;
       yearIds?: string[];
+      startYear?: string;
     }): Promise<ApiResult<Class & { years?: any[] }>> {
       return apiFetch<Class & { years?: any[] }>("/classes", {
         method: "POST",

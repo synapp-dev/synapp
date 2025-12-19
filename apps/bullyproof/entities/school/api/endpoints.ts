@@ -40,27 +40,12 @@ export const schoolApi = {
       });
     },
     create(payload: {
-      school: {
-        name: string;
-        stateId: string;
-        sectorId: string;
-        levelIds: string[];
-        emailDomain?: string | null;
-        address?: string | null;
-        bannerUrl?: string | null;
-        avatarUrl?: string | null;
-      };
-      adminEmails: string[];
-    }): Promise<ApiResult<{
-      school: School;
-      adminUsers: Array<{ userId: string; email: string }>;
-      errors?: Array<{ email: string; error: string }>;
-    }>> {
-      return apiFetch<{
-        school: School;
-        adminUsers: Array<{ userId: string; email: string }>;
-        errors?: Array<{ email: string; error: string }>;
-      }>("/schools", {
+      name: string;
+      stateId: string;
+      sectorId: string;
+      levelIds: string[];
+    }): Promise<ApiResult<School>> {
+      return apiFetch<School>("/schools", {
         method: "POST",
         body: JSON.stringify(payload),
       });
