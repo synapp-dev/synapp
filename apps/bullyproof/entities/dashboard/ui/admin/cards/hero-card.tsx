@@ -61,7 +61,7 @@ export function SnapshotCard({
   const IconComponent = iconMap[icon] || School;
 
   return (
-    <Card className="relative">
+    <Card className="relative group">
       <CardHeader className="">
         <CardTitle className="text-sm font-medium text-muted-foreground flex flex-row justify-between">
           <div className="flex items-center gap-1">
@@ -79,7 +79,7 @@ export function SnapshotCard({
           </div>
         </CardTitle>
         <div className="flex items-center justify-between">
-          <div className="text-5xl font-bold text-primary/80">
+          <div className="text-5xl font-bold text-primary/75 group-hover:text-primary transition-colors duration-200">
             <CountUp start={0} end={value.amount} duration={2} />
             {value.type === "percentage" && "%"}
           </div>

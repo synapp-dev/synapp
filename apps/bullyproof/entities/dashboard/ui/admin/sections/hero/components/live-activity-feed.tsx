@@ -308,7 +308,7 @@ export function LiveActivityFeed() {
 
   return (
     <div
-      className="flex items-center justify-between h-full px-4"
+      className="flex items-center justify-between h-full w-full px-4 py-4"
       key={currentEvent.id}
     >
       {/* Badge and message on the left */}
