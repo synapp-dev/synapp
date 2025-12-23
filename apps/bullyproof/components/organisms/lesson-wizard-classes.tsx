@@ -1,35 +1,70 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@workspace/ui/components/input";
 import { Badge } from "@workspace/ui/components/badge";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import type { ClassOption } from "@/types/lesson-wizard";
+import { classesApi } from "@/entities/classes/api/endpoints";
 
 interface LessonWizardClassesProps {
+  schoolId: string;
   selectedClasses: ClassOption[];
   onClassesChange: (classes: ClassOption[]) => void;
 }
 
-// Dummy class data (formatted like "7 Blue", "8 Red", etc.)
-const dummyClasses: ClassOption[] = [
-  { id: "class-1", name: "7 Blue", yearLevel: "Year 7", schoolId: "" },
-  { id: "class-2", name: "8 Red", yearLevel: "Year 8", schoolId: "" },
-  { id: "class-3", name: "9 Green", yearLevel: "Year 9", schoolId: "" },
-  { id: "class-4", name: "10 Yellow", yearLevel: "Year 10", schoolId: "" },
-  { id: "class-5", name: "11 Purple", yearLevel: "Year 11", schoolId: "" },
-  { id: "class-6", name: "6 Orange", yearLevel: "Year 6", schoolId: "" },
-];
-
 export function LessonWizardClasses({
+  schoolId,
   selectedClasses,
   onClassesChange,
 }: LessonWizardClassesProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [classes, setClasses] = useState<ClassOption[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filteredClasses = dummyClasses.filter((cls) =>
-    cls.name.toLowerCase().includes(searchQuery.toLowerCase())
+  useEffect(() => {
+    if (!schoolId) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    classesApi.get
+      .list({ schoolId, active: true })
+      .then((result) => {
+        if (result.error) {
+          setError(result.error.message || "Failed to load classes");
+          setClasses([]);
+        } else if (result.data) {
+          // Map Class type to ClassOption format
+          const mappedClasses: ClassOption[] = result.data.map((cls) => ({
+            id: cls.id,
+            name: cls.name,
+            yearLevel: cls.code || cls.stream || "N/A", // Use code or stream as fallback for yearLevel
+            schoolId: cls.schoolId,
+          }));
+          setClasses(mappedClasses);
+        } else {
+          setClasses([]);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch classes:", err);
+        setError("Failed to load classes. Please try again.");
+        setClasses([]);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [schoolId]);
+
+  const filteredClasses = classes.filter((cls) =>
+    cls.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    cls.yearLevel.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const toggleClassSelection = (classItem: ClassOption) => {
@@ -86,41 +121,53 @@ export function LessonWizardClasses({
 
       {/* Class list */}
       <ScrollArea className="h-[300px]">
-        <div className="flex flex-col gap-2">
-          {filteredClasses.map((classItem) => {
-            const isSelected = selectedClasses.some((c) => c.id === classItem.id);
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {filteredClasses.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                {searchQuery
+                  ? `No classes found matching "${searchQuery}"`
+                  : "No classes available for this school"}
+              </p>
+            ) : (
+              filteredClasses.map((classItem) => {
+                const isSelected = selectedClasses.some((c) => c.id === classItem.id);
 
-            return (
-              <button
-                key={classItem.id}
-                onClick={() => toggleClassSelection(classItem)}
-                className={`
-                  flex items-center justify-between p-3 rounded-lg border text-left
-                  transition-colors
-                  ${isSelected
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:bg-accent"
-                  }
-                `}
-              >
-                <div className="flex flex-col">
-                  <span className="font-medium">{classItem.name}</span>
-                  <span className="text-sm text-muted-foreground">{classItem.yearLevel}</span>
-                </div>
-                {isSelected && (
-                  <div className="text-primary">✓</div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+                return (
+                  <button
+                    key={classItem.id}
+                    onClick={() => toggleClassSelection(classItem)}
+                    className={`
+                      flex items-center justify-between p-3 rounded-lg border text-left
+                      transition-colors
+                      ${isSelected
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-accent"
+                      }
+                    `}
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{classItem.name}</span>
+                      <span className="text-sm text-muted-foreground">{classItem.yearLevel}</span>
+                    </div>
+                    {isSelected && (
+                      <div className="text-primary">✓</div>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
       </ScrollArea>
-
-      {searchQuery && filteredClasses.length === 0 && (
-        <p className="text-sm text-muted-foreground text-center py-4">
-          No classes found matching "{searchQuery}"
-        </p>
-      )}
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { LessonWizardConfirm } from "./lesson-wizard-confirm";
 import type { ClassOption, TopicOption, ScheduleOption, LessonCreatePayload } from "@/types/lesson-wizard";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
 
 interface LessonWizardProps {
   schoolId: string;
@@ -85,32 +86,36 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
 
     try {
       // Prepare payload
-      const payload: LessonCreatePayload = {
+      const scheduledFor = state.scheduleOption === 'scheduled' && state.scheduledDate && state.scheduledTime
+        ? `${state.scheduledDate}T${state.scheduledTime}:00`
+        : undefined;
+
+      const payload = {
         schoolId,
         topicId: state.selectedTopic.id,
         classIds: state.selectedClasses.map((c) => c.id),
-        status: state.scheduleOption === 'immediate' ? 'in_progress' : 'scheduled',
-        scheduledFor:
-          state.scheduleOption === 'scheduled' && state.scheduledDate && state.scheduledTime
-            ? `${state.scheduledDate}T${state.scheduledTime}:00`
-            : undefined,
+        status: state.scheduleOption === 'immediate' ? 'in_progress' : (scheduledFor ? 'scheduled' : 'draft'),
+        scheduledFor,
       };
 
-      // TODO: Replace with actual API call when backend is ready
-      // For now, simulate API call
-      console.log('Creating lesson with payload:', payload);
-      
-      // Simulate API delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Call the API to create the lesson
+      const result = await lessonsApi.post.create(payload);
 
-      // Mock lesson ID - replace with actual response when API is ready
-      const lessonId = 'mock-lesson-id';
+      if (result.error) {
+        throw new Error(result.error.message || 'Failed to create lesson');
+      }
+
+      if (!result.data) {
+        throw new Error('No data returned from API');
+      }
+
+      const lessonId = result.data.id;
 
       // Mark lesson as live in global store (with some helpful metadata)
       useLiveLessonStore.getState().startLiveLesson({
         schoolSlug: schoolId,
         lessonId,
-        title: "Live Lesson",
+        title: result.data.topic?.title || "Live Lesson",
         classCount: state.selectedClasses.length,
         startedAt: new Date().toISOString(),
       });
@@ -121,6 +126,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
       // Close drawer
       onOpenChange(false);
     } catch (err: any) {
+      console.error('Failed to create lesson:', err);
       setError(err.message || 'Failed to create lesson. Please try again.');
     } finally {
       setLoading(false);
@@ -192,6 +198,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
           <div className="max-w-4xl mx-auto">
             {state.step === 1 && (
               <LessonWizardClasses
+                schoolId={schoolId}
                 selectedClasses={state.selectedClasses}
                 onClassesChange={(classes) =>
                   setState((prev) => ({ ...prev, selectedClasses: classes }))
