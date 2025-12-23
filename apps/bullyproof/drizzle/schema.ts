@@ -1063,6 +1063,7 @@ export const certificationUserAnswers = pgTable(
     stageId: uuid("stage_id").notNull(),
     topicId: uuid("topic_id").notNull(),
     slideId: uuid("slide_id").notNull(),
+    attemptId: uuid("attempt_id"),
     answerId: text("answer_id"),
     isCorrect: boolean("is_correct").notNull(),
     timeTaken: integer("time_taken"),
@@ -1100,6 +1101,12 @@ export const certificationUserAnswers = pgTable(
       foreignColumns: [usersInAuth.id],
       name: "certification_user_answers_user_id_fkey",
     }).onDelete("cascade"),
+    // Foreign key for attemptId will be added after certificationUserTopicProgress is defined
+    // The SQL migration handles this constraint
+    index("idx_certification_user_answers_attempt").using(
+      "btree",
+      table.attemptId.asc().nullsLast().op("uuid_ops")
+    ),
     pgPolicy("certification_user_answers_admin_select", {
       as: "permissive",
       for: "select",
@@ -1130,6 +1137,7 @@ export const certificationUserProgress = pgTable(
     id: uuid().defaultRandom().primaryKey().notNull(),
     userId: uuid("user_id").notNull(),
     stageId: uuid("stage_id").notNull(),
+    lastUpdatedTopicId: uuid("last_updated_topic_id"),
     status: text().default("started").notNull(),
     progressPercentage: integer("progress_percentage").default(0).notNull(),
     startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
@@ -1154,6 +1162,11 @@ export const certificationUserProgress = pgTable(
       foreignColumns: [usersInAuth.id],
       name: "certification_user_progress_user_id_fkey",
     }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.lastUpdatedTopicId],
+      foreignColumns: [certificationTopics.id],
+      name: "certification_user_progress_last_topic_id_fkey",
+    }).onDelete("set null"),
     unique("certification_user_progress_user_stage").on(
       table.userId,
       table.stageId
@@ -1182,6 +1195,107 @@ export const certificationUserProgress = pgTable(
     check(
       "certification_user_progress_status_check",
       sql`status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text])`
+    ),
+  ]
+);
+
+export const certificationUserTopicProgress = pgTable(
+  "certification_user_topic_progress",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    userId: uuid("user_id").notNull(),
+    stageId: uuid("stage_id").notNull(),
+    topicId: uuid("topic_id").notNull(),
+    attemptNumber: integer("attempt_number").default(1).notNull(),
+    currentSlideId: uuid("current_slide_id"),
+    status: text().default("started").notNull(),
+    scorePercentage: integer("score_percentage"),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    completedAt: timestamp("completed_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    passedAt: timestamp("passed_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    slideProgress: jsonb("slide_progress").default({}).notNull(),
+  },
+  (table) => [
+    unique("certification_user_topic_progress_user_stage_topic_attempt").on(
+      table.userId,
+      table.stageId,
+      table.topicId,
+      table.attemptNumber
+    ),
+    index("idx_certification_user_topic_progress_user_topic").using(
+      "btree",
+      table.userId.asc().nullsLast().op("uuid_ops"),
+      table.topicId.asc().nullsLast().op("uuid_ops"),
+      table.attemptNumber.desc().nullsLast().op("int4_ops")
+    ),
+    index("idx_certification_user_topic_progress_user_stage").using(
+      "btree",
+      table.userId.asc().nullsLast().op("uuid_ops"),
+      table.stageId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_certification_user_topic_progress_current_slide").using(
+      "btree",
+      table.currentSlideId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_certification_user_topic_progress_status").using(
+      "btree",
+      table.status.asc().nullsLast().op("text_ops")
+    ),
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [usersInAuth.id],
+      name: "certification_user_topic_progress_user_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.stageId],
+      foreignColumns: [certificationStages.id],
+      name: "certification_user_topic_progress_stage_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.topicId],
+      foreignColumns: [certificationTopics.id],
+      name: "certification_user_topic_progress_topic_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.currentSlideId],
+      foreignColumns: [certificationSlides.id],
+      name: "certification_user_topic_progress_current_slide_id_fkey",
+    }).onDelete("set null"),
+    pgPolicy("certification_user_topic_progress_admin_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+      using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)`,
+    }),
+    pgPolicy("certification_user_topic_progress_insert", {
+      as: "permissive",
+      for: "insert",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_user_topic_progress_select", {
+      as: "permissive",
+      for: "select",
+      to: ["authenticated"],
+    }),
+    pgPolicy("certification_user_topic_progress_update", {
+      as: "permissive",
+      for: "update",
+      to: ["authenticated"],
+    }),
+    check(
+      "certification_user_topic_progress_status_check",
+      sql`status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text, 'passed'::text, 'failed'::text])`
     ),
   ]
 );
@@ -2037,8 +2151,10 @@ export const vSchoolsStatistics = pgView("v_schools_statistics", {
   // You can use { mode: "bigint" } if numbers are exceeding js number limitations
   schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
   activeLicence: boolean("active_licence"),
+  // You can use { mode: "bigint" } if numbers are exceeding js number limitations
+  lessonCount: bigint("lesson_count", { mode: "number" }),
 }).as(
-  sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, EXISTS(SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status) AS active_licence FROM schools s`
+  sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, EXISTS(SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status) AS active_licence, COALESCE(( SELECT count(*) AS count FROM lessons l WHERE l.school_id = s.id), 0::bigint) AS lesson_count FROM schools s`
 );
 
 export const vStageThresholds = pgView("v_stage_thresholds", {

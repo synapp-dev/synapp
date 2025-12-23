@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, schoolSectors, schools, states, schoolLicences, schoolInvites, oauthAuthorizationsInAuth, oauthConsentsInAuth, certificationSlides, certificationUserAnswers, certificationStages, certificationTopics, certificationUserProgress, curriculumStages, topics, schoolLevels, schoolYears, classes, lessons, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
+import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, schoolSectors, schools, states, schoolLicences, schoolInvites, oauthAuthorizationsInAuth, oauthConsentsInAuth, certificationSlides, certificationUserAnswers, certificationStages, certificationTopics, certificationUserProgress, certificationUserTopicProgress, curriculumStages, topics, schoolLevels, schoolYears, classes, lessons, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -39,6 +39,7 @@ export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
 	oauthConsentsInAuths: many(oauthConsentsInAuth),
 	certificationUserAnswers: many(certificationUserAnswers),
 	certificationUserProgresses: many(certificationUserProgress),
+	certificationUserTopicProgresses: many(certificationUserTopicProgress),
 	lessons: many(lessons),
 	lessonLiveStates: many(lessonLiveState),
 	userRoles: many(userRoles),
@@ -209,6 +210,10 @@ export const certificationUserAnswersRelations = relations(certificationUserAnsw
 		fields: [certificationUserAnswers.topicId],
 		references: [certificationTopics.id]
 	}),
+	certificationUserTopicProgress: one(certificationUserTopicProgress, {
+		fields: [certificationUserAnswers.attemptId],
+		references: [certificationUserTopicProgress.id]
+	}),
 	usersInAuth: one(usersInAuth, {
 		fields: [certificationUserAnswers.userId],
 		references: [usersInAuth.id]
@@ -217,6 +222,7 @@ export const certificationUserAnswersRelations = relations(certificationUserAnsw
 
 export const certificationSlidesRelations = relations(certificationSlides, ({one, many}) => ({
 	certificationUserAnswers: many(certificationUserAnswers),
+	certificationUserTopicProgresses: many(certificationUserTopicProgress),
 	certificationTopic: one(certificationTopics, {
 		fields: [certificationSlides.topicId],
 		references: [certificationTopics.id]
@@ -226,11 +232,13 @@ export const certificationSlidesRelations = relations(certificationSlides, ({one
 export const certificationStagesRelations = relations(certificationStages, ({many}) => ({
 	certificationUserAnswers: many(certificationUserAnswers),
 	certificationUserProgresses: many(certificationUserProgress),
+	certificationUserTopicProgresses: many(certificationUserTopicProgress),
 	certificationTopics: many(certificationTopics),
 }));
 
 export const certificationTopicsRelations = relations(certificationTopics, ({one, many}) => ({
 	certificationUserAnswers: many(certificationUserAnswers),
+	certificationUserTopicProgresses: many(certificationUserTopicProgress),
 	certificationSlides: many(certificationSlides),
 	certificationStage: one(certificationStages, {
 		fields: [certificationTopics.stageId],
@@ -243,8 +251,32 @@ export const certificationUserProgressRelations = relations(certificationUserPro
 		fields: [certificationUserProgress.stageId],
 		references: [certificationStages.id]
 	}),
+	lastUpdatedTopic: one(certificationTopics, {
+		fields: [certificationUserProgress.lastUpdatedTopicId],
+		references: [certificationTopics.id]
+	}),
 	usersInAuth: one(usersInAuth, {
 		fields: [certificationUserProgress.userId],
+		references: [usersInAuth.id]
+	}),
+}));
+
+export const certificationUserTopicProgressRelations = relations(certificationUserTopicProgress, ({one, many}) => ({
+	certificationStage: one(certificationStages, {
+		fields: [certificationUserTopicProgress.stageId],
+		references: [certificationStages.id]
+	}),
+	certificationTopic: one(certificationTopics, {
+		fields: [certificationUserTopicProgress.topicId],
+		references: [certificationTopics.id]
+	}),
+	currentSlide: one(certificationSlides, {
+		fields: [certificationUserTopicProgress.currentSlideId],
+		references: [certificationSlides.id]
+	}),
+	certificationUserAnswers: many(certificationUserAnswers),
+	usersInAuth: one(usersInAuth, {
+		fields: [certificationUserTopicProgress.userId],
 		references: [usersInAuth.id]
 	}),
 }));
