@@ -490,6 +490,7 @@ export function CertificationTopicDetailSection({
                           currentSlide.kind === "quiz"
                             ? "text"
                             : currentSlide.kind,
+                        orderIndex: currentSlide.orderIndex,
                         textHtml:
                           currentSlide.kind === "quiz"
                             ? `<div><h3>${currentSlide.quizData?.question || "Question"}</h3><ul>${currentSlide.quizData?.answers.map((a) => `<li>${a.text}${a.isCorrect ? " ✓" : ""}</li>`).join("") || ""}</ul></div>`
