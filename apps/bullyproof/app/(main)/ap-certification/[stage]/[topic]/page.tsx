@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
@@ -54,7 +54,7 @@ function createSlug(title: string): string {
     .replace(/-+/g, "-"); // Replace multiple hyphens with single hyphen
 }
 
-export default function APCertificationTopicPage() {
+function APCertificationTopicPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const stageCode = params?.stage as string;
@@ -1237,5 +1237,19 @@ export default function APCertificationTopicPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function APCertificationTopicPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <APCertificationTopicPageContent />
+    </Suspense>
   );
 }

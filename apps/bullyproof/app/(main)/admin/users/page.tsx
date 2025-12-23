@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   meApi,
@@ -48,8 +48,7 @@ import {
   AlertTitle,
 } from "@workspace/ui/components/alert";
 
-export default function AdminUsersPage() {
-  usePageTitle(["admin", "users"]);
+function AdminUsersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
@@ -384,5 +383,23 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function AdminUsersPage() {
+  usePageTitle(["admin", "users"]);
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Loading users...</p>
+          </div>
+        </div>
+      }
+    >
+      <AdminUsersPageContent />
+    </Suspense>
   );
 }

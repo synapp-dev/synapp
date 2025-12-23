@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -19,10 +20,19 @@ export default function LessonsPage({
   usePageTitle(["schools", "lessons"]);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [schoolId, setSchoolId] = useState<string>("");
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     params.then(({ school_id }) => setSchoolId(school_id));
   }, [params]);
+
+  // Check for dialog query parameter and open wizard if present
+  useEffect(() => {
+    const dialog = searchParams?.get("dialog");
+    if (dialog === "add-new-lesson" && schoolId) {
+      setIsWizardOpen(true);
+    }
+  }, [searchParams, schoolId]);
 
   if (!schoolId) {
     return null;
