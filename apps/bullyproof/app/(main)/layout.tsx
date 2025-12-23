@@ -1,6 +1,7 @@
 "use client";
 
 import { MeLoader } from "@/components/molecules/me-loader";
+import { TutorialGuard } from "@/components/molecules/tutorial-guard";
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
 
@@ -17,6 +18,7 @@ export default function MainLayout({
   return (
     <SidebarProvider>
       <MeLoader />
+      <TutorialGuard />
       <AppSidebar />
       <div className="flex flex-col flex-1 max-w-7xl mx-auto">
         <AppHeader />

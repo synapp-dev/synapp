@@ -1,133 +1,204 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
-import { Button } from "@workspace/ui/components/button";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { isYouTubeUrl, convertToYouTubeEmbedUrl } from "@/utils/youtube";
+import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { useCompleteTutorial } from "@/entities/me/api/completeTutorial";
+import { useMeStore } from "@/entities/me/model/store";
+import Image from "next/image";
+import { Button } from "@workspace/ui/components/button";
+import { cn } from "@workspace/ui/lib/utils";
+import { ChevronsRight } from "lucide-react";
+
+type Step = "intro" | "video";
 
 export default function WelcomePage() {
   usePageTitle(["welcome"]);
-  const [open, setOpen] = useState(false);
-  const [stepIndex, setStepIndex] = useState(0);
+  const router = useRouter();
+  const currentUser = useMeStore((s) => s.currentUser);
+  const completeTutorial = useCompleteTutorial();
+  const [currentStep, setCurrentStep] = useState<Step>("intro");
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [videoInteracted, setVideoInteracted] = useState(false);
 
+  // Check if tutorial is already completed and redirect
   useEffect(() => {
-    setOpen(true);
-  }, []);
+    if (currentUser?.metadata) {
+      const metadata = currentUser.metadata as any;
+      if (metadata?.tutorials?.welcome?.completed === true) {
+        router.push("/dashboard");
+      }
+    }
+  }, [currentUser, router]);
 
-  const steps = useMemo(
-    () => [
-      {
-        key: "welcome",
-        title: "Welcome to BullyProof",
-        description: "A quick, friendly setup to get you oriented.",
-        content: (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              We’ll walk you through a few short steps so you know where
-              everything lives. This should take less than a minute.
-            </p>
-          </div>
-        ),
-      },
-      {
-        key: "profile",
-        title: "Personalize your experience",
-        description: "Tell us a little about your role and school.",
-        content: (
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              You can refine these later in settings. For now, we’ll set a few
-              sensible defaults.
-            </p>
-          </div>
-        ),
-      },
-      {
-        key: "get-started",
-        title: "You’re all set",
-        description: "Here’s what to do next.",
-        content: (
-          <div className="space-y-3">
-            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-              <li>Invite teammates</li>
-              <li>Explore your dashboard</li>
-              <li>Review quick start guides</li>
-            </ul>
-          </div>
-        ),
-      },
-    ],
-    []
-  );
+  // Video URL - you can change this to any YouTube URL or video URL
+  const videoUrl = "https://youtu.be/Y3SiLdBRGgQ";
 
-  const clampedIndex = Math.min(Math.max(stepIndex, 0), steps.length - 1);
-  const currentStep = steps[clampedIndex];
-  const isFirst = clampedIndex === 0;
-  const isLast = clampedIndex === steps.length - 1;
+  const videoEmbedUrl = useMemo(() => {
+    if (!videoUrl) return null;
+    if (isYouTubeUrl(videoUrl)) {
+      return convertToYouTubeEmbedUrl(videoUrl);
+    }
+    return null;
+  }, [videoUrl]);
 
-  if (steps.length === 0) return null;
-  if (!currentStep) return null;
+  const handleNext = () => {
+    setIsTransitioning(true);
+    // Wait for fade out animation
+    setTimeout(() => {
+      setCurrentStep("video");
+      setIsTransitioning(false);
+    }, 300);
+  };
 
-  function goNext() {
-    if (!isLast) setStepIndex((i) => i + 1);
-    else setOpen(false);
-  }
+  const handleVideoInteraction = () => {
+    setVideoInteracted(true);
+  };
 
-  function goBack() {
-    if (!isFirst) setStepIndex((i) => i - 1);
-  }
+  const handleGetStarted = async () => {
+    try {
+      await completeTutorial.mutateAsync("welcome");
+      // Redirect to dashboard after successful completion
+      // The TutorialGuard will ensure we don't get redirected back if the store updates first
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Error completing tutorial:", error);
+      // Still redirect even if there's an error
+      router.push("/dashboard");
+    }
+  };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md max-w-md" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>{currentStep.title}</DialogTitle>
-          <DialogDescription>{currentStep.description}</DialogDescription>
-        </DialogHeader>
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="container max-w-3xl mx-auto px-4 py-8 md:py-12">
+        {/* Intro Step */}
+        {currentStep === "intro" && (
+          <div
+            className={cn(
+              "transition-opacity duration-300",
+              isTransitioning && "opacity-0"
+            )}
+          >
+            <div className="flex flex-col items-center text-center space-y-8">
+              {/* Step 1: Large Header */}
+              <StaggeredAnimation index={0} baseDelay={0} incrementDelay={0}>
+                <h1 className="text-4xl md:text-6xl font-bold">
+                  Welcome to Bullyproof
+                </h1>
+              </StaggeredAnimation>
 
-        <div className="space-y-6">
-          <ol className="flex items-center gap-2" aria-label="Progress">
-            {steps.map((step, idx) => (
-              <li key={step.key} className="flex items-center gap-2">
-                <div
-                  className={
-                    "size-2 rounded-full transition-colors " +
-                    (idx <= stepIndex ? "bg-primary" : "bg-muted-foreground/30")
-                  }
-                  aria-hidden
+              {/* Step 2: Login Image (appears after 1 second) */}
+              <StaggeredAnimation
+                index={1}
+                baseDelay={1}
+                incrementDelay={0}
+                fadeDirection="up"
+              >
+                <Image
+                  src="/images/login-image-bare.svg"
+                  alt="Bullyproof Logo"
+                  width={400}
+                  height={400}
+                  className="mt-4"
                 />
-                {idx < steps.length - 1 && (
-                  <div className="h-px w-6 bg-border" aria-hidden />
-                )}
-              </li>
-            ))}
-          </ol>
+              </StaggeredAnimation>
 
-          {currentStep.content}
-        </div>
+              {/* Step 3: Welcome Paragraph (appears after 1 second) */}
+              <StaggeredAnimation
+                index={2}
+                baseDelay={1}
+                incrementDelay={0}
+                fadeDirection="up"
+              >
+                <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mt-6">
+                  We're glad you're here. We're excited to share this journey
+                  with you.
+                </p>
+              </StaggeredAnimation>
 
-        <DialogFooter>
-          <div className="flex w-full items-center justify-between">
-            <Button variant="ghost" onClick={() => setOpen(false)}>
-              Skip for now
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={goBack} disabled={isFirst}>
-                Back
-              </Button>
-              <Button onClick={goNext}>{isLast ? "Finish" : "Continue"}</Button>
+              {/* Step 4: Next Button (appears after 1 more second = 2 seconds total) */}
+              <StaggeredAnimation
+                index={3}
+                baseDelay={2}
+                incrementDelay={0}
+                fadeDirection="up"
+              >
+                <Button
+                  onClick={handleNext}
+                  size="lg"
+                  className="mt-8"
+                  disabled={isTransitioning}
+                >
+                  Next
+                  <ChevronsRight className="w-4 h-4" />
+                </Button>
+              </StaggeredAnimation>
             </div>
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        )}
+
+        {/* Video Step */}
+        {currentStep === "video" && (
+          <div
+            className={cn(
+              "transition-opacity duration-300",
+              isTransitioning && "opacity-0"
+            )}
+          >
+            <div className="flex flex-col items-center text-center space-y-8">
+              {/* Video Section */}
+              <div className="w-full">
+                <h2 className="text-2xl md:text-3xl font-semibold mb-6">
+                  Watch our welcome video
+                </h2>
+                <div
+                  className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted shadow-lg"
+                  onClick={handleVideoInteraction}
+                  onMouseEnter={handleVideoInteraction}
+                >
+                  {videoEmbedUrl ? (
+                    <iframe
+                      src={videoEmbedUrl}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      title="Welcome video"
+                      onLoad={handleVideoInteraction}
+                    />
+                  ) : (
+                    <video
+                      src={videoUrl}
+                      controls
+                      className="w-full h-full"
+                      onPlay={handleVideoInteraction}
+                      onClick={handleVideoInteraction}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  )}
+                </div>
+              </div>
+
+              {/* Get Started Button (appears after video interaction) */}
+              {videoInteracted && (
+                <div className="animate-slide-up-fade-in">
+                  <Button
+                    onClick={handleGetStarted}
+                    size="lg"
+                    disabled={completeTutorial.isPending}
+                  >
+                    {completeTutorial.isPending
+                      ? "Getting Started..."
+                      : "Get Started"}
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

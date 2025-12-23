@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   meApi,
   type UserWithRolesAndSchools,
 } from "@/entities/me/api/endpoints";
+import { rolesApi } from "@/entities/roles/api/endpoints";
+import type { roles } from "@/server/db/schema";
+
+type Role = typeof roles.$inferSelect;
 import {
   Card,
   CardContent,
@@ -29,6 +34,13 @@ import {
 } from "@workspace/ui/components/avatar";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { Search, Users, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
 import {
   Alert,
@@ -38,42 +50,104 @@ import {
 
 export default function AdminUsersPage() {
   usePageTitle(["admin", "users"]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchInput, setSearchInput] = useState("");
 
-  const loadUsers = useCallback(async (search?: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await meApi.get.listAllUsers({
-        limit: 100,
-        offset: 0,
-        search: search || undefined,
-      });
+  // Get filters from URL query params
+  const roleFilter = searchParams?.get("role") || "";
+  const schoolFilter = searchParams?.get("schoolId") || "";
 
-      if (result.error) {
-        setError(result.error.message || "Failed to load users");
+  // Extract unique schools from users data
+  const availableSchools = Array.from(
+    new Map(
+      users
+        .flatMap((user) => user.schoolRoles)
+        .filter((sr) => sr.schoolId && sr.schoolName)
+        .map((sr) => [sr.schoolId, { id: sr.schoolId, name: sr.schoolName! }])
+    ).values()
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
+  // Filter roles to only show roles that have a key (for filtering)
+  const availableRoles = roles
+    .filter((role) => role.key)
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  const loadUsers = useCallback(
+    async (search?: string, role?: string, schoolId?: string) => {
+      try {
+        setLoading(true);
+        setError(null);
+        const result = await meApi.get.listAllUsers({
+          limit: 100,
+          offset: 0,
+          search: search || undefined,
+          role: role || undefined,
+          schoolId: schoolId || undefined,
+        });
+
+        if (result.error) {
+          setError(result.error.message || "Failed to load users");
+          setUsers([]);
+        } else {
+          setUsers(result.data || []);
+        }
+      } catch (err: any) {
+        setError(err.message || "An error occurred");
         setUsers([]);
-      } else {
-        setUsers(result.data || []);
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError(err.message || "An error occurred");
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
+    },
+    []
+  );
+
+  // Load roles on mount
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        const result = await rolesApi.get.list();
+        if (result.data) {
+          setRoles(result.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch roles:", err);
+      }
+    };
+    fetchRoles();
   }, []);
 
   useEffect(() => {
-    loadUsers(searchTerm);
-  }, [searchTerm, loadUsers]);
+    loadUsers(searchTerm, roleFilter || undefined, schoolFilter || undefined);
+  }, [searchTerm, roleFilter, schoolFilter, loadUsers]);
 
   const handleSearch = () => {
     setSearchTerm(searchInput);
+  };
+
+  const handleRoleFilterChange = (value: string) => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (value && value !== "all") {
+      params.set("role", value);
+    } else {
+      params.delete("role");
+    }
+    router.push(`/admin/users?${params.toString()}`, { scroll: false });
+  };
+
+  const handleSchoolFilterChange = (value: string) => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (value && value !== "all") {
+      params.set("schoolId", value);
+    } else {
+      params.delete("schoolId");
+    }
+    router.push(`/admin/users?${params.toString()}`, { scroll: false });
   };
 
   const getInitials = (firstName: string | null, lastName: string | null) => {
@@ -117,6 +191,38 @@ export default function AdminUsersPage() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Select
+                value={roleFilter || "all"}
+                onValueChange={handleRoleFilterChange}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {availableRoles.map((role) => (
+                    <SelectItem key={role.id} value={role.key || ""}>
+                      {role.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={schoolFilter || "all"}
+                onValueChange={handleSchoolFilterChange}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by school" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {availableSchools.map((school) => (
+                    <SelectItem key={school.id} value={school.id}>
+                      {school.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 placeholder="Search by name or email..."
                 value={searchInput}
