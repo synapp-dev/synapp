@@ -16,6 +16,7 @@ import {
   Settings,
 } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
+import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
 
 interface TabItem {
   title: string;
@@ -101,6 +102,13 @@ export function HeaderTabSwitcherClient({
   className,
 }: HeaderTabSwitcherClientProps) {
   const pathname = usePathname();
+  const { filterCategories } = useSchoolNavigationPermissions();
+
+  // Filter categories based on teacher role
+  const filteredCategories = React.useMemo(
+    () => filterCategories(tabCategories),
+    [filterCategories]
+  );
 
   const isActive = React.useCallback(
     (url: string) => {
@@ -112,7 +120,7 @@ export function HeaderTabSwitcherClient({
 
   return (
     <div className={cn("flex items-center gap-12", className)}>
-      {tabCategories.map((category) => (
+      {filteredCategories.map((category) => (
         <div key={category.name} className="flex items-center gap-0">
           {category.items.map((item) => {
             const Icon = item.icon;

@@ -36,8 +36,9 @@ import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useSchoolStore } from "@/stores/school-store";
 import { usePathname } from "next/navigation";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useIsPlatformAdmin, useMeStore } from "@/entities/me/model/store";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
+import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
 
 // This is sample data.
 const data = {
@@ -147,16 +148,33 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state } = useSidebar();
   const pathname = usePathname();
   const isPlatformAdmin = useIsPlatformAdmin();
+  const currentUser = useMeStore((s) => s.currentUser);
+
+  // Check if welcome tutorial is completed
+  const isWelcomeCompleted = React.useMemo(() => {
+    if (!currentUser?.metadata) return false;
+    const metadata = currentUser.metadata as any;
+    return metadata?.tutorials?.welcome?.completed === true;
+  }, [currentUser]);
 
   const platformItems = React.useMemo(() => {
+    // If welcome is not completed, only show Welcome
+    if (!isWelcomeCompleted) {
+      return data.navBullyproof.filter((item) => item.title === "Welcome");
+    }
+
+    // If welcome is completed, show all items except Welcome
     // Filter out Admin menu if user is not a platform admin
     return data.navBullyproof.filter((item) => {
+      if (item.title === "Welcome") {
+        return false; // Hide Welcome after completion
+      }
       if (item.title === "Admin" && !isPlatformAdmin) {
         return false;
       }
       return true;
     });
-  }, [isPlatformAdmin]);
+  }, [isPlatformAdmin, isWelcomeCompleted]);
 
   const schoolSlugFromPath = React.useMemo(() => {
     // Match /schools/{slug}/...
@@ -210,10 +228,29 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     [activeSchoolSlug]
   );
 
+  // Use shared navigation permissions hook
+  const { filterItems } = useSchoolNavigationPermissions();
+
+  // Filter school navigation items based on teacher role
+  const filteredNavSchoolMain = React.useMemo(
+    () => filterItems(data.navSchoolMain),
+    [filterItems]
+  );
+
+  const filteredNavData = React.useMemo(
+    () => filterItems(data.navData),
+    [filterItems]
+  );
+
   const isLive = useLiveLessonStore((s) => s.isLive);
   const liveUrl = useLiveLessonStore((s) => s.getUrl());
 
   const platformItemsWithLive = React.useMemo(() => {
+    // Don't show live lesson if welcome is not completed
+    if (!isWelcomeCompleted) {
+      return platformItems;
+    }
+
     if (!isLive || !liveUrl) return platformItems;
     const items = [...platformItems];
     const dashboardIndex = items.findIndex((i) => i.title === "Dashboard");
@@ -231,7 +268,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items.unshift(liveItem);
     }
     return items;
-  }, [platformItems, isLive, liveUrl]);
+  }, [platformItems, isLive, liveUrl, isWelcomeCompleted]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -257,43 +294,52 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <ScrollArea className="h-full">
           <NavMain items={platformItemsWithLive} title="Platform" />
-          <Separator className="my-2" />
-          <div className="-space-y-2">
-            <SchoolSwitcher />
+          {/* Only show separator, school switcher, and school navigation if welcome is completed */}
+          {isWelcomeCompleted && (
+            <>
+              <Separator className="my-2" />
+              <div className="-space-y-2">
+                <SchoolSwitcher />
 
-            {/* Only show school-specific navigation when a school is selected */}
-            {hasSchoolSelected && (
-              <div className="space-y-4" key={activeSchoolSlug}>
-                {/* navSchoolMain: 3 items, no title - starts at 0 */}
-                <NavMain
-                  items={withSlug(data.navSchoolMain)}
-                  enableStaggeredAnimation
-                  startIndex={0}
-                />
-                {/* navPeople: 2 items, has title - title at 3, items at 4-5 */}
-                <NavMain
-                  items={withSlug(data.navPeople)}
-                  title="People"
-                  enableStaggeredAnimation
-                  startIndex={3}
-                />
-                {/* navCurriculum: 3 items, has title - title at 6, items at 7-9 */}
-                <NavMain
-                  items={withSlug(data.navCurriculum)}
-                  title="Curriculum"
-                  enableStaggeredAnimation
-                  startIndex={6}
-                />
-                {/* navData: 1 item, has title - title at 10, item at 11 */}
-                <NavMain
-                  items={withSlug(data.navData)}
-                  title="Data"
-                  enableStaggeredAnimation
-                  startIndex={10}
-                />
+                {/* Only show school-specific navigation when a school is selected */}
+                {hasSchoolSelected && (
+                  <div className="space-y-4" key={activeSchoolSlug}>
+                    {/* navSchoolMain: filtered based on role - starts at 0 */}
+                    {filteredNavSchoolMain.length > 0 && (
+                      <NavMain
+                        items={withSlug(filteredNavSchoolMain)}
+                        enableStaggeredAnimation
+                        startIndex={0}
+                      />
+                    )}
+                    {/* navPeople: 2 items, has title - title at 3, items at 4-5 */}
+                    <NavMain
+                      items={withSlug(data.navPeople)}
+                      title="People"
+                      enableStaggeredAnimation
+                      startIndex={3}
+                    />
+                    {/* navCurriculum: 3 items, has title - title at 6, items at 7-9 */}
+                    <NavMain
+                      items={withSlug(data.navCurriculum)}
+                      title="Curriculum"
+                      enableStaggeredAnimation
+                      startIndex={6}
+                    />
+                    {/* navData: filtered based on role - title at 10, item at 11 */}
+                    {filteredNavData.length > 0 && (
+                      <NavMain
+                        items={withSlug(filteredNavData)}
+                        title="Data"
+                        enableStaggeredAnimation
+                        startIndex={10}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </ScrollArea>
       </SidebarContent>
       <SidebarFooter>

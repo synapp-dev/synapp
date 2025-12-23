@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSchoolStore } from "@/stores/school-store";
 import {
@@ -40,9 +41,12 @@ export function Breadcrumb() {
         isLast: i === pathSegments.length - 1,
       });
     } else {
-      // Use the segment as-is, but capitalize it
+      // Format the segment: split by hyphens, capitalize each word, join with spaces
       const label = segment
-        ? segment.charAt(0).toUpperCase() + segment.slice(1)
+        ? segment
+            .split("-")
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(" ")
         : "";
       breadcrumbItems.push({
         label,
@@ -63,11 +67,10 @@ export function Breadcrumb() {
                   {item.label}
                 </BreadcrumbPage>
               ) : (
-                <BreadcrumbLink
-                  href={item.href}
-                  className="text-lg font-semibold"
-                >
-                  {item.label}
+                <BreadcrumbLink asChild>
+                  <Link href={item.href} className="text-lg font-semibold">
+                    {item.label}
+                  </Link>
                 </BreadcrumbLink>
               )}
             </BreadcrumbItem>
