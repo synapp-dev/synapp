@@ -1,15 +1,21 @@
 import { db } from "@/server/db/drizzle";
 import { userProfile, userRoles, roles, schools } from "@/server/db/schema";
-import { eq, ilike, or, asc } from "drizzle-orm";
+import { eq, ilike, or, and, asc } from "drizzle-orm";
 
 export const userRepo = {
   getAllUsersWithRolesAndSchools: async (params: {
     limit: number;
     offset: number;
     search?: string;
+    role?: string;
+    schoolId?: string;
   }) => {
     const hasSearch =
       typeof params.search === "string" && params.search.trim().length > 0;
+    const hasRoleFilter =
+      typeof params.role === "string" && params.role.trim().length > 0;
+    const hasSchoolFilter =
+      typeof params.schoolId === "string" && params.schoolId.trim().length > 0;
 
     // Base query to get all users with their roles and schools
     const baseQuery = db
@@ -24,20 +30,38 @@ export const userRepo = {
       .leftJoin(roles, eq(userRoles.roleId, roles.id))
       .leftJoin(schools, eq(userRoles.schoolId, schools.id));
 
+    // Build where conditions
+    const whereConditions: any[] = [];
+
     // Apply search filter if provided
-    const searchTerm = hasSearch ? `%${params.search!.trim()}%` : null;
-    const queryWithSearch = hasSearch
-      ? baseQuery.where(
-          or(
-            ilike(userProfile.firstName, searchTerm!),
-            ilike(userProfile.lastName, searchTerm!),
-            ilike(userProfile.email, searchTerm!)
-          ) as any
-        )
-      : baseQuery;
+    if (hasSearch) {
+      const searchTerm = `%${params.search!.trim()}%`;
+      whereConditions.push(
+        or(
+          ilike(userProfile.firstName, searchTerm),
+          ilike(userProfile.lastName, searchTerm),
+          ilike(userProfile.email, searchTerm)
+        ) as any
+      );
+    }
+
+    // Apply role filter if provided
+    if (hasRoleFilter) {
+      whereConditions.push(eq(roles.key, params.role!.trim()));
+    }
+
+    // Apply school filter if provided
+    if (hasSchoolFilter) {
+      whereConditions.push(eq(userRoles.schoolId, params.schoolId!));
+    }
+
+    const queryWithFilters =
+      whereConditions.length > 0
+        ? baseQuery.where(whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions))
+        : baseQuery;
 
     // Order by user name and apply pagination
-    const rows = await queryWithSearch
+    const rows = await queryWithFilters
       .orderBy(asc(userProfile.firstName), asc(userProfile.lastName))
       .limit(params.limit)
       .offset(params.offset);

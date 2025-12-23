@@ -21,11 +21,15 @@ export const listUsersSchema = z
         }
       ),
     search: z.string().trim().max(100).optional(),
+    role: z.string().trim().max(100).optional(),
+    schoolId: z.string().uuid().optional(),
   })
   .transform((v) => ({
     limit: v.limit ?? 50,
     offset: v.offset ?? 0,
     search: v.search,
+    role: v.role,
+    schoolId: v.schoolId,
   }));
 
 export type ListUsersParams = z.infer<typeof listUsersSchema>;
