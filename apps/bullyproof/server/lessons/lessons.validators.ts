@@ -7,6 +7,7 @@ export const createLessonSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
   scheduledFor: z.string().datetime().optional(),
+  status: z.enum(['draft', 'scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
   classIds: z.array(z.string().trim().min(1)).optional(),
 });
 

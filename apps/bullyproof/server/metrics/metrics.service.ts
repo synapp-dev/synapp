@@ -1,5 +1,12 @@
 import { db } from "@/server/db/drizzle";
-import { schools, lessons, userRoles, roles, classes, schoolLicences } from "@/server/db/schema";
+import {
+  schools,
+  lessons,
+  userRoles,
+  roles,
+  classes,
+  schoolLicences,
+} from "@/server/db/schema";
 import { getUserScopedRoles } from "../auth/rbac";
 import { eq, and, sql, inArray } from "drizzle-orm";
 
@@ -22,7 +29,15 @@ function getDateRanges() {
   const now = new Date();
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  const previousMonthEnd = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    0,
+    23,
+    59,
+    59,
+    999
+  );
 
   return {
     currentMonthStart: currentMonthStart.toISOString(),
@@ -48,10 +63,12 @@ export const metricsService = {
 
     const userRoles = await getUserScopedRoles(ctx.userId);
     const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
-    const { currentMonthStart, previousMonthStart, previousMonthEnd } = getDateRanges();
+    const { currentMonthStart, previousMonthStart, previousMonthEnd } =
+      getDateRanges();
 
-    let currentQuery = db.select({ count: sql<number>`count(*)` }).from(schools);
-    let previousQuery = db.select({ count: sql<number>`count(*)` }).from(schools);
+    // Build where conditions
+    let currentWhereConditions: any[] = [];
+    let previousWhereConditions: any[] = [];
 
     // Apply scope filtering
     if (params.scope === "all") {
@@ -70,40 +87,64 @@ export const metricsService = {
         };
       }
       if (schoolIds.length > 0) {
-        currentQuery = currentQuery.where(inArray(schools.id, schoolIds));
-        previousQuery = previousQuery.where(inArray(schools.id, schoolIds));
+        currentWhereConditions.push(inArray(schools.id, schoolIds));
+        previousWhereConditions.push(inArray(schools.id, schoolIds));
       }
     }
 
     // Filter by date for current month (schools created this month)
-    currentQuery = currentQuery.where(
+    currentWhereConditions.push(
       sql`${schools.createdAt} >= ${currentMonthStart}`
     );
 
     // Filter by date for previous month
-    previousQuery = previousQuery.where(
+    previousWhereConditions.push(
       sql`${schools.createdAt} >= ${previousMonthStart} AND ${schools.createdAt} <= ${previousMonthEnd}`
     );
+
+    const currentQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(schools)
+      .where(and(...currentWhereConditions));
+
+    const previousQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(schools)
+      .where(and(...previousWhereConditions));
 
     const [currentResult] = await currentQuery;
     const [previousResult] = await previousQuery;
 
     // Get total count (not just this month's new schools)
-    let totalCurrentQuery = db.select({ count: sql<number>`count(*)` }).from(schools);
-    let totalPreviousQuery = db.select({ count: sql<number>`count(*)` }).from(schools);
+    let totalCurrentWhereConditions: any[] = [];
+    let totalPreviousWhereConditions: any[] = [];
 
     if (params.scope !== "all") {
       const schoolIds = await getUserSchoolIds(ctx.userId);
       if (schoolIds.length > 0) {
-        totalCurrentQuery = totalCurrentQuery.where(inArray(schools.id, schoolIds));
-        totalPreviousQuery = totalPreviousQuery.where(inArray(schools.id, schoolIds));
+        totalCurrentWhereConditions.push(inArray(schools.id, schoolIds));
+        totalPreviousWhereConditions.push(inArray(schools.id, schoolIds));
       }
     }
 
     // For previous month, get count at end of previous month
-    totalPreviousQuery = totalPreviousQuery.where(
+    totalPreviousWhereConditions.push(
       sql`${schools.createdAt} <= ${previousMonthEnd}`
     );
+
+    const totalCurrentQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(schools)
+      .where(
+        totalCurrentWhereConditions.length > 0
+          ? and(...totalCurrentWhereConditions)
+          : undefined
+      );
+
+    const totalPreviousQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(schools)
+      .where(and(...totalPreviousWhereConditions));
 
     const [totalCurrentResult] = await totalCurrentQuery;
     const [totalPreviousResult] = await totalPreviousQuery;
@@ -197,28 +238,20 @@ export const metricsService = {
 
     const userRoles = await getUserScopedRoles(ctx.userId);
     const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
-    const { currentMonthStart, previousMonthStart, previousMonthEnd } = getDateRanges();
+    const { currentMonthStart, previousMonthStart, previousMonthEnd } =
+      getDateRanges();
 
-    let currentQuery = db
-      .select({ count: sql<number>`count(*)` })
-      .from(lessons)
-      .where(
-        and(
-          eq(lessons.status, "completed"),
-          sql`${lessons.createdAt} >= ${currentMonthStart}`
-        )
-      );
+    // Build where conditions
+    let currentWhereConditions = [
+      eq(lessons.status, "completed"),
+      sql`${lessons.createdAt} >= ${currentMonthStart}`,
+    ];
 
-    let previousQuery = db
-      .select({ count: sql<number>`count(*)` })
-      .from(lessons)
-      .where(
-        and(
-          eq(lessons.status, "completed"),
-          sql`${lessons.createdAt} >= ${previousMonthStart}`,
-          sql`${lessons.createdAt} <= ${previousMonthEnd}`
-        )
-      );
+    let previousWhereConditions = [
+      eq(lessons.status, "completed"),
+      sql`${lessons.createdAt} >= ${previousMonthStart}`,
+      sql`${lessons.createdAt} <= ${previousMonthEnd}`,
+    ];
 
     // Apply scope filtering
     if (params.scope === "all") {
@@ -236,10 +269,20 @@ export const metricsService = {
         };
       }
       if (schoolIds.length > 0) {
-        currentQuery = currentQuery.where(inArray(lessons.schoolId, schoolIds));
-        previousQuery = previousQuery.where(inArray(lessons.schoolId, schoolIds));
+        currentWhereConditions.push(inArray(lessons.schoolId, schoolIds));
+        previousWhereConditions.push(inArray(lessons.schoolId, schoolIds));
       }
     }
+
+    const currentQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(lessons)
+      .where(and(...currentWhereConditions));
+
+    const previousQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(lessons)
+      .where(and(...previousWhereConditions));
 
     const [currentResult] = await currentQuery;
     const [previousResult] = await previousQuery;
@@ -266,7 +309,8 @@ export const metricsService = {
 
     const userRoles = await getUserScopedRoles(ctx.userId);
     const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
-    const { currentMonthStart, previousMonthStart, previousMonthEnd } = getDateRanges();
+    const { currentMonthStart, previousMonthStart, previousMonthEnd } =
+      getDateRanges();
 
     // Build base query for active schools (with active licence)
     const activeSchoolsQuery = db
@@ -369,4 +413,3 @@ export const metricsService = {
     };
   },
 };
-
