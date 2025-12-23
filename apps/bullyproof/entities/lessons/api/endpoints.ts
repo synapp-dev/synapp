@@ -30,10 +30,12 @@ export const lessonsApi = {
   },
   post: {
     create(payload: {
+      schoolId: string;
       topicId: string;
       title?: string;
       description?: string;
       scheduledFor?: string;
+      status?: string;
       classIds?: string[];
     }): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
       return apiFetch<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>("/lessons", {
