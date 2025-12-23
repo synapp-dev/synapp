@@ -1,0 +1,62 @@
+/**
+ * Teachers API route handler.
+ *
+ * Exposes HTTP GET endpoint for teacher metrics.
+ *
+ * Authentication:
+ * - Requires a valid user derived from the request (401 if missing).
+ * - Requires PLATFORM_ADMIN role for scope=all, otherwise filters by user's schools.
+ *
+ * Query parameters:
+ * - scope: 'all' | 'school' (default: 'school')
+ *   - 'all': Returns count of all teachers (requires PLATFORM_ADMIN)
+ *   - 'school': Returns count of teachers in user's schools
+ *
+ * Responses:
+ * - 200 OK: Returns metric data with current and previous month values.
+ * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 403 Forbidden: `{ error: string }` when user lacks required permissions.
+ * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ */
+import { NextResponse } from "next/server";
+import { metricsService } from "@/server/metrics/metrics.service";
+import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+
+/**
+ * Handle GET /api/teachers
+ *
+ * Returns teacher count metrics for the authenticated user.
+ *
+ * @param request The incoming HTTP request.
+ * @returns A JSON `NextResponse` with metric data or an error payload.
+ */
+export async function GET(request: Request) {
+  try {
+    const userId = await getUserIdFromRequest(request);
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const scope = searchParams.get("scope") || "school";
+
+    const result = await metricsService.getTeacherCount(
+      { userId },
+      { scope: scope === "all" ? "all" : "school" }
+    );
+
+    return NextResponse.json(result, { status: 200 });
+  } catch (e: any) {
+    console.error("[TEACHERS METRIC] Error:", e);
+    const status =
+      e.message?.includes("Unauthorized") ||
+      e.message?.includes("PLATFORM_ADMIN")
+        ? 403
+        : 500;
+    return NextResponse.json(
+      { error: e.message ?? "Internal error" },
+      { status }
+    );
+  }
+}
