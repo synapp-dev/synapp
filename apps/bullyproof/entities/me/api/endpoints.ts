@@ -23,6 +23,13 @@ export type UserWithRolesAndSchools = {
   }>;
 };
 
+export type TutorialProgress = {
+  [key: string]: {
+    completed: boolean;
+    completedAt?: string;
+  };
+};
+
 export const meApi = {
   get: {
     currentUser(): Promise<ApiResult<UserProfile | null>> {
@@ -40,11 +47,15 @@ export const meApi = {
       limit?: number;
       offset?: number;
       search?: string;
+      role?: string;
+      schoolId?: string;
     }): Promise<ApiResult<UserWithRolesAndSchools[]>> {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
       if (params?.search) searchParams.set("search", params.search);
+      if (params?.role) searchParams.set("role", params.role);
+      if (params?.schoolId) searchParams.set("schoolId", params.schoolId);
 
       const query = searchParams.toString();
       return apiFetch<UserWithRolesAndSchools[]>(
@@ -62,6 +73,19 @@ export const meApi = {
       return apiFetch<UserProfile | null>("/me", {
         method: "PUT",
         body: JSON.stringify(payload),
+      });
+    },
+  },
+  tutorials: {
+    get(): Promise<ApiResult<{ tutorials: TutorialProgress }>> {
+      return apiFetch<{ tutorials: TutorialProgress }>("/me/tutorials");
+    },
+    complete(
+      tutorialKey: string
+    ): Promise<ApiResult<{ tutorials: TutorialProgress }>> {
+      return apiFetch<{ tutorials: TutorialProgress }>("/me/tutorials", {
+        method: "PATCH",
+        body: JSON.stringify({ tutorialKey, completed: true }),
       });
     },
   },
