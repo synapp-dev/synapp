@@ -44,6 +44,13 @@ export const certificationApi = {
         `/certification/stages/by-code/${encodeURIComponent(code)}`
       );
     },
+    progress: {
+      byCode(code: string): Promise<ApiResult<{ progress: any[] }>> {
+        return apiFetch<{ progress: any[] }>(
+          `/certification/stages/by-code/${encodeURIComponent(code)}/progress`
+        );
+      },
+    },
   },
   topics: {
     byId(id: string): Promise<ApiResult<Topic>> {
@@ -156,6 +163,65 @@ export const certificationApi = {
           `/certification-slides/${encodeURIComponent(slideId)}/url`
         );
       },
+      markViewed(topicId: string, slideId: string): Promise<ApiResult<{ success: boolean }>> {
+        return apiFetch<{ success: boolean }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/slides/${encodeURIComponent(slideId)}/view`,
+          {
+            method: "POST",
+          }
+        );
+      },
+    },
+    progress: {
+      get(topicId: string): Promise<ApiResult<{ attempt: any }>> {
+        return apiFetch<{ attempt: any }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/progress`
+        );
+      },
+      create(
+        topicId: string,
+        payload: { currentSlideId?: string }
+      ): Promise<ApiResult<{ attempt: any }>> {
+        return apiFetch<{ attempt: any }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/progress`,
+          {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }
+        );
+      },
+      update(
+        topicId: string,
+        payload: {
+          currentSlideId?: string;
+          status?: "started" | "in_progress" | "completed" | "passed" | "failed";
+          scorePercentage?: number;
+        }
+      ): Promise<ApiResult<{ attempt: any }>> {
+        return apiFetch<{ attempt: any }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/progress`,
+          {
+            method: "PATCH",
+            body: JSON.stringify(payload),
+          }
+        );
+      },
+    },
+  },
+  answers: {
+    create(payload: {
+      stageId: string;
+      topicId: string;
+      slideId: string;
+      attemptId?: string;
+      answerId?: string;
+      isCorrect: boolean;
+      timeTaken?: number;
+    }): Promise<ApiResult<{ answer: any }>> {
+      return apiFetch<{ answer: any }>(`/certification/answers`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
     },
   },
 };
