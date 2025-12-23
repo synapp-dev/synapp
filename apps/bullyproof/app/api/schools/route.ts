@@ -22,6 +22,7 @@
  */
 import { NextResponse } from "next/server";
 import { schoolService } from "@/server/school/school.service";
+import { metricsService } from "@/server/metrics/metrics.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
@@ -31,26 +32,48 @@ import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
  * delegates to `schoolService.listSchools` to fetch visible schools for the
  * current user.
  *
+ * Query parameters:
+ * - metric: 'count' - Returns count metric instead of list of schools
+ * - scope: 'all' | 'school' (only used with metric=count)
+ *   - 'all': Returns count of all schools (requires PLATFORM_ADMIN)
+ *   - 'school': Returns count of user's schools
+ *
  * @param request The incoming HTTP request.
- * @returns A JSON `NextResponse` with the list of schools or an error payload.
+ * @returns A JSON `NextResponse` with the list of schools or metric data or an error payload.
  */
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = Object.fromEntries(searchParams.entries());
     const userId = await getUserIdFromRequest(request);
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check if this is a metric request
+    const metric = searchParams.get("metric");
+    if (metric === "count") {
+      const scope = searchParams.get("scope") || "school";
+      const result = await metricsService.getSchoolCount(
+        { userId },
+        { scope: scope === "all" ? "all" : "school" }
+      );
+      return NextResponse.json(result, { status: 200 });
+    }
+
+    // Otherwise, return list of schools (existing behavior)
+    const query = Object.fromEntries(searchParams.entries());
     const rows = await schoolService.listSchools({ userId }, query);
     return NextResponse.json(rows, { status: 200 });
   } catch (e: any) {
     console.error(e);
+    const status =
+      e.message?.includes("Unauthorized") || e.message?.includes("PLATFORM_ADMIN")
+        ? 403
+        : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
-      { status: 500 }
+      { status }
     );
   }
 }
