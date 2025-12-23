@@ -1,16 +1,17 @@
 import { db } from "@/server/db/drizzle";
-import { classes, classYears, schoolYears, schoolLevels } from "@/server/db/schema";
+import {
+  classes,
+  classYears,
+  schoolYears,
+  schoolLevels,
+} from "@/server/db/schema";
 import { eq, and, inArray, desc, asc } from "drizzle-orm";
 
 export const classesRepo = {
   getAll: () => db.select().from(classes),
 
   getById: (id: string) =>
-    db
-      .select()
-      .from(classes)
-      .where(eq(classes.id, id))
-      .limit(1),
+    db.select().from(classes).where(eq(classes.id, id)).limit(1),
 
   getBySchoolId: (schoolId: string) =>
     db
@@ -56,43 +57,39 @@ export const classesRepo = {
     room?: string;
     studentCap?: number;
     active?: boolean;
-    startYear?: string;
   }) =>
     db
       .insert(classes)
       .values({
-        ...data,
+        schoolId: data.schoolId,
+        name: data.name,
+        code: data.code,
+        stream: data.stream,
+        room: data.room,
+        studentCap: data.studentCap,
         active: data.active ?? true,
-        startYear: data.startYear ? new Date(data.startYear) : undefined,
       })
       .returning(),
 
-  update: (id: string, data: {
-    name?: string;
-    code?: string;
-    stream?: string;
-    room?: string;
-    studentCap?: number;
-    active?: boolean;
-  }) =>
-    db
-      .update(classes)
-      .set(data)
-      .where(eq(classes.id, id))
-      .returning(),
+  update: (
+    id: string,
+    data: {
+      name?: string;
+      code?: string;
+      stream?: string;
+      room?: string;
+      studentCap?: number;
+      active?: boolean;
+    }
+  ) => db.update(classes).set(data).where(eq(classes.id, id)).returning(),
 
-  delete: (id: string) =>
-    db
-      .delete(classes)
-      .where(eq(classes.id, id)),
+  delete: (id: string) => db.delete(classes).where(eq(classes.id, id)),
 
   assignYears: (classId: string, yearIds: string[]) =>
     db
       .insert(classYears)
-      .values(yearIds.map(yearId => ({ classId, schoolYearId: yearId }))),
+      .values(yearIds.map((yearId) => ({ classId, schoolYearId: yearId }))),
 
   removeYears: (classId: string) =>
-    db
-      .delete(classYears)
-      .where(eq(classYears.classId, classId)),
+    db.delete(classYears).where(eq(classYears.classId, classId)),
 };

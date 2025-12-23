@@ -76,13 +76,17 @@ export const lessonsRepo = {
     title?: string;
     description?: string;
     scheduledFor?: string;
+    status?: string;
     classIds?: string[];
   }) =>
     db.transaction(async (tx) => {
       const { classIds, ...lessonData } = data;
       const newLesson = await tx
         .insert(lessons)
-        .values(lessonData)
+        .values({
+          ...lessonData,
+          status: lessonData.status || 'draft', // Default to 'draft' if not provided
+        })
         .returning();
 
       if (classIds && classIds.length > 0) {

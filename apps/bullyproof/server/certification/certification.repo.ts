@@ -38,7 +38,8 @@ export const certificationRepo = {
       .from(sql`certification_topics`)
       .where(sql`stage_id = ${stageId}`);
 
-    const topicCount = Number(topicCountResult[0]?.count ?? 0);
+    const firstResult = topicCountResult?.[0] as { count: number } | undefined;
+    const topicCount = firstResult ? Number(firstResult.count ?? 0) : 0;
 
     return {
       ...stage[0],
@@ -61,7 +62,8 @@ export const certificationRepo = {
       .from(sql`certification_topics`)
       .where(sql`stage_id = ${stage[0].id}`);
 
-    const topicCount = Number(topicCountResult[0]?.count ?? 0);
+    const firstResult = topicCountResult?.[0] as { count: number } | undefined;
+    const topicCount = firstResult ? Number(firstResult.count ?? 0) : 0;
 
     return {
       ...stage[0],
