@@ -17,7 +17,7 @@ import {
 import { AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { clearAllUserData } from "@/utils/clear-user-data";
 import Image from "next/image";
@@ -60,7 +60,7 @@ const cyclingTexts = [
   },
 ];
 
-export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
+function AuthFormContent({ className, ...props }: React.ComponentProps<"div">) {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -815,5 +815,26 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
       </Card>
       <AuthFooter />
     </div>
+  );
+}
+
+export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <Suspense
+      fallback={
+        <div className={cn("flex flex-col gap-6 transition-all duration-300", className)}>
+          <Card className="overflow-hidden p-0 transition-all duration-300 border-[#00878e]/50">
+            <CardContent className="grid p-0 md:grid-cols-2 min-h-[28rem]">
+              <div className="flex items-center justify-center min-h-[28rem]">
+                <Loader className="animate-spin size-4" />
+              </div>
+            </CardContent>
+          </Card>
+          <AuthFooter />
+        </div>
+      }
+    >
+      <AuthFormContent className={className} {...props} />
+    </Suspense>
   );
 }
