@@ -52,9 +52,13 @@ import { schoolApi } from "@/entities/school/api/endpoints";
 
 interface SchoolsDataTableProps {
   onSchoolClick: (school: School) => void;
+  refreshTrigger?: number | string; // When this changes, the table will refetch data
 }
 
-export function SchoolsDataTable({ onSchoolClick }: SchoolsDataTableProps) {
+export function SchoolsDataTable({
+  onSchoolClick,
+  refreshTrigger,
+}: SchoolsDataTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -126,6 +130,7 @@ export function SchoolsDataTable({ onSchoolClick }: SchoolsDataTableProps) {
               classCount,
               schoolAdminCount,
               schoolLicenceCount,
+              activeLicence: school.activeLicence ?? false,
               status,
               slug: school.slug || null,
               levels: school.levels || null,
@@ -153,7 +158,7 @@ export function SchoolsDataTable({ onSchoolClick }: SchoolsDataTableProps) {
     };
 
     fetchSchools();
-  }, []);
+  }, [refreshTrigger]);
 
   // Filter schools based on filter states
   const filteredSchools = React.useMemo(() => {

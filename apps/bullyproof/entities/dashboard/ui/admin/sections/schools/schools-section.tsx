@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SchoolsDataTable } from "./components/schools-data-table";
 import { SchoolDetailDrawer } from "./components/school-detail-drawer";
@@ -8,15 +8,16 @@ import { AddSchoolWizard } from "./components/add-school-wizard";
 import { type School } from "./components/schools-table-columns";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Button } from "@workspace/ui/components/button";
-import { Plus } from "lucide-react";
+import { Plus, Loader2 } from "lucide-react";
 
-export function SchoolsSection() {
+function SchoolsSectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [schools, setSchools] = useState<School[]>([]);
+  const [tableRefreshTrigger, setTableRefreshTrigger] = useState(0);
   const isClosingRef = useRef(false);
   const isWizardClosingRef = useRef(false);
 
@@ -193,6 +194,90 @@ export function SchoolsSection() {
     }
   };
 
+  const handleSchoolCreated = async (school: { slug: string | null }) => {
+    if (!school.slug) {
+      console.error("School created but no slug available");
+      return;
+    }
+
+    // Set flag to prevent useEffect from interfering
+    isWizardClosingRef.current = true;
+
+    // Close wizard immediately
+    setIsWizardOpen(false);
+
+    // Refresh schools list
+    try {
+      const result = await schoolApi.get.listSchools({
+        limit: 100,
+        offset: 0,
+      });
+      if (result.data) {
+        const mappedSchools: School[] = result.data.map((school: any) => {
+          const teacherCount = school.teacherCount ?? 0;
+          const classCount = school.classCount ?? 0;
+          const schoolAdminCount = school.schoolAdminCount ?? 0;
+          const schoolLicenceCount = school.schoolLicenceCount ?? 0;
+          const activeLicence =
+            school.activeLicence ?? school.active_licence ?? false;
+
+          // Status: onboarding if any count < 1, active if all counts >= 1
+          const status: "onboarding" | "active" =
+            teacherCount < 1 ||
+            classCount < 1 ||
+            schoolAdminCount < 1 ||
+            schoolLicenceCount < 1
+              ? "onboarding"
+              : "active";
+
+          return {
+            id: school.id || "",
+            name: school.name || "",
+            state: school.state || null,
+            sector: school.sector || null,
+            teacherCount,
+            classCount,
+            schoolAdminCount,
+            schoolLicenceCount,
+            activeLicence,
+            status,
+            slug: school.slug || null,
+            levels: school.levels || null,
+          };
+        });
+        setSchools(mappedSchools);
+
+        // Trigger data table refresh
+        setTableRefreshTrigger((prev) => prev + 1);
+
+        // Update URL with the new school's slug (remove modal param, add school param)
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.delete("modal");
+        params.set("school", school.slug);
+        router.replace(`/admin/schools?${params.toString()}`, {
+          scroll: false,
+        });
+
+        // Reset flag after a brief delay to allow URL update to complete
+        setTimeout(() => {
+          isWizardClosingRef.current = false;
+        }, 100);
+      }
+    } catch (err) {
+      console.error("Failed to refresh schools:", err);
+      // Still update URL even if refresh fails
+      // Trigger data table refresh even on error
+      setTableRefreshTrigger((prev) => prev + 1);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.delete("modal");
+      params.set("school", school.slug);
+      router.replace(`/admin/schools?${params.toString()}`, { scroll: false });
+      setTimeout(() => {
+        isWizardClosingRef.current = false;
+      }, 100);
+    }
+  };
+
   const handleTabChange = (
     tab:
       | "onboarding"
@@ -223,7 +308,10 @@ export function SchoolsSection() {
       </div>
 
       {/* Data Table */}
-      <SchoolsDataTable onSchoolClick={handleSchoolClick} />
+      <SchoolsDataTable
+        onSchoolClick={handleSchoolClick}
+        refreshTrigger={tableRefreshTrigger}
+      />
 
       {/* Detail Drawer */}
       <SchoolDetailDrawer
@@ -310,7 +398,25 @@ export function SchoolsSection() {
       />
 
       {/* Add School Wizard */}
-      <AddSchoolWizard open={isWizardOpen} onOpenChange={handleWizardClose} />
+      <AddSchoolWizard
+        open={isWizardOpen}
+        onOpenChange={handleWizardClose}
+        onSchoolCreated={handleSchoolCreated}
+      />
     </div>
+  );
+}
+
+export function SchoolsSection() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      }
+    >
+      <SchoolsSectionContent />
+    </Suspense>
   );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sheet,
@@ -167,7 +167,7 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
     : "—";
 }
 
-export function SchoolDetailDrawer({
+function SchoolDetailDrawerContent({
   school,
   open,
   onOpenChange,
@@ -443,6 +443,20 @@ export function SchoolDetailDrawer({
         setTeacherLastName("");
       }
     }
+
+    if (open && school && activeSection === "classes") {
+      const dialogParam = searchParams?.get("dialog");
+      if (dialogParam === "add-class" && !addClassDialogOpen) {
+        setAddClassDialogOpen(true);
+      } else if (dialogParam !== "add-class" && addClassDialogOpen) {
+        // Close dialog when param is removed
+        setAddClassDialogOpen(false);
+        setClassName("");
+        setClassCode("");
+        setClassRunningYear("");
+        setSelectedYearIds([]);
+      }
+    }
   }, [
     open,
     school,
@@ -451,6 +465,7 @@ export function SchoolDetailDrawer({
     addLicenceDialogOpen,
     addAdminDialogOpen,
     addTeacherDialogOpen,
+    addClassDialogOpen,
   ]);
 
   // Fetch existing school licence email when dialog opens
@@ -757,6 +772,25 @@ export function SchoolDetailDrawer({
                                     params.set("school", school.slug);
                                     params.set("tab", "users");
                                     params.set("dialog", "add-teacher");
+                                    router.push(
+                                      `/admin/schools?${params.toString()}`,
+                                      {
+                                        scroll: false,
+                                      }
+                                    );
+                                  }
+                                }
+
+                                // If this is the "Add Classes" step, navigate to classes tab with dialog
+                                if (item.id === "add-classes") {
+                                  handleTabChange("classes");
+                                  if (school?.slug) {
+                                    const params = new URLSearchParams(
+                                      searchParams?.toString() || ""
+                                    );
+                                    params.set("school", school.slug);
+                                    params.set("tab", "classes");
+                                    params.set("dialog", "add-class");
                                     router.push(
                                       `/admin/schools?${params.toString()}`,
                                       {
@@ -1220,7 +1254,23 @@ export function SchoolDetailDrawer({
                     <h3 className="text-lg font-semibold">Classes</h3>
                   </div>
                   <div className="flex justify-end">
-                    <Button onClick={() => setAddClassDialogOpen(true)}>
+                    <Button
+                      onClick={() => {
+                        setAddClassDialogOpen(true);
+                        // Add dialog query parameter to URL
+                        if (school?.slug) {
+                          const params = new URLSearchParams(
+                            searchParams?.toString() || ""
+                          );
+                          params.set("school", school.slug);
+                          params.set("tab", "classes");
+                          params.set("dialog", "add-class");
+                          router.push(`/admin/schools?${params.toString()}`, {
+                            scroll: false,
+                          });
+                        }
+                      }}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Add Class
                     </Button>
@@ -1908,6 +1958,9 @@ export function SchoolDetailDrawer({
                       }
                     }
 
+                    // Refresh school data to update counts
+                    onSchoolUpdate?.();
+
                     // Wait 2 seconds, then remove dialog param from URL (which will close dialog)
                     setTimeout(() => {
                       // Set flag to prevent effect from interfering
@@ -2094,6 +2147,9 @@ export function SchoolDetailDrawer({
                       }
                     }
 
+                    // Refresh school data to update counts
+                    onSchoolUpdate?.();
+
                     // Wait 2 seconds, then remove dialog param from URL (which will close dialog)
                     setTimeout(() => {
                       // Set flag to prevent effect from interfering
@@ -2147,7 +2203,37 @@ export function SchoolDetailDrawer({
       </Dialog>
 
       {/* Add Class Dialog */}
-      <Dialog open={addClassDialogOpen} onOpenChange={setAddClassDialogOpen}>
+      <Dialog
+        open={addClassDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Set flag to prevent effect from interfering
+            isClosingDialogRef.current = true;
+
+            // Close dialog immediately
+            setAddClassDialogOpen(false);
+            setClassName("");
+            setClassCode("");
+            setClassRunningYear("");
+            setSelectedYearIds([]);
+
+            // Remove dialog query parameter from URL
+            const params = new URLSearchParams(searchParams?.toString() || "");
+            params.delete("dialog");
+            const newUrl = params.toString()
+              ? `/admin/schools?${params.toString()}`
+              : "/admin/schools";
+            router.replace(newUrl, { scroll: false });
+
+            // Reset flag after a brief delay to allow URL update to complete
+            setTimeout(() => {
+              isClosingDialogRef.current = false;
+            }, 100);
+          } else {
+            setAddClassDialogOpen(open);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Add Class</DialogTitle>
@@ -2311,11 +2397,30 @@ export function SchoolDetailDrawer({
             <Button
               variant="outline"
               onClick={() => {
+                // Set flag to prevent effect from interfering
+                isClosingDialogRef.current = true;
+
+                // Close dialog immediately
                 setAddClassDialogOpen(false);
                 setClassName("");
                 setClassCode("");
                 setClassRunningYear("");
                 setSelectedYearIds([]);
+
+                // Remove dialog query parameter from URL
+                const params = new URLSearchParams(
+                  searchParams?.toString() || ""
+                );
+                params.delete("dialog");
+                const newUrl = params.toString()
+                  ? `/admin/schools?${params.toString()}`
+                  : "/admin/schools";
+                router.replace(newUrl, { scroll: false });
+
+                // Reset flag after a brief delay to allow URL update to complete
+                setTimeout(() => {
+                  isClosingDialogRef.current = false;
+                }, 100);
               }}
             >
               Cancel
@@ -2343,11 +2448,26 @@ export function SchoolDetailDrawer({
                   if (result.error) {
                     console.error("Failed to create class:", result.error);
                   } else {
+                    // Set flag to prevent effect from interfering
+                    isClosingDialogRef.current = true;
+
+                    // Close dialog immediately
                     setAddClassDialogOpen(false);
                     setClassName("");
                     setClassCode("");
                     setClassRunningYear("");
                     setSelectedYearIds([]);
+
+                    // Remove dialog query parameter from URL
+                    const params = new URLSearchParams(
+                      searchParams?.toString() || ""
+                    );
+                    params.delete("dialog");
+                    const newUrl = params.toString()
+                      ? `/admin/schools?${params.toString()}`
+                      : "/admin/schools";
+                    router.replace(newUrl, { scroll: false });
+
                     // Refresh classes list
                     if (activeSection === "classes") {
                       setLoadingClasses(true);
@@ -2366,6 +2486,11 @@ export function SchoolDetailDrawer({
                         });
                     }
                     onSchoolUpdate?.();
+
+                    // Reset flag after a brief delay to allow URL update to complete
+                    setTimeout(() => {
+                      isClosingDialogRef.current = false;
+                    }, 100);
                   }
                 } catch (error) {
                   console.error("Failed to create class:", error);
@@ -2381,5 +2506,26 @@ export function SchoolDetailDrawer({
         </DialogContent>
       </Dialog>
     </Sheet>
+  );
+}
+
+export function SchoolDetailDrawer(props: SchoolDetailDrawerProps) {
+  return (
+    <Suspense
+      fallback={
+        <Sheet open={props.open} onOpenChange={props.onOpenChange}>
+          <SheetContent
+            side="bottom"
+            className="h-[95vh] w-full max-w-4xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-hidden flex flex-col"
+          >
+            <div className="flex items-center justify-center min-h-[400px]">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          </SheetContent>
+        </Sheet>
+      }
+    >
+      <SchoolDetailDrawerContent {...props} />
+    </Suspense>
   );
 }

@@ -30,6 +30,7 @@ import { Separator } from "@workspace/ui/components/separator";
 interface AddSchoolWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSchoolCreated?: (school: { slug: string | null }) => void;
 }
 
 type State = {
@@ -57,7 +58,11 @@ interface SchoolFormData {
   levelSelection: string; // "primary", "secondary", or "p12"
 }
 
-export function AddSchoolWizard({ open, onOpenChange }: AddSchoolWizardProps) {
+export function AddSchoolWizard({
+  open,
+  onOpenChange,
+  onSchoolCreated,
+}: AddSchoolWizardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [states, setStates] = useState<State[]>([]);
@@ -207,10 +212,20 @@ export function AddSchoolWizard({ open, onOpenChange }: AddSchoolWizardProps) {
         return;
       }
 
-      // Success - close sheet and refresh
+      // Success - get the created school data
+      const createdSchool = result.data;
+      if (!createdSchool) {
+        setError("School was created but no data was returned");
+        return;
+      }
+
+      // Close the wizard
       onOpenChange(false);
-      // Trigger a page refresh or update the schools list
-      window.location.reload();
+
+      // Call the callback with the created school's slug
+      if (onSchoolCreated) {
+        onSchoolCreated({ slug: createdSchool.slug || null });
+      }
     } catch (err: any) {
       setError(err.message || "Failed to create school. Please try again.");
     } finally {
