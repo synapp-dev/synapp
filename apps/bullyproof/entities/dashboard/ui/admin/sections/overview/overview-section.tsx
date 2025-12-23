@@ -1,6 +1,4 @@
-import { SnapshotCard } from "@/entities/dashboard/ui/admin/cards/hero-card";
-
-import dummyData from "@/entities/dashboard/ui/admin/dummy-data/snapshot-card-dummy-data.json";
+import { SnapshotCardWithData } from "@/entities/dashboard/ui/admin/cards/snapshot-card-with-data";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import {
   Card,
@@ -14,23 +12,34 @@ import Link from "next/link";
 import { Book, FileText, Newspaper, Shield, Users, Zap } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import Image from "next/image";
+import { cn } from "@workspace/ui/lib/utils";
 
 function QuickActionsCard({
   title,
   icon,
   link,
+  disabled,
 }: {
   title: string;
   icon: React.ReactNode;
   link: string;
+  disabled?: boolean;
 }) {
   const words = title.split(" ");
   const firstWord = words[0] || "";
   const secondWord = words.slice(1).join(" ");
 
   return (
-    <Card className="hover:shadow-md transition-shadow cursor-pointer p-0 flex-1 flex">
-      <Link href={link} className="w-full h-full flex items-center gap-1 p-2">
+    <Card
+      className={cn(
+        "hover:shadow-md transition-shadow cursor-pointer p-0 flex-1 flex",
+        disabled ? "opacity-50 cursor-not-allowed pointer-events-none" : ""
+      )}
+    >
+      <Link
+        href={disabled ? "#" : link}
+        className="w-full h-full flex items-center gap-1 p-2"
+      >
         <div className="p-1 rounded flex-shrink-0">{icon}</div>
         <span className="text-sm">
           <span className="font-light">{firstWord}</span>
@@ -47,7 +56,6 @@ function QuickActionsCard({
 }
 
 export function OverviewSection() {
-  const { metrics } = dummyData;
   return (
     <div className="space-y-6 grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
       <div className="col-span-1 flex gap-4 h-full items-center">
@@ -56,24 +64,25 @@ export function OverviewSection() {
             <QuickActionsCard
               title="Invite School"
               icon={<Users className="w-4 h-4" />}
-              link="/admin/invite-school"
+              link="/admin/schools?modal=add-new-school"
             />
             <QuickActionsCard
               title="Edit Curriculum"
               icon={<Book className="w-4 h-4" />}
-              link="/admin/edit-curriculum"
+              link="/admin/content/curriculum"
             />
             <QuickActionsCard
               title="Edit Certification"
               icon={<Shield className="w-4 h-4" />}
-              link="/admin/edit-certification"
+              link="/admin/content/certification"
             />
             <QuickActionsCard
               title="Manage Users"
               icon={<Users className="w-4 h-4" />}
-              link="/admin/manage-users"
+              link="/admin/users"
             />
             <QuickActionsCard
+              disabled
               title="Generate Reports"
               icon={<FileText className="w-4 h-4" />}
               link="/admin/generate-reports"
@@ -124,83 +133,44 @@ export function OverviewSection() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
         {/* Total Schools Card */}
         <StaggeredAnimation index={0}>
-          <SnapshotCard
-            title={metrics.totalSchools.title}
-            icon={metrics.totalSchools.icon}
-            value={
-              metrics.totalSchools.value as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            previousValue={
-              metrics.totalSchools.previousValue as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            subtitle={metrics.totalSchools.subtitle}
+          <SnapshotCardWithData
+            link="/admin/schools"
+            metricKey="schools"
+            title="Total Schools"
+            icon="School"
+            subtitle="Schools actively using platform"
+            scope="all"
           />
         </StaggeredAnimation>
 
         {/* Active Teachers Card */}
         <StaggeredAnimation index={1}>
-          <SnapshotCard
-            title={metrics.activeTeachers.title}
-            icon={metrics.activeTeachers.icon}
-            value={
-              metrics.activeTeachers.value as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            previousValue={
-              metrics.activeTeachers.previousValue as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            subtitle={metrics.activeTeachers.subtitle}
+          <SnapshotCardWithData
+            metricKey="teachers"
+            title="Active Teachers"
+            icon="Users"
+            subtitle="Teachers engaged this term"
+            scope="all"
           />
         </StaggeredAnimation>
         {/* Engagement Rate Card */}
         <StaggeredAnimation index={2}>
-          <SnapshotCard
-            title={metrics.engagementRate.title}
-            icon={metrics.engagementRate.icon}
-            value={
-              metrics.engagementRate.value as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            previousValue={
-              metrics.engagementRate.previousValue as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            subtitle={metrics.engagementRate.subtitle}
+          <SnapshotCardWithData
+            metricKey="lessons/engagement-rate"
+            title="Engagement Rate"
+            icon="Activity"
+            subtitle="Teachers active in last 30 days"
+            scope="all"
           />
         </StaggeredAnimation>
         {/* Completed Lessons Card */}
         <StaggeredAnimation index={3}>
-          <SnapshotCard
-            title={metrics.completedLessons.title}
-            icon={metrics.completedLessons.icon}
-            value={
-              metrics.completedLessons.value as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            previousValue={
-              metrics.completedLessons.previousValue as {
-                amount: number;
-                type: "number" | "percentage";
-              }
-            }
-            subtitle={metrics.completedLessons.subtitle}
+          <SnapshotCardWithData
+            metricKey="lessons/completed"
+            title="Completed Lessons"
+            icon="BookOpen"
+            subtitle="Lessons completed this term"
+            scope="all"
           />
         </StaggeredAnimation>
       </div>
