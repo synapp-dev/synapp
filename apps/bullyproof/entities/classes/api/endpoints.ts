@@ -2,6 +2,7 @@ import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type { classes } from "@/server/db/schema";
 
 type Class = typeof classes.$inferSelect;
+type ClassWithYearCodes = Class & { yearCodes?: string[] };
 
 export const classesApi = {
   get: {
@@ -11,7 +12,7 @@ export const classesApi = {
       offset?: number;
       search?: string;
       active?: boolean;
-    }): Promise<ApiResult<Class[]>> {
+    }): Promise<ApiResult<ClassWithYearCodes[]>> {
       const searchParams = new URLSearchParams();
       if (params?.schoolId) searchParams.set("schoolId", params.schoolId);
       if (params?.limit) searchParams.set("limit", params.limit.toString());
@@ -20,7 +21,7 @@ export const classesApi = {
       if (params?.active !== undefined) searchParams.set("active", params.active.toString());
 
       const query = searchParams.toString();
-      return apiFetch<Class[]>(`/classes${query ? `?${query}` : ""}`);
+      return apiFetch<ClassWithYearCodes[]>(`/classes${query ? `?${query}` : ""}`);
     },
     byId(id: string): Promise<ApiResult<Class & { years?: any[] }>> {
       return apiFetch<Class & { years?: any[] }>(`/classes/${encodeURIComponent(id)}`);

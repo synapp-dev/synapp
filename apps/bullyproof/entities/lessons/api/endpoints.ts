@@ -9,6 +9,7 @@ export const lessonsApi = {
       teacherId?: string;
       classId?: string;
       topicId?: string;
+      status?: string;
       limit?: number;
       offset?: number;
       search?: string;
@@ -17,6 +18,7 @@ export const lessonsApi = {
       if (params?.teacherId) searchParams.set("teacherId", params.teacherId);
       if (params?.classId) searchParams.set("classId", params.classId);
       if (params?.topicId) searchParams.set("topicId", params.topicId);
+      if (params?.status) searchParams.set("status", params.status);
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
       if (params?.search) searchParams.set("search", params.search);

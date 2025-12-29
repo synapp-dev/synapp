@@ -163,4 +163,13 @@ export const topicsApi = {
         }));
     },
   },
+  reorder(payload: {
+    stageId: string;
+    topicIds: string[];
+  }): Promise<ApiResult<{ success: boolean }>> {
+    return apiFetch<{ success: boolean }>("/topics/reorder", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
 };

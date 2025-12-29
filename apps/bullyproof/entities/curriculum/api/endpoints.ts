@@ -1,5 +1,9 @@
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { curriculumStages, schoolYears, schoolLevels } from "@/server/db/schema";
+import type {
+  curriculumStages,
+  schoolYears,
+  schoolLevels,
+} from "@/server/db/schema";
 
 type Stage = typeof curriculumStages.$inferSelect;
 type Year = typeof schoolYears.$inferSelect;
@@ -19,10 +23,41 @@ export const curriculumApi = {
       return apiFetch<Stage[]>(`/curriculum/stages${query ? `?${query}` : ""}`);
     },
     byId(id: string): Promise<ApiResult<Stage & { years?: any[] }>> {
-      return apiFetch<Stage & { years?: any[] }>(`/curriculum/stages/${encodeURIComponent(id)}`);
+      return apiFetch<Stage & { years?: any[] }>(
+        `/curriculum/stages/${encodeURIComponent(id)}`
+      );
     },
     byCode(code: string): Promise<ApiResult<Stage & { years?: any[] }>> {
-      return apiFetch<Stage & { years?: any[] }>(`/curriculum/stages/by-code/${encodeURIComponent(code)}`);
+      return apiFetch<Stage & { years?: any[] }>(
+        `/curriculum/stages/by-code/${encodeURIComponent(code)}`
+      );
+    },
+    create(data: {
+      code: string;
+      name: string;
+      minimumYearLevelIds: string[];
+    }): Promise<ApiResult<Stage>> {
+      return apiFetch<Stage>("/curriculum/stages", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    update(
+      id: string,
+      data: { name: string; minimumYearLevelIds: string[] }
+    ): Promise<ApiResult<Stage>> {
+      return apiFetch<Stage>(`/curriculum/stages/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    delete(id: string): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch<{ success: boolean }>(
+        `/curriculum/stages/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
     },
   },
   years: {
@@ -39,8 +74,12 @@ export const curriculumApi = {
       const query = searchParams.toString();
       return apiFetch<Year[]>(`/curriculum/years${query ? `?${query}` : ""}`);
     },
-    byId(id: string): Promise<ApiResult<Year & { level?: any; stages?: any[] }>> {
-      return apiFetch<Year & { level?: any; stages?: any[] }>(`/curriculum/years/${encodeURIComponent(id)}`);
+    byId(
+      id: string
+    ): Promise<ApiResult<Year & { level?: any; stages?: any[] }>> {
+      return apiFetch<Year & { level?: any; stages?: any[] }>(
+        `/curriculum/years/${encodeURIComponent(id)}`
+      );
     },
   },
   levels: {
