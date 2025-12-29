@@ -42,7 +42,11 @@ async function assertCanManageLessons(ctx: AuthContext, teacherId?: string) {
   throw new Error("Unauthorized to manage lessons");
 }
 
-async function assertCanViewLessons(ctx: AuthContext, teacherId?: string) {
+async function assertCanViewLessons(
+  ctx: AuthContext,
+  teacherId?: string,
+  schoolId?: string
+) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
@@ -59,10 +63,40 @@ async function assertCanViewLessons(ctx: AuthContext, teacherId?: string) {
     return;
   }
 
-  // School users can view lessons in their schools
-  if (roles.school.length > 0) {
+  // School admins can view lessons in their schools
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) =>
+        role.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim() &&
+        role.roleKey === "SCHOOL_ADMIN"
+    )
+  ) {
     return;
   }
+
+  // Teachers at the school can view lessons in their schools
+  if (
+    schoolId &&
+    roles.school.some(
+      (role) =>
+        role.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim() &&
+        role.roleKey === "TEACHER"
+    )
+  ) {
+    return;
+  }
+
+  // If no specific schoolId is provided, allow if user is a TEACHER at any school
+  // This allows teachers to list/view lessons from their schools
+  if (!schoolId && roles.school.some((role) => role.roleKey === "TEACHER")) {
+    return;
+  }
+
+  console.log("roles", roles);
+  console.log("teacherId", teacherId);
+  console.log("schoolId", schoolId);
+  console.log("ctx.userId", ctx.userId);
 
   throw new Error("Unauthorized to view lessons");
 }
@@ -73,15 +107,15 @@ export const lessonsService = {
     await assertCanViewLessons(ctx, params.teacherId);
 
     if (params.teacherId) {
-      return await lessonsRepo.getByTeacherId(params.teacherId);
+      return await lessonsRepo.getByTeacherId(params.teacherId, params.status);
     }
 
     if (params.classId) {
       return await lessonsRepo.getByClassId(params.classId);
     }
 
-    // For platform admins, return all lessons
-    return await lessonsRepo.getAll();
+    // For platform admins, return all lessons (optionally filtered by status)
+    return await lessonsRepo.getAll(params.status);
   },
 
   async getLessonById(ctx: AuthContext, params: unknown) {
@@ -92,7 +126,11 @@ export const lessonsService = {
       return null;
     }
 
-    await assertCanViewLessons(ctx, lessonData[0].createdByUserId);
+    await assertCanViewLessons(
+      ctx,
+      lessonData[0].createdByUserId,
+      lessonData[0].schoolId
+    );
 
     return await lessonsRepo.getWithDetails(id);
   },

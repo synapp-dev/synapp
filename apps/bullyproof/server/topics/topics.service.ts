@@ -6,6 +6,7 @@ import {
   createSlideSchema,
   updateSlideSchema,
   reorderSlidesSchema,
+  reorderTopicsSchema,
   type CreateTopicParams,
   type UpdateTopicParams,
   type ListTopicsParams,
@@ -13,6 +14,7 @@ import {
   type CreateSlideParams,
   type UpdateSlideParams,
   type ReorderSlidesParams,
+  type ReorderTopicsParams,
 } from "./topics.validators";
 import { topicsRepo } from "./topics.repo";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -268,6 +270,14 @@ export const topicsService = {
     await assertCanManageTopics(ctx);
 
     await topicsRepo.reorderSlides(data.topicId, data.slideIds);
+    return { success: true };
+  },
+
+  async reorderTopics(ctx: AuthContext, params: unknown) {
+    const data: ReorderTopicsParams = reorderTopicsSchema.parse(params);
+    await assertCanManageTopics(ctx);
+
+    await topicsRepo.reorderTopics(data.stageId, data.topicIds);
     return { success: true };
   },
 

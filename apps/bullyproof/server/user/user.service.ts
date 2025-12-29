@@ -7,6 +7,14 @@ import {
 import { userRepo } from "./user.repo";
 import { getUserScopedRoles } from "@/server/auth/rbac";
 import { createServerAdminClient } from "@/utils/supabase/admin";
+import { schoolRepo } from "@/server/school/school.repo";
+
+// Helper to check if a string is a valid UUID
+function isValidUUID(str: string): boolean {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -14,21 +22,36 @@ type AuthContext = {
   roles?: string[];
 };
 
-async function assertCanListAllUsers(ctx: AuthContext) {
+async function assertCanListAllUsers(
+  ctx: AuthContext,
+  schoolId?: string
+) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
 
   const roles = await getUserScopedRoles(ctx.userId);
 
-  // Only platform admins can list all users
-  if (
-    roles.platform.includes("PLATFORM_ADMIN") ||
-    roles.platform.includes("PLATFORM_ADMIN")
-  ) {
+  // Platform admins can list all users
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
+  // If a schoolId is provided, check if user has any role at that school
+  if (schoolId) {
+    const hasAccessToSchool = roles.school.some(
+      (role) =>
+        role.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim()
+    );
+
+    if (hasAccessToSchool) {
+      return;
+    }
+
+    throw new Error("Unauthorized to list users for this school");
+  }
+
+  // If no schoolId is provided, only platform admins can list all users
   throw new Error("Unauthorized to list all users");
 }
 
@@ -40,10 +63,7 @@ async function assertCanCreateUsers(ctx: AuthContext) {
   const roles = await getUserScopedRoles(ctx.userId);
 
   // Only platform admins can create users
-  if (
-    roles.platform.includes("PLATFORM_ADMIN") ||
-    roles.platform.includes("PLATFORM_ADMIN")
-  ) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
 
@@ -53,7 +73,20 @@ async function assertCanCreateUsers(ctx: AuthContext) {
 export const userService = {
   async listAllUsers(ctx: AuthContext, query: unknown) {
     const params: ListUsersParams = listUsersSchema.parse(query);
-    await assertCanListAllUsers(ctx);
+    
+    // Resolve schoolId if it's a slug (for permission check)
+    let resolvedSchoolId: string | undefined = params.schoolId;
+    if (params.schoolId && !isValidUUID(params.schoolId)) {
+      // It's a slug, resolve it to UUID for permission check
+      const schoolResults = await schoolRepo.getBySlug(params.schoolId);
+      if (schoolResults.length > 0) {
+        resolvedSchoolId = schoolResults[0].id;
+      } else {
+        throw new Error("School not found");
+      }
+    }
+    
+    await assertCanListAllUsers(ctx, resolvedSchoolId);
 
     return await userRepo.getAllUsersWithRolesAndSchools(params);
   },
@@ -141,3 +174,4 @@ export const userService = {
     };
   },
 };
+

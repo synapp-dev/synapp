@@ -5,12 +5,18 @@ import {
   getStageByCodeSchema,
   getYearByIdSchema,
   getLevelsSchema,
+  createStageSchema,
+  updateStageSchema,
+  deleteStageSchema,
   type GetStagesParams,
   type GetYearsParams,
   type GetStageByIdParams,
   type GetStageByCodeParams,
   type GetYearByIdParams,
   type GetLevelsParams,
+  type CreateStageParams,
+  type UpdateStageParams,
+  type DeleteStageParams,
 } from "./curriculum.validators";
 import { curriculumRepo } from "./curriculum.repo";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -28,6 +34,21 @@ async function assertCanViewCurriculum(ctx: AuthContext) {
 
   // All authenticated users can view curriculum
   return;
+}
+
+async function assertCanManageCurriculum(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const roles = await getUserScopedRoles(ctx.userId);
+
+  // Only platform admins can manage curriculum stages
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+
+  throw new Error("Unauthorized to manage curriculum stages");
 }
 
 export const curriculumService = {
@@ -59,21 +80,48 @@ export const curriculumService = {
   async getStageById(ctx: AuthContext, params: unknown) {
     const { id } = getStageByIdSchema.parse(params);
     await assertCanViewCurriculum(ctx);
-    
+
     return await curriculumRepo.getStageWithYears(id);
   },
 
   async getStageByCode(ctx: AuthContext, params: unknown) {
     const { code } = getStageByCodeSchema.parse(params);
     await assertCanViewCurriculum(ctx);
-    
+
     return await curriculumRepo.getStageByCodeWithYears(code);
   },
 
   async getYearById(ctx: AuthContext, params: unknown) {
     const { id } = getYearByIdSchema.parse(params);
     await assertCanViewCurriculum(ctx);
-    
+
     return await curriculumRepo.getYearWithStages(id);
+  },
+
+  async createStage(ctx: AuthContext, params: unknown) {
+    const data: CreateStageParams = createStageSchema.parse(params);
+    await assertCanManageCurriculum(ctx);
+
+    const newStage = await curriculumRepo.createStage(data);
+    return newStage;
+  },
+
+  async updateStage(ctx: AuthContext, params: unknown) {
+    const data: UpdateStageParams = updateStageSchema.parse(params);
+    await assertCanManageCurriculum(ctx);
+
+    const updatedStage = await curriculumRepo.updateStage(data.id, {
+      name: data.name,
+      minimumYearLevelIds: data.minimumYearLevelIds,
+    });
+    return updatedStage;
+  },
+
+  async deleteStage(ctx: AuthContext, params: unknown) {
+    const { id } = deleteStageSchema.parse(params);
+    await assertCanManageCurriculum(ctx);
+
+    await curriculumRepo.deleteStage(id);
+    return { success: true };
   },
 };
