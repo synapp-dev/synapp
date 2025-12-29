@@ -518,6 +518,7 @@ function SidebarMenuButton({
       data-size={size}
       data-active={isActive}
       className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
+      suppressHydrationWarning
       {...props}
     />
   )
@@ -534,7 +535,9 @@ function SidebarMenuButton({
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipTrigger asChild suppressHydrationWarning>
+        {button}
+      </TooltipTrigger>
       <TooltipContent
         side="right"
         align="center"
