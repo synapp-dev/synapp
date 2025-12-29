@@ -114,7 +114,7 @@ export function convertToYouTubeEmbedUrl(
 
     // Enable autoplay and other useful parameters
     embedUrl.searchParams.set("rel", "0"); // Don't show related videos
-    embedUrl.searchParams.set("modestbranding", "1"); // Less YouTube branding
+    embedUrl.searchParams.set("modestbranding", "1"); // Less YouTube branding (set to 1 for cleaner video previews)
 
     return embedUrl.toString();
   } catch {
