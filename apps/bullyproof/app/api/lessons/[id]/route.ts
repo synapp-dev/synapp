@@ -53,9 +53,13 @@ export async function GET(
     return NextResponse.json(lessonData, { status: 200 });
   } catch (e: any) {
     console.error(e);
+    const status =
+      e.message?.includes("Unauthorized") || e.message?.includes("permission")
+        ? 403
+        : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
-      { status: 500 }
+      { status }
     );
   }
 }
