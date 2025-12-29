@@ -102,6 +102,12 @@ importers:
       next-themes:
         specifier: ^0.4.4
         version: 0.4.4(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      pdf-lib:
+        specifier: ^1.17.1
+        version: 1.17.1
+      pdfjs-dist:
+        specifier: ^4.0.379
+        version: 4.10.38
       postgres:
         specifier: ^3.4.7
         version: 3.4.7
@@ -1362,6 +1368,76 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@napi-rs/canvas-android-arm64@0.1.87':
+    resolution: {integrity: sha512-uW7NxJXPvZft9fers4oBhdCsBRVe77DLQS3eXEOxndFzGKiwmjIbZpQqj4QPvrg3I0FM3UfHatz1+17P5SeCOQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [android]
+
+  '@napi-rs/canvas-darwin-arm64@0.1.87':
+    resolution: {integrity: sha512-S6YbpXwajDKLTsYftEqR+Ne1lHpeC78okI3IqctVdFexN31Taprn6mdV4CkPY/4S8eGNuReBHvXNyWbGqBZ1eQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@napi-rs/canvas-darwin-x64@0.1.87':
+    resolution: {integrity: sha512-OJLwP2WIUmRSqWTyV/NZ2TnvBzUsbNqQu6IL7oshwfxYg4BELPV279wrfQ/xZFqzr7wybfIzKaPF4du5ZdA2Cg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@napi-rs/canvas-linux-arm-gnueabihf@0.1.87':
+    resolution: {integrity: sha512-Io3tY6ogc+oyvIGK9rQlnfH4gKiS35P7W6s22x3WCrLFR0dXzZP2IBBoEFEHd6FY6FR1ky5u9cRmADaiLRdX3g==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [linux]
+
+  '@napi-rs/canvas-linux-arm64-gnu@0.1.87':
+    resolution: {integrity: sha512-Zq7h/PQzs37gaSR/gNRZOAaCC1kGt6NmDjA1PcqpONITh/rAfAwAeP98emrbBJ4FDoPkYRkxmxHlmXNLlsQIBw==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@napi-rs/canvas-linux-arm64-musl@0.1.87':
+    resolution: {integrity: sha512-CUa5YJjpsFcUxJbtfoQ4bqO/Rq+JU/2RfTNFxx07q1AjuDjCM8+MOOLCvVOV1z3qhl6nKAtjJT0pA0J8EbnK8Q==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@napi-rs/canvas-linux-riscv64-gnu@0.1.87':
+    resolution: {integrity: sha512-5KM4dBFEzFMNkJV2rheIQWpd+mRZA7VNDnxTT7nsCEf6DUjUnf6Hssq9bAwjVYTe4jqraDHbWRbF4uXLBLRFJg==}
+    engines: {node: '>= 10'}
+    cpu: [riscv64]
+    os: [linux]
+
+  '@napi-rs/canvas-linux-x64-gnu@0.1.87':
+    resolution: {integrity: sha512-zSv+ozz9elT5YhocyogX5LwVYURChO4QGD6CQIW6OnuNA0UOMDD/b4wDzlJiMphISy3EVTntlKFhe4W3EuKcxw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
+  '@napi-rs/canvas-linux-x64-musl@0.1.87':
+    resolution: {integrity: sha512-jTNmicAZQ70X+cbjZz6G6w8lmORwxRBmj/U20ECNYvcWVLshgyCKWPFL2I0Z6pkJve0vZWls6oZ15iccm1sv8w==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+
+  '@napi-rs/canvas-win32-arm64-msvc@0.1.87':
+    resolution: {integrity: sha512-p6J7UNAxKHYc7AL0glEtYuW/E0OLLUNnLti8dA2OT51p08Il4T7yZCl+iNo6f73HntFP+dgOHh2cTXUhmk8GuA==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@napi-rs/canvas-win32-x64-msvc@0.1.87':
+    resolution: {integrity: sha512-WrwfETMLBRFWkGU8fXU50gCpA2eIjR4NE9JyTKl86Kz5g6SDp0CcuqS2phYtB66TI2HDUhTPbNrk4V7Qf1FOLA==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  '@napi-rs/canvas@0.1.87':
+    resolution: {integrity: sha512-Zb5tePmPMOYBcuNW3NQaVM1sIkvIfel39euiOab/XMjC5Oc/AnPJLa/BacJcToGyIvehecS6eqcsF7i0Wqe1Sw==}
+    engines: {node: '>= 10'}
+
   '@next/env@15.5.9':
     resolution: {integrity: sha512-4GlTZ+EJM7WaW2HEZcyU317tIQDjkQIyENDLxYJfSWlfqguN+dHkZgyQTV/7ykvobU7yEH5gKvreNrH4B6QgIg==}
 
@@ -1435,6 +1511,12 @@ packages:
   '@passport-next/passport-strategy@1.1.0':
     resolution: {integrity: sha512-2KhFjtPueJG6xVj2HnqXt9BlANOfYCVLyu+pXYjPGBDT8yk+vQwc/6tsceIj+mayKcoxMau2JimggXRPHgoc8w==}
     engines: {node: '>= 6.0.0'}
+
+  '@pdf-lib/standard-fonts@1.0.0':
+    resolution: {integrity: sha512-hU30BK9IUN/su0Mn9VdlVKsWBS6GyhVfqjwl1FjZN4TxP6cCw0jP2w7V3Hf5uX7M0AZJ16vey9yE0ny7Sa59ZA==}
+
+  '@pdf-lib/upng@1.0.1':
+    resolution: {integrity: sha512-dQK2FUMQtowVP00mtIksrlZhdFXQZPC+taih1q4CvPZ5vqdxR/LKBaFg0oAfzd1GlHZXXSPdQfzQnt+ViGvEIQ==}
 
   '@radix-ui/number@1.1.1':
     resolution: {integrity: sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g==}
@@ -3965,6 +4047,9 @@ packages:
     resolution: {integrity: sha512-5NPgf87AT2STgwa2ntRMr45jTKrYBGkVU36yT0ig/n/GMAa3oPqhZfIQ2kMEimReg0+t9kZViDVZ83qfVUlckg==}
     engines: {node: '>= 14'}
 
+  pako@1.0.11:
+    resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
+
   param-case@2.1.1:
     resolution: {integrity: sha512-eQE845L6ot89sk2N8liD8HAuH4ca6Vvr7VWAWwt7+kvvG5aBcPmmphQ68JsEG2qa9n1TykS2DLeMt363AAH8/w==}
 
@@ -4009,6 +4094,13 @@ packages:
   path-type@4.0.0:
     resolution: {integrity: sha512-gDKb8aZMDeD/tZWs9P6+q0J9Mwkdl6xMV8TjnGP3qJVJ06bdMgkbBlLU8IdfOsIsFz2BW1rNVT3XuNEl8zPAvw==}
     engines: {node: '>=8'}
+
+  pdf-lib@1.17.1:
+    resolution: {integrity: sha512-V/mpyJAoTsN4cnP31vc0wfNA1+p20evqqnap0KLoRUN0Yk/p3wN52DOEsL4oBFcLdb76hlpKPtzJIgo67j/XLw==}
+
+  pdfjs-dist@4.10.38:
+    resolution: {integrity: sha512-/Y3fcFrXEAsMjJXeL9J8+ZG9U01LbuWaYypvDW2ycW1jL269L3js3DVBjDJ0Up9Np1uqDXsDrRihHANhZOlwdQ==}
+    engines: {node: '>=20'}
 
   picocolors@1.0.1:
     resolution: {integrity: sha512-anP1Z8qwhkbmu7MFP5iTt+wQKXgwzf7zTyGlcdzabySa9vd0Xt392U0rVmz9poOaBj0uHJKyyo9/upk0HrEQew==}
@@ -5220,6 +5312,54 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
 
+  '@napi-rs/canvas-android-arm64@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-darwin-arm64@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-darwin-x64@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-linux-arm-gnueabihf@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-linux-arm64-gnu@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-linux-arm64-musl@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-linux-riscv64-gnu@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-linux-x64-gnu@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-linux-x64-musl@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-win32-arm64-msvc@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas-win32-x64-msvc@0.1.87':
+    optional: true
+
+  '@napi-rs/canvas@0.1.87':
+    optionalDependencies:
+      '@napi-rs/canvas-android-arm64': 0.1.87
+      '@napi-rs/canvas-darwin-arm64': 0.1.87
+      '@napi-rs/canvas-darwin-x64': 0.1.87
+      '@napi-rs/canvas-linux-arm-gnueabihf': 0.1.87
+      '@napi-rs/canvas-linux-arm64-gnu': 0.1.87
+      '@napi-rs/canvas-linux-arm64-musl': 0.1.87
+      '@napi-rs/canvas-linux-riscv64-gnu': 0.1.87
+      '@napi-rs/canvas-linux-x64-gnu': 0.1.87
+      '@napi-rs/canvas-linux-x64-musl': 0.1.87
+      '@napi-rs/canvas-win32-arm64-msvc': 0.1.87
+      '@napi-rs/canvas-win32-x64-msvc': 0.1.87
+    optional: true
+
   '@next/env@15.5.9': {}
 
   '@next/eslint-plugin-next@15.1.7':
@@ -5270,6 +5410,14 @@ snapshots:
       - debug
 
   '@passport-next/passport-strategy@1.1.0': {}
+
+  '@pdf-lib/standard-fonts@1.0.0':
+    dependencies:
+      pako: 1.0.11
+
+  '@pdf-lib/upng@1.0.1':
+    dependencies:
+      pako: 1.0.11
 
   '@radix-ui/number@1.1.1': {}
 
@@ -8088,6 +8236,8 @@ snapshots:
       degenerator: 5.0.1
       netmask: 2.0.2
 
+  pako@1.0.11: {}
+
   param-case@2.1.1:
     dependencies:
       no-case: 2.3.2
@@ -8134,6 +8284,17 @@ snapshots:
   path-parse@1.0.7: {}
 
   path-type@4.0.0: {}
+
+  pdf-lib@1.17.1:
+    dependencies:
+      '@pdf-lib/standard-fonts': 1.0.0
+      '@pdf-lib/upng': 1.0.1
+      pako: 1.0.11
+      tslib: 1.14.1
+
+  pdfjs-dist@4.10.38:
+    optionalDependencies:
+      '@napi-rs/canvas': 0.1.87
 
   picocolors@1.0.1: {}
 
