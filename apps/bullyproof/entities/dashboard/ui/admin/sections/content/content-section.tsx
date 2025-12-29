@@ -7,6 +7,7 @@ import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import type { curriculumStages } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Loader2 } from "lucide-react";
+import { AddStageSheet } from "./add-stage-sheet";
 
 type Stage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
@@ -27,52 +28,60 @@ export function ContentSection() {
   const [stages, setStages] = useState<Stage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+
+  const fetchStages = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const result = await curriculumApi.stages.list({
+        limit: 100,
+        offset: 0,
+      });
+      if (result.data) {
+        // Fetch years for each stage
+        const stagesWithYears = await Promise.all(
+          result.data.map(async (stage) => {
+            const stageResult = await curriculumApi.stages.byId(stage.id);
+            if (stageResult.data && stageResult.data.years) {
+              return {
+                ...stage,
+                years: stageResult.data.years,
+              };
+            }
+            return stage;
+          })
+        );
+        setStages(stagesWithYears);
+      } else if (result.error) {
+        setError(result.error.message ?? "Failed to fetch curriculum stages");
+      }
+    } catch (err) {
+      console.error("Failed to fetch curriculum stages:", err);
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch curriculum stages"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchStages = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const result = await curriculumApi.stages.list({
-          limit: 100,
-          offset: 0,
-        });
-        if (result.data) {
-          // Fetch years for each stage
-          const stagesWithYears = await Promise.all(
-            result.data.map(async (stage) => {
-              const stageResult = await curriculumApi.stages.byId(stage.id);
-              if (stageResult.data && stageResult.data.years) {
-                return {
-                  ...stage,
-                  years: stageResult.data.years,
-                };
-              }
-              return stage;
-            })
-          );
-          setStages(stagesWithYears);
-        } else if (result.error) {
-          setError(result.error.message ?? "Failed to fetch curriculum stages");
-        }
-      } catch (err) {
-        console.error("Failed to fetch curriculum stages:", err);
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Failed to fetch curriculum stages"
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchStages();
   }, []);
 
   const handleStageClick = (stage: Stage) => {
     // Navigate to stage detail page using the stage code as slug
     router.push(`/admin/content/curriculum/${stage.code}`);
+  };
+
+  const handleAddNewClick = () => {
+    setIsAddSheetOpen(true);
+  };
+
+  const handleStageCreated = () => {
+    // Refresh the stages list after creating a new stage
+    fetchStages();
   };
 
   if (isLoading) {
@@ -101,30 +110,37 @@ export function ContentSection() {
     );
   }
 
-  if (stages.length === 0) {
-    return (
-      <Card>
-        <CardContent className="pt-6">
-          <div className="text-center text-muted-foreground">
-            <p className="font-medium">No curriculum stages found</p>
-            <p className="text-sm mt-2">
-              There are no curriculum stages available.
+  return (
+    <>
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            Curriculum Stages
+          </h2>
+          <p className="text-muted-foreground">
+            Manage and view curriculum stages for the platform.
+          </p>
+        </div>
+        {stages.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8">
+            <p className="font-medium mb-2">No curriculum stages found</p>
+            <p className="text-sm">
+              There are no curriculum stages available. Click "Add new stage" to
+              create one.
             </p>
           </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Curriculum Stages</h2>
-        <p className="text-muted-foreground">
-          Manage and view curriculum stages for the platform.
-        </p>
+        ) : null}
+        <StageCards
+          stages={stages}
+          onStageClick={handleStageClick}
+          onAddNewClick={handleAddNewClick}
+        />
       </div>
-      <StageCards stages={stages} onStageClick={handleStageClick} />
-    </div>
+      <AddStageSheet
+        open={isAddSheetOpen}
+        onOpenChange={setIsAddSheetOpen}
+        onStageCreated={handleStageCreated}
+      />
+    </>
   );
 }

@@ -79,6 +79,8 @@ import {
 } from "@workspace/ui/components/radio-group";
 import { uploadSlideImage } from "@/utils/supabase/upload";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
+import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
+import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -124,10 +126,6 @@ export function TopicDetailSection({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const slideGalleryRef = useRef<HTMLDivElement>(null);
   const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
-  const [showTypeChangeDialog, setShowTypeChangeDialog] = useState(false);
-  const [pendingTypeChange, setPendingTypeChange] = useState<
-    "image" | "video" | "quiz" | null
-  >(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -173,6 +171,7 @@ export function TopicDetailSection({
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [showChangesDialog, setShowChangesDialog] = useState(false);
   const [pendingSave, setPendingSave] = useState(false);
+  const [showImageSelectorDialog, setShowImageSelectorDialog] = useState(false);
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -307,28 +306,30 @@ export function TopicDetailSection({
   const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
   const setSlideUrl = useTopicSlidesCacheStore((state) => state.setSlideUrl);
 
+  // Certification cache store methods
+  const invalidateCertificationSlide = useCertificationSlidesCacheStore(
+    (state) => state.invalidateSlide
+  );
+
   // Parse topic slug (e.g., "T1" -> order 1) - only for curriculum
   const topicOrder = topicSlug?.startsWith("T")
     ? parseInt(topicSlug.substring(1), 10)
     : null;
 
-  useEffect(() => {
-    if (isCertification) {
-      // Certification flow
-      if (!topicId) return;
-    } else {
-      // Curriculum flow
-      if (!stageSlug || !topicOrder) return;
-    }
-
-    const fetchData = async () => {
+  // Extract fetchData function so it can be reused after save
+  const fetchTopicData = useCallback(
+    async (skipLoading = false) => {
       try {
-        setIsLoading(true);
+        if (!skipLoading) {
+          setIsLoading(true);
+        }
         setError(null);
 
         if (isCertification) {
           // Certification flow: fetch topic directly by ID
-          const topicResult = await certificationApi.topics.byId(topicId!);
+          if (!topicId) return;
+
+          const topicResult = await certificationApi.topics.byId(topicId);
           if (!topicResult.data) {
             setError(
               topicResult.error?.message ??
@@ -340,9 +341,8 @@ export function TopicDetailSection({
           setTopic(topicResult.data);
 
           // Fetch slides separately
-          const slidesResult = await certificationApi.topics.slides.list(
-            topicId!
-          );
+          const slidesResult =
+            await certificationApi.topics.slides.list(topicId);
           if (slidesResult.data) {
             const initialSlides: ExtendedSlideData[] = slidesResult.data
               .sort((a, b) => a.orderIndex - b.orderIndex)
@@ -363,10 +363,17 @@ export function TopicDetailSection({
             setHasUnsavedChanges(false);
             setDeletedSlideIds(new Set());
             setPendingFileUploads(new Map());
+
+            // Invalidate all slide caches to force refresh
+            initialSlides.forEach((slide) => {
+              invalidateCertificationSlide(slide.id);
+            });
           }
         } else {
           // Curriculum flow: fetch stage, then topics, then find by order
-          const stageResult = await curriculumApi.stages.byCode(stageSlug!);
+          if (!stageSlug || !topicOrder) return;
+
+          const stageResult = await curriculumApi.stages.byCode(stageSlug);
           if (!stageResult.data) {
             setError(
               stageResult.error?.message ?? "Failed to fetch curriculum stage"
@@ -414,6 +421,11 @@ export function TopicDetailSection({
             setHasUnsavedChanges(false);
             setDeletedSlideIds(new Set());
             setPendingFileUploads(new Map());
+
+            // Invalidate all slide caches to force refresh
+            initialSlides.forEach((slide) => {
+              invalidateSlide(slide.id);
+            });
           } else {
             setError(
               topicResult.error?.message ?? "Failed to fetch topic details"
@@ -426,12 +438,24 @@ export function TopicDetailSection({
           err instanceof Error ? err.message : "Failed to fetch topic details"
         );
       } finally {
-        setIsLoading(false);
+        if (!skipLoading) {
+          setIsLoading(false);
+        }
       }
-    };
+    },
+    [
+      isCertification,
+      stageSlug,
+      topicOrder,
+      topicId,
+      invalidateSlide,
+      invalidateCertificationSlide,
+    ]
+  );
 
-    fetchData();
-  }, [isCertification, stageSlug, topicOrder, topicId]);
+  useEffect(() => {
+    fetchTopicData();
+  }, [fetchTopicData]);
 
   // Use local slides instead of topic.slides
   const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
@@ -485,8 +509,44 @@ export function TopicDetailSection({
         setLocalSlides(updatedSlides);
         setHasUnsavedChanges(true);
       } else if (newType === "image" || newType === "video") {
-        setPendingTypeChange(newType as "image" | "video");
-        setShowTypeChangeDialog(true);
+        // Change type immediately in local state - no dialog needed
+        if (!currentSlide) return;
+        const updatedSlides = localSlides.map((slide) => {
+          if (slide.id !== currentSlide.id) return slide;
+
+          if (newType === "image") {
+            // Changing to image: set videoUrl to null, keep or set imageUrl
+            return {
+              ...slide,
+              kind: "image" as const,
+              imageUrl: slide.imageUrl || null,
+              videoUrl: null,
+              textHtml: null,
+              quizData: null,
+            };
+          } else {
+            // Changing to video: set imageUrl to null, keep existing videoUrl or null
+            return {
+              ...slide,
+              kind: "video" as const,
+              videoUrl: slide.videoUrl || null,
+              imageUrl: null,
+              textHtml: null,
+              quizData: null,
+            };
+          }
+        });
+        setLocalSlides(updatedSlides);
+
+        // Update URL value state to match the new type
+        if (newType === "video") {
+          setVideoUrlValue(currentSlide.videoUrl || "");
+        } else if (newType === "image") {
+          setImageUrlValue(currentSlide.imageUrl || "");
+        }
+
+        setUploadError(null);
+        setHasUnsavedChanges(true);
       } else if (newType === "text" && !isCertification) {
         // Text type for curriculum - handle directly
         if (!currentSlide) return;
@@ -507,44 +567,6 @@ export function TopicDetailSection({
     }
   };
 
-  const handleConfirmTypeChange = () => {
-    if (!currentSlide || !pendingTypeChange) return;
-
-    // Update local slide state
-    const updatedSlides = localSlides.map((slide) => {
-      if (slide.id !== currentSlide.id) return slide;
-
-      if (pendingTypeChange === "image") {
-        return {
-          ...slide,
-          kind: "image" as const,
-          imageUrl: imageUrlValue || slide.imageUrl || null,
-          videoUrl: null,
-          textHtml: null,
-        };
-      } else {
-        // video
-        const videoUrl = videoUrlValue || slide.videoUrl || null;
-        if (!videoUrl) {
-          setUploadError("Video URL is required when changing to video type");
-          return slide;
-        }
-        return {
-          ...slide,
-          kind: "video" as const,
-          videoUrl,
-          imageUrl: null,
-          textHtml: null,
-        };
-      }
-    });
-
-    setLocalSlides(updatedSlides);
-    setHasUnsavedChanges(true);
-    setShowTypeChangeDialog(false);
-    setPendingTypeChange(null);
-  };
-
   const handleVideoUrlChange = (newUrl: string) => {
     if (!currentSlide) return;
 
@@ -560,10 +582,38 @@ export function TopicDetailSection({
     setHasUnsavedChanges(true);
   };
 
+  const handleVideoStartTimeChange = (value: string) => {
+    if (!currentSlide) return;
+
+    const numValue = value === "" ? null : Number(value);
+    if (numValue !== null && (isNaN(numValue) || numValue < 0)) return;
+
+    // Update local slide state
+    const updatedSlides = localSlides.map((slide) =>
+      slide.id === currentSlide.id ? { ...slide, videoStartS: numValue } : slide
+    );
+    setLocalSlides(updatedSlides);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleVideoEndTimeChange = (value: string) => {
+    if (!currentSlide) return;
+
+    const numValue = value === "" ? null : Number(value);
+    if (numValue !== null && (isNaN(numValue) || numValue < 0)) return;
+
+    // Update local slide state
+    const updatedSlides = localSlides.map((slide) =>
+      slide.id === currentSlide.id ? { ...slide, videoEndS: numValue } : slide
+    );
+    setLocalSlides(updatedSlides);
+    setHasUnsavedChanges(true);
+  };
+
   const handleFileUpload = (file: File) => {
     if (!file || !currentSlide) return;
 
-    // Validate file type
+    // Validate file type for images
     if (!file.type.startsWith("image/")) {
       setUploadError("Please select an image file");
       return;
@@ -589,6 +639,43 @@ export function TopicDetailSection({
     // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  // Handle image selection from the image selector dialog
+  const handleImageSelect = async (imageData: Blob, blobUrl: string) => {
+    if (!currentSlide) return;
+
+    try {
+      // Convert blob to File object
+      const file = new File([imageData], `image-${Date.now()}.jpg`, {
+        type: imageData.type || "image/jpeg",
+      });
+
+      // Store file for bulk upload
+      const newPendingUploads = new Map(pendingFileUploads);
+      newPendingUploads.set(currentSlide.id, file);
+      setPendingFileUploads(newPendingUploads);
+
+      // Update local slide state with preview URL
+      const updatedSlides = localSlides.map((slide) =>
+        slide.id === currentSlide.id ? { ...slide, imageUrl: blobUrl } : slide
+      );
+      setLocalSlides(updatedSlides);
+      setImageUrlValue(blobUrl);
+      setHasUnsavedChanges(true);
+      setSlideRefreshKey((prev) => prev + 1);
+
+      toast.success("Image updated", {
+        position: "bottom-right",
+      });
+    } catch (error) {
+      console.error("Error applying image:", error);
+      setUploadError(
+        error instanceof Error
+          ? error.message
+          : "Failed to apply image. Please try again."
+      );
     }
   };
 
@@ -1321,35 +1408,73 @@ export function TopicDetailSection({
         }
 
         // Update slides from response if available
+        // Always use the response topic if available, don't fall back to existing topic
+        // as it may have stale data
         const responseTopic =
           "topic" in result.data && result.data.topic
             ? result.data.topic
-            : topic; // Fallback to current topic if not in response
+            : null;
 
-        if (responseTopic?.slides) {
+        if (responseTopic?.slides && responseTopic.slides.length > 0) {
+          // Create a map of slide IDs that had pending uploads
+          const slidesWithUploads = new Set(pendingFileUploads.keys());
+
           updatedSlides =
             responseTopic.slides
               ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
-              .map((slide: any) => ({
-                id: slide.id,
-                kind: slide.kind as
-                  | "text"
-                  | "image"
-                  | "video"
-                  | "quiz"
-                  | "test",
-                orderIndex: slide.orderIndex,
-                textHtml: slide.textHtml ?? null,
-                imageUrl: slide.imageUrl ?? null,
-                videoUrl: slide.videoUrl ?? null,
-                videoStartS: slide.videoStartS ?? null,
-                videoEndS: slide.videoEndS ?? null,
-                effectiveNotes: slide.officialNotes ?? null,
-                quizData: isCertification
-                  ? (slide.quizData as QuizData | null)
-                  : null,
-              })) ?? [];
+              .map((slide: any) => {
+                // If this slide had a pending upload, ensure we use the server's imageUrl
+                // If the server didn't return an imageUrl but we had an upload, log a warning
+                const hadUpload = slidesWithUploads.has(slide.id);
+                if (hadUpload && !slide.imageUrl) {
+                  console.error(
+                    `Slide ${slide.id} had a file upload but server response doesn't include imageUrl. Server slide data:`,
+                    slide
+                  );
+                }
+
+                // Ensure we're not using blob URLs - only use server URLs
+                const imageUrl =
+                  slide.imageUrl && slide.imageUrl.startsWith("blob:")
+                    ? null
+                    : (slide.imageUrl ?? null);
+
+                return {
+                  id: slide.id,
+                  kind: slide.kind as
+                    | "text"
+                    | "image"
+                    | "video"
+                    | "quiz"
+                    | "test",
+                  orderIndex: slide.orderIndex,
+                  textHtml: slide.textHtml ?? null,
+                  // Use server's imageUrl - it should have the uploaded file URL
+                  // Never use blob URLs from the response
+                  imageUrl,
+                  videoUrl: slide.videoUrl ?? null,
+                  videoStartS: slide.videoStartS ?? null,
+                  videoEndS: slide.videoEndS ?? null,
+                  effectiveNotes: slide.officialNotes ?? null,
+                  quizData: isCertification
+                    ? (slide.quizData as QuizData | null)
+                    : null,
+                };
+              }) ?? [];
           setLocalSlides(updatedSlides);
+        } else {
+          // If response doesn't have slides, but we had uploads, this is an error
+          if (pendingFileUploads.size > 0) {
+            console.error(
+              "Server response doesn't include slides but we had file uploads. Response:",
+              result.data
+            );
+            // Don't update localSlides - keep the current state with blobUrls for now
+            // The user can try saving again
+          } else if (responseTopic) {
+            // No slides in response but no uploads - set empty array
+            setLocalSlides([]);
+          }
         }
 
         // Invalidate cache for slides that had files uploaded
@@ -1384,11 +1509,32 @@ export function TopicDetailSection({
         setHasUnsavedChanges(false);
         setSlideRefreshKey((prev) => prev + 1);
 
-        // Update original slides to match current state
-        // Use updatedSlides if available, otherwise use current localSlides
-        const slidesToSave =
-          updatedSlides.length > 0 ? updatedSlides : localSlides;
-        setOriginalSlides(JSON.parse(JSON.stringify(slidesToSave)));
+        // Invalidate all slide caches for slides that were updated/created
+        // This ensures the cache store will refetch fresh URLs
+        const allSlideIds = new Set<string>();
+        if (updatedSlides.length > 0) {
+          updatedSlides.forEach((slide) => allSlideIds.add(slide.id));
+        }
+        // Also include slides from the response topic if available
+        if (responseTopic?.slides) {
+          responseTopic.slides.forEach((slide: any) =>
+            allSlideIds.add(slide.id)
+          );
+        }
+
+        // Invalidate caches for all slides
+        allSlideIds.forEach((slideId) => {
+          if (isCertification) {
+            invalidateCertificationSlide(slideId);
+          } else {
+            invalidateSlide(slideId);
+          }
+        });
+
+        // Completely refetch topic data the same way as initial page load
+        // This will repopulate the cache store and ensure we have the latest data
+        // Skip loading state since we're already in a save operation
+        await fetchTopicData(true);
 
         // Show success feedback on button
         setShowSaveSuccess(true);
@@ -1821,21 +1967,14 @@ export function TopicDetailSection({
                       )}
                     </div>
 
-                    {/* Upload Button - fills remaining space */}
+                    {/* Change Image Button - fills remaining space */}
                     {currentSlide.kind === "image" && (
                       <div className="flex-1 flex items-end mt-auto pt-4">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleFileSelect}
-                          className="hidden"
-                        />
                         <Button
                           ref={uploadButtonRef}
                           type="button"
                           variant="outline"
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => setShowImageSelectorDialog(true)}
                           disabled={isUploading}
                           onDragOver={handleDragOver}
                           onDragLeave={handleDragLeave}
@@ -1853,15 +1992,15 @@ export function TopicDetailSection({
                             </>
                           ) : (
                             <>
-                              <Upload className="h-6 w-6" />
-                              <span>Click to upload or drag and drop</span>
+                              <ImageIcon className="h-6 w-6" />
+                              <span>Click to change image</span>
                             </>
                           )}
                         </Button>
                       </div>
                     )}
                     {currentSlide.kind === "video" && (
-                      <div className="space-y-2">
+                      <div className="space-y-2 mt-4">
                         <Label htmlFor="video-url">Video URL</Label>
                         <Input
                           id="video-url"
@@ -1870,28 +2009,6 @@ export function TopicDetailSection({
                           placeholder="https://www.youtube.com/watch?v=..."
                           disabled={isUploading}
                         />
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-2">
-                            <Label htmlFor="video-start">Start Time (s)</Label>
-                            <Input
-                              id="video-start"
-                              type="number"
-                              value={currentSlide.videoStartS ?? ""}
-                              placeholder="0"
-                              readOnly
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="video-end">End Time (s)</Label>
-                            <Input
-                              id="video-end"
-                              type="number"
-                              value={currentSlide.videoEndS ?? ""}
-                              placeholder="0"
-                              readOnly
-                            />
-                          </div>
-                        </div>
                       </div>
                     )}
                   </TabsContent>
@@ -2280,34 +2397,6 @@ export function TopicDetailSection({
         </div>
       ) : null}
 
-      {/* Type Change Confirmation Dialog */}
-      <Dialog
-        open={showTypeChangeDialog}
-        onOpenChange={setShowTypeChangeDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Convert Slide Type</DialogTitle>
-            <DialogDescription>
-              This will convert the current slide to a{" "}
-              {pendingTypeChange === "video" ? "video" : "image"}.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowTypeChangeDialog(false);
-                setPendingTypeChange(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmTypeChange}>Confirm</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Delete Slide Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
@@ -2430,6 +2519,13 @@ export function TopicDetailSection({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Image Selector Dialog */}
+      <ImageSelectorDialog
+        open={showImageSelectorDialog}
+        onOpenChange={setShowImageSelectorDialog}
+        onSelectImage={handleImageSelect}
+      />
     </div>
   );
 }
