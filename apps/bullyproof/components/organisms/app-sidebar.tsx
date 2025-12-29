@@ -32,6 +32,7 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar";
 import Image from "next/image";
+import Link from "next/link";
 import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useSchoolStore } from "@/stores/school-store";
@@ -244,6 +245,51 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isLive = useLiveLessonStore((s) => s.isLive);
   const liveUrl = useLiveLessonStore((s) => s.getUrl());
+  const fetchInProgressLesson = useLiveLessonStore(
+    (s) => s.fetchInProgressLesson
+  );
+
+  // Fetch in-progress lesson on mount and when user changes
+  // Wait for session to be ready before fetching
+  React.useEffect(() => {
+    if (!currentUser) return;
+
+    let retryCount = 0;
+    const maxRetries = 3;
+    let retryTimeout: NodeJS.Timeout | null = null;
+
+    const checkSessionAndFetch = async () => {
+      try {
+        const { createBrowserClient } = await import("@/utils/supabase/client");
+        const supabase = createBrowserClient();
+        const { data: sessionData } = await supabase.auth.getSession();
+        
+        // Only fetch if we have a valid session token
+        if (sessionData?.session?.access_token) {
+          fetchInProgressLesson();
+        } else if (retryCount < maxRetries) {
+          // Retry after a short delay if token isn't ready yet
+          retryCount++;
+          retryTimeout = setTimeout(() => {
+            checkSessionAndFetch();
+          }, 500);
+        } else {
+          // Max retries reached, give up silently
+          console.warn("Session token not available after retries, skipping live lesson fetch");
+        }
+      } catch (error) {
+        console.error("Error checking session:", error);
+      }
+    };
+
+    checkSessionAndFetch();
+
+    return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+    };
+  }, [currentUser, fetchInProgressLesson]);
 
   const platformItemsWithLive = React.useMemo(() => {
     // Don't show live lesson if welcome is not completed
@@ -273,23 +319,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mb-2">
-        {state === "expanded" ? (
-          <Image
-            src="/images/bullyproof-logo.svg"
-            alt="Bullyproof Logo"
-            width={500}
-            height={500}
-            className="h-16 mt-4"
-          />
-        ) : (
-          <Image
-            src="/images/bp-small-logo.svg"
-            alt="Bullyproof Small Logo"
-            width={500}
-            height={500}
-            className="h-10 mt-4"
-          />
-        )}
+        <Link href="/" className="block">
+          {state === "expanded" ? (
+            <Image
+              src="/images/bullyproof-logo.svg"
+              alt="Bullyproof Logo"
+              width={500}
+              height={500}
+              className="h-16 mt-4"
+            />
+          ) : (
+            <Image
+              src="/images/bp-small-logo.svg"
+              alt="Bullyproof Small Logo"
+              width={500}
+              height={500}
+              className="h-10 mt-4"
+            />
+          )}
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <ScrollArea className="h-full">

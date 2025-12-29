@@ -4,91 +4,12 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@workspace/ui/lib/utils";
+import { getAdminItemsByCategory } from "@/lib/admin-items";
 import {
-  Building2,
-  Users,
-  GraduationCap,
-  Presentation,
-  BarChart3,
-  Settings,
-  FileText,
-  HelpCircle,
-  Home,
-  BookOpenText,
-} from "lucide-react";
-
-const tabCategories = [
-  {
-    name: "Content",
-    items: [
-      {
-        title: "Content",
-        url: "/admin/content",
-        icon: BookOpenText,
-      },
-    ],
-  },
-  {
-    name: "Clients",
-    items: [
-      {
-        title: "Schools",
-        url: "/admin/schools",
-        icon: Building2,
-      },
-      {
-        title: "Users",
-        url: "/admin/users",
-        icon: Users,
-      },
-      {
-        title: "Classes",
-        url: "/admin/classes",
-        icon: GraduationCap,
-      },
-    ],
-  },
-  {
-    name: "Lessons",
-    items: [
-      {
-        title: "Lessons",
-        url: "/admin/lessons",
-        icon: Presentation,
-      },
-    ],
-  },
-  {
-    name: "Reporting",
-    items: [
-      {
-        title: "Culture Ratings",
-        url: "/admin/culture-ratings",
-        icon: BarChart3,
-      },
-    ],
-  },
-  {
-    name: "System Settings",
-    items: [
-      {
-        title: "Audit Logs",
-        url: "/admin/audit-logs",
-        icon: FileText,
-      },
-    ],
-  },
-  {
-    name: "Support Tools",
-    items: [
-      {
-        title: "Support Tools",
-        url: "/admin/support-tools",
-        icon: HelpCircle,
-      },
-    ],
-  },
-];
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@workspace/ui/components/tooltip";
 
 interface AdminTabSwitcherClientProps {
   className?: string;
@@ -98,6 +19,7 @@ export function AdminTabSwitcherClient({
   className,
 }: AdminTabSwitcherClientProps) {
   const pathname = usePathname();
+  const tabCategories = getAdminItemsByCategory();
 
   const isActive = React.useCallback(
     (url: string) => {
@@ -113,21 +35,43 @@ export function AdminTabSwitcherClient({
           {category.items.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.url);
+            const isDisabled = item.disabled === true;
 
-            return (
-              <Link
-                key={item.title}
-                href={item.url}
-                className={cn(
-                  "inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                  "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                  active
-                    ? "bg-background text-foreground shadow-sm border border-border"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
-              >
+            const className = cn(
+              "inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+              isDisabled
+                ? "opacity-50 cursor-not-allowed text-muted-foreground"
+                : [
+                    "hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    active
+                      ? "bg-background text-foreground shadow-sm border border-border"
+                      : "text-muted-foreground hover:text-foreground",
+                  ]
+            );
+
+            const content = (
+              <>
                 <Icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{item.title}</span>
+              </>
+            );
+
+            if (isDisabled) {
+              return (
+                <Tooltip key={item.title}>
+                  <TooltipTrigger asChild>
+                    <span className={className}>{content}</span>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" sideOffset={8}>
+                    Currently under development
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            return (
+              <Link key={item.title} href={item.url} className={className}>
+                {content}
               </Link>
             );
           })}
@@ -136,4 +80,3 @@ export function AdminTabSwitcherClient({
     </div>
   );
 }
-

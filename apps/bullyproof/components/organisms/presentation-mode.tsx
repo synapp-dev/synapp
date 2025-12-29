@@ -56,8 +56,8 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       } else if (e.key === "ArrowLeft") {
         prevSlide();
       } else if (e.key === "Escape") {
-        // Exit presentation mode
-        router.back();
+        // Terminate the tab
+        window.close();
       } else if (e.key === "f" || e.key === "F") {
         // Toggle fullscreen
         if (!document.fullscreenElement) {
@@ -298,7 +298,10 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.back()}
+              onClick={() => {
+                // Terminate the tab
+                window.close();
+              }}
               className="text-foreground hover:bg-foreground/20"
               title="Exit presentation (Esc)"
             >

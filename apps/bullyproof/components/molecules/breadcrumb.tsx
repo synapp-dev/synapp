@@ -13,6 +13,12 @@ import {
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
 
+// Helper function to check if a string is a UUID
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 export function Breadcrumb() {
   const pathname = usePathname();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
@@ -23,6 +29,12 @@ export function Breadcrumb() {
   // Check if we're in a schools/[slug] route
   const isSchoolRoute =
     pathSegments[0] === "schools" && pathSegments.length > 1;
+
+  // Check if we're in a schools/[slug]/lessons/[uuid] route
+  const isLessonsRoute =
+    isSchoolRoute &&
+    pathSegments.length > 2 &&
+    pathSegments[2] === "lessons";
 
   // Build breadcrumb items
   const breadcrumbItems = [];
@@ -37,6 +49,13 @@ export function Breadcrumb() {
       // Replace school slug with actual school name
       breadcrumbItems.push({
         label: currentSchool.name,
+        href: currentPath,
+        isLast: i === pathSegments.length - 1,
+      });
+    } else if (isLessonsRoute && i === 3 && segment && isUUID(segment)) {
+      // Replace lesson UUID with "Live lesson"
+      breadcrumbItems.push({
+        label: "Live lesson",
         href: currentPath,
         isLast: i === pathSegments.length - 1,
       });

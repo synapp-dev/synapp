@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Drawer,
@@ -20,9 +20,10 @@ import type { ClassOption, TopicOption, ScheduleOption, LessonCreatePayload } fr
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { schoolApi } from "@/entities/school/api/endpoints";
 
 interface LessonWizardProps {
-  schoolId: string;
+  schoolId: string; // This is actually the school slug from the URL
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -31,6 +32,26 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [schoolUuid, setSchoolUuid] = useState<string | null>(null);
+  
+  // Fetch school UUID from slug
+  useEffect(() => {
+    if (!schoolId) return;
+    
+    schoolApi.get.schoolBySlug(schoolId)
+      .then((result) => {
+        if (result.error || !result.data) {
+          console.error("Failed to fetch school:", result.error);
+          setError("Failed to load school information");
+        } else {
+          setSchoolUuid(result.data.id);
+        }
+      })
+      .catch((err) => {
+        console.error("Error fetching school:", err);
+        setError("Failed to load school information");
+      });
+  }, [schoolId]);
 
   const [state, setState] = useState({
     step: 1,
@@ -77,7 +98,10 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
   };
 
   const handleCreateLesson = async () => {
-    if (!canProceed() || !state.selectedTopic) {
+    if (!canProceed() || !state.selectedTopic || !schoolUuid) {
+      if (!schoolUuid) {
+        setError('School information not loaded. Please try again.');
+      }
       return;
     }
 
@@ -91,7 +115,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
         : undefined;
 
       const payload = {
-        schoolId,
+        schoolId: schoolUuid, // Use UUID for API call
         topicId: state.selectedTopic.id,
         classIds: state.selectedClasses.map((c) => c.id),
         status: state.scheduleOption === 'immediate' ? 'in_progress' : (scheduledFor ? 'scheduled' : 'draft'),
@@ -112,15 +136,16 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
       const lessonId = result.data.id;
 
       // Mark lesson as live in global store (with some helpful metadata)
+      // Use the slug (schoolId from URL) for navigation, not the UUID
       useLiveLessonStore.getState().startLiveLesson({
-        schoolSlug: schoolId,
+        schoolSlug: schoolId, // Use slug from URL for navigation
         lessonId,
         title: result.data.topic?.title || "Live Lesson",
         classCount: state.selectedClasses.length,
         startedAt: new Date().toISOString(),
       });
 
-      // Navigate to lesson page
+      // Navigate to lesson page using slug
       router.push(`/schools/${schoolId}/lessons/${lessonId}`);
 
       // Close drawer
@@ -197,13 +222,19 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto">
             {state.step === 1 && (
-              <LessonWizardClasses
-                schoolId={schoolId}
-                selectedClasses={state.selectedClasses}
-                onClassesChange={(classes) =>
-                  setState((prev) => ({ ...prev, selectedClasses: classes }))
-                }
-              />
+              schoolUuid ? (
+                <LessonWizardClasses
+                  schoolId={schoolUuid}
+                  selectedClasses={state.selectedClasses}
+                  onClassesChange={(classes) =>
+                    setState((prev) => ({ ...prev, selectedClasses: classes }))
+                  }
+                />
+              ) : (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              )
             )}
 
             {state.step === 2 && (

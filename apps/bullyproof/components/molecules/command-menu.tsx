@@ -85,16 +85,20 @@ export function CommandMenu() {
             <CommandItem>Settings</CommandItem>
           </CommandGroup>
           <CommandGroup heading="Schools">
-            {(!loadingSchools ? schools : []).map((school) => (
-              <CommandItem
-                key={school.id}
-                value={school.name ?? school.slug ?? String(school.id)}
-                onSelect={() => {
-                  const slug = school.slug ?? school.id;
-                  router.push(`/schools/${slug}/home`);
-                  setOpen(false);
-                }}
-              >
+            {(!loadingSchools ? schools : []).map((school) => {
+              // Only navigate if we have a valid slug - never use UUID
+              const slug = school.slug;
+              if (!slug) return null;
+              
+              return (
+                <CommandItem
+                  key={school.id}
+                  value={school.name ?? slug}
+                  onSelect={() => {
+                    router.push(`/schools/${slug}/home`);
+                    setOpen(false);
+                  }}
+                >
                 <div className="flex w-full items-center justify-between gap-2">
                   <span className="truncate">{school.name}</span>
                   <Badge variant="secondary" className="shrink-0">
@@ -102,7 +106,8 @@ export function CommandMenu() {
                   </Badge>
                 </div>
               </CommandItem>
-            ))}
+              );
+            })}
           </CommandGroup>
         </CommandList>
       </CommandDialog>

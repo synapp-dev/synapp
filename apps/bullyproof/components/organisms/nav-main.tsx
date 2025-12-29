@@ -107,7 +107,7 @@ export function NavMain({
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <Link href={item.url}>
+                  <Link href={item.url} suppressHydrationWarning>
                     <SidebarMenuButton
                       tooltip={item.title}
                       className={
