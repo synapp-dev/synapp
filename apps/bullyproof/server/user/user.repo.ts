@@ -1,6 +1,14 @@
 import { db } from "@/server/db/drizzle";
 import { userProfile, userRoles, roles, schools } from "@/server/db/schema";
 import { eq, ilike, or, and, asc } from "drizzle-orm";
+import { schoolRepo } from "@/server/school/school.repo";
+
+// Helper function to check if a string is a valid UUID
+function isValidUUID(str: string): boolean {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
 
 export const userRepo = {
   getAllUsersWithRolesAndSchools: async (params: {
@@ -16,6 +24,19 @@ export const userRepo = {
       typeof params.role === "string" && params.role.trim().length > 0;
     const hasSchoolFilter =
       typeof params.schoolId === "string" && params.schoolId.trim().length > 0;
+
+    // Resolve schoolId if it's a slug (not a UUID)
+    let resolvedSchoolId: string | undefined = params.schoolId;
+    if (hasSchoolFilter && !isValidUUID(params.schoolId!)) {
+      // It's a slug, resolve it to an ID
+      const schoolResults = await schoolRepo.getBySlug(params.schoolId!);
+      if (schoolResults.length > 0) {
+        resolvedSchoolId = schoolResults[0].id;
+      } else {
+        // Slug not found, return empty results
+        return [];
+      }
+    }
 
     // Base query to get all users with their roles and schools
     const baseQuery = db
@@ -50,9 +71,9 @@ export const userRepo = {
       whereConditions.push(eq(roles.key, params.role!.trim()));
     }
 
-    // Apply school filter if provided
-    if (hasSchoolFilter) {
-      whereConditions.push(eq(userRoles.schoolId, params.schoolId!));
+    // Apply school filter if provided (using resolved ID)
+    if (hasSchoolFilter && resolvedSchoolId) {
+      whereConditions.push(eq(userRoles.schoolId, resolvedSchoolId));
     }
 
     const queryWithFilters =

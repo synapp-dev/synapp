@@ -73,12 +73,30 @@ export const topicsRepo = {
     return query.orderBy(asc(topics.title)).limit(limit).offset(offset);
   },
 
-  create: (data: {
+  create: async (data: {
     stageId: string;
     title: string;
     description?: string;
     officialNotes?: string;
-  }) => db.insert(topics).values(data).returning(),
+    stageOrder?: number | null;
+  }) => {
+    // If stageOrder is not provided, automatically assign the next available order
+    if (data.stageOrder === null || data.stageOrder === undefined) {
+      const existingTopics = await db
+        .select()
+        .from(topics)
+        .where(eq(topics.stageId, data.stageId))
+        .orderBy(desc(topics.stageOrder));
+      
+      const maxOrder = existingTopics.length > 0 && existingTopics[0].stageOrder !== null
+        ? existingTopics[0].stageOrder!
+        : 0;
+      
+      data.stageOrder = maxOrder + 1;
+    }
+    
+    return db.insert(topics).values(data).returning();
+  },
 
   update: (
     id: string,
@@ -90,6 +108,56 @@ export const topicsRepo = {
   ) => db.update(topics).set(data).where(eq(topics.id, id)).returning(),
 
   delete: (id: string) => db.delete(topics).where(eq(topics.id, id)),
+
+  // Reorder topics based on an array of topic IDs in the desired order
+  reorderTopics: async (stageId: string, topicIds: string[]) => {
+    // First, move all topics to temporary high indices to avoid conflicts
+    const tempOffset = 100000;
+    const allTopics = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.stageId, stageId));
+
+    // Phase 1: Move all topics to temporary indices
+    for (let i = 0; i < allTopics.length; i++) {
+      await db
+        .update(topics)
+        .set({
+          stageOrder: tempOffset + i,
+        })
+        .where(eq(topics.id, allTopics[i].id));
+    }
+
+    // Phase 2: Assign new stageOrder values based on topicIds array (1-indexed)
+    for (let i = 0; i < topicIds.length; i++) {
+      await db
+        .update(topics)
+        .set({
+          stageOrder: i + 1, // stageOrder is 1-indexed
+        })
+        .where(eq(topics.id, topicIds[i]));
+    }
+
+    // Phase 3: Handle any topics not in the topicIds array (shouldn't happen, but handle gracefully)
+    const remainingTopics = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.stageId, stageId));
+
+    const topicsNotInArray = remainingTopics.filter(
+      (topic) => !topicIds.includes(topic.id)
+    );
+
+    // Assign sequential stageOrder to remaining topics (append to end)
+    for (let i = 0; i < topicsNotInArray.length; i++) {
+      await db
+        .update(topics)
+        .set({
+          stageOrder: topicIds.length + i + 1,
+        })
+        .where(eq(topics.id, topicsNotInArray[i].id));
+    }
+  },
 
   createSlide: (data: {
     topicId: string;

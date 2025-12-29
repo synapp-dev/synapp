@@ -5,7 +5,7 @@ import {
   schoolYears,
   schoolLevels,
 } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc } from "drizzle-orm";
+import { eq, and, inArray, desc, asc, sql } from "drizzle-orm";
 
 export const classesRepo = {
   getAll: () => db.select().from(classes),
@@ -13,12 +13,43 @@ export const classesRepo = {
   getById: (id: string) =>
     db.select().from(classes).where(eq(classes.id, id)).limit(1),
 
-  getBySchoolId: (schoolId: string) =>
-    db
-      .select()
+  getBySchoolId: async (schoolId: string) => {
+    const result = await db
+      .select({
+        id: classes.id,
+        schoolId: classes.schoolId,
+        name: classes.name,
+        code: classes.code,
+        stream: classes.stream,
+        room: classes.room,
+        studentCap: classes.studentCap,
+        active: classes.active,
+        createdAt: classes.createdAt,
+        yearCodes: sql<string[]>`COALESCE(
+          array_agg(${schoolYears.code} ORDER BY ${schoolYears.sortIndex}) 
+          FILTER (WHERE ${schoolYears.code} IS NOT NULL),
+          ARRAY[]::text[]
+        )`,
+      })
       .from(classes)
+      .leftJoin(classYears, eq(classYears.classId, classes.id))
+      .leftJoin(schoolYears, eq(classYears.schoolYearId, schoolYears.id))
       .where(eq(classes.schoolId, schoolId))
-      .orderBy(asc(classes.name)),
+      .groupBy(
+        classes.id,
+        classes.schoolId,
+        classes.name,
+        classes.code,
+        classes.stream,
+        classes.room,
+        classes.studentCap,
+        classes.active,
+        classes.createdAt
+      )
+      .orderBy(asc(classes.name));
+
+    return result;
+  },
 
   getWithYears: async (id: string) => {
     const classData = await db

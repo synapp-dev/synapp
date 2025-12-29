@@ -3,7 +3,10 @@ import { lessons, topics, lessonClasses, classes, userProfile } from "@/server/d
 import { eq, and, inArray, desc, asc } from "drizzle-orm";
 
 export const lessonsRepo = {
-  getAll: () => db.select().from(lessons),
+  getAll: (status?: string) =>
+    status
+      ? db.select().from(lessons).where(eq(lessons.status, status))
+      : db.select().from(lessons),
 
   getById: (id: string) =>
     db
@@ -12,11 +15,22 @@ export const lessonsRepo = {
       .where(eq(lessons.id, id))
       .limit(1),
 
-  getByTeacherId: (teacherId: string) =>
+  getByTeacherId: (teacherId: string, status?: string) =>
     db
       .select()
       .from(lessons)
-      .where(eq(lessons.createdByUserId, teacherId))
+      .where(
+        status
+          ? and(eq(lessons.createdByUserId, teacherId), eq(lessons.status, status))
+          : eq(lessons.createdByUserId, teacherId)
+      )
+      .orderBy(desc(lessons.createdAt)),
+
+  getByStatus: (status: string) =>
+    db
+      .select()
+      .from(lessons)
+      .where(eq(lessons.status, status))
       .orderBy(desc(lessons.createdAt)),
 
   getByClassId: (classId: string) =>
