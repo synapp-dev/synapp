@@ -81,6 +81,7 @@ import {
 } from "@workspace/ui/components/command";
 
 type Class = typeof classes.$inferSelect;
+type ClassWithYearCodes = Class & { yearCodes?: string[] };
 import {
   School,
   Users,
@@ -193,7 +194,7 @@ function SchoolDetailDrawerContent({
   };
   const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [classes, setClasses] = useState<Class[]>([]);
+  const [classes, setClasses] = useState<ClassWithYearCodes[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
   // Dialog states
@@ -1300,9 +1301,7 @@ function SchoolDetailDrawerContent({
                             <TableRow>
                               <TableHead>Class Name</TableHead>
                               <TableHead>Code</TableHead>
-                              <TableHead>Stream</TableHead>
-                              <TableHead>Room</TableHead>
-                              <TableHead>Student Cap</TableHead>
+                              <TableHead>Year Level Codes</TableHead>
                               <TableHead>Status</TableHead>
                               <TableHead>Created</TableHead>
                             </TableRow>
@@ -1321,19 +1320,23 @@ function SchoolDetailDrawerContent({
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  <span className="text-sm text-muted-foreground">
-                                    {classItem.stream || "—"}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-muted-foreground">
-                                    {classItem.room || "—"}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-muted-foreground">
-                                    {classItem.studentCap || "—"}
-                                  </span>
+                                  {classItem.yearCodes && classItem.yearCodes.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {classItem.yearCodes.map((yearCode, index) => (
+                                        <Badge
+                                          key={index}
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          {yearCode}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                      —
+                                    </span>
+                                  )}
                                 </TableCell>
                                 <TableCell>
                                   <Badge
