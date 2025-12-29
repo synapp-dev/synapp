@@ -8,7 +8,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Plus } from "lucide-react";
 import type { curriculumStages } from "@/server/db/schema";
 
 type Stage = typeof curriculumStages.$inferSelect & {
@@ -28,9 +28,14 @@ type Stage = typeof curriculumStages.$inferSelect & {
 interface StageCardsProps {
   stages: Stage[];
   onStageClick?: (stage: Stage) => void;
+  onAddNewClick?: () => void;
 }
 
-export function StageCards({ stages, onStageClick }: StageCardsProps) {
+export function StageCards({
+  stages,
+  onStageClick,
+  onAddNewClick,
+}: StageCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {stages.map((stage, index) => (
@@ -67,6 +72,27 @@ export function StageCards({ stages, onStageClick }: StageCardsProps) {
           </Card>
         </StaggeredAnimation>
       ))}
+      {onAddNewClick && (
+        <StaggeredAnimation key="add-new" index={stages.length}>
+          <Card
+            className="relative transition-shadow cursor-pointer hover:shadow-md border-2 border-dashed border-muted-foreground/50"
+            onClick={onAddNewClick}
+          >
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base text-muted-foreground">
+                <Plus className="h-5 w-5 text-muted-foreground" />
+                <BookOpen className="h-5 w-5 text-muted-foreground" />
+                <span>Add new stage</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm text-muted-foreground">
+                Click to add a new curriculum stage
+              </div>
+            </CardContent>
+          </Card>
+        </StaggeredAnimation>
+      )}
     </div>
   );
 }
