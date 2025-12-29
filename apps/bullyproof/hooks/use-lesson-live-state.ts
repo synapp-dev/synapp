@@ -4,9 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { SlideData } from "@/components/organisms/slide-renderer";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
-
-// Hardcoded lesson ID for demo
-const DEMO_LESSON_ID = "5fda276d-96ca-428c-a891-745538f65366";
+import { useLiveLessonStore } from "@/stores/live-lesson-store";
 
 interface LiveState {
   lesson_id: string;
@@ -27,10 +25,11 @@ interface UseLessonLiveStateReturn {
 }
 
 export function useLessonLiveState(
-  lessonId?: string // Parameter kept for API compatibility but not used
+  lessonId?: string
 ): UseLessonLiveStateReturn {
-  // Always use hardcoded demo lesson ID for now
-  const actualLessonId = DEMO_LESSON_ID;
+  // Use lessonId from props if provided, otherwise get from store
+  const storeLessonId = useLiveLessonStore((s) => s.lessonId);
+  const actualLessonId = lessonId || storeLessonId;
   
   const [slides, setSlides] = useState<SlideData[]>([]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
@@ -40,6 +39,12 @@ export function useLessonLiveState(
 
   // Fetch initial data and get latest live state from database
   useEffect(() => {
+    if (!actualLessonId) {
+      setIsLoading(false);
+      setError("No lesson ID provided");
+      return;
+    }
+
     let mounted = true;
 
     async function fetchData() {
@@ -130,7 +135,7 @@ export function useLessonLiveState(
     return () => {
       mounted = false;
     };
-  }, [actualLessonId, supabase]);
+  }, [actualLessonId]);
 
   // Set up realtime subscription
   useEffect(() => {
