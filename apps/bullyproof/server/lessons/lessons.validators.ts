@@ -24,14 +24,37 @@ export const updateLessonSchema = z.object({
 export type UpdateLessonParams = z.infer<typeof updateLessonSchema>;
 
 // Schema for listing lessons
-export const listLessonsSchema = z.object({
-  teacherId: z.string().trim().min(1).max(500).optional(),
-  classId: z.string().trim().min(1).max(500).optional(),
-  topicId: z.string().trim().min(1).max(500).optional(),
-  limit: z.number().int().min(1).max(100).optional().default(50),
-  offset: z.number().int().min(0).max(10000).optional().default(0),
-  search: z.string().trim().max(100).optional(),
-});
+export const listLessonsSchema = z
+  .object({
+    teacherId: z.string().trim().min(1).max(500).optional(),
+    classId: z.string().trim().min(1).max(500).optional(),
+    topicId: z.string().trim().min(1).max(500).optional(),
+    status: z.enum(['draft', 'scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+    limit: z
+      .string()
+      .optional()
+      .transform((v) => (v == null ? undefined : Number(v)))
+      .refine((v) => v == null || (Number.isInteger(v) && v > 0 && v <= 100), {
+        message: "limit must be an integer between 1 and 100",
+      }),
+    offset: z
+      .string()
+      .optional()
+      .transform((v) => (v == null ? undefined : Number(v)))
+      .refine((v) => v == null || (Number.isInteger(v) && v >= 0 && v <= 10_000), {
+        message: "offset must be an integer between 0 and 10000",
+      }),
+    search: z.string().trim().max(100).optional(),
+  })
+  .transform((v) => ({
+    teacherId: v.teacherId,
+    classId: v.classId,
+    topicId: v.topicId,
+    status: v.status,
+    limit: v.limit ?? 50,
+    offset: v.offset ?? 0,
+    search: v.search,
+  }));
 
 export type ListLessonsParams = z.infer<typeof listLessonsSchema>;
 

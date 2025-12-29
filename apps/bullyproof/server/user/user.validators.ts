@@ -22,7 +22,7 @@ export const listUsersSchema = z
       ),
     search: z.string().trim().max(100).optional(),
     role: z.string().trim().max(100).optional(),
-    schoolId: z.string().uuid().optional(),
+    schoolId: z.string().trim().max(200).optional(), // Accept UUID or slug
   })
   .transform((v) => ({
     limit: v.limit ?? 50,

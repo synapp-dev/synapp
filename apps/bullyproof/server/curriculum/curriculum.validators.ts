@@ -45,3 +45,37 @@ export const getLevelsSchema = z.object({
 });
 
 export type GetLevelsParams = z.infer<typeof getLevelsSchema>;
+
+// Schema for creating a curriculum stage
+export const createStageSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1)
+    .max(50)
+    .regex(/^S[0-9]+$/, "Code must match pattern S[0-9]+ (e.g., S1, S2)"),
+  name: z.string().trim().min(1).max(500),
+  minimumYearLevelIds: z
+    .array(z.string().uuid())
+    .min(1, "At least one year level must be selected"),
+});
+
+export type CreateStageParams = z.infer<typeof createStageSchema>;
+
+// Schema for updating a curriculum stage
+export const updateStageSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(500),
+  minimumYearLevelIds: z
+    .array(z.string().uuid())
+    .min(1, "At least one year level must be selected"),
+});
+
+export type UpdateStageParams = z.infer<typeof updateStageSchema>;
+
+// Schema for deleting a curriculum stage
+export const deleteStageSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export type DeleteStageParams = z.infer<typeof deleteStageSchema>;

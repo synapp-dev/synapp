@@ -70,3 +70,11 @@ export const reorderSlidesSchema = z.object({
 });
 
 export type ReorderSlidesParams = z.infer<typeof reorderSlidesSchema>;
+
+// Schema for reordering topics
+export const reorderTopicsSchema = z.object({
+  stageId: z.string().trim().min(1).max(500),
+  topicIds: z.array(z.string().trim().min(1).max(500)).min(1),
+});
+
+export type ReorderTopicsParams = z.infer<typeof reorderTopicsSchema>;
