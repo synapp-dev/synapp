@@ -34,6 +34,7 @@ export function NavMain({
     icon?: LucideIcon;
     isActive?: boolean;
     exact?: boolean;
+    disabled?: boolean;
     // Special flags for custom rendering
     disableActiveStyle?: boolean;
     liveStyle?: boolean;
@@ -98,7 +99,18 @@ export function NavMain({
             ? false
             : itemActive;
 
-          const menuItem = (
+          const menuItem = item.disabled ? (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton
+                tooltip={item.title}
+                disabled
+                className="cursor-not-allowed opacity-50"
+              >
+                {item.icon && <item.icon />}
+                <span>{item.title}</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ) : (
             <Collapsible
               asChild
               defaultOpen={itemActive}

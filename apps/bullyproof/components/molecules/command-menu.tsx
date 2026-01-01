@@ -14,15 +14,18 @@ import { Button } from "@workspace/ui/components/button";
 import { Command as CommandIcon, SquareTerminal } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@/utils/supabase/client";
-import type { Tables } from "@/types/supabase";
+import { schoolApi } from "@/entities/school/api/endpoints";
+import { useSchoolStore } from "@/stores/school-store";
+import type { vSchoolsReadable } from "@/drizzle/schema";
+
+type School = typeof vSchoolsReadable.$inferSelect;
 
 export function CommandMenu() {
   const [open, setOpen] = useState(false);
-  const [schools, setSchools] = useState<Array<Tables<"schools">>>([]);
+  const [schools, setSchools] = useState<School[]>([]);
   const [loadingSchools, setLoadingSchools] = useState<boolean>(false);
   const router = useRouter();
-  const supabase = createBrowserClient();
+  const currentSchool = useSchoolStore((state) => state.currentSchool);
   const isMac =
     typeof navigator !== "undefined"
       ? navigator.platform.toUpperCase().indexOf("MAC") >= 0
@@ -45,12 +48,10 @@ export function CommandMenu() {
     let isMounted = true;
     async function loadSchools() {
       setLoadingSchools(true);
-      const { data, error } = await supabase.from("schools").select("*");
+      const result = await schoolApi.get.schools();
       if (!isMounted) return;
-      if (!error) {
-        setSchools(
-          (data ?? []).filter((s): s is Tables<"schools"> => Boolean(s?.id))
-        );
+      if (result.data !== null) {
+        setSchools(result.data.filter((s): s is School => Boolean(s?.id)));
       } else {
         setSchools([]);
       }
@@ -60,7 +61,7 @@ export function CommandMenu() {
     return () => {
       isMounted = false;
     };
-  }, [supabase]);
+  }, []);
 
   return (
     <>
@@ -79,17 +80,27 @@ export function CommandMenu() {
         <CommandInput placeholder="Type a command or search..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Suggestions">
-            <CommandItem>Calendar</CommandItem>
-            <CommandItem>Search</CommandItem>
-            <CommandItem>Settings</CommandItem>
+          <CommandGroup heading="Actions">
+            <CommandItem
+              onSelect={() => {
+                if (currentSchool?.slug) {
+                  router.push(
+                    `/schools/${currentSchool.slug}/lessons?startingYourLesson=true`
+                  );
+                  setOpen(false);
+                }
+              }}
+              disabled={!currentSchool?.slug}
+            >
+              Start new lesson
+            </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Schools">
             {(!loadingSchools ? schools : []).map((school) => {
               // Only navigate if we have a valid slug - never use UUID
               const slug = school.slug;
               if (!slug) return null;
-              
+
               return (
                 <CommandItem
                   key={school.id}
@@ -99,13 +110,13 @@ export function CommandMenu() {
                     setOpen(false);
                   }}
                 >
-                <div className="flex w-full items-center justify-between gap-2">
-                  <span className="truncate">{school.name}</span>
-                  <Badge variant="secondary" className="shrink-0">
-                    School
-                  </Badge>
-                </div>
-              </CommandItem>
+                  <div className="flex w-full items-center justify-between gap-2">
+                    <span className="truncate">{school.name}</span>
+                    <Badge variant="secondary" className="shrink-0">
+                      School
+                    </Badge>
+                  </div>
+                </CommandItem>
               );
             })}
           </CommandGroup>

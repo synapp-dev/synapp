@@ -40,6 +40,7 @@ import { usePathname } from "next/navigation";
 import { useIsPlatformAdmin, useMeStore } from "@/entities/me/model/store";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
+import { useUserLessonsStatusRealtime } from "@/hooks/use-lesson-status-realtime";
 
 // This is sample data.
 const data = {
@@ -133,6 +134,7 @@ const data = {
       url: "/resources",
       icon: LibraryBig,
       isActive: false,
+      disabled: true,
     },
   ],
   navData: [
@@ -150,6 +152,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const isPlatformAdmin = useIsPlatformAdmin();
   const currentUser = useMeStore((s) => s.currentUser);
+
+  // Listen for real-time status changes to user's lessons
+  useUserLessonsStatusRealtime(currentUser?.id);
 
   // Check if welcome tutorial is completed
   const isWelcomeCompleted = React.useMemo(() => {

@@ -17,11 +17,17 @@ import {
 } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 
 interface TabItem {
   title: string;
   url: string;
   icon: React.ComponentType<{ className?: string }>;
+  disabled?: boolean;
 }
 
 interface HeaderTabSwitcherClientProps {
@@ -82,6 +88,7 @@ const tabCategories = [
         title: "Resources",
         url: "/resources",
         icon: LibraryBig,
+        disabled: true,
       },
     ],
   },
@@ -126,6 +133,27 @@ export function HeaderTabSwitcherClient({
             const Icon = item.icon;
             const fullUrl = `/schools/${schoolSlug}${item.url}`;
             const active = isActive(item.url);
+
+            if (item.disabled) {
+              return (
+                <Tooltip key={item.title}>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                        "text-muted-foreground/50 cursor-not-allowed opacity-50"
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="hidden sm:inline">{item.title}</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>This page is currently under development.</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
 
             return (
               <Link

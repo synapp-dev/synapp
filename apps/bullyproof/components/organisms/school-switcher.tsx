@@ -158,6 +158,7 @@ export function SchoolSwitcher() {
     }
 
     // Auto-select single school if user has only one school and none is selected
+    const isOnDashboard = pathname === "/dashboard";
     if (
       hasOnlyOneSchool &&
       !currentSchool &&
@@ -179,17 +180,19 @@ export function SchoolSwitcher() {
         };
         setCurrentSchool(schoolData);
         setSelectedSchool(singleSchool);
-        // Navigate to the school's home page if not already on a school-specific page
-        // Use setTimeout to ensure navigation happens after state updates and avoid SSR issues
-        const slug =
-          typeof (singleSchool as any).slug === "string"
-            ? (singleSchool as any).slug
-            : "";
-        if (slug && typeof window !== "undefined") {
-          // Use setTimeout to avoid navigation during render
-          setTimeout(() => {
-            router.push(`/schools/${slug}/home`);
-          }, 0);
+        // Only navigate to the school's home page if NOT on the dashboard
+        // Dashboard should stay on dashboard but still have school loaded in store
+        if (!isOnDashboard) {
+          const slug =
+            typeof (singleSchool as any).slug === "string"
+              ? (singleSchool as any).slug
+              : "";
+          if (slug && typeof window !== "undefined") {
+            // Use setTimeout to avoid navigation during render
+            setTimeout(() => {
+              router.push(`/schools/${slug}/home`);
+            }, 0);
+          }
         }
         return;
       }
