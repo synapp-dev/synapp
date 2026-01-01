@@ -104,14 +104,18 @@ async function assertCanViewLessons(
 export const lessonsService = {
   async listLessons(ctx: AuthContext, query: unknown) {
     const params: ListLessonsParams = listLessonsSchema.parse(query);
-    await assertCanViewLessons(ctx, params.teacherId);
+    await assertCanViewLessons(ctx, params.teacherId, params.schoolId);
 
     if (params.teacherId) {
       return await lessonsRepo.getByTeacherId(params.teacherId, params.status);
     }
 
     if (params.classId) {
-      return await lessonsRepo.getByClassId(params.classId);
+      return await lessonsRepo.getByClassId(params.classId, params.status);
+    }
+
+    if (params.schoolId) {
+      return await lessonsRepo.getBySchoolId(params.schoolId, params.status);
     }
 
     // For platform admins, return all lessons (optionally filtered by status)

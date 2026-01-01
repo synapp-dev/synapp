@@ -75,6 +75,11 @@ export const topicsService = {
     const params: ListTopicsParams = listTopicsSchema.parse(query);
     await assertCanViewTopics(ctx);
 
+    // Check if requesting from view (for lesson wizard)
+    if ((params as any).useView) {
+      return await topicsRepo.getFromView();
+    }
+
     if (params.stageId) {
       return await topicsRepo.getByStageId(params.stageId);
     }
