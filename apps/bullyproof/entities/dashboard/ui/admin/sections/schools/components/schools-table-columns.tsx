@@ -31,8 +31,15 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
     return "—";
   }
 
-  // Normalize level names to lowercase for comparison
-  const normalizedLevels = levels.map((level) => level.toLowerCase().trim());
+  // Filter out null/undefined/non-string values and normalize level names to lowercase for comparison
+  const normalizedLevels = levels
+    .filter((level): level is string => typeof level === "string" && level != null)
+    .map((level) => level.toLowerCase().trim())
+    .filter((level) => level.length > 0); // Remove empty strings after trimming
+
+  if (normalizedLevels.length === 0) {
+    return "—";
+  }
 
   const hasPrimary = normalizedLevels.some(
     (level) => level === "primary" || level.includes("primary")
@@ -50,8 +57,9 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
   }
 
   // Fallback: return first level capitalized
-  return levels[0]
-    ? levels[0].charAt(0).toUpperCase() + levels[0].slice(1).toLowerCase()
+  const firstLevel = normalizedLevels[0];
+  return firstLevel
+    ? firstLevel.charAt(0).toUpperCase() + firstLevel.slice(1).toLowerCase()
     : "—";
 }
 
