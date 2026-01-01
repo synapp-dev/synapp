@@ -25,6 +25,7 @@ export const listTopicsSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(50),
   offset: z.number().int().min(0).max(10000).optional().default(0),
   search: z.string().trim().max(100).optional(),
+  useView: z.string().optional().transform((val) => val === "true"),
 });
 
 export type ListTopicsParams = z.infer<typeof listTopicsSchema>;

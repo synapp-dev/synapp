@@ -7,7 +7,7 @@ export const createLessonSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
   scheduledFor: z.string().datetime().optional(),
-  status: z.enum(['draft', 'scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+  status: z.enum(['draft', 'scheduled', 'in_progress', 'pending_review', 'completed', 'cancelled']).optional(),
   classIds: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -18,6 +18,7 @@ export const updateLessonSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
   scheduledFor: z.string().datetime().optional(),
+  status: z.enum(['draft', 'scheduled', 'in_progress', 'pending_review', 'completed', 'cancelled']).optional(),
   classIds: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -26,10 +27,11 @@ export type UpdateLessonParams = z.infer<typeof updateLessonSchema>;
 // Schema for listing lessons
 export const listLessonsSchema = z
   .object({
+    schoolId: z.string().trim().min(1).max(500).optional(),
     teacherId: z.string().trim().min(1).max(500).optional(),
     classId: z.string().trim().min(1).max(500).optional(),
     topicId: z.string().trim().min(1).max(500).optional(),
-    status: z.enum(['draft', 'scheduled', 'in_progress', 'completed', 'cancelled']).optional(),
+    status: z.enum(['draft', 'scheduled', 'in_progress', 'pending_review', 'completed', 'cancelled']).optional(),
     limit: z
       .string()
       .optional()
@@ -47,6 +49,7 @@ export const listLessonsSchema = z
     search: z.string().trim().max(100).optional(),
   })
   .transform((v) => ({
+    schoolId: v.schoolId,
     teacherId: v.teacherId,
     classId: v.classId,
     topicId: v.topicId,
