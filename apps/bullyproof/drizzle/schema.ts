@@ -1468,7 +1468,7 @@ export const lessons = pgTable(
     }).onDelete("restrict"),
     check(
       "lessons_status_check",
-      sql`status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'in_progress'::text, 'completed'::text, 'cancelled'::text])`
+      sql`status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'in_progress'::text, 'pending_review'::text, 'completed'::text, 'cancelled'::text])`
     ),
   ]
 );
@@ -1532,6 +1532,45 @@ export const lessonLiveState = pgTable(
       for: "update",
       to: ["public"],
     }),
+  ]
+);
+
+export const lessonFeedback = pgTable(
+  "lesson_feedback",
+  {
+    id: uuid().defaultRandom().primaryKey().notNull(),
+    lessonId: uuid("lesson_id").notNull(),
+    teacherUserId: uuid("teacher_user_id").notNull(),
+    rating: integer().notNull(),
+    comments: text(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_lesson_feedback_lesson_id").using(
+      "btree",
+      table.lessonId.asc().nullsLast().op("uuid_ops")
+    ),
+    index("idx_lesson_feedback_teacher_user_id").using(
+      "btree",
+      table.teacherUserId.asc().nullsLast().op("uuid_ops")
+    ),
+    foreignKey({
+      columns: [table.lessonId],
+      foreignColumns: [lessons.id],
+      name: "lesson_feedback_lesson_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.teacherUserId],
+      foreignColumns: [usersInAuth.id],
+      name: "lesson_feedback_teacher_user_id_fkey",
+    }),
+    check(
+      "lesson_feedback_rating_check",
+      sql`rating >= 1 AND rating <= 5`
+    ),
+    unique("lesson_feedback_lesson_id_unique", [table.lessonId]),
   ]
 );
 
@@ -2249,6 +2288,58 @@ export const vLessonAllowedSlides = pgView("v_lesson_allowed_slides", {
   .with({ securityInvoker: true })
   .as(
     sql`SELECT l.id AS lesson_id, ts.id AS topic_slide_id, ts.order_index FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id`
+  );
+
+export const vTopicsWithCompletion = pgView("v_topics_with_completion", {
+  topicId: uuid("topic_id"),
+  topicTitle: text("topic_title"),
+  topicDescription: text("topic_description"),
+  stageOrder: smallint("stage_order"),
+  topicStatus: text("topic_status"),
+  topicCreatedAt: timestamp("topic_created_at", { withTimezone: true, mode: "string" }),
+  stageId: uuid("stage_id"),
+  stageCode: text("stage_code"),
+  stageName: text("stage_name"),
+  stageSortIndex: smallint("stage_sort_index"),
+  slideCount: integer("slide_count"),
+  completedClassIds: text("completed_class_ids"),
+  completedClassNames: text("completed_class_names"),
+})
+  .with({ securityInvoker: true })
+  .as(
+    sql`SELECT 
+      t.id AS topic_id,
+      t.title AS topic_title,
+      t.official_notes AS topic_description,
+      t.stage_order,
+      t.status AS topic_status,
+      t.created_at AS topic_created_at,
+      cs.id AS stage_id,
+      cs.code AS stage_code,
+      cs.name AS stage_name,
+      cs.sort_index AS stage_sort_index,
+      COALESCE(slide_counts.slide_count, 0) AS slide_count,
+      COALESCE(completed_classes.completed_class_ids, ARRAY[]::uuid[]) AS completed_class_ids,
+      COALESCE(completed_classes.completed_class_names, ARRAY[]::text[]) AS completed_class_names
+    FROM topics t
+    INNER JOIN curriculum_stages cs ON t.stage_id = cs.id
+    LEFT JOIN (
+      SELECT topic_id, COUNT(*) AS slide_count
+      FROM topic_slides
+      GROUP BY topic_id
+    ) slide_counts ON slide_counts.topic_id = t.id
+    LEFT JOIN (
+      SELECT 
+        l.topic_id,
+        array_agg(DISTINCT c.id ORDER BY c.id) AS completed_class_ids,
+        array_agg(DISTINCT c.name ORDER BY c.name) AS completed_class_names
+      FROM lessons l
+      INNER JOIN lesson_classes lc ON l.id = lc.lesson_id
+      INNER JOIN classes c ON lc.class_id = c.id
+      WHERE l.status = 'completed'
+      GROUP BY l.topic_id
+    ) completed_classes ON completed_classes.topic_id = t.id
+    ORDER BY cs.sort_index, t.stage_order, t.title`
   );
 
 export const vSchoolsEnriched = pgView("v_schools_enriched", {
