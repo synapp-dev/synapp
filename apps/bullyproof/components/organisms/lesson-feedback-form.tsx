@@ -2,7 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { Star, Loader2 } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Label } from "@workspace/ui/components/label";
@@ -30,7 +36,10 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
       const result = await lessonsApi.feedback.get.byLessonId(lessonId);
       if (result.error) {
         // 404 means no feedback exists yet, which is fine
-        if (result.error.message?.includes("not found") || result.status === 404) {
+        if (
+          result.error.message?.includes("not found") ||
+          result.error.status === 404
+        ) {
           return null;
         }
         throw new Error(result.error.message || "Failed to load feedback");
@@ -92,8 +101,10 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
 
       // Invalidate queries to refresh lesson status
       await queryClient.invalidateQueries({ queryKey: ["lesson", lessonId] });
-      await queryClient.invalidateQueries({ queryKey: ["lesson-feedback", lessonId] });
-      
+      await queryClient.invalidateQueries({
+        queryKey: ["lesson-feedback", lessonId],
+      });
+
       // Refresh the page to show updated status
       router.refresh();
     } catch (err: any) {
@@ -110,7 +121,8 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
       <CardHeader>
         <CardTitle>Rate Your Lesson Experience</CardTitle>
         <CardDescription>
-          Please provide your feedback. Rating is required to complete the lesson.
+          Please provide your feedback. Rating is required to complete the
+          lesson.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -123,7 +135,11 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
             {/* Star Rating */}
             <div className="space-y-2">
               <Label htmlFor="rating">Rating *</Label>
-              <div className="flex gap-2" role="radiogroup" aria-label="Lesson rating">
+              <div
+                className="flex gap-2"
+                role="radiogroup"
+                aria-label="Lesson rating"
+              >
                 {[1, 2, 3, 4, 5].map((value) => (
                   <button
                     key={value}
@@ -197,4 +213,3 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
     </Card>
   );
 }
-
