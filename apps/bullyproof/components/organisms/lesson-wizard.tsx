@@ -14,9 +14,8 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { LessonWizardClasses } from "./lesson-wizard-classes";
 import { LessonWizardTopic } from "./lesson-wizard-topic";
-import { LessonWizardSchedule } from "./lesson-wizard-schedule";
 import { LessonWizardConfirm } from "./lesson-wizard-confirm";
-import type { ClassOption, TopicOption, ScheduleOption, LessonCreatePayload } from "@/types/lesson-wizard";
+import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
 import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
@@ -57,12 +56,9 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
     step: 1,
     selectedClasses: [] as ClassOption[],
     selectedTopic: null as TopicOption | null,
-    scheduleOption: 'immediate' as ScheduleOption,
-    scheduledDate: '',
-    scheduledTime: '',
   });
 
-  const totalSteps = 4;
+  const totalSteps = 3;
 
   const goToStep = (step: number) => {
     setState((prev) => ({ ...prev, step: Math.max(1, Math.min(totalSteps, step)) }));
@@ -86,11 +82,6 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
       case 2:
         return state.selectedTopic !== null;
       case 3:
-        if (state.scheduleOption === 'scheduled') {
-          return state.scheduledDate !== '' && state.scheduledTime !== '';
-        }
-        return true;
-      case 4:
         return true;
       default:
         return false;
@@ -109,17 +100,12 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
     setError(null);
 
     try {
-      // Prepare payload
-      const scheduledFor = state.scheduleOption === 'scheduled' && state.scheduledDate && state.scheduledTime
-        ? `${state.scheduledDate}T${state.scheduledTime}:00`
-        : undefined;
-
+      // Prepare payload - all lessons start immediately
       const payload = {
         schoolId: schoolUuid, // Use UUID for API call
         topicId: state.selectedTopic.id,
         classIds: state.selectedClasses.map((c) => c.id),
-        status: state.scheduleOption === 'immediate' ? 'in_progress' : (scheduledFor ? 'scheduled' : 'draft'),
-        scheduledFor,
+        status: 'in_progress', // Always start immediately
       };
 
       // Call the API to create the lesson
@@ -165,8 +151,6 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
       case 2:
         return 'Choose Topic';
       case 3:
-        return 'Schedule';
-      case 4:
         return 'Confirm';
       default:
         return 'Create Lesson';
@@ -180,8 +164,6 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
       case 2:
         return 'Select the lesson content you want to teach';
       case 3:
-        return 'Decide when to start this lesson';
-      case 4:
         return 'Review your selections before creating';
       default:
         return '';
@@ -240,6 +222,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
             {state.step === 2 && (
               <LessonWizardTopic
                 selectedTopic={state.selectedTopic}
+                selectedClasses={state.selectedClasses}
                 onTopicChange={(topic) =>
                   setState((prev) => ({ ...prev, selectedTopic: topic }))
                 }
@@ -247,29 +230,9 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
             )}
 
             {state.step === 3 && (
-              <LessonWizardSchedule
-                scheduleOption={state.scheduleOption}
-                scheduledDate={state.scheduledDate}
-                scheduledTime={state.scheduledTime}
-                onScheduleChange={(option) =>
-                  setState((prev) => ({ ...prev, scheduleOption: option }))
-                }
-                onDateChange={(date) =>
-                  setState((prev) => ({ ...prev, scheduledDate: date }))
-                }
-                onTimeChange={(time) =>
-                  setState((prev) => ({ ...prev, scheduledTime: time }))
-                }
-              />
-            )}
-
-            {state.step === 4 && (
               <LessonWizardConfirm
                 selectedClasses={state.selectedClasses}
                 selectedTopic={state.selectedTopic}
-                scheduleOption={state.scheduleOption}
-                scheduledDate={state.scheduledDate}
-                scheduledTime={state.scheduledTime}
               />
             )}
 

@@ -2,39 +2,18 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
-import { CalendarIcon, ClockIcon, UsersIcon, BookOpenIcon } from "lucide-react";
-import type { ClassOption, TopicOption, ScheduleOption } from "@/types/lesson-wizard";
+import { UsersIcon, BookOpenIcon } from "lucide-react";
+import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
 
 interface LessonWizardConfirmProps {
   selectedClasses: ClassOption[];
   selectedTopic: TopicOption | null;
-  scheduleOption: ScheduleOption;
-  scheduledDate: string;
-  scheduledTime: string;
 }
 
 export function LessonWizardConfirm({
   selectedClasses,
   selectedTopic,
-  scheduleOption,
-  scheduledDate,
-  scheduledTime,
 }: LessonWizardConfirmProps) {
-  const formatDateTime = () => {
-    if (scheduleOption === "immediate") {
-      return "Starting immediately";
-    }
-
-    const date = new Date(`${scheduledDate}T${scheduledTime}`);
-    return date.toLocaleString('en-AU', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -86,20 +65,6 @@ export function LessonWizardConfirm({
             </div>
           )}
 
-          {/* Schedule Section */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <ClockIcon className="h-4 w-4" />
-              <span>Schedule</span>
-              <Badge variant={scheduleOption === "immediate" ? "default" : "secondary"}>
-                {scheduleOption === "immediate" ? "Immediate" : "Scheduled"}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <CalendarIcon className="h-4 w-4" />
-              <span>{formatDateTime()}</span>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

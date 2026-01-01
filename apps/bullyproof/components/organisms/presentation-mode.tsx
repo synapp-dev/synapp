@@ -11,10 +11,12 @@ import {
   Maximize,
   Minimize,
   Joystick,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { SlideRenderer } from "./slide-renderer";
 import { useLessonLiveState } from "@/hooks/use-lesson-live-state";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
 
 interface PresentationModeProps {
   lessonId: string;
@@ -32,18 +34,57 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
   } = useLessonLiveState(lessonId);
   const [showControls, setShowControls] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showCompletionSlide, setShowCompletionSlide] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const nextSlide = useCallback(() => {
-    if (currentSlideIndex < slides.length - 1) {
+    // If we're on the last slide, show completion slide instead
+    if (currentSlideIndex === slides.length - 1) {
+      setShowCompletionSlide(true);
+    } else if (currentSlideIndex < slides.length - 1) {
       updateSlide(currentSlideIndex + 1);
     }
   }, [currentSlideIndex, slides.length, updateSlide]);
 
   const prevSlide = useCallback(() => {
-    if (currentSlideIndex > 0) {
+    // If we're showing completion slide, go back to last regular slide
+    if (showCompletionSlide) {
+      setShowCompletionSlide(false);
+    } else if (currentSlideIndex > 0) {
       updateSlide(currentSlideIndex - 1);
     }
-  }, [currentSlideIndex, updateSlide]);
+  }, [currentSlideIndex, showCompletionSlide, updateSlide]);
+
+  // Mark lesson as pending_review when completion slide is shown
+  useEffect(() => {
+    if (showCompletionSlide && !isCompleted && !isCompleting) {
+      const markAsPendingReview = async () => {
+        try {
+          setIsCompleting(true);
+          const result = await lessonsApi.put.update(lessonId, {
+            status: "pending_review",
+          });
+
+          if (result.error) {
+            console.error("Failed to mark lesson as pending review:", result.error);
+          } else {
+            setIsCompleted(true);
+          }
+        } catch (err) {
+          console.error("Error marking lesson as pending review:", err);
+        } finally {
+          setIsCompleting(false);
+        }
+      };
+
+      markAsPendingReview();
+    }
+  }, [showCompletionSlide, isCompleted, isCompleting, lessonId]);
+
+  const handleClosePresentation = useCallback(() => {
+    window.close();
+  }, []);
 
   // All hooks must be called before any conditional returns
   // Keyboard navigation
@@ -51,6 +92,14 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     if (isLoading || error || !slides.length || !currentSlide) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (showCompletionSlide) {
+        // On completion slide, only allow escape to close
+        if (e.key === "Escape") {
+          window.close();
+        }
+        return;
+      }
+
       if (e.key === "ArrowRight") {
         nextSlide();
       } else if (e.key === "ArrowLeft") {
@@ -80,6 +129,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     error,
     slides.length,
     currentSlide,
+    showCompletionSlide,
   ]);
 
   // Fullscreen change detection
@@ -95,7 +145,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
 
   // Mouse movement detection for controls
   useEffect(() => {
-    if (isLoading || error || !slides.length || !currentSlide) return;
+    if (isLoading || error || !slides.length || showCompletionSlide) return;
 
     let timeoutId: NodeJS.Timeout;
 
@@ -112,7 +162,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       window.removeEventListener("mousemove", handleMouseMove);
       clearTimeout(timeoutId);
     };
-  }, [isLoading, error, slides.length, currentSlide]);
+  }, [isLoading, error, slides.length, currentSlide, showCompletionSlide]);
 
   // Now we can have conditional returns after all hooks
   // Loading state
@@ -138,11 +188,46 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
   }
 
   // Early return if no slides
-  if (!slides.length || !currentSlide) {
+  if (!slides.length) {
     return (
       <div className="relative w-full h-full flex items-center justify-center">
         <div className="text-center text-muted-foreground">
           <p>No slides available</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show completion slide if we've navigated past the last regular slide
+  if (showCompletionSlide) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-muted">
+        <div className="flex flex-col items-center justify-center gap-8 p-8 text-center max-w-2xl">
+          <CheckCircle2 className="h-24 w-24 text-primary" />
+          <div className="space-y-4">
+            <h1 className="text-4xl font-bold text-foreground">Topic Complete</h1>
+            <p className="text-lg text-muted-foreground">
+              You have completed all slides in this topic.
+            </p>
+            <Button
+              onClick={handleClosePresentation}
+              size="lg"
+              className="mt-6"
+            >
+              Click here to close
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Ensure we have a current slide for regular slides
+  if (!currentSlide) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="text-center text-muted-foreground">
+          <p>Loading slide...</p>
         </div>
       </div>
     );
@@ -241,7 +326,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
               variant="ghost"
               size="icon"
               onClick={prevSlide}
-              disabled={currentSlideIndex === 0}
+              disabled={currentSlideIndex === 0 && !showCompletionSlide}
               className="text-foreground hover:bg-foreground/20 disabled:opacity-50"
             >
               <ChevronLeft className="h-6 w-6" />
@@ -251,7 +336,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
               variant="ghost"
               size="icon"
               onClick={nextSlide}
-              disabled={currentSlideIndex === slides.length - 1}
+              disabled={showCompletionSlide}
               className="text-foreground hover:bg-foreground/20 disabled:opacity-50"
             >
               <ChevronRight className="h-6 w-6" />

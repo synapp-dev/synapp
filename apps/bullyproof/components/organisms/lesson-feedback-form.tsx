@@ -1,24 +1,56 @@
 "use client";
 
-import { useState } from "react";
-import { Star } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Star, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Label } from "@workspace/ui/components/label";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 
 interface LessonFeedbackFormProps {
   lessonId: string;
 }
 
 export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const [rating, setRating] = useState<number | null>(null);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [comments, setComments] = useState("");
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch existing feedback
+  const { data: existingFeedback, isLoading } = useQuery({
+    queryKey: ["lesson-feedback", lessonId],
+    queryFn: async () => {
+      const result = await lessonsApi.feedback.get.byLessonId(lessonId);
+      if (result.error) {
+        // 404 means no feedback exists yet, which is fine
+        if (result.error.message?.includes("not found") || result.status === 404) {
+          return null;
+        }
+        throw new Error(result.error.message || "Failed to load feedback");
+      }
+      return result.data;
+    },
+    retry: false,
+  });
+
+  // Initialize form with existing feedback
+  useEffect(() => {
+    if (existingFeedback) {
+      setRating(existingFeedback.rating);
+      setComments(existingFeedback.comments || "");
+    }
+  }, [existingFeedback]);
 
   const handleRatingClick = (value: number) => {
     setRating(value);
+    setError(null);
   };
 
   const handleMouseEnter = (value: number) => {
@@ -29,10 +61,46 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
     setHoveredRating(null);
   };
 
-  const handleSubmit = () => {
-    // TODO: Submit to backend when implemented
-    console.log("Submitting feedback:", { lessonId, rating, comments });
-    setIsSubmitted(true);
+  const handleSubmit = async () => {
+    if (!rating) {
+      setError("Please select a rating");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      let result;
+      if (existingFeedback) {
+        // Update existing feedback
+        result = await lessonsApi.feedback.put.update(lessonId, {
+          rating,
+          comments: comments || undefined,
+        });
+      } else {
+        // Create new feedback
+        result = await lessonsApi.feedback.post.create(lessonId, {
+          rating,
+          comments: comments || undefined,
+        });
+      }
+
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to save feedback");
+      }
+
+      // Invalidate queries to refresh lesson status
+      await queryClient.invalidateQueries({ queryKey: ["lesson", lessonId] });
+      await queryClient.invalidateQueries({ queryKey: ["lesson-feedback", lessonId] });
+      
+      // Refresh the page to show updated status
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message || "An error occurred while saving feedback");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const filledRating = hoveredRating ?? rating;
@@ -46,7 +114,11 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!isSubmitted ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center p-6">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
           <div className="space-y-6">
             {/* Star Rating */}
             <div className="space-y-2">
@@ -62,6 +134,7 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
                     className="group relative inline-block"
                     aria-label={`Rate ${value} out of 5 stars`}
                     aria-pressed={rating === value}
+                    disabled={isSubmitting}
                   >
                     <Star
                       className={`h-8 w-8 transition-colors ${
@@ -88,50 +161,36 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
                 rows={6}
+                disabled={isSubmitting}
               />
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-sm text-destructive">{error}</p>
+              </div>
+            )}
 
             {/* Submit Button */}
             <div className="flex justify-end gap-2">
               <Button
                 onClick={handleSubmit}
-                disabled={!rating}
+                disabled={!rating || isSubmitting}
                 className="min-w-[200px]"
               >
-                Mark as Completed
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : existingFeedback ? (
+                  "Update Feedback"
+                ) : (
+                  "Mark as Completed"
+                )}
               </Button>
             </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-center p-6 bg-primary/10 rounded-lg">
-              <div className="text-center space-y-2">
-                <div className="flex justify-center gap-1 mb-2">
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <Star
-                      key={value}
-                      className={`h-6 w-6 ${
-                        value <= (rating ?? 0)
-                          ? "fill-primary text-primary"
-                          : "fill-none text-muted-foreground"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <h3 className="text-lg font-semibold">Thank You!</h3>
-                <p className="text-sm text-muted-foreground">
-                  Your lesson has been marked as completed.
-                </p>
-              </div>
-            </div>
-            {comments && (
-              <div className="p-4 bg-secondary rounded-lg">
-                <p className="text-sm font-medium mb-1">Your Feedback</p>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {comments}
-                </p>
-              </div>
-            )}
           </div>
         )}
       </CardContent>

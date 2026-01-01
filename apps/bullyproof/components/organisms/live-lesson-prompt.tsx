@@ -106,8 +106,7 @@ export function LiveLessonPrompt() {
 
             {/* Description */}
             <p className="text-xs text-muted-foreground mb-4">
-              There is currently a live lesson in progress. Would you like to
-              go?
+              You currently have a live lesson in progress.
             </p>
 
             {/* Footer */}
@@ -118,14 +117,14 @@ export function LiveLessonPrompt() {
                 onClick={handleCancel}
                 className="h-8"
               >
-                Cancel
+                Dismiss
               </Button>
               <Button
                 size="sm"
                 onClick={handleGoToLesson}
                 className="h-8 bg-orange-600 hover:bg-orange-700"
               >
-                Go to lesson
+                View lesson
               </Button>
             </div>
           </div>
