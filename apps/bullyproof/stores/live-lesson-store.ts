@@ -91,22 +91,32 @@ export const useLiveLessonStore = create<LiveLessonState>()(
         }),
       fetchInProgressLesson: async () => {
         try {
-          // Fetch lessons with status 'in_progress'
+          // Fetch lessons with status 'in_progress' or 'pending_review'
           // The API client (apiFetch) automatically handles authentication
-          const result = await lessonsApi.get.list({
-            status: "in_progress",
-            limit: 1,
-          });
+          const [inProgressResult, pendingReviewResult] = await Promise.all([
+            lessonsApi.get.list({
+              status: "in_progress",
+              limit: 1,
+            }),
+            lessonsApi.get.list({
+              status: "pending_review",
+              limit: 1,
+            }),
+          ]);
 
-          if (result.error) {
-            // If it's an auth error (401/403), don't clear state - might be a timing issue
-            if (result.error.status === 401 || result.error.status === 403) {
+          // Check for errors
+          if (inProgressResult.error && pendingReviewResult.error) {
+            // If both are auth errors (401/403), don't clear state - might be a timing issue
+            if (
+              (inProgressResult.error.status === 401 || inProgressResult.error.status === 403) &&
+              (pendingReviewResult.error.status === 401 || pendingReviewResult.error.status === 403)
+            ) {
               console.warn(
-                "Auth error fetching in-progress lessons - token may not be ready yet"
+                "Auth error fetching live lessons - token may not be ready yet"
               );
               return;
             }
-            console.error("Error fetching in-progress lessons:", result.error);
+            console.error("Error fetching live lessons:", inProgressResult.error, pendingReviewResult.error);
             // If there's an error, clear the live lesson state
             set({
               isLive: false,
@@ -119,10 +129,13 @@ export const useLiveLessonStore = create<LiveLessonState>()(
             return;
           }
 
-          const inProgressLessons = result.data || [];
+          // Combine results, prioritizing in_progress over pending_review
+          const inProgressLessons = inProgressResult.data || [];
+          const pendingReviewLessons = pendingReviewResult.data || [];
+          const allLiveLessons = [...inProgressLessons, ...pendingReviewLessons];
 
-          if (inProgressLessons.length === 0) {
-            // No in-progress lessons found, clear the state
+          if (allLiveLessons.length === 0) {
+            // No live lessons found, clear the state
             set({
               isLive: false,
               schoolSlug: null,
@@ -134,8 +147,8 @@ export const useLiveLessonStore = create<LiveLessonState>()(
             return;
           }
 
-          // Get the first in-progress lesson
-          const lesson = inProgressLessons[0];
+          // Get the first lesson (prioritizes in_progress if both exist)
+          const lesson = allLiveLessons[0];
 
           // Fetch user's schools to find the school by ID and get the slug
           const schoolsResult = await schoolApi.get.schools();

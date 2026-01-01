@@ -95,16 +95,26 @@ export function useLessonLiveState(
 
         // Set current slide index from live state - prioritize current_index from database
         if (liveState) {
+          // Handle both camelCase (from Drizzle API) and snake_case (from Supabase direct query) formats
+          const currentIndex = 
+            (liveState as any).currentIndex ?? 
+            (liveState as any).current_index ?? 
+            -1;
+          const currentSlideId = 
+            (liveState as any).currentSlideId ?? 
+            (liveState as any).current_slide_id ?? 
+            null;
+
           // First, try to use current_index directly (most reliable)
           if (
-            liveState.current_index >= 0 &&
-            liveState.current_index < formattedSlides.length
+            currentIndex >= 0 &&
+            currentIndex < formattedSlides.length
           ) {
-            setCurrentSlideIndex(liveState.current_index);
-          } else {
+            setCurrentSlideIndex(currentIndex);
+          } else if (currentSlideId) {
             // Fallback: find by slide ID if current_index is invalid
             const index = formattedSlides.findIndex(
-              (s) => s.id === liveState.current_slide_id
+              (s) => s.id === currentSlideId
             );
             if (index !== -1) {
               setCurrentSlideIndex(index);
@@ -112,6 +122,9 @@ export function useLessonLiveState(
               // Last resort: start at first slide
               setCurrentSlideIndex(0);
             }
+          } else {
+            // No valid index or slide ID - start at first slide
+            setCurrentSlideIndex(0);
           }
         } else {
           // No live state exists - create initial state at slide 0
@@ -155,21 +168,30 @@ export function useLessonLiveState(
           const newState = payload.new as LiveState;
           
           setCurrentSlideIndex((currentIndex) => {
-            // Find the slide index by current_slide_id
-            const index = slides.findIndex(
-              (s) => s.id === newState.current_slide_id
-            );
+            // Handle both camelCase and snake_case formats from realtime updates
+            const slideId = 
+              (newState as any).currentSlideId ?? 
+              (newState as any).current_slide_id ?? 
+              null;
+            const indexValue = 
+              (newState as any).currentIndex ?? 
+              (newState as any).current_index ?? 
+              -1;
             
-            if (index !== -1) {
-              return index;
+            // First, try to find by slide ID
+            if (slideId) {
+              const index = slides.findIndex((s) => s.id === slideId);
+              if (index !== -1) {
+                return index;
+              }
             }
             
             // Fallback to current_index
             if (
-              newState.current_index >= 0 &&
-              newState.current_index < slides.length
+              indexValue >= 0 &&
+              indexValue < slides.length
             ) {
-              return newState.current_index;
+              return indexValue;
             }
             
             return currentIndex;
