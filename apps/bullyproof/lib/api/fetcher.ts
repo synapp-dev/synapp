@@ -54,15 +54,23 @@ export async function apiFetch<T>(
     body = await res.json();
   } catch {}
 
-  if (!res.ok || body?.error) {
+  if (!res.ok) {
+    // Handle error responses
+    const errorMessage =
+      typeof body?.error === "string"
+        ? body.error
+        : body?.error?.message || `HTTP ${res.status}`;
     return {
       data: null,
-      error: body?.error ?? {
-        message: `HTTP ${res.status}`,
+      error: {
+        message: errorMessage,
         status: res.status,
       },
     };
   }
+
+  // Handle successful responses
+  // API can return { data: T } or just T directly
   const payload =
     body && typeof body === "object" && "data" in body
       ? (body as any).data
