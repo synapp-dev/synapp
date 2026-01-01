@@ -6,6 +6,7 @@ type Lesson = typeof lessons.$inferSelect;
 export const lessonsApi = {
   get: {
     list(params?: {
+      schoolId?: string;
       teacherId?: string;
       classId?: string;
       topicId?: string;
@@ -15,6 +16,7 @@ export const lessonsApi = {
       search?: string;
     }): Promise<ApiResult<Lesson[]>> {
       const searchParams = new URLSearchParams();
+      if (params?.schoolId) searchParams.set("schoolId", params.schoolId);
       if (params?.teacherId) searchParams.set("teacherId", params.teacherId);
       if (params?.classId) searchParams.set("classId", params.classId);
       if (params?.topicId) searchParams.set("topicId", params.topicId);
@@ -53,6 +55,7 @@ export const lessonsApi = {
         title?: string;
         description?: string;
         scheduledFor?: string;
+        status?: string;
         classIds?: string[];
       }
     ): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
@@ -116,6 +119,62 @@ export const lessonsApi = {
       }>> {
         return apiFetch(`/lessons/${encodeURIComponent(id)}/live-state`, {
           method: "POST",
+          body: JSON.stringify(payload),
+        });
+      },
+    },
+  },
+  feedback: {
+    get: {
+      byLessonId(id: string): Promise<ApiResult<{
+        id: string;
+        lessonId: string;
+        teacherUserId: string;
+        rating: number;
+        comments: string | null;
+        createdAt: string;
+      }>> {
+        return apiFetch(`/lessons/${encodeURIComponent(id)}/feedback`);
+      },
+    },
+    post: {
+      create(
+        lessonId: string,
+        payload: {
+          rating: number;
+          comments?: string;
+        }
+      ): Promise<ApiResult<{
+        id: string;
+        lessonId: string;
+        teacherUserId: string;
+        rating: number;
+        comments: string | null;
+        createdAt: string;
+      }>> {
+        return apiFetch(`/lessons/${encodeURIComponent(lessonId)}/feedback`, {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      },
+    },
+    put: {
+      update(
+        lessonId: string,
+        payload: {
+          rating?: number;
+          comments?: string;
+        }
+      ): Promise<ApiResult<{
+        id: string;
+        lessonId: string;
+        teacherUserId: string;
+        rating: number;
+        comments: string | null;
+        createdAt: string;
+      }>> {
+        return apiFetch(`/lessons/${encodeURIComponent(lessonId)}/feedback`, {
+          method: "PUT",
           body: JSON.stringify(payload),
         });
       },

@@ -14,12 +14,14 @@ export const topicsApi = {
       limit?: number;
       offset?: number;
       search?: string;
+      useView?: boolean;
     }): Promise<ApiResult<Topic[]>> {
       const searchParams = new URLSearchParams();
       if (params?.stageId) searchParams.set("stageId", params.stageId);
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
       if (params?.search) searchParams.set("search", params.search);
+      if (params?.useView) searchParams.set("useView", "true");
 
       const query = searchParams.toString();
       return apiFetch<Topic[]>(`/topics${query ? `?${query}` : ""}`);

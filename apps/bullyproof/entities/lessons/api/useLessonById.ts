@@ -43,7 +43,8 @@ export const getLessonByIdOptions = (id: string) =>
       }
       return data ?? null;
     },
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 1000, // 30 seconds - reduced to make it more reactive to status changes
+    refetchOnMount: true, // Always refetch on mount to ensure fresh data
   });
 
 export function useLessonById(
