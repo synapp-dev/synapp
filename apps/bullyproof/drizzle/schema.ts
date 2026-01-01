@@ -1566,11 +1566,11 @@ export const lessonFeedback = pgTable(
       foreignColumns: [usersInAuth.id],
       name: "lesson_feedback_teacher_user_id_fkey",
     }),
-    check(
-      "lesson_feedback_rating_check",
-      sql`rating >= 1 AND rating <= 5`
+    check("lesson_feedback_rating_check", sql`rating >= 1 AND rating <= 5`),
+    unique("lesson_feedback_lesson_id_unique").on(
+      table.lessonId,
+      table.teacherUserId
     ),
-    unique("lesson_feedback_lesson_id_unique", [table.lessonId]),
   ]
 );
 
@@ -2296,7 +2296,10 @@ export const vTopicsWithCompletion = pgView("v_topics_with_completion", {
   topicDescription: text("topic_description"),
   stageOrder: smallint("stage_order"),
   topicStatus: text("topic_status"),
-  topicCreatedAt: timestamp("topic_created_at", { withTimezone: true, mode: "string" }),
+  topicCreatedAt: timestamp("topic_created_at", {
+    withTimezone: true,
+    mode: "string",
+  }),
   stageId: uuid("stage_id"),
   stageCode: text("stage_code"),
   stageName: text("stage_name"),
