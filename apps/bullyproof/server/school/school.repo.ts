@@ -15,9 +15,12 @@ export const schoolRepo = {
     limit: number;
     offset: number;
     search?: string;
+    schoolIds?: string[];
   }) => {
     const hasSearch =
       typeof params.search === "string" && params.search.trim().length > 0;
+    const hasSchoolIdsFilter =
+      Array.isArray(params.schoolIds) && params.schoolIds.length > 0;
 
     // Base query with statistics from v_schools_statistics view
     const baseQuery = db
@@ -64,8 +67,29 @@ export const schoolRepo = {
         eq(vSchoolsStatistics.id, vSchoolsReadable.id)
       );
 
+    // Build where conditions
+    const whereConditions = [];
+    if (hasSearch) {
+      whereConditions.push(
+        ilike(vSchoolsReadable.name, `%${params.search!.trim()}%`)
+      );
+    }
+    if (hasSchoolIdsFilter) {
+      whereConditions.push(inArray(vSchoolsReadable.id, params.schoolIds!));
+    }
+
+    // Apply where conditions if any
+    let queryWithWhere = baseQuery;
+    if (whereConditions.length > 0) {
+      queryWithWhere = baseQuery.where(
+        whereConditions.length === 1
+          ? whereConditions[0]
+          : and(...whereConditions)
+      ) as any;
+    }
+
     if (!hasSearch) {
-      const rows = await baseQuery
+      const rows = await queryWithWhere
         .orderBy(asc(vSchoolsReadable.name))
         .limit(params.limit)
         .offset(params.offset);
@@ -78,15 +102,13 @@ export const schoolRepo = {
     // Falls back to ILIKE and alphabetical order if similarity not installed.
     try {
       const similarityExpr = sql`similarity(${vSchoolsReadable.name}, ${q})`;
-      const rows = await baseQuery
-        .where(ilike(vSchoolsReadable.name, `%${q}%`) as any)
+      const rows = await queryWithWhere
         .orderBy(desc(similarityExpr), asc(vSchoolsReadable.name))
         .limit(params.limit)
         .offset(params.offset);
       return rows;
     } catch {
-      const rows = await baseQuery
-        .where(ilike(vSchoolsReadable.name, `%${q}%`) as any)
+      const rows = await queryWithWhere
         .orderBy(asc(vSchoolsReadable.name))
         .limit(params.limit)
         .offset(params.offset);

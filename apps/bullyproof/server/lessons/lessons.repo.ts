@@ -33,7 +33,18 @@ export const lessonsRepo = {
       .where(eq(lessons.status, status))
       .orderBy(desc(lessons.createdAt)),
 
-  getByClassId: (classId: string) =>
+  getBySchoolId: (schoolId: string, status?: string) =>
+    db
+      .select()
+      .from(lessons)
+      .where(
+        status
+          ? and(eq(lessons.schoolId, schoolId), eq(lessons.status, status))
+          : eq(lessons.schoolId, schoolId)
+      )
+      .orderBy(desc(lessons.createdAt)),
+
+  getByClassId: (classId: string, status?: string) =>
     db
       .select({
         lesson: lessons,
@@ -42,7 +53,11 @@ export const lessonsRepo = {
       .from(lessons)
       .innerJoin(topics, eq(lessons.topicId, topics.id))
       .innerJoin(lessonClasses, eq(lessons.id, lessonClasses.lessonId))
-      .where(eq(lessonClasses.classId, classId))
+      .where(
+        status
+          ? and(eq(lessonClasses.classId, classId), eq(lessons.status, status))
+          : eq(lessonClasses.classId, classId)
+      )
       .orderBy(desc(lessons.createdAt)),
 
   getWithDetails: async (id: string) => {
@@ -119,6 +134,7 @@ export const lessonsRepo = {
     title?: string;
     description?: string;
     scheduledFor?: string;
+    status?: string;
     classIds?: string[];
   }) =>
     db.transaction(async (tx) => {

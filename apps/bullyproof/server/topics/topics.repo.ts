@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { topics, curriculumStages, topicSlides } from "@/server/db/schema";
+import { topics, curriculumStages, topicSlides, vTopicsWithCompletion } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc, ilike, sql } from "drizzle-orm";
 
 export const topicsRepo = {
@@ -40,6 +40,13 @@ export const topicsRepo = {
       slides,
     };
   },
+
+  getFromView: () =>
+    db.select().from(vTopicsWithCompletion).orderBy(
+      asc(vTopicsWithCompletion.stageSortIndex),
+      asc(vTopicsWithCompletion.stageOrder),
+      asc(vTopicsWithCompletion.topicTitle)
+    ),
 
   search: async (params: {
     search?: string;
