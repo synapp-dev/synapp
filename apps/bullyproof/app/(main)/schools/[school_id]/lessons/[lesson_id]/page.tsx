@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -8,10 +9,26 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
-import { User, BookOpen, Users, Loader2 } from "lucide-react";
+import {
+  BookOpen,
+  Users,
+  Loader2,
+  FileText,
+  MessageSquare,
+} from "lucide-react";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useParams } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useLessonStatusRealtime } from "@/hooks/use-lesson-status-realtime";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { useQuery } from "@tanstack/react-query";
+import { Badge } from "@workspace/ui/components/badge";
+import Link from "next/link";
+import { Button } from "@workspace/ui/components/button";
+import Image from "next/image";
+import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
+import { classesApi } from "@/entities/classes/api/endpoints";
+import { useMemo } from "react";
 
 function getInitials(
   firstName?: string | null,
@@ -22,10 +39,84 @@ function getInitials(
   return first + last || "?";
 }
 
+// Component to handle thumbnail image with error fallback
+function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
+  const [hasError, setHasError] = useState(false);
+  const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
+  const cachedUrl = useTopicSlidesCacheStore(
+    (state) => state.cache[slideId]?.url ?? null
+  );
+  const loading = useTopicSlidesCacheStore(
+    (state) => state.loading[slideId] ?? false
+  );
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
+
+  // Fetch URL using cache store (same as SlideRenderer)
+  useEffect(() => {
+    if (slideId && !slideId.startsWith("temp_")) {
+      // If we already have a cached URL, use it immediately
+      if (cachedUrl) {
+        setImageUrl(cachedUrl);
+        return;
+      }
+
+      // Otherwise, fetch it
+      let cancelled = false;
+      getSlideUrl(slideId).then((url) => {
+        if (!cancelled) {
+          setImageUrl(url);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    } else {
+      setImageUrl(null);
+    }
+  }, [slideId, getSlideUrl, cachedUrl]);
+
+  // Update when cached URL changes (for instant updates after cache updates)
+  useEffect(() => {
+    if (cachedUrl && !loading) {
+      setImageUrl(cachedUrl);
+    }
+  }, [cachedUrl, loading]);
+
+  if (loading && !imageUrl) {
+    return (
+      <div className="w-32 h-20 flex-shrink-0 rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center aspect-video">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError || !imageUrl) {
+    return (
+      <div className="w-32 h-20 flex-shrink-0 rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center aspect-video">
+        <FileText className="h-5 w-5 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-32 h-20 flex-shrink-0 rounded-md overflow-hidden bg-muted aspect-video">
+      <Image
+        src={imageUrl}
+        alt={alt}
+        fill
+        className="object-cover"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
 export default function LessonOverviewPage() {
   usePageTitle(["schools", "lessons", "overview"]);
   const params = useParams();
   const lesson_id = params?.lesson_id as string;
+  const school_id = params?.school_id as string;
 
   const {
     data: lessonData,
@@ -33,6 +124,100 @@ export default function LessonOverviewPage() {
     isError,
     error,
   } = useLessonById(lesson_id);
+
+  // Listen for real-time status changes
+  useLessonStatusRealtime(lesson_id);
+
+  // Fetch live state to get current slide information
+  const { data: liveStateData, isLoading: isLoadingLiveState } = useQuery({
+    queryKey: ["lesson-live-state", lesson_id],
+    queryFn: async () => {
+      const result = await lessonsApi.liveState.get.byLessonId(lesson_id);
+      if (result.error) {
+        console.error("Failed to fetch live state:", result.error);
+        return null;
+      }
+      return result.data;
+    },
+    enabled: !!lesson_id,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+
+  // Fetch year codes for assigned classes by fetching each class individually
+  const classIds = useMemo(
+    () => lessonData?.assignedClasses?.map((c) => c.classId) || [],
+    [lessonData?.assignedClasses]
+  );
+
+  // Fetch each class individually to get year codes
+  const { data: classesData } = useQuery<
+    Map<string, { id: string; yearCodes: string[] }>
+  >({
+    queryKey: ["classes-with-years", classIds],
+    queryFn: async () => {
+      if (classIds.length === 0) return new Map();
+
+      // Fetch all classes in parallel
+      const classPromises = classIds.map(async (classId) => {
+        try {
+          const result = await classesApi.get.byId(classId);
+          if (result.error) {
+            console.error(`Failed to fetch class ${classId}:`, result.error);
+            return null;
+          }
+          // Extract year codes from the years array
+          // The years array contains objects with yearCode property
+          const yearCodes =
+            result.data?.years
+              ?.map((year: any) => year.yearCode)
+              .filter((code: string) => code != null && code !== undefined) ||
+            [];
+          return {
+            id: classId,
+            yearCodes,
+          };
+        } catch (error) {
+          console.error(`Error fetching class ${classId}:`, error);
+          return null;
+        }
+      });
+
+      const results = await Promise.all(classPromises);
+      const classesMap = new Map<string, { id: string; yearCodes: string[] }>();
+
+      results.forEach((classData) => {
+        if (classData) {
+          classesMap.set(classData.id, classData);
+        }
+      });
+
+      return classesMap;
+    },
+    enabled: classIds.length > 0,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Calculate slide progress information from lesson_live_state table
+  // The liveState comes from the lesson_live_state table with fields:
+  // - lessonId/lesson_id (primary key)
+  // - currentSlideId/current_slide_id (uuid reference to topic_slides)
+  // - currentIndex/current_index (integer, 0-based slide position)
+  // - isPaused/is_paused (boolean)
+  // - updatedBy/updated_by (uuid reference to auth.users)
+  // - updatedAt/updated_at (timestamp)
+  const liveState = liveStateData?.liveState;
+  const slides = liveStateData?.slides ?? [];
+  const totalSlides = slides.length;
+  // Handle both camelCase (from Drizzle API) and snake_case (from Supabase direct) formats
+  const currentSlideIndex =
+    (liveState as any)?.currentIndex ?? (liveState as any)?.current_index ?? 0;
+  const currentSlideNumber = currentSlideIndex + 1; // 1-indexed for display
+  // Lesson is in progress if: has slides, has live state, current slide > 1, and current slide < last slide
+  const isInProgress =
+    totalSlides > 0 &&
+    liveState !== null &&
+    currentSlideNumber > 1 &&
+    currentSlideNumber < totalSlides;
 
   if (isLoading) {
     return (
@@ -72,86 +257,198 @@ export default function LessonOverviewPage() {
     ? getInitials(lessonData.teacher.firstName, lessonData.teacher.lastName)
     : "?";
 
+  // Determine lesson state
+  const isCompleted = lessonData.status === "completed";
+  const isPendingReview = lessonData.status === "pending_review";
+  const canProvideFeedback = isCompleted || isPendingReview;
+  const currentSlide = slides[currentSlideIndex];
+  const hasSlides = totalSlides > 0;
+  const deliverUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver?dialog=present`;
+
   return (
     <div className="space-y-6">
-      <div className="max-w-4xl mx-auto">
-        {/* Teacher Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Teacher
-            </CardTitle>
-            <CardDescription>Who started this lesson</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Avatar className="h-12 w-12">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {teacherInitials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-medium text-lg">{teacherName}</p>
-                {lessonData.teacher?.email && (
-                  <p className="text-sm text-muted-foreground">
-                    {lessonData.teacher.email}
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Teacher & Classes Card and Topic Card in a row */}
+        <div className="grid grid-cols-5 gap-6">
+          {/* Combined Teacher & Classes Card - 2/5 width */}
+          <div className="col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Teacher & Classes
+                </CardTitle>
+                <CardDescription>
+                  {lessonData.assignedClasses?.length || 0} class
+                  {(lessonData.assignedClasses?.length || 0) !== 1
+                    ? "es"
+                    : ""}{" "}
+                  taking this lesson
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {/* Teacher Section */}
+                  <div className="flex items-center gap-4 pb-4 border-b">
+                    <Avatar className="h-12 w-12">
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {teacherInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium text-lg">{teacherName}</p>
+                      {lessonData.teacher?.email && (
+                        <p className="text-sm text-muted-foreground">
+                          {lessonData.teacher.email}
+                        </p>
+                      )}
+                    </div>
+                  </div>
 
-        {/* Topic Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Topic
-            </CardTitle>
-            <CardDescription>The topic for this lesson</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-lg font-medium">
-              {lessonData.topic?.title || "No topic assigned"}
-            </p>
-          </CardContent>
-        </Card>
+                  {/* Classes Section */}
+                  {lessonData.assignedClasses &&
+                  lessonData.assignedClasses.length > 0 ? (
+                    <div className="space-y-3">
+                      {lessonData.assignedClasses.map((assignedClass) => {
+                        const classData = classesData?.get(
+                          assignedClass.classId
+                        );
+                        const yearCodes = classData?.yearCodes || [];
+                        return (
+                          <div
+                            key={assignedClass.classId}
+                            className="p-4 border rounded-lg hover:bg-accent transition-colors"
+                          >
+                            <p className="font-medium mb-2">
+                              {assignedClass.className}
+                            </p>
+                            {yearCodes.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {yearCodes.map((yearCode) => (
+                                  <Badge
+                                    key={yearCode}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {yearCode}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No classes assigned</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Classes Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Classes
-            </CardTitle>
-            <CardDescription>
-              {lessonData.assignedClasses?.length || 0} class
-              {(lessonData.assignedClasses?.length || 0) !== 1 ? "es" : ""}{" "}
-              taking this lesson
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {lessonData.assignedClasses &&
-            lessonData.assignedClasses.length > 0 ? (
-              <div className="space-y-3">
-                {lessonData.assignedClasses.map((assignedClass) => (
-                  <div
-                    key={assignedClass.classId}
-                    className="p-4 border rounded-lg hover:bg-accent transition-colors"
-                  >
-                    <p className="font-medium">{assignedClass.className}</p>
-                    {assignedClass.classCode && (
+          {/* Topic Card - 3/5 width */}
+          <div className="col-span-3">
+            {hasSlides ? (
+              <Link href={deliverUrl} className="block">
+                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5" />
+                      Topic
+                    </CardTitle>
+                    <CardDescription>The topic for this lesson</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <p className="text-lg font-medium">
+                        {lessonData.topic?.title || "No topic assigned"}
+                      </p>
+                      {!isLoadingLiveState && liveState !== null && (
+                        <div className="flex items-center gap-4">
+                          {/* Thumbnail Preview */}
+                          {currentSlide && currentSlide.kind === "image" && (
+                            <ThumbnailImage
+                              slideId={currentSlide.topicSlideId}
+                              alt={`Slide ${currentSlideNumber} preview`}
+                            />
+                          )}
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <FileText className="h-4 w-4" />
+                              <span>
+                                Slide {currentSlideNumber} of {totalSlides}
+                              </span>
+                            </div>
+                            {isInProgress && (
+                              <Badge
+                                variant="secondary"
+                                className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              >
+                                In Progress
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ) : (
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    Topic
+                  </CardTitle>
+                  <CardDescription>The topic for this lesson</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <p className="text-lg font-medium">
+                      {lessonData.topic?.title || "No topic assigned"}
+                    </p>
+                    {!isLoadingLiveState && totalSlides === 0 && (
                       <p className="text-sm text-muted-foreground">
-                        Code: {assignedClass.classCode}
+                        No slides available
                       </p>
                     )}
                   </div>
-                ))}
-              </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* Feedback Card */}
+        <Card className={canProvideFeedback ? "" : "opacity-50"}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              Feedback
+            </CardTitle>
+            <CardDescription>
+              {isPendingReview
+                ? "Provide feedback to mark this lesson as completed"
+                : isCompleted
+                ? "View your feedback for this lesson"
+                : "Share your experience and mark this lesson as completed"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {canProvideFeedback ? (
+              <Link
+                href={`/schools/${school_id}/lessons/${lesson_id}/feedback`}
+              >
+                <Button variant="outline" className="w-full">
+                  {isPendingReview ? "Provide Feedback" : "View Feedback"}
+                </Button>
+              </Link>
             ) : (
-              <p className="text-muted-foreground">No classes assigned</p>
+              <Button variant="outline" className="w-full" disabled>
+                Complete lesson to provide feedback
+              </Button>
             )}
           </CardContent>
         </Card>

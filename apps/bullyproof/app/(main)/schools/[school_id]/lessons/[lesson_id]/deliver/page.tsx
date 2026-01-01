@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Presentation, Settings } from "lucide-react";
+// import { Settings } from "lucide-react"; // Commented out for now - control mode disabled
 import {
   Dialog,
   DialogContent,
@@ -19,6 +20,7 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useSearchParams } from "next/navigation";
 
 export default function LessonDeliverPage({
   params,
@@ -27,8 +29,17 @@ export default function LessonDeliverPage({
 }) {
   usePageTitle(["schools", "lessons", "deliver"]);
   const { school_id, lesson_id } = use(params);
+  const searchParams = useSearchParams();
   const [presentDialogOpen, setPresentDialogOpen] = useState(false);
-  const [controlsDialogOpen, setControlsDialogOpen] = useState(false);
+  // const [controlsDialogOpen, setControlsDialogOpen] = useState(false); // Commented out - control mode disabled
+
+  // Check for query param to auto-open dialog
+  useEffect(() => {
+    const dialog = searchParams?.get("dialog");
+    if (dialog === "present") {
+      setPresentDialogOpen(true);
+    }
+  }, [searchParams]);
 
   const handlePresentAccept = () => {
     const presentUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver/present`;
@@ -36,11 +47,12 @@ export default function LessonDeliverPage({
     setPresentDialogOpen(false);
   };
 
-  const handleControlsAccept = () => {
-    const controlsUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver/controls`;
-    window.open(controlsUrl, "_blank", "noopener,noreferrer");
-    setControlsDialogOpen(false);
-  };
+  // Commented out - control mode disabled
+  // const handleControlsAccept = () => {
+  //   const controlsUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver/controls`;
+  //   window.open(controlsUrl, "_blank", "noopener,noreferrer");
+  //   setControlsDialogOpen(false);
+  // };
 
   return (
     <div className="space-y-6">
@@ -75,17 +87,19 @@ export default function LessonDeliverPage({
           </CardContent>
         </Card>
 
-        {/* Control Mode Card */}
+        {/* Control Mode Card - Disabled for now */}
         <Card
-          className="h-full hover:shadow-lg transition-shadow cursor-pointer"
-          onClick={() => setControlsDialogOpen(true)}
+          className="h-full opacity-50 cursor-not-allowed"
+          // onClick={() => setControlsDialogOpen(true)} // Commented out - control mode disabled
         >
           <CardHeader>
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Settings className="h-6 w-6 text-primary" />
               </div>
-              <CardTitle>Control Mode</CardTitle>
+              <CardTitle className="text-muted-foreground">
+                Control Mode
+              </CardTitle>
             </div>
           </CardHeader>
           <CardContent>
@@ -158,8 +172,8 @@ export default function LessonDeliverPage({
         </DialogContent>
       </Dialog>
 
-      {/* Controls Mode Dialog */}
-      <Dialog open={controlsDialogOpen} onOpenChange={setControlsDialogOpen}>
+      {/* Controls Mode Dialog - Commented out - control mode disabled */}
+      {/* <Dialog open={controlsDialogOpen} onOpenChange={setControlsDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Open Control Mode</DialogTitle>
@@ -186,7 +200,7 @@ export default function LessonDeliverPage({
             <Button onClick={handleControlsAccept}>Open Controls</Button>
           </DialogFooter>
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
     </div>
   );
 }
