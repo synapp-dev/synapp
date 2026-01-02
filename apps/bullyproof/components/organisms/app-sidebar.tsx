@@ -88,18 +88,14 @@ const data = {
       url: "/performance",
       icon: TrendingUp,
       isActive: false,
+      disabled: true,
     },
     {
       title: "Settings",
       url: "/settings",
       icon: Settings,
       isActive: false,
-    },
-    {
-      title: "Setup",
-      url: "/setup",
-      icon: Wrench,
-      isActive: false,
+      disabled: true,
     },
   ],
   navPeople: [
@@ -143,6 +139,7 @@ const data = {
       url: "/reports",
       icon: FileText,
       isActive: false,
+      disabled: true,
     },
   ],
 };

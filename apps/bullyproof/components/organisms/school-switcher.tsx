@@ -33,7 +33,6 @@ import {
   School,
   Pointer,
 } from "lucide-react";
-import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import {
   useMySchoolsQuery,
@@ -50,6 +49,110 @@ import { cn } from "@workspace/ui/lib/utils";
 
 // Union type for both school types
 type School = MeSchool | SchoolServiceSchool;
+
+// Helper function to extract school metadata (state, sector, levels)
+function extractSchoolMetadata(school: School | null) {
+  if (!school) {
+    return { stateText: "", sectorText: "", levelsText: "" };
+  }
+
+  const st = (school as any)?.state;
+  const stateText = st
+    ? typeof st === "string"
+      ? st.toUpperCase()
+      : (st as any)?.code?.toUpperCase() || ""
+    : "";
+
+  // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
+  const sector = (school as any)?.sector;
+  const sectorText =
+    typeof sector === "string"
+      ? sector
+      : sector && typeof sector === "object"
+        ? (sector as any)?.name || ""
+        : "";
+
+  // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
+  const lvls = (school as any)?.levels;
+  let levelsText = "";
+  if (Array.isArray(lvls) && lvls.length > 0) {
+    // Extract names if objects, or use strings directly
+    const levelNames = lvls.map((lvl) =>
+      typeof lvl === "string"
+        ? lvl
+        : (lvl as any)?.name || (lvl as any)?.key || ""
+    );
+    const lower = levelNames.map((s) => s.toLowerCase());
+    const hasPrimary = lower.some((s) => s.includes("primary"));
+    const hasSecondary = lower.some((s) => s.includes("secondary"));
+    if (hasPrimary && hasSecondary) levelsText = "P-12";
+    else if (hasPrimary) levelsText = "Primary";
+    else if (hasSecondary) levelsText = "Secondary";
+    else levelsText = levelNames.join(", ");
+  }
+
+  return { stateText, sectorText, levelsText };
+}
+
+// Component for school icon with teal background
+function SchoolIconBadge({ size = "md" }: { size?: "sm" | "md" }) {
+  const iconSize = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
+  const containerSize = size === "sm" ? "w-6 h-6" : "w-8 h-8";
+  return (
+    <div
+      className={`${containerSize} rounded flex items-center aspect-square justify-center`}
+      style={{ backgroundColor: "#008993" }}
+    >
+      <School className={`${iconSize} text-background`} />
+    </div>
+  );
+}
+
+// Component for displaying school metadata (state, sector, levels)
+function SchoolMetadata({
+  school,
+  className = "",
+  capitalize = false,
+}: {
+  school: School | null;
+  className?: string;
+  capitalize?: boolean;
+}) {
+  const { stateText, sectorText, levelsText } = extractSchoolMetadata(school);
+  const parts = [stateText, sectorText, levelsText].filter(Boolean);
+
+  if (parts.length === 0) return null;
+
+  return (
+    <div
+      className={`flex items-center gap-1 text-muted-foreground text-[0.65rem] ${className}`}
+    >
+      {parts.map((part, index) => (
+        <div key={index} className="flex items-center gap-1">
+          <div className={cn("truncate", capitalize && "capitalize")}>
+            {part}
+          </div>
+          {index < parts.length - 1 && (
+            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Wrapper component for loading/error/empty states
+function StateWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem className="items-center w-full flex pb-2">
+        <SidebarMenuButton className="w-full flex items-center gap-2 justify-center group/school-switcher py-6">
+          {children}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  );
+}
 
 export function SchoolSwitcher() {
   const [open, setOpen] = useState(false);
@@ -250,33 +353,56 @@ export function SchoolSwitcher() {
     }
   }, [open]);
 
+  // Handler for school selection/deselection in popover
+  const handleSchoolSelect = useCallback(
+    (school: School, isSelected: boolean) => {
+      // If clicking the same school that's already selected, deselect it
+      if (isSelected) {
+        clearCurrentSchool();
+        clearLastAccessedSchool();
+        setSelectedSchool(null);
+        setOpen(false);
+        router.push("/dashboard");
+        return;
+      }
+
+      setSelectedSchool(school);
+      setOpen(false);
+      // Persist last accessed immediately for non-school pages
+      setLastAccessedSchool({
+        id: school.id as string,
+        name: school.name as string,
+        slug: (school as any).slug as string,
+        bannerUrl: (school as any).bannerUrl ?? null,
+        avatarUrl: (school as any).avatarUrl ?? null,
+      });
+      // Navigate to the school route
+      const slug =
+        typeof (school as any).slug === "string" ? (school as any).slug : "";
+      if (slug) {
+        router.push(`/schools/${slug}/home`);
+      }
+    },
+    [clearCurrentSchool, clearLastAccessedSchool, router, setLastAccessedSchool]
+  );
+
   // Show loading state
   if (isLoading) {
     return (
-      <SidebarMenu>
-        <SidebarMenuItem className="items-center w-full flex pb-2 px-2">
-          <SidebarMenuButton className="w-full flex items-center gap-2 justify-center group/school-switcher py-6">
-            <div className="animate-pulse text-muted-foreground text-sm">
-              Loading schools...
-            </div>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
+      <StateWrapper>
+        <div className="animate-pulse text-muted-foreground text-sm">
+          Loading schools...
+        </div>
+      </StateWrapper>
     );
   }
 
   // Show error state
   if (error) {
     return (
-      <SidebarMenu>
-        <SidebarMenuItem className="items-center w-full flex pb-2 px-2">
-          <SidebarMenuButton className="w-full flex items-center gap-2 justify-center group/school-switcher py-6">
-            <div className="text-destructive text-sm">
-              Error loading schools
-            </div>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
-      </SidebarMenu>
+      <StateWrapper>
+        <div className="text-destructive text-sm">Error loading schools</div>
+      </StateWrapper>
     );
   }
 
@@ -287,107 +413,45 @@ export function SchoolSwitcher() {
     const noUserSchools = !isPlatformAdmin && mySchools.length === 0;
     if (noAdminSchools || noUserSchools) {
       return (
-        <SidebarMenu>
-          <SidebarMenuItem className="items-center w-full flex pb-2 px-2">
-            <SidebarMenuButton className="w-full flex items-center gap-2 justify-center group/school-switcher py-6">
-              <div className="text-muted-foreground text-sm">
-                No schools available
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <StateWrapper>
+          <div className="text-muted-foreground text-sm">
+            No schools available
+          </div>
+        </StateWrapper>
       );
     }
   }
 
   return (
     <SidebarMenu>
-      <SidebarMenuItem className="items-center w-full flex pb-2 px-2">
+      <SidebarMenuItem
+        className={cn(
+          "items-center w-full flex pb-2",
+          state === "expanded" ? "" : "pl-2"
+        )}
+      >
         {hasOnlyOneSchool ? (
           // Simple display without popover when user has only one school
           <SidebarMenuButton
             tooltip={selectedSchool?.name || "School"}
-            className="w-full flex items-center gap-2 justify-start group/school-switcher py-6"
+            className={cn(
+              "w-full flex items-center gap-2 group/school-switcher py-6",
+              state === "expanded" ? "justify-start" : "justify-center"
+            )}
             onClick={handleSchoolToggle}
           >
             {state === "expanded" ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <Image
-                  src={"https://i.imgur.com/8TMyB0x.png"}
-                  alt={selectedSchool?.name || "School"}
-                  width={100}
-                  height={100}
-                  className="object-cover w-5 h-auto opacity-100"
-                />
+                <SchoolIconBadge size="md" />
                 <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
                   <h3 className="font-medium truncate">
                     {selectedSchool?.name || "No school selected"}
                   </h3>
-                  <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
-                    {(() => {
-                      const st = (selectedSchool as any)?.state;
-                      const stateText = st
-                        ? typeof st === "string"
-                          ? st.toUpperCase()
-                          : (st as any)?.name || ""
-                        : "";
-
-                      // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
-                      const sector = (selectedSchool as any)?.sector;
-                      const sectorText =
-                        typeof sector === "string"
-                          ? sector
-                          : sector && typeof sector === "object"
-                            ? (sector as any)?.name || ""
-                            : "";
-
-                      // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
-                      const lvls = (selectedSchool as any)?.levels;
-                      let levelsText = "";
-                      if (Array.isArray(lvls) && lvls.length > 0) {
-                        // Extract names if objects, or use strings directly
-                        const levelNames = lvls.map((lvl) =>
-                          typeof lvl === "string"
-                            ? lvl
-                            : (lvl as any)?.name || (lvl as any)?.key || ""
-                        );
-                        const lower = levelNames.map((s) => s.toLowerCase());
-                        const hasPrimary = lower.some((s) =>
-                          s.includes("primary")
-                        );
-                        const hasSecondary = lower.some((s) =>
-                          s.includes("secondary")
-                        );
-                        if (hasPrimary && hasSecondary) levelsText = "P-12";
-                        else if (hasPrimary) levelsText = "Primary";
-                        else if (hasSecondary) levelsText = "Secondary";
-                        else levelsText = levelNames.join(", ");
-                      }
-
-                      const parts = [stateText, sectorText, levelsText].filter(
-                        Boolean
-                      );
-
-                      return parts.map((part, index) => (
-                        <div key={index} className="flex items-center gap-1">
-                          <div className="truncate">{part}</div>
-                          {index < parts.length - 1 && (
-                            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                          )}
-                        </div>
-                      ));
-                    })()}
-                  </div>
+                  <SchoolMetadata school={selectedSchool} />
                 </div>
               </div>
             ) : (
-              <Image
-                src={"https://i.imgur.com/8TMyB0x.png"}
-                alt={selectedSchool?.name || "School"}
-                width={32}
-                height={32}
-                className="object-contain w-6 h-auto"
-              />
+              <SchoolIconBadge size="sm" />
             )}
           </SidebarMenuButton>
         ) : (
@@ -396,21 +460,23 @@ export function SchoolSwitcher() {
             <PopoverTrigger asChild>
               <SidebarMenuButton
                 tooltip={selectedSchool?.name || "Select school"}
-                className="w-full flex items-center gap-2 justify-between group/school-switcher py-6"
+                className={cn(
+                  "w-full flex items-center gap-2 group/school-switcher py-6",
+                  state === "expanded" ? "justify-between" : "justify-center"
+                )}
               >
                 {state === "expanded" ? (
                   <>
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 flex-1 min-w-0",
+                        selectedSchool?.name ? "mx-auto" : "mx-2"
+                      )}
+                    >
                       {selectedSchool?.name ? (
-                        <Image
-                          src={"https://i.imgur.com/8TMyB0x.png"}
-                          alt={selectedSchool?.name || "School"}
-                          width={100}
-                          height={100}
-                          className="object-cover w-5 h-auto opacity-100"
-                        />
+                        <SchoolIconBadge size="md" />
                       ) : (
-                        <School className="size-5 text-muted-foreground" />
+                        <School className="size-4 text-muted-foreground" />
                       )}
 
                       <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
@@ -424,73 +490,7 @@ export function SchoolSwitcher() {
                         >
                           {selectedSchool?.name || "Select a school!"}
                         </h3>
-                        <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
-                          {(() => {
-                            const st = (selectedSchool as any)?.state;
-                            const stateText = st
-                              ? typeof st === "string"
-                                ? st.toUpperCase()
-                                : (st as any)?.name || ""
-                              : "";
-
-                            // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
-                            const sector = (selectedSchool as any)?.sector;
-                            const sectorText =
-                              typeof sector === "string"
-                                ? sector
-                                : sector && typeof sector === "object"
-                                  ? (sector as any)?.name || ""
-                                  : "";
-
-                            // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
-                            const lvls = (selectedSchool as any)?.levels;
-                            let levelsText = "";
-                            if (Array.isArray(lvls) && lvls.length > 0) {
-                              // Extract names if objects, or use strings directly
-                              const levelNames = lvls.map((lvl) =>
-                                typeof lvl === "string"
-                                  ? lvl
-                                  : (lvl as any)?.name ||
-                                    (lvl as any)?.key ||
-                                    ""
-                              );
-                              const lower = levelNames.map((s) =>
-                                s.toLowerCase()
-                              );
-                              const hasPrimary = lower.some((s) =>
-                                s.includes("primary")
-                              );
-                              const hasSecondary = lower.some((s) =>
-                                s.includes("secondary")
-                              );
-                              if (hasPrimary && hasSecondary)
-                                levelsText = "P-12";
-                              else if (hasPrimary) levelsText = "Primary";
-                              else if (hasSecondary) levelsText = "Secondary";
-                              else levelsText = levelNames.join(", ");
-                            }
-
-                            const parts = [
-                              stateText,
-                              sectorText,
-                              levelsText,
-                            ].filter(Boolean);
-
-                            return parts.map((part, index) => (
-                              <div
-                                key={index}
-                                className="flex items-center gap-1"
-                              >
-                                <div className="truncate capitalize">
-                                  {part}
-                                </div>
-                                {index < parts.length - 1 && (
-                                  <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                                )}
-                              </div>
-                            ));
-                          })()}
-                        </div>
+                        <SchoolMetadata school={selectedSchool} capitalize />
                       </div>
                     </div>
                     {selectedSchool?.name ? (
@@ -500,13 +500,7 @@ export function SchoolSwitcher() {
                     )}
                   </>
                 ) : (
-                  <Image
-                    src={"https://i.imgur.com/8TMyB0x.png"}
-                    alt={selectedSchool?.name || "School"}
-                    width={32}
-                    height={32}
-                    className="object-contain w-6 h-auto"
-                  />
+                  <SchoolIconBadge size="sm" />
                 )}
               </SidebarMenuButton>
             </PopoverTrigger>
@@ -573,45 +567,8 @@ export function SchoolSwitcher() {
                       school: School,
                       isSelected: boolean
                     ) => {
-                      const st = (school as any)?.state;
-                      const stateText = st
-                        ? typeof st === "string"
-                          ? st.toUpperCase()
-                          : (st as any)?.name || ""
-                        : "";
-
-                      // Handle sector: can be string (vSchoolsReadable) or object (vSchoolsEnriched)
-                      const sector = (school as any)?.sector;
-                      const sectorText =
-                        typeof sector === "string"
-                          ? sector
-                          : sector && typeof sector === "object"
-                            ? (sector as any)?.name || ""
-                            : "";
-
-                      // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
-                      const lvls = (school as any)?.levels;
-                      let levelsText = "";
-                      if (Array.isArray(lvls) && lvls.length > 0) {
-                        // Extract names if objects, or use strings directly
-                        const levelNames = lvls.map((lvl) =>
-                          typeof lvl === "string"
-                            ? lvl
-                            : (lvl as any)?.name || (lvl as any)?.key || ""
-                        );
-                        const lower = levelNames.map((s) => s.toLowerCase());
-                        const hasPrimary = lower.some((s) =>
-                          s.includes("primary")
-                        );
-                        const hasSecondary = lower.some((s) =>
-                          s.includes("secondary")
-                        );
-                        if (hasPrimary && hasSecondary) levelsText = "P-12";
-                        else if (hasPrimary) levelsText = "Primary";
-                        else if (hasSecondary) levelsText = "Secondary";
-                        else levelsText = levelNames.join(", ");
-                      }
-
+                      const { stateText, sectorText, levelsText } =
+                        extractSchoolMetadata(school);
                       const parts = [stateText, sectorText, levelsText].filter(
                         Boolean
                       );
@@ -620,58 +577,33 @@ export function SchoolSwitcher() {
                         <CommandItem
                           key={school.id}
                           value={school.name || ""}
-                          onSelect={() => {
-                            // If clicking the same school that's already selected, deselect it
-                            if (isSelected) {
-                              clearCurrentSchool();
-                              clearLastAccessedSchool();
-                              setSelectedSchool(null);
-                              setOpen(false);
-                              router.push("/dashboard");
-                              return;
-                            }
-
-                            setSelectedSchool(school);
-                            setOpen(false);
-                            // Persist last accessed immediately for non-school pages
-                            setLastAccessedSchool({
-                              id: school.id as string,
-                              name: school.name as string,
-                              slug: (school as any).slug as string,
-                              bannerUrl: (school as any).bannerUrl ?? null,
-                              avatarUrl: (school as any).avatarUrl ?? null,
-                            });
-                            // Navigate to the school route
-                            const slug =
-                              typeof (school as any).slug === "string"
-                                ? (school as any).slug
-                                : "";
-                            if (slug) {
-                              router.push(`/schools/${slug}/home`);
-                            }
-                          }}
+                          onSelect={() =>
+                            handleSchoolSelect(school, isSelected)
+                          }
                           className="flex items-center gap-2"
                         >
-                          <SchoolIcon className="h-4 w-4" />
+                          <SchoolIcon className="h-3.5 w-3.5" />
                           <div className="flex flex-col flex-1 min-w-0">
                             <span className="font-medium truncate">
                               {school.name}
                             </span>
-                            <div className="flex items-center gap-1">
-                              {parts.map((part, index) => (
-                                <div
-                                  key={index}
-                                  className="flex items-center gap-1"
-                                >
-                                  <span className="text-muted-foreground text-xs truncate capitalize">
-                                    {part}
-                                  </span>
-                                  {index < parts.length - 1 && (
-                                    <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                            {parts.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                {parts.map((part, index) => (
+                                  <div
+                                    key={index}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <span className="text-muted-foreground text-xs truncate capitalize">
+                                      {part}
+                                    </span>
+                                    {index < parts.length - 1 && (
+                                      <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           {isSelected && (
                             <Check className="h-4 w-4 text-primary" />

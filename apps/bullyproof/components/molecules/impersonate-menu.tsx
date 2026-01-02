@@ -148,7 +148,7 @@ export function ImpersonateMenu() {
           <TooltipContent side="left">
             <p>
               {isDisabled
-                ? "Impersonate feature is coming soon!"
+                ? "Impersonation is currently disabled!"
                 : "Impersonating user"}
             </p>
           </TooltipContent>
@@ -182,9 +182,7 @@ export function ImpersonateMenu() {
           </TooltipTrigger>
           <TooltipContent side="left">
             <p>
-              {isDisabled
-                ? "Impersonate feature is coming soon!"
-                : "Impersonate User"}
+              {isDisabled ? "Impersonation is disabled!" : "Impersonate User"}
             </p>
           </TooltipContent>
         </Tooltip>
