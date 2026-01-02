@@ -1,5 +1,5 @@
 import {
-  Building2,
+  School,
   Users,
   GraduationCap,
   Presentation,
@@ -36,8 +36,8 @@ export const adminItemsConfig: AdminItem[] = [
   {
     title: "Schools",
     url: "/admin/schools",
-    icon: Building2,
-    iconName: "Building2",
+    icon: School,
+    iconName: "School",
     description: "View and manage school accounts",
     enabled: true,
   },

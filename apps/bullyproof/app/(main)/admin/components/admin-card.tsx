@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  Building2,
+  School,
   Users,
   GraduationCap,
   Presentation,
@@ -32,7 +32,7 @@ interface AdminCardProps {
 
 const iconMap: Record<string, LucideIcon> = {
   BookOpenText,
-  Building2,
+  School,
   Users,
   GraduationCap,
   Presentation,
