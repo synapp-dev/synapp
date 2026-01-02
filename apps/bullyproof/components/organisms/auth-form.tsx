@@ -207,17 +207,17 @@ function AuthFormContent({ className, ...props }: React.ComponentProps<"div">) {
         router.replace(`?email=${encodeURIComponent(email)}`);
 
         // Check if dev bypass is enabled
-        if (devBypassOtp) {
-          setAlertMessage({
-            title: "Development Mode",
-            description: "Bypassing OTP - proceeding to password entry",
-            variant: "info",
-          });
-          setIsOtpMode(true);
-          setIsPasswordMode(true);
-          setLoading(false);
-          return;
-        }
+        // if (devBypassOtp) {
+        //   setAlertMessage({
+        //     title: "Development Mode",
+        //     description: "Bypassing OTP - proceeding to password entry",
+        //     variant: "info",
+        //   });
+        //   setIsOtpMode(true);
+        //   setIsPasswordMode(true);
+        //   setLoading(false);
+        //   return;
+        // }
 
         setAlertMessage({
           title: "Sending Code",
@@ -633,7 +633,7 @@ function AuthFormContent({ className, ...props }: React.ComponentProps<"div">) {
                 />
 
                 {/* Development bypass checkbox - only show when not in OTP mode */}
-                {!isOtpMode && (
+                {/* {!isOtpMode && (
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="dev-bypass"
@@ -647,7 +647,7 @@ function AuthFormContent({ className, ...props }: React.ComponentProps<"div">) {
                       Dev: Bypass OTP (go straight to password)
                     </Label>
                   </div>
-                )}
+                )} */}
 
                 {isOtpMode && (
                   <div
@@ -822,7 +822,12 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <Suspense
       fallback={
-        <div className={cn("flex flex-col gap-6 transition-all duration-300", className)}>
+        <div
+          className={cn(
+            "flex flex-col gap-6 transition-all duration-300",
+            className
+          )}
+        >
           <Card className="overflow-hidden p-0 transition-all duration-300 border-[#00878e]/50">
             <CardContent className="grid p-0 md:grid-cols-2 min-h-[28rem]">
               <div className="flex items-center justify-center min-h-[28rem]">
