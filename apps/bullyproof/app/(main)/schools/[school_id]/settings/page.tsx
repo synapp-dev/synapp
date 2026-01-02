@@ -26,6 +26,7 @@ import {
 import { Switch } from "@workspace/ui/components/switch";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { generateMetadataFromSegments } from "@/utils/metadata";
+import { redirect } from "next/navigation";
 
 export const metadata = generateMetadataFromSegments(["schools", "settings"]);
 import {
@@ -49,6 +50,9 @@ export default async function SettingsPage({
 }) {
   const { school_id } = await params;
   const { data: school } = await schoolServerApi.get.schoolBySlug(school_id);
+  
+  // Redirect to home page - this page is disabled
+  redirect(`/schools/${school_id}/home`);
 
   // Mock settings data
   const schoolSettings = {

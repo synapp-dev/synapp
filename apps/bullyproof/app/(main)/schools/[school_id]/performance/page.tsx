@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { generateMetadataFromSegments } from "@/utils/metadata";
+import { redirect } from "next/navigation";
 
 export const metadata = generateMetadataFromSegments([
   "schools",
@@ -44,6 +45,9 @@ export default async function PerformancePage({
 }) {
   const { school_id } = await params;
   const { data: school } = await schoolServerApi.get.schoolBySlug(school_id);
+  
+  // Redirect to home page - this page is disabled
+  redirect(`/schools/${school_id}/home`);
 
   // Mock performance data
   const performanceMetrics = {

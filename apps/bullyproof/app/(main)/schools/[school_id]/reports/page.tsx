@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { generateMetadataFromSegments } from "@/utils/metadata";
+import { redirect } from "next/navigation";
 
 export const metadata = generateMetadataFromSegments(["schools", "reports"]);
 import {
@@ -51,6 +52,9 @@ export default async function ReportsPage({
 }) {
   const { school_id } = await params;
   const { data: school } = await schoolServerApi.get.schoolBySlug(school_id);
+  
+  // Redirect to home page - this page is disabled
+  redirect(`/schools/${school_id}/home`);
 
   // Mock data for reports
   const reportTypes = [
