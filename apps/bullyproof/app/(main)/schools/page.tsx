@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
@@ -96,7 +96,7 @@ function extractSchoolMetadata(school: School) {
   return { stateText, sectorText, levelsText };
 }
 
-export default function SchoolsPage() {
+function SchoolsPageContent() {
   usePageTitle(["schools"]);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -519,5 +519,30 @@ export default function SchoolsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function SchoolsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded flex items-center justify-center"
+              style={{ backgroundColor: "#008993" }}
+            >
+              <School className="w-4 h-4 text-background" />
+            </div>
+            <h1 className="text-2xl font-semibold">Schools</h1>
+          </div>
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        </div>
+      }
+    >
+      <SchoolsPageContent />
+    </Suspense>
   );
 }
