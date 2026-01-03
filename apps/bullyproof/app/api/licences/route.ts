@@ -72,9 +72,11 @@ export async function POST(request: Request) {
     return NextResponse.json(newLicence, { status: 201 });
   } catch (e: any) {
     console.error(e);
+    const errorMessage = e.message ?? "Internal error";
+    const status = e.message?.includes("Unauthorized") ? 403 : 500;
     return NextResponse.json(
-      { error: e.message ?? "Internal error" },
-      { status: 500 }
+      { error: { message: errorMessage, status } },
+      { status }
     );
   }
 }

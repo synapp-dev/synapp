@@ -24,6 +24,7 @@ import { NextResponse } from "next/server";
 import { schoolService } from "@/server/school/school.service";
 import { metricsService } from "@/server/metrics/metrics.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import { capitalizeSchoolName } from "@/utils/school-name";
 
 /**
  * Handle GET /api/schools
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { name, stateId, sectorId, levelIds } = body;
+    let { name, stateId, sectorId, levelIds } = body;
 
     if (!name || !stateId || !sectorId || !levelIds) {
       return NextResponse.json(
@@ -110,6 +111,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    // Capitalize school name as a safety measure (also handled in validator)
+    name = capitalizeSchoolName(name.trim());
 
     // Create the school
     const createdSchool = await schoolService.createSchool(

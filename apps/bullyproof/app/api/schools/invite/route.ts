@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { capitalizeSchoolName } from "@/utils/school-name";
 
 // Log incoming request from Invite New School dialog
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
+    
+    // Capitalize school name as a safety measure
+    if (body.name && typeof body.name === "string") {
+      body.name = capitalizeSchoolName(body.name.trim());
+    }
+    
     // eslint-disable-next-line no-console
     console.log("[schools/invite] POST body:", body);
 
