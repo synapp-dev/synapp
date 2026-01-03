@@ -74,6 +74,7 @@ const data = {
       url: "/support",
       icon: HelpingHand,
       isActive: false,
+      disabled: true,
     },
   ],
   navSchoolMain: [

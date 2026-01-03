@@ -27,6 +27,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { useMutation } from "@tanstack/react-query";
 import { schoolApi } from "@/entities/school/api/endpoints";
+import { capitalizeSchoolName } from "@/utils/school-name";
 
 type InviteNewSchoolDialogProps = {
   open: boolean;
@@ -121,7 +122,12 @@ export function InviteNewSchoolDialog({
             <Input
               id="name"
               placeholder="e.g. Melbourne Grammar"
-              {...form.register("name")}
+              {...form.register("name", {
+                onChange: (e) => {
+                  const capitalized = capitalizeSchoolName(e.target.value);
+                  form.setValue("name", capitalized, { shouldValidate: true });
+                },
+              })}
             />
             {form.formState.errors.name && (
               <p className="text-xs text-destructive">
@@ -378,7 +384,7 @@ export function InviteNewSchoolDialog({
     const values = form.getValues();
     const payload = {
       // Send through the dialog values; server currently just logs them
-      name: values.name,
+      name: capitalizeSchoolName(values.name.trim()),
       state: values.state,
       address: values.address,
       level: values.level,

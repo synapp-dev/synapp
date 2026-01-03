@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, Hammer, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import {
   Collapsible,
@@ -21,6 +22,57 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+
+function DisabledMenuItem({
+  title,
+  icon: Icon,
+}: {
+  title: string;
+  icon?: LucideIcon;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        tooltip={isHovered ? "Under Construction" : title}
+        className="opacity-50 cursor-not-allowed"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <div className="relative w-4 h-4 flex items-center justify-center overflow-hidden">
+          {isHovered ? (
+            <div
+              key="hammer"
+              className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
+            >
+              <Hammer className="w-4 h-4 animate-spin" />
+            </div>
+          ) : (
+            Icon && (
+              <div
+                key="icon"
+                className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
+              >
+                <Icon className="w-4 h-4" />
+              </div>
+            )
+          )}
+        </div>
+        <span
+          key={isHovered ? "hover" : "default"}
+          className="animate-slide-down-fade-in"
+        >
+          {isHovered ? "Under Construction" : title}
+        </span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
 
 export function NavMain({
   items,
@@ -100,16 +152,11 @@ export function NavMain({
             : itemActive;
 
           const menuItem = item.disabled ? (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton
-                tooltip={item.title}
-                disabled
-                className="cursor-not-allowed opacity-50"
-              >
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            <DisabledMenuItem
+              key={item.title}
+              title={item.title}
+              icon={item.icon}
+            />
           ) : (
             <Collapsible
               asChild
