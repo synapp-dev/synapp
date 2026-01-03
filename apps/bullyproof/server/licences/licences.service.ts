@@ -149,6 +149,18 @@ export const licencesService = {
           data.schoolId
         );
 
+        // Check if user has any other roles before assigning SCHOOL_LICENCE
+        const userRoles = await rolesRepo.getUserRoles(userId);
+        const hasOtherRoles = userRoles.some(
+          (ur) => ur.role.key !== "SCHOOL_LICENCE"
+        );
+
+        if (hasOtherRoles) {
+          throw new Error(
+            "This email has already been used for another role! The school licence can only be tied to the school email, and it cannot have any other roles."
+          );
+        }
+
         // Assign role if not already assigned
         if (existingRole.length === 0) {
           await rolesRepo.assignRole({
@@ -160,8 +172,21 @@ export const licencesService = {
         }
       } catch (error: any) {
         // Re-throw with more context if it's not already a user-friendly error
-        if (error.message && error.message.includes("required")) {
+        if (
+          error.message &&
+          (error.message.includes("required") ||
+            error.message.includes("already been used"))
+        ) {
           throw error;
+        }
+        // Check if it's a database constraint violation
+        if (
+          error.message &&
+          error.message.includes("cannot have any other roles")
+        ) {
+          throw new Error(
+            "This email has already been used for another role! The school licence can only be tied to the school email, and it cannot have any other roles."
+          );
         }
         throw new Error(
           `Failed to create user and assign role: ${error.message || "Unknown error"}`

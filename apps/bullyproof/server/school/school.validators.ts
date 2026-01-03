@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { capitalizeSchoolName } from "@/utils/school-name";
 
 // Query params for listing schools
 export const listSchoolsQuerySchema = z
@@ -32,7 +33,11 @@ export type ListSchoolsQuery = z.infer<typeof listSchoolsQuerySchema>;
 
 // Schema for creating a school
 export const createSchoolSchema = z.object({
-  name: z.string().min(1, "School name is required").max(255),
+  name: z
+    .string()
+    .min(1, "School name is required")
+    .max(255)
+    .transform((val) => capitalizeSchoolName(val.trim())),
   stateId: z.string().uuid("Invalid state ID"),
   sectorId: z.string().uuid("Invalid sector ID"),
   levelIds: z.array(z.string().uuid("Invalid level ID")).min(1, "At least one school level is required"),
