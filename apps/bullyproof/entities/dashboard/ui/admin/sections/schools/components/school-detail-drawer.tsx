@@ -242,6 +242,7 @@ function SchoolDetailDrawerContent({
   const [teacherFirstName, setTeacherFirstName] = useState("");
   const [teacherLastName, setTeacherLastName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [licenceError, setLicenceError] = useState<string | null>(null);
   const isClosingDialogRef = useRef(false);
 
   // Email validation function
@@ -1651,7 +1652,13 @@ function SchoolDetailDrawerContent({
                     existingLicenceEmail ? undefined : "Enter main school email"
                   }
                   value={schoolLicenceEmail}
-                  onChange={(e) => setSchoolLicenceEmail(e.target.value)}
+                  onChange={(e) => {
+                    setSchoolLicenceEmail(e.target.value);
+                    // Clear error when user starts typing
+                    if (licenceError) {
+                      setLicenceError(null);
+                    }
+                  }}
                   disabled={loadingLicenceEmail || !!existingLicenceEmail}
                   className={
                     schoolLicenceEmail &&
@@ -1673,6 +1680,13 @@ function SchoolDetailDrawerContent({
                     Using existing licence email
                   </p>
                 )}
+                {licenceError && (
+                  <div className="mt-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                    <p className="text-sm text-destructive font-medium">
+                      {licenceError}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1688,6 +1702,7 @@ function SchoolDetailDrawerContent({
                 setLicenceDuration("");
                 setSchoolLicenceEmail("");
                 setExistingLicenceEmail(null);
+                setLicenceError(null);
 
                 // Remove dialog query parameter from URL
                 const params = new URLSearchParams(
@@ -1711,6 +1726,7 @@ function SchoolDetailDrawerContent({
               onClick={async () => {
                 if (!school || !licenceDuration || !hasValidEmail) return;
                 setSubmitting(true);
+                setLicenceError(null);
                 try {
                   const result = await licencesApi.post.create({
                     schoolId: school.id,
@@ -1721,7 +1737,26 @@ function SchoolDetailDrawerContent({
                       : undefined,
                   });
                   if (result.error) {
-                    console.error("Failed to create licence:", result.error);
+                    console.warn("Failed to create licence:", result.error);
+                    // Check if it's the constraint violation error
+                    // Handle both string and object error formats
+                    const errorMessage =
+                      typeof result.error === "string"
+                        ? result.error
+                        : result.error?.message || String(result.error);
+                    if (
+                      errorMessage.includes("already been used") ||
+                      errorMessage.includes("cannot have any other roles")
+                    ) {
+                      setLicenceError(
+                        "This email has already been used for another role! The school licence can only be tied to the school email, and it cannot have any other roles."
+                      );
+                    } else {
+                      setLicenceError(
+                        errorMessage || "Failed to create licence. Please try again."
+                      );
+                    }
+                    setSubmitting(false);
                   } else {
                     // Set flag to prevent effect from interfering
                     isClosingDialogRef.current = true;
@@ -1805,8 +1840,22 @@ function SchoolDetailDrawerContent({
                       isClosingDialogRef.current = false;
                     }, 100);
                   }
-                } catch (error) {
-                  console.error("Failed to create licence:", error);
+                } catch (error: any) {
+                  console.warn("Error creating licence:", error);
+                  // Check if it's the constraint violation error
+                  const errorMessage = error?.message || error?.toString() || "";
+                  if (
+                    errorMessage.includes("already been used") ||
+                    errorMessage.includes("cannot have any other roles")
+                  ) {
+                    setLicenceError(
+                      "This email has already been used for another role! The school licence can only be tied to the school email, and it cannot have any other roles."
+                    );
+                  } else {
+                    setLicenceError(
+                      errorMessage || "Failed to create licence. Please try again."
+                    );
+                  }
                 } finally {
                   setSubmitting(false);
                 }

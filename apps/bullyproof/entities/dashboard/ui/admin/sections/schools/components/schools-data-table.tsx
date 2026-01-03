@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -20,7 +21,7 @@ declare module "@tanstack/react-table" {
     align?: "left" | "right" | "center";
   }
 }
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search, X, Loader2 } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
@@ -59,6 +60,9 @@ export function SchoolsDataTable({
   onSchoolClick,
   refreshTrigger,
 }: SchoolsDataTableProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -70,11 +74,95 @@ export function SchoolsDataTable({
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Filter states
-  const [searchFilter, setSearchFilter] = React.useState("");
-  const [stateFilter, setStateFilter] = React.useState("all");
-  const [sectorFilter, setSectorFilter] = React.useState("all");
-  const [statusFilter, setStatusFilter] = React.useState("all");
+  // Filter states - initialize from URL params
+  const [searchFilter, setSearchFilter] = React.useState(
+    searchParams?.get("search") || ""
+  );
+  const [debouncedSearchFilter, setDebouncedSearchFilter] = React.useState(
+    searchParams?.get("search") || ""
+  );
+  const [stateFilter, setStateFilter] = React.useState(
+    searchParams?.get("state") || "all"
+  );
+  const [sectorFilter, setSectorFilter] = React.useState(
+    searchParams?.get("sector") || "all"
+  );
+  const [statusFilter, setStatusFilter] = React.useState(
+    searchParams?.get("status") || "all"
+  );
+
+  // Update URL query parameters
+  const updateQueryParams = React.useCallback(
+    (updates: {
+      search?: string;
+      state?: string;
+      sector?: string;
+      status?: string;
+    }) => {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+
+      if (updates.search !== undefined) {
+        if (updates.search.trim()) {
+          params.set("search", updates.search.trim());
+        } else {
+          params.delete("search");
+        }
+      }
+
+      if (updates.state !== undefined) {
+        if (updates.state !== "all") {
+          params.set("state", updates.state);
+        } else {
+          params.delete("state");
+        }
+      }
+
+      if (updates.sector !== undefined) {
+        if (updates.sector !== "all") {
+          params.set("sector", updates.sector);
+        } else {
+          params.delete("sector");
+        }
+      }
+
+      if (updates.status !== undefined) {
+        if (updates.status !== "all") {
+          params.set("status", updates.status);
+        } else {
+          params.delete("status");
+        }
+      }
+
+      const newUrl = params.toString()
+        ? `/admin/schools?${params.toString()}`
+        : "/admin/schools";
+      router.replace(newUrl, { scroll: false });
+    },
+    [router, searchParams]
+  );
+
+  // Debounce search query updates (500ms)
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchFilter(searchFilter);
+      updateQueryParams({ search: searchFilter });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchFilter, updateQueryParams]);
+
+  // Update URL immediately when filters change
+  React.useEffect(() => {
+    updateQueryParams({ state: stateFilter });
+  }, [stateFilter, updateQueryParams]);
+
+  React.useEffect(() => {
+    updateQueryParams({ sector: sectorFilter });
+  }, [sectorFilter, updateQueryParams]);
+
+  React.useEffect(() => {
+    updateQueryParams({ status: statusFilter });
+  }, [statusFilter, updateQueryParams]);
 
   React.useEffect(() => {
     const fetchSchools = async () => {
@@ -160,13 +248,13 @@ export function SchoolsDataTable({
     fetchSchools();
   }, [refreshTrigger]);
 
-  // Filter schools based on filter states
+  // Filter schools based on filter states (use debounced search)
   const filteredSchools = React.useMemo(() => {
     return schools.filter((school) => {
-      // Search filter (name)
+      // Search filter (name) - use debounced value
       if (
-        searchFilter &&
-        !school.name.toLowerCase().includes(searchFilter.toLowerCase())
+        debouncedSearchFilter &&
+        !school.name.toLowerCase().includes(debouncedSearchFilter.toLowerCase())
       ) {
         return false;
       }
@@ -188,7 +276,7 @@ export function SchoolsDataTable({
 
       return true;
     });
-  }, [schools, searchFilter, stateFilter, sectorFilter, statusFilter]);
+  }, [schools, debouncedSearchFilter, stateFilter, sectorFilter, statusFilter]);
 
   const data = filteredSchools;
 
@@ -211,11 +299,41 @@ export function SchoolsDataTable({
     },
   });
 
-  // Get unique states and sectors from schools for filter options
-  const uniqueStates = React.useMemo(() => {
+  // Get unique states and sectors from ALL schools for filter options
+  const allUniqueStates = React.useMemo(() => {
     const states = new Set(schools.map((s) => s.state).filter(Boolean));
     return Array.from(states).sort() as string[];
   }, [schools]);
+
+  // Get states/sectors from CURRENT filtered schools (for enabling/disabling)
+  const currentAvailableStates = React.useMemo(() => {
+    return new Set(filteredSchools.map((s) => s.state).filter(Boolean));
+  }, [filteredSchools]);
+
+  const currentAvailableSectors = React.useMemo(() => {
+    return new Set(filteredSchools.map((s) => s.sector).filter(Boolean));
+  }, [filteredSchools]);
+
+  const currentAvailableStatuses = React.useMemo(() => {
+    return new Set(filteredSchools.map((s) => s.status).filter(Boolean));
+  }, [filteredSchools]);
+
+  // All possible sectors and statuses
+  const allSectors = ["government", "catholic", "independent"];
+  const allStatuses = ["active", "onboarding"];
+
+  // Count schools for each filter option in current filtered results
+  const getStateCount = (state: string) => {
+    return filteredSchools.filter((school) => school.state === state).length;
+  };
+
+  const getSectorCount = (sector: string) => {
+    return filteredSchools.filter((school) => school.sector === sector).length;
+  };
+
+  const getStatusCount = (status: string) => {
+    return filteredSchools.filter((school) => school.status === status).length;
+  };
 
   return (
     <div className="w-full">
@@ -227,8 +345,22 @@ export function SchoolsDataTable({
             placeholder="Search schools..."
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            className="pl-10"
+            className="pl-10 pr-10"
           />
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            {searchFilter !== debouncedSearchFilter || isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            ) : searchFilter ? (
+              <button
+                type="button"
+                onClick={() => setSearchFilter("")}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
         </div>
         <Select value={stateFilter} onValueChange={setStateFilter}>
           <SelectTrigger className="w-[140px]">
@@ -236,11 +368,29 @@ export function SchoolsDataTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All States</SelectItem>
-            {uniqueStates.map((state) => (
-              <SelectItem key={state} value={state}>
-                {state.toUpperCase()}
-              </SelectItem>
-            ))}
+            {allUniqueStates.map((state) => {
+              const isAvailable = currentAvailableStates.has(state);
+              const isSelected = stateFilter === state;
+              const count = getStateCount(state);
+              return (
+                <SelectItem
+                  key={state}
+                  value={state}
+                  disabled={!isAvailable && !isSelected}
+                  className={!isAvailable && !isSelected ? "opacity-50" : ""}
+                  title={!isAvailable && !isSelected ? "No results" : undefined}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span>{state.toUpperCase()}</span>
+                    {isAvailable && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         <Select value={sectorFilter} onValueChange={setSectorFilter}>
@@ -249,9 +399,31 @@ export function SchoolsDataTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Sectors</SelectItem>
-            <SelectItem value="government">Government</SelectItem>
-            <SelectItem value="catholic">Catholic</SelectItem>
-            <SelectItem value="independent">Independent</SelectItem>
+            {allSectors.map((sector) => {
+              const isAvailable = currentAvailableSectors.has(sector);
+              const isSelected = sectorFilter === sector;
+              const sectorName =
+                sector.charAt(0).toUpperCase() + sector.slice(1);
+              const count = getSectorCount(sector);
+              return (
+                <SelectItem
+                  key={sector}
+                  value={sector}
+                  disabled={!isAvailable && !isSelected}
+                  className={!isAvailable && !isSelected ? "opacity-50" : ""}
+                  title={!isAvailable && !isSelected ? "No results" : undefined}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span>{sectorName}</span>
+                    {isAvailable && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -260,8 +432,31 @@ export function SchoolsDataTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="onboarding">Onboarding</SelectItem>
+            {allStatuses.map((status) => {
+              const isAvailable = currentAvailableStatuses.has(status);
+              const isSelected = statusFilter === status;
+              const statusName =
+                status.charAt(0).toUpperCase() + status.slice(1);
+              const count = getStatusCount(status);
+              return (
+                <SelectItem
+                  key={status}
+                  value={status}
+                  disabled={!isAvailable && !isSelected}
+                  className={!isAvailable && !isSelected ? "opacity-50" : ""}
+                  title={!isAvailable && !isSelected ? "No results" : undefined}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <span>{statusName}</span>
+                    {isAvailable && (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {count}
+                      </span>
+                    )}
+                  </div>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         <DropdownMenu>

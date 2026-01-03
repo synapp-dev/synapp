@@ -26,6 +26,7 @@ import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
+import { capitalizeSchoolName } from "@/utils/school-name";
 
 interface AddSchoolWizardProps {
   open: boolean;
@@ -201,7 +202,7 @@ export function AddSchoolWizard({
       }
 
       const result = await schoolApi.post.create({
-        name: formData.name,
+        name: capitalizeSchoolName(formData.name.trim()),
         stateId: formData.stateId,
         sectorId: formData.sectorId,
         levelIds,
@@ -280,9 +281,10 @@ export function AddSchoolWizard({
                     className="w-full capitalize"
                     placeholder="New School"
                     value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const capitalized = capitalizeSchoolName(e.target.value);
+                      setFormData({ ...formData, name: capitalized });
+                    }}
                   />
                 </div>
 
