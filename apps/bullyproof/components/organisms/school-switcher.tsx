@@ -469,14 +469,16 @@ export function SchoolSwitcher() {
                   <>
                     <div
                       className={cn(
-                        "flex items-center gap-2 flex-1 min-w-0",
-                        selectedSchool?.name ? "mx-auto" : "mx-2"
+                        "flex items-center gap-2 min-w-0 max-w-[80%]",
+                        selectedSchool?.name ? "" : "mx-2"
                       )}
                     >
                       {selectedSchool?.name ? (
-                        <SchoolIconBadge size="md" />
+                        <div className="flex-shrink-0">
+                          <SchoolIconBadge size="md" />
+                        </div>
                       ) : (
-                        <School className="size-4 text-muted-foreground" />
+                        <School className="size-4 text-muted-foreground flex-shrink-0" />
                       )}
 
                       <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
@@ -494,9 +496,9 @@ export function SchoolSwitcher() {
                       </div>
                     </div>
                     {selectedSchool?.name ? (
-                      <ArrowLeftRight className="flex-shrink-0 group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300" />
+                      <ArrowLeftRight className="flex-shrink-0 group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300 mr-1" />
                     ) : (
-                      <MousePointer2 className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
+                      <MousePointer2 className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300 flex-shrink-0 mr-1" />
                     )}
                   </>
                 ) : (
@@ -507,7 +509,15 @@ export function SchoolSwitcher() {
             <PopoverContent className="w-80 p-0" align="start" side="right">
               <div className="flex items-center justify-between px-3 py-2 border-b">
                 <p className="text-xs text-muted-foreground">Change school</p>
-                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push("/schools");
+                  }}
+                >
                   View all
                 </Button>
               </div>
