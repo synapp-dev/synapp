@@ -18,20 +18,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { usePageTitle } from "@/hooks/use-page-title";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
-import { Badge } from "@workspace/ui/components/badge";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -41,41 +27,122 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { Search, Users, Loader2, AlertCircle, ShieldCheck } from "lucide-react";
+import { Search, Users, Loader2, AlertCircle, X } from "lucide-react";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
+import { Badge } from "@workspace/ui/components/badge";
+import { UserDetailDrawer } from "./components/user-detail-drawer";
+import { UsersDataTable } from "./components/users-data-table";
 
 function AdminUsersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
+  const [allUsers, setAllUsers] = useState<UserWithRolesAndSchools[]>([]); // All users for filter options
   const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState(
+    searchParams?.get("search") || ""
+  );
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  const [selectedUser, setSelectedUser] =
+    useState<UserWithRolesAndSchools | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Get filters from URL query params
   const roleFilter = searchParams?.get("role") || "";
   const schoolFilter = searchParams?.get("schoolId") || "";
+  const userIdFromUrl = searchParams?.get("user") || null;
 
-  // Extract unique schools from users data
-  const availableSchools = Array.from(
+  // Handle drawer state from URL
+  useEffect(() => {
+    if (userIdFromUrl && users.length > 0) {
+      const user = users.find((u) => u.id === userIdFromUrl);
+      if (user) {
+        setSelectedUser(user);
+        setIsDrawerOpen(true);
+      }
+    } else if (!userIdFromUrl) {
+      setIsDrawerOpen(false);
+      setSelectedUser(null);
+    }
+  }, [userIdFromUrl, users]);
+
+  const handleUserClick = (user: UserWithRolesAndSchools) => {
+    setSelectedUser(user);
+    setIsDrawerOpen(true);
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    params.set("user", user.id);
+    router.push(`/admin/users?${params.toString()}`, { scroll: false });
+  };
+
+  const handleDrawerClose = (open: boolean) => {
+    setIsDrawerOpen(open);
+    if (!open) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.delete("user");
+      router.push(`/admin/users?${params.toString()}`, { scroll: false });
+      setSelectedUser(null);
+    }
+  };
+
+  // Extract unique schools from ALL users data (for filter options)
+  const allAvailableSchools = Array.from(
     new Map(
-      users
+      allUsers
         .flatMap((user) => user.schoolRoles)
         .filter((sr) => sr.schoolId && sr.schoolName)
         .map((sr) => [sr.schoolId, { id: sr.schoolId, name: sr.schoolName! }])
     ).values()
   ).sort((a, b) => a.name.localeCompare(b.name));
 
+  // Extract schools from CURRENT filtered users (for enabling/disabling)
+  const currentAvailableSchools = Array.from(
+    new Map(
+      users
+        .flatMap((user) => user.schoolRoles)
+        .filter((sr) => sr.schoolId && sr.schoolName)
+        .map((sr) => [sr.schoolId, { id: sr.schoolId, name: sr.schoolName! }])
+    ).values()
+  );
+
+  const currentAvailableSchoolIds = new Set(
+    currentAvailableSchools.map((s) => s.id)
+  );
+
   // Filter roles to only show roles that have a key (for filtering)
   const availableRoles = roles
     .filter((role) => role.key)
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+  // Get roles that appear in current filtered users
+  const currentAvailableRoleKeys = new Set(
+    users.flatMap((user) => [
+      ...user.platformRoles,
+      ...user.schoolRoles.map((sr) => sr.roleKey).filter(Boolean),
+    ])
+  );
+
+  // Count users for each role in current filtered results
+  const getRoleCount = (roleKey: string) => {
+    return users.filter((user) => {
+      return (
+        user.platformRoles.includes(roleKey) ||
+        user.schoolRoles.some((sr) => sr.roleKey === roleKey)
+      );
+    }).length;
+  };
+
+  // Count users for each school in current filtered results
+  const getSchoolCount = (schoolId: string) => {
+    return users.filter((user) =>
+      user.schoolRoles.some((sr) => sr.schoolId === schoolId)
+    ).length;
+  };
 
   const loadUsers = useCallback(
     async (search?: string, role?: string, schoolId?: string) => {
@@ -106,6 +173,24 @@ function AdminUsersPageContent() {
     []
   );
 
+  // Load all users once on mount to populate filter options
+  useEffect(() => {
+    const loadAllUsers = async () => {
+      try {
+        const result = await meApi.get.listAllUsers({
+          limit: 100,
+          offset: 0,
+        });
+        if (result.data) {
+          setAllUsers(result.data);
+        }
+      } catch (err) {
+        console.error("Failed to load all users for filters:", err);
+      }
+    };
+    loadAllUsers();
+  }, []);
+
   // Load roles on mount
   useEffect(() => {
     const fetchRoles = async () => {
@@ -121,13 +206,29 @@ function AdminUsersPageContent() {
     fetchRoles();
   }, []);
 
+  // Debounce search query updates (500ms)
   useEffect(() => {
-    loadUsers(searchTerm, roleFilter || undefined, schoolFilter || undefined);
-  }, [searchTerm, roleFilter, schoolFilter, loadUsers]);
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      } else {
+        params.delete("search");
+      }
+      router.replace(`/admin/users?${params.toString()}`, { scroll: false });
+    }, 500);
 
-  const handleSearch = () => {
-    setSearchTerm(searchInput);
-  };
+    return () => clearTimeout(timer);
+  }, [searchQuery, router, searchParams]);
+
+  useEffect(() => {
+    loadUsers(
+      debouncedSearchQuery || undefined,
+      roleFilter || undefined,
+      schoolFilter || undefined
+    );
+  }, [debouncedSearchQuery, roleFilter, schoolFilter, loadUsers]);
 
   const handleRoleFilterChange = (value: string) => {
     const params = new URLSearchParams(searchParams?.toString() || "");
@@ -149,23 +250,26 @@ function AdminUsersPageContent() {
     router.push(`/admin/users?${params.toString()}`, { scroll: false });
   };
 
-  const getInitials = (firstName: string | null, lastName: string | null) => {
-    const first = firstName?.[0]?.toUpperCase() || "";
-    const last = lastName?.[0]?.toUpperCase() || "";
-    return first + last || "?";
-  };
+  const hasActiveFilters =
+    debouncedSearchQuery.trim() !== "" ||
+    roleFilter !== "" ||
+    schoolFilter !== "";
 
-  const getFullName = (user: UserWithRolesAndSchools) => {
-    const parts = [user.firstName, user.lastName].filter(Boolean);
-    return parts.length > 0 ? parts.join(" ") : user.email;
+  const clearFilters = () => {
+    setSearchQuery("");
+    const params = new URLSearchParams();
+    router.replace("/admin/users", { scroll: false });
   };
 
   if (loading && users.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Loading users...</p>
+      <div className="space-y-6">
+        <div className="flex items-center gap-2">
+          <Users className="w-8 h-8 text-foreground" />
+          <h1 className="text-2xl font-semibold">Users</h1>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       </div>
     );
@@ -173,215 +277,226 @@ function AdminUsersPageContent() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-        <p className="text-muted-foreground">
-          Manage and view all platform users with their roles and schools
-        </p>
-      </div>
+      {/* Sticky Header and Search/Filters */}
+      <div className="sticky top-16 z-10 bg-background backdrop-blur supports-[backdrop-filter]:bg-background/90 -mx-6 px-6 border-b">
+        {/* Header */}
+        <div className="py-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Users className="w-8 h-8 text-foreground" />
+            <h1 className="text-2xl font-semibold">Users</h1>
+            {/* Active Filters Display */}
+            {hasActiveFilters && (
+              <div className="flex flex-wrap gap-2 ml-2">
+                {debouncedSearchQuery && (
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                    onClick={() => setSearchQuery("")}
+                  >
+                    Search: {debouncedSearchQuery}
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {roleFilter && (
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                    onClick={() => handleRoleFilterChange("all")}
+                  >
+                    Role:{" "}
+                    {availableRoles.find((r) => r.key === roleFilter)?.name ||
+                      roleFilter}
+                    <span className="ml-1 text-xs bg-background/50 px-1.5 py-0.5 rounded">
+                      {getRoleCount(roleFilter)}
+                    </span>
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+                {schoolFilter && (
+                  <Badge
+                    variant="secondary"
+                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                    onClick={() => handleSchoolFilterChange("all")}
+                  >
+                    School:{" "}
+                    {allAvailableSchools.find((s) => s.id === schoolFilter)
+                      ?.name || schoolFilter}
+                    <span className="ml-1 text-xs bg-background/50 px-1.5 py-0.5 rounded">
+                      {getSchoolCount(schoolFilter)}
+                    </span>
+                    <X className="h-3 w-3" />
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>All Users</CardTitle>
-              <CardDescription>
-                {users.length} user{users.length !== 1 ? "s" : ""} found
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Select
-                value={roleFilter || "all"}
-                onValueChange={handleRoleFilterChange}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Filter by role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  {availableRoles.map((role) => (
-                    <SelectItem key={role.id} value={role.key || ""}>
-                      {role.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={schoolFilter || "all"}
-                onValueChange={handleSchoolFilterChange}
-              >
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filter by school" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Schools</SelectItem>
-                  {availableSchools.map((school) => (
-                    <SelectItem key={school.id} value={school.id}>
-                      {school.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {/* Search and Filters */}
+        <div className="pb-4 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative w-full sm:w-1/2">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <Input
                 placeholder="Search by name or email..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    handleSearch();
-                  }
-                }}
-                className="w-[300px]"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-10"
               />
-              <Button onClick={handleSearch} variant="outline" size="icon">
-                <Search className="h-4 w-4" />
-              </Button>
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                {searchQuery !== debouncedSearchQuery || loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                ) : searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {users.length === 0 && !loading ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <Users className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No users found</h3>
-              <p className="text-sm text-muted-foreground">
-                {searchTerm
-                  ? "Try adjusting your search criteria"
-                  : "No users are registered on the platform yet"}
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>User</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Roles</TableHead>
-                  <TableHead>Schools</TableHead>
-                  <TableHead>Created</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => {
-                  // Combine all roles (platform + school roles)
-                  const allRoles: Array<{ name: string; isAdmin: boolean }> =
-                    [];
-
-                  // Add platform roles
-                  user.platformRoles.forEach((role) => {
-                    const isAdmin =
-                      role.includes("ADMIN") || role.includes("admin");
-                    allRoles.push({ name: role, isAdmin });
-                  });
-
-                  // Add school roles (deduplicate by role key)
-                  const schoolRoleKeys = new Set<string>();
-                  user.schoolRoles.forEach((schoolRole) => {
-                    if (
-                      schoolRole.roleKey &&
-                      !schoolRoleKeys.has(schoolRole.roleKey)
-                    ) {
-                      schoolRoleKeys.add(schoolRole.roleKey);
-                      const isAdmin =
-                        schoolRole.roleKey.includes("ADMIN") ||
-                        schoolRole.roleKey.includes("admin");
-                      allRoles.push({ name: schoolRole.roleKey, isAdmin });
-                    }
-                  });
-
-                  return (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={user.avatarUrl || undefined} />
-                            <AvatarFallback>
-                              {getInitials(user.firstName, user.lastName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">
-                              {getFullName(user)}
-                            </div>
-                            {user.firstName && user.lastName && (
-                              <div className="text-sm text-muted-foreground">
-                                {user.email}
-                              </div>
+            <div className="flex gap-2">
+              {availableRoles.length > 0 && (
+                <Select
+                  value={roleFilter || "all"}
+                  onValueChange={handleRoleFilterChange}
+                >
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Roles</SelectItem>
+                    {availableRoles.map((role) => {
+                      const roleKey = role.key || "";
+                      const isAvailable = currentAvailableRoleKeys.has(roleKey);
+                      const isSelected = roleFilter === roleKey;
+                      const count = getRoleCount(roleKey);
+                      return (
+                        <SelectItem
+                          key={role.id}
+                          value={roleKey}
+                          disabled={!isAvailable && !isSelected}
+                          className={
+                            !isAvailable && !isSelected ? "opacity-50" : ""
+                          }
+                          title={
+                            !isAvailable && !isSelected
+                              ? "No results"
+                              : undefined
+                          }
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>{role.name}</span>
+                            {isAvailable && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {count}
+                              </span>
                             )}
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm">{user.email}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {allRoles.length > 0 ? (
-                            allRoles.map((role, idx) => (
-                              <Badge
-                                key={idx}
-                                variant="default"
-                                className="flex items-center gap-1"
-                              >
-                                {role.isAdmin ? (
-                                  <ShieldCheck className="h-3 w-3" />
-                                ) : (
-                                  <Users className="h-3 w-3" />
-                                )}
-                                {role.name}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              None
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1 max-w-md">
-                          {user.schoolRoles.length > 0 ? (
-                            user.schoolRoles.map((schoolRole, idx) => (
-                              <div
-                                key={idx}
-                                className="flex items-center gap-2"
-                              >
-                                <Users className="h-3 w-3 text-muted-foreground" />
-                                <Badge variant="outline" className="text-xs">
-                                  {schoolRole.schoolName || "Unknown School"}
-                                </Badge>
-                              </div>
-                            ))
-                          ) : (
-                            <span className="text-sm text-muted-foreground">
-                              None
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="text-sm text-muted-foreground">
-                          {user.createdAt
-                            ? new Date(user.createdAt).toLocaleDateString()
-                            : "N/A"}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {allAvailableSchools.length > 0 && (
+                <Select
+                  value={schoolFilter || "all"}
+                  onValueChange={handleSchoolFilterChange}
+                >
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="School" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schools</SelectItem>
+                    {allAvailableSchools.map((school) => {
+                      const isAvailable = currentAvailableSchoolIds.has(
+                        school.id
+                      );
+                      const isSelected = schoolFilter === school.id;
+                      const count = getSchoolCount(school.id);
+                      return (
+                        <SelectItem
+                          key={school.id}
+                          value={school.id}
+                          disabled={!isAvailable && !isSelected}
+                          className={
+                            !isAvailable && !isSelected ? "opacity-50" : ""
+                          }
+                          title={
+                            !isAvailable && !isSelected
+                              ? "No results"
+                              : undefined
+                          }
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span>{school.name}</span>
+                            {isAvailable && (
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {count}
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {hasActiveFilters && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearFilters}
+                  className="flex items-center gap-1"
+                >
+                  <X className="h-4 w-4" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div>
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <UsersDataTable
+          users={users}
+          roles={roles}
+          onUserClick={handleUserClick}
+          isLoading={loading}
+          error={error}
+        />
+      </div>
+
+      {/* User Detail Drawer */}
+      <UserDetailDrawer
+        user={selectedUser}
+        open={isDrawerOpen}
+        onOpenChange={handleDrawerClose}
+        onUserUpdate={async () => {
+          // Refresh users list
+          await loadUsers(
+            debouncedSearchQuery || undefined,
+            roleFilter || undefined,
+            schoolFilter || undefined
+          );
+        }}
+      />
     </div>
   );
 }
