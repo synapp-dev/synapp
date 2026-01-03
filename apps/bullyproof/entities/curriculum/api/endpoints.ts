@@ -9,18 +9,32 @@ type Stage = typeof curriculumStages.$inferSelect;
 type Year = typeof schoolYears.$inferSelect;
 type Level = typeof schoolLevels.$inferSelect;
 
+type StageWithYears = Stage & {
+  years?: Array<{
+    id: string;
+    code: string;
+    displayName: string;
+    sortIndex: number;
+    level: {
+      id: string;
+      name: string;
+      key: string;
+    };
+  }>;
+};
+
 export const curriculumApi = {
   stages: {
     list(params?: {
       limit?: number;
       offset?: number;
-    }): Promise<ApiResult<Stage[]>> {
+    }): Promise<ApiResult<StageWithYears[]>> {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
 
       const query = searchParams.toString();
-      return apiFetch<Stage[]>(`/curriculum/stages${query ? `?${query}` : ""}`);
+      return apiFetch<StageWithYears[]>(`/curriculum/stages${query ? `?${query}` : ""}`);
     },
     byId(id: string): Promise<ApiResult<Stage & { years?: any[] }>> {
       return apiFetch<Stage & { years?: any[] }>(
