@@ -1,31 +1,7 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
-import { Button } from "@workspace/ui/components/button";
-import {
-  HelpCircle,
-  BookOpen,
-  Users,
-  Download,
-  MessageCircle,
-  Bug,
-  Lightbulb,
-  Activity,
-  Mail,
-  ArrowRight,
-  Star,
-  Clock,
-  Shield,
-} from "lucide-react";
-import { generateMetadataFromSegments } from "@/utils/metadata";
-
-export const metadata = generateMetadataFromSegments(["support"]);
+import { redirect } from "next/navigation";
 
 export default function SupportPage() {
+  redirect("/");
   const quickLinks = [
     {
       title: "FAQ",
