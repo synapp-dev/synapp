@@ -6,7 +6,8 @@ import { StageCards } from "@/entities/curriculum/ui/stage-cards";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import type { curriculumStages } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import { Loader2 } from "lucide-react";
+import { Button } from "@workspace/ui/components/button";
+import { Loader2, Plus } from "lucide-react";
 import { AddStageSheet } from "./add-stage-sheet";
 
 type Stage = typeof curriculumStages.$inferSelect & {
@@ -39,20 +40,8 @@ export function ContentSection() {
         offset: 0,
       });
       if (result.data) {
-        // Fetch years for each stage
-        const stagesWithYears = await Promise.all(
-          result.data.map(async (stage) => {
-            const stageResult = await curriculumApi.stages.byId(stage.id);
-            if (stageResult.data && stageResult.data.years) {
-              return {
-                ...stage,
-                years: stageResult.data.years,
-              };
-            }
-            return stage;
-          })
-        );
-        setStages(stagesWithYears);
+        // Years are now included directly from the API
+        setStages(result.data as Stage[]);
       } else if (result.error) {
         setError(result.error.message ?? "Failed to fetch curriculum stages");
       }
@@ -113,13 +102,19 @@ export function ContentSection() {
   return (
     <>
       <div className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">
-            Curriculum Stages
-          </h2>
-          <p className="text-muted-foreground">
-            Manage and view curriculum stages for the platform.
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              Curriculum Stages
+            </h2>
+            <p className="text-muted-foreground">
+              Manage and view curriculum stages for the platform.
+            </p>
+          </div>
+          <Button onClick={handleAddNewClick} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Add new stage
+          </Button>
         </div>
         {stages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
@@ -129,12 +124,13 @@ export function ContentSection() {
               create one.
             </p>
           </div>
-        ) : null}
-        <StageCards
-          stages={stages}
-          onStageClick={handleStageClick}
-          onAddNewClick={handleAddNewClick}
-        />
+        ) : (
+          <StageCards
+            stages={stages}
+            onStageClick={handleStageClick}
+            basePath="/admin/content/curriculum"
+          />
+        )}
       </div>
       <AddStageSheet
         open={isAddSheetOpen}
