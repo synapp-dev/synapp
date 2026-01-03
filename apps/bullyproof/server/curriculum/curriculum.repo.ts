@@ -11,6 +11,63 @@ export const curriculumRepo = {
   getStages: () =>
     db.select().from(curriculumStages).orderBy(asc(curriculumStages.sortIndex)),
 
+  getStagesWithYears: async () => {
+    // Fetch all stages with their years in a single query using LEFT JOIN
+    const stagesWithYearsData = await db
+      .select({
+        stage: curriculumStages,
+        year: schoolYears,
+        level: schoolLevels,
+      })
+      .from(curriculumStages)
+      .leftJoin(stageYearLinks, eq(curriculumStages.id, stageYearLinks.stageId))
+      .leftJoin(schoolYears, eq(stageYearLinks.schoolYearId, schoolYears.id))
+      .leftJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
+      .orderBy(asc(curriculumStages.sortIndex), asc(schoolYears.sortIndex));
+
+    // Group years by stage
+    const stagesMap = new Map<
+      string,
+      typeof curriculumStages.$inferSelect & {
+        years: Array<{
+          id: string;
+          code: string;
+          displayName: string;
+          sortIndex: number;
+          level: {
+            id: string;
+            name: string;
+            key: string;
+          };
+        }>;
+      }
+    >();
+
+    for (const row of stagesWithYearsData) {
+      const stageId = row.stage.id;
+      if (!stagesMap.has(stageId)) {
+        stagesMap.set(stageId, {
+          ...row.stage,
+          years: [],
+        });
+      }
+
+      // Add year if it exists (LEFT JOIN can return null)
+      if (row.year && row.level) {
+        const stage = stagesMap.get(stageId)!;
+        // Avoid duplicates (in case of multiple joins)
+        if (!stage.years.some((y) => y.id === row.year.id)) {
+          stage.years.push({
+            ...row.year,
+            level: row.level,
+          });
+        }
+      }
+    }
+
+    return Array.from(stagesMap.values());
+  },
+
   getStageById: (id: string) =>
     db
       .select()
