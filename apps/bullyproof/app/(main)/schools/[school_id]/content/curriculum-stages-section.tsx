@@ -41,20 +41,8 @@ export function CurriculumStagesSection({ schoolId }: CurriculumStagesSectionPro
         offset: 0,
       });
       if (result.data) {
-        // Fetch years for each stage
-        const stagesWithYears = await Promise.all(
-          result.data.map(async (stage) => {
-            const stageResult = await curriculumApi.stages.byId(stage.id);
-            if (stageResult.data && stageResult.data.years) {
-              return {
-                ...stage,
-                years: stageResult.data.years,
-              };
-            }
-            return stage;
-          })
-        );
-        setStages(stagesWithYears);
+        // Years are now included directly from the API
+        setStages(result.data as Stage[]);
       } else if (result.error) {
         setError(result.error.message ?? "Failed to fetch curriculum stages");
       }
@@ -124,6 +112,7 @@ export function CurriculumStagesSection({ schoolId }: CurriculumStagesSectionPro
       <StageCards
         stages={stages}
         onStageClick={handleStageClick}
+        basePath={`/schools/${schoolId}/content`}
       />
     </div>
   );

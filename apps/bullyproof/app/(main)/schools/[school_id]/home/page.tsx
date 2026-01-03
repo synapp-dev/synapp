@@ -66,20 +66,31 @@ export default function HomePage({
         });
 
         if (!teachersResult.error && teachersResult.data) {
-          // Filter to only show teachers (exclude SCHOOL_ADMIN only users)
+          // Filter to only show teachers and school admins (exclude SCHOOL_LICENCE users)
           const schoolId = currentSchool?.id;
           const filteredTeachers = schoolId
             ? teachersResult.data.filter((user) => {
                 const schoolRoles = user.schoolRoles.filter(
                   (role) => role.schoolId === schoolId
                 );
+                // Exclude SCHOOL_LICENCE users
+                const hasLicenceRole = schoolRoles.some(
+                  (role) => role.roleKey === "SCHOOL_LICENCE"
+                );
+                if (hasLicenceRole) return false;
+                // Include TEACHER and SCHOOL_ADMIN
                 return schoolRoles.some(
                   (role) =>
                     role.roleKey === "TEACHER" ||
                     role.roleKey === "SCHOOL_ADMIN"
                 );
               })
-            : teachersResult.data;
+            : teachersResult.data.filter((user) => {
+                // Exclude SCHOOL_LICENCE users even if no schoolId
+                return !user.schoolRoles.some(
+                  (role) => role.roleKey === "SCHOOL_LICENCE"
+                );
+              });
 
           setTeachers(filteredTeachers);
 
@@ -180,6 +191,50 @@ export default function HomePage({
     }
   };
 
+  // Extract school metadata similar to school-switcher
+  const getSchoolMetadata = () => {
+    if (!currentSchool) return { stateText: "", sectorText: "", levelsText: "" };
+
+    const stateText = currentSchool.state
+      ? typeof currentSchool.state === "string"
+        ? currentSchool.state.toUpperCase()
+        : ""
+      : "";
+
+    const sectorText =
+      typeof currentSchool.sector === "string" ? currentSchool.sector : "";
+
+    let levelsText = "";
+    if (Array.isArray(currentSchool.levels) && currentSchool.levels.length > 0) {
+      const levelNames = currentSchool.levels.map((lvl) =>
+        typeof lvl === "string" ? lvl : (lvl as any)?.name || (lvl as any)?.key || ""
+      );
+      const lower = levelNames.map((s) => s.toLowerCase());
+      const hasPrimary = lower.some((s) => s.includes("primary"));
+      const hasSecondary = lower.some((s) => s.includes("secondary"));
+      if (hasPrimary && hasSecondary) levelsText = "P-12";
+      else if (hasPrimary) levelsText = "Primary";
+      else if (hasSecondary) levelsText = "Secondary";
+      else levelsText = levelNames.join(", ");
+    }
+
+    return { stateText, sectorText, levelsText };
+  };
+
+  // Filter out SCHOOL_LICENCE users
+  const filteredUsers = useMemo(() => {
+    const schoolId = currentSchool?.id;
+    if (!schoolId) return [];
+
+    return teachers.filter((user) => {
+      const schoolRoles = user.schoolRoles.filter(
+        (role) => role.schoolId === schoolId
+      );
+      // Exclude users with SCHOOL_LICENCE role
+      return !schoolRoles.some((role) => role.roleKey === "SCHOOL_LICENCE");
+    });
+  }, [teachers, currentSchool?.id]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -188,125 +243,109 @@ export default function HomePage({
     );
   }
 
+  const { stateText, sectorText, levelsText } = getSchoolMetadata();
+  const metadataParts = [stateText, sectorText, levelsText].filter(Boolean);
+
   return (
     <>
       <div className="space-y-8">
         {/* Hero Section */}
-        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-8 border border-border">
-          <h1 className="text-4xl font-bold mb-2">{getGreeting()}</h1>
-          {currentSchool && (
-            <p className="text-xl text-muted-foreground">
-              Welcome to {currentSchool.name}
-            </p>
-          )}
-        </div>
-
-        {/* School Info */}
         {currentSchool && (
-          <div className="bg-card rounded-lg p-6 border border-border">
-            <h2 className="text-2xl font-semibold mb-4">School Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <div className="text-sm text-muted-foreground">Name</div>
-                <div className="text-lg font-medium">{currentSchool.name}</div>
+          <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-8 border border-border">
+            <h1 className="text-4xl font-bold mb-2">{currentSchool.name}</h1>
+            {metadataParts.length > 0 && (
+              <div className="flex items-center gap-1 text-muted-foreground">
+                {metadataParts.map((part, index) => (
+                  <div key={index} className="flex items-center gap-1">
+                    <span className="capitalize">{part}</span>
+                    {index < metadataParts.length - 1 && (
+                      <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+                    )}
+                  </div>
+                ))}
               </div>
-              {currentSchool.state && (
-                <div>
-                  <div className="text-sm text-muted-foreground">State</div>
-                  <div className="text-lg font-medium">
-                    {currentSchool.state.toUpperCase()}
-                  </div>
-                </div>
-              )}
-              {currentSchool.sector && (
-                <div>
-                  <div className="text-sm text-muted-foreground">Sector</div>
-                  <div className="text-lg font-medium capitalize">
-                    {currentSchool.sector}
-                  </div>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
 
-        {/* Lessons List */}
-        <div className="bg-card rounded-lg p-6 border border-border">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-semibold">
-              All Lessons ({lessons.length})
-            </h2>
-            <Button onClick={() => setIsWizardOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Start New Lesson
-            </Button>
-          </div>
-          {lessons.length > 0 ? (
-            <div className="space-y-3">
-              {lessons.map((lesson) => (
-                <div
-                  key={lesson.id}
-                  className="bg-muted/50 rounded-lg p-4 border border-border/50 hover:bg-muted/70 transition-colors"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-medium">
+        {/* 2 Column Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Lessons Card */}
+          <div className="bg-card rounded-lg p-6 border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">Lessons</h2>
+              <Button
+                size="sm"
+                onClick={() => setIsWizardOpen(true)}
+                className="h-8"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {lessons.length > 0 ? (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {lessons.map((lesson) => (
+                  <div
+                    key={lesson.id}
+                    className="bg-muted/50 rounded-lg p-3 border border-border/50 hover:bg-muted/70 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-medium truncate">
                           {getLessonTitle(lesson)}
                         </h3>
-                        <span
-                          className={`px-2 py-1 rounded text-xs font-medium ${getStatusBadgeColor(
-                            lesson.status
-                          )}`}
-                        >
-                          {lesson.status.replace("_", " ")}
-                        </span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Teacher: {getTeacherNameFromLesson(lesson)}
-                      </div>
-                      {lesson.scheduledFor && (
-                        <div className="text-sm text-muted-foreground mt-1">
-                          Scheduled:{" "}
-                          {format(new Date(lesson.scheduledFor), "MMM d, yyyy")}
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {getTeacherNameFromLesson(lesson)}
                         </div>
-                      )}
+                        {lesson.scheduledFor && (
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(lesson.scheduledFor), "MMM d, yyyy")}
+                          </div>
+                        )}
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded text-xs font-medium whitespace-nowrap ${getStatusBadgeColor(
+                          lesson.status
+                        )}`}
+                      >
+                        {lesson.status.replace("_", " ")}
+                      </span>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              No lessons found. Start by creating a new lesson!
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No lessons found
+              </div>
+            )}
+          </div>
 
-        {/* Teachers List */}
-        <div className="bg-card rounded-lg p-6 border border-border">
-          <h2 className="text-2xl font-semibold mb-4">
-            All Teachers ({teachers.length})
-          </h2>
-          {teachers.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {teachers.map((teacher) => (
-                <div
-                  key={teacher.id}
-                  className="bg-muted/50 rounded-lg p-4 border border-border/50 hover:bg-muted/70 transition-colors"
-                >
-                  <div className="font-medium">{getTeacherName(teacher)}</div>
-                  <div className="text-sm text-muted-foreground mt-1">
-                    {teacher.email}
+          {/* Users Card */}
+          <div className="bg-card rounded-lg p-6 border border-border">
+            <h2 className="text-xl font-semibold mb-4">Users</h2>
+            {filteredUsers.length > 0 ? (
+              <div className="space-y-2 max-h-[600px] overflow-y-auto">
+                {filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="bg-muted/50 rounded-lg p-3 border border-border/50 hover:bg-muted/70 transition-colors"
+                  >
+                    <div className="font-medium text-sm">
+                      {getTeacherName(user)}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1 truncate">
+                      {user.email}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              No teachers found
-            </div>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground text-sm">
+                No users found
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
