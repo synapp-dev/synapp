@@ -143,7 +143,7 @@ function UserDetailDrawerContent({
     const fetchSchools = async () => {
       try {
         setLoadingSchools(true);
-        const result = await schoolApi.get.listSchools({ limit: 1000 });
+        const result = await schoolApi.get.listSchools({ limit: 100 });
         if (result.data) {
           setSchools(result.data);
         }

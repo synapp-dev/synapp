@@ -116,7 +116,7 @@ export function AddUserSheet({
   const loadSchools = async () => {
     try {
       setLoadingSchools(true);
-      const result = await schoolApi.get.listSchools({ limit: 1000 });
+      const result = await schoolApi.get.listSchools({ limit: 100 });
       if (result.data) {
         setSchools(result.data);
       } else if (result.error) {
@@ -202,14 +202,14 @@ export function AddUserSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="bottom"
-        className="h-[90vh] w-full max-w-2xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-y-auto flex flex-col"
+        side="top"
+        className="w-full max-w-2xl mx-auto rounded-b-2xl border-b-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0"
       >
         <SheetHeader className="px-6 pt-6 pb-4 border-b">
           <SheetTitle>Add New User</SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+        <form onSubmit={handleSubmit}>
           <div className="px-6 py-6 space-y-6">
             {error && (
               <Alert variant="destructive">
@@ -314,14 +314,6 @@ export function AddUserSheet({
           </div>
 
           <SheetFooter className="px-6 py-4 border-t gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              Cancel
-            </Button>
             <Button type="submit" disabled={loading}>
               {loading ? (
                 <>
