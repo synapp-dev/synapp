@@ -82,6 +82,7 @@ import {
   FileBadge2,
   Trash2,
   Plus,
+  AlertCircle,
 } from "lucide-react";
 
 type Role = typeof roles.$inferSelect;
@@ -549,19 +550,18 @@ function UserDetailDrawerContent({
                             setSaving(true);
                             setSaveError(null);
 
-                            const result = await usersApi.patch.update(user.id, {
-                              firstName: firstName || undefined,
-                              lastName: lastName || undefined,
-                              email: email || undefined,
-                            });
+                            const result = await usersApi.patch.update(
+                              user.id,
+                              {
+                                firstName: firstName || undefined,
+                                lastName: lastName || undefined,
+                                email: email || undefined,
+                              }
+                            );
 
                             if (result.error) {
                               const errorMessage =
-                                typeof result.error === "object"
-                                  ? result.error.message
-                                  : typeof result.error === "string"
-                                    ? result.error
-                                    : "Failed to update user";
+                                result.error.message || "Failed to update user";
                               throw new Error(errorMessage);
                             }
 
@@ -569,7 +569,9 @@ function UserDetailDrawerContent({
                             onUserUpdate?.();
                           } catch (err: any) {
                             console.error("Failed to update user:", err);
-                            setSaveError(err.message || "Failed to update user");
+                            setSaveError(
+                              err.message || "Failed to update user"
+                            );
                           } finally {
                             setSaving(false);
                           }
