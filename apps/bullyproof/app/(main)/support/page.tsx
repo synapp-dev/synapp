@@ -1,7 +1,26 @@
-import { redirect } from "next/navigation";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Button } from "@workspace/ui/components/button";
+import {
+  HelpCircle,
+  BookOpen,
+  Users,
+  Download,
+  Activity,
+  Clock,
+  Mail,
+  Shield,
+  ArrowRight,
+  MessageCircle,
+  Star,
+} from "lucide-react";
 
 export default function SupportPage() {
-  redirect("/");
   const quickLinks = [
     {
       title: "FAQ",
