@@ -16,6 +16,7 @@ import {
   AvatarImage,
 } from "@workspace/ui/components/avatar";
 import { Input } from "@workspace/ui/components/input";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Mail, Search, Users } from "lucide-react";
 import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { useSchoolStore } from "@/stores/school-store";
@@ -152,19 +153,29 @@ export default function TeachersPageClient() {
     return name.toLowerCase().replace(/\s+/g, "-");
   };
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-2">
-          <Users className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Teachers</h1>
+  // Teacher card skeleton component
+  const TeacherCardSkeleton = () => (
+    <Card className="h-full">
+      <CardHeader>
+        <div className="flex items-start space-x-3">
+          <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
+          <div className="flex-1 min-w-0 space-y-2">
+            <Skeleton className="h-5 w-32" />
+            <div className="flex flex-wrap gap-1">
+              <Skeleton className="h-5 w-16 rounded-full" />
+              <Skeleton className="h-5 w-20 rounded-full" />
+            </div>
+          </div>
         </div>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading teachers...</p>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center space-x-2">
+          <Skeleton className="h-4 w-4 flex-shrink-0" />
+          <Skeleton className="h-4 w-40" />
         </div>
-      </div>
-    );
-  }
+      </CardContent>
+    </Card>
+  );
 
   if (!currentSchool) {
     return (
@@ -195,11 +206,18 @@ export default function TeachersPageClient() {
           className="pl-10"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          disabled={loading}
         />
       </div>
 
       {/* Teachers Grid */}
-      {filteredUsers.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(6)].map((_, i) => (
+            <TeacherCardSkeleton key={i} />
+          ))}
+        </div>
+      ) : filteredUsers.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-12">

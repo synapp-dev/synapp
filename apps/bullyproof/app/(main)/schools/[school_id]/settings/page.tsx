@@ -50,7 +50,7 @@ export default async function SettingsPage({
 }) {
   const { school_id } = await params;
   const { data: school } = await schoolServerApi.get.schoolBySlug(school_id);
-  
+
   // Redirect to home page - this page is disabled
   redirect(`/schools/${school_id}/home`);
 

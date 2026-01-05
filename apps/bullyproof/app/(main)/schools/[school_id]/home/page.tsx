@@ -7,10 +7,15 @@ import {
   type UserWithRolesAndSchools,
 } from "@/entities/me/api/endpoints";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
-import { Button } from "@workspace/ui/components/button";
-import { LessonWizard } from "@/components/organisms/lesson-wizard";
-import { Plus } from "lucide-react";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@workspace/ui/components/avatar";
 import { format } from "date-fns";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type Lesson = {
   id: string;
@@ -39,7 +44,7 @@ export default function HomePage({
   const [teachers, setTeachers] = useState<UserWithRolesAndSchools[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const router = useRouter();
 
   const currentSchool = useSchoolStore((state) => state.currentSchool);
 
@@ -161,6 +166,25 @@ export default function HomePage({
     return `${firstName} ${lastName}`.trim() || user.email;
   };
 
+  const getInitials = (user: UserWithRolesAndSchools) => {
+    const firstName = user.firstName || "";
+    const lastName = user.lastName || "";
+    if (firstName && lastName) {
+      return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    }
+    if (firstName) {
+      return firstName[0].toUpperCase();
+    }
+    if (user.email) {
+      return user.email[0].toUpperCase();
+    }
+    return "U";
+  };
+
+  const getTeacherSlug = (name: string) => {
+    return name.toLowerCase().replace(/\s+/g, "-");
+  };
+
   const getLessonTitle = (lesson: Lesson) => {
     return lesson.topic?.title || "Untitled Lesson";
   };
@@ -237,8 +261,61 @@ export default function HomePage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="space-y-8">
+        {/* Hero Section Skeleton */}
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-8 border border-border">
+          <Skeleton className="h-10 w-64 mb-2" />
+          <div className="flex items-center gap-1 mt-2">
+            <Skeleton className="h-4 w-16" />
+            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+            <Skeleton className="h-4 w-20" />
+            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+            <Skeleton className="h-4 w-12" />
+          </div>
+        </div>
+
+        {/* 2 Column Grid Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Lessons Card Skeleton */}
+          <div className="bg-card rounded-lg p-6 border border-border">
+            <div className="flex items-center justify-between mb-4">
+              <Skeleton className="h-7 w-24" />
+            </div>
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="bg-muted/50 rounded-lg p-3 border border-border/50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                      <Skeleton className="h-3 w-1/3" />
+                    </div>
+                    <Skeleton className="h-5 w-20 rounded-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Users Card Skeleton */}
+          <div className="bg-card rounded-lg p-6 border border-border">
+            <Skeleton className="h-7 w-16 mb-4" />
+            <div className="grid grid-cols-2 gap-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="bg-muted/50 rounded-lg p-3 border border-border/50 flex items-center gap-3"
+                >
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <Skeleton className="h-4 flex-1" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -271,23 +348,21 @@ export default function HomePage({
         {/* 2 Column Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Lessons Card */}
-          <div className="bg-card rounded-lg p-6 border border-border">
+          <div
+            onClick={() => router.push(`/schools/${schoolSlug}/lessons`)}
+            className="bg-card rounded-lg p-6 border border-border hover:shadow-md transition-shadow cursor-pointer"
+          >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Lessons</h2>
-              <Button
-                size="sm"
-                onClick={() => setIsWizardOpen(true)}
-                className="h-8"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
             {lessons.length > 0 ? (
               <div className="space-y-2 max-h-[600px] overflow-y-auto">
                 {lessons.map((lesson) => (
-                  <div
+                  <Link
                     key={lesson.id}
-                    className="bg-muted/50 rounded-lg p-3 border border-border/50 hover:bg-muted/70 transition-colors"
+                    href={`/schools/${schoolSlug}/lessons/${lesson.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="block bg-muted/50 rounded-lg p-3 border border-border/50 hover:bg-muted/70 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -311,7 +386,7 @@ export default function HomePage({
                         {lesson.status.replace("_", " ")}
                       </span>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             ) : (
@@ -323,37 +398,37 @@ export default function HomePage({
 
           {/* Users Card */}
           <div className="bg-card rounded-lg p-6 border border-border">
-            <h2 className="text-xl font-semibold mb-4">Users</h2>
+            <h2 className="text-xl font-semibold mb-4">Staff</h2>
             {filteredUsers.length > 0 ? (
-              <div className="space-y-2 max-h-[600px] overflow-y-auto">
-                {filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className="bg-muted/50 rounded-lg p-3 border border-border/50 hover:bg-muted/70 transition-colors"
-                  >
-                    <div className="font-medium text-sm">
-                      {getTeacherName(user)}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1 truncate">
-                      {user.email}
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
+                {filteredUsers.map((user) => {
+                  const fullName = getTeacherName(user);
+                  const teacherSlug = getTeacherSlug(fullName);
+                  return (
+                    <Link
+                      key={user.id}
+                      href={`/schools/${schoolSlug}/teachers/${teacherSlug}`}
+                      className="bg-muted/50 rounded-lg p-3 border border-border/50 hover:bg-muted/70 transition-colors flex items-center gap-3"
+                    >
+                      <Avatar className="h-10 w-10 flex-shrink-0">
+                        <AvatarImage src={user.avatarUrl || undefined} />
+                        <AvatarFallback>{getInitials(user)}</AvatarFallback>
+                      </Avatar>
+                      <div className="font-medium text-sm truncate min-w-0">
+                        {fullName}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground text-sm">
-                No users found
+                No staff found
               </div>
             )}
           </div>
         </div>
       </div>
-
-      <LessonWizard
-        schoolId={schoolSlug}
-        open={isWizardOpen}
-        onOpenChange={setIsWizardOpen}
-      />
     </>
   );
 }
