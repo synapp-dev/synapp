@@ -1,6 +1,5 @@
 "use client";
 
-import { SnapshotCardWithData } from "@/entities/dashboard/ui/admin/cards/snapshot-card-with-data";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import {
   Card,
@@ -34,11 +33,15 @@ import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { Badge } from "@workspace/ui/components/badge";
 import Image from "next/image";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
+import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@workspace/ui/components/tooltip";
+import { Progress } from "@workspace/ui/components/progress";
+import { certificationApi } from "@/entities/certification/api/endpoints";
+import CountUp from "react-countup";
 
 function QuickActionsCard({
   title,
@@ -154,6 +157,87 @@ function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
   );
 }
 
+// Component to handle certification slide thumbnail image with error fallback
+function CertificationThumbnailImage({
+  slideId,
+  alt,
+}: {
+  slideId: string;
+  alt: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const getSlideUrl = useCertificationSlidesCacheStore(
+    (state) => state.getSlideUrl
+  );
+  const cachedUrl = useCertificationSlidesCacheStore(
+    (state) => state.cache[slideId]?.url ?? null
+  );
+  const loading = useCertificationSlidesCacheStore(
+    (state) => state.loading[slideId] ?? false
+  );
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
+
+  // Fetch URL using cache store
+  useEffect(() => {
+    if (slideId && !slideId.startsWith("temp_")) {
+      // If we already have a cached URL, use it immediately
+      if (cachedUrl) {
+        setImageUrl(cachedUrl);
+        return;
+      }
+
+      // Otherwise, fetch it
+      let cancelled = false;
+      getSlideUrl(slideId).then((url) => {
+        if (!cancelled) {
+          setImageUrl(url);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    } else {
+      setImageUrl(null);
+    }
+  }, [slideId, getSlideUrl, cachedUrl]);
+
+  // Update when cached URL changes
+  useEffect(() => {
+    if (cachedUrl && !loading) {
+      setImageUrl(cachedUrl);
+    }
+  }, [cachedUrl, loading]);
+
+  if (loading && !imageUrl) {
+    return (
+      <div className="w-full rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center aspect-video">
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError || !imageUrl) {
+    return (
+      <div className="w-full rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center aspect-video">
+        <FileText className="h-5 w-5 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full rounded-md overflow-hidden bg-muted aspect-video">
+      <Image
+        src={imageUrl}
+        alt={alt}
+        fill
+        className="object-cover"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
 export function TeacherOverviewSection() {
   const currentUser = useMeStore((s) => s.currentUser);
   const activeSchool = useSchoolStore((s) => s.getActiveSchool());
@@ -169,6 +253,21 @@ export function TeacherOverviewSection() {
   // Build the lessons link with dialog parameter using slug
   const startNewLessonLink = schoolSlug
     ? `/schools/${schoolSlug}/lessons?dialog=add-new-lesson`
+    : "/schools";
+
+  // Build the view lessons link using slug
+  const viewLessonsLink = schoolSlug
+    ? `/schools/${schoolSlug}/lessons`
+    : "/schools";
+
+  // Build the view content link using slug
+  const viewContentLink = schoolSlug
+    ? `/schools/${schoolSlug}/content`
+    : "/schools";
+
+  // Build the classes link using slug
+  const classesLink = schoolSlug
+    ? `/schools/${schoolSlug}/classes`
     : "/schools";
 
   // Fetch live lessons (in_progress or pending_review) for the current teacher
@@ -280,6 +379,153 @@ export function TeacherOverviewSection() {
       ? "Provide feedback"
       : "Resume lesson";
 
+  // Fetch AP Certification data
+  const { data: certificationData } = useQuery({
+    queryKey: ["ap-certification-dashboard", teacherId],
+    queryFn: async () => {
+      // Get the active stage (code "C")
+      const stageResult = await certificationApi.stages.byCode("C");
+      if (stageResult.error || !stageResult.data) {
+        return null;
+      }
+
+      const stage = stageResult.data;
+
+      // Get all topics for this stage
+      const topicsResult = await certificationApi.topics.byStageCode("C");
+      if (topicsResult.error || !topicsResult.data) {
+        return {
+          stage,
+          topics: [],
+          progress: [],
+          topicSlides: {},
+          topicSlideCounts: {},
+        };
+      }
+
+      const topics = topicsResult.data;
+
+      // Get progress for all topics
+      const progressResult = await certificationApi.stages.progress.byCode("C");
+      if (progressResult.error || !progressResult.data) {
+        return {
+          stage,
+          topics,
+          progress: [],
+          topicSlides: {},
+          topicSlideCounts: {},
+        };
+      }
+
+      // Fetch slides for each topic to find first image slide and total slide count
+      const topicSlides: Record<string, string | null> = {};
+      const topicSlideCounts: Record<string, number> = {};
+      await Promise.all(
+        topics.map(async (topic) => {
+          const slidesResult = await certificationApi.topics.slides.list(
+            topic.id
+          );
+          if (slidesResult.data && slidesResult.data.length > 0) {
+            const firstImageSlide = slidesResult.data.find(
+              (slide) => slide.kind === "image"
+            );
+            topicSlides[topic.id] = firstImageSlide?.id || null;
+            topicSlideCounts[topic.id] = slidesResult.data.length;
+          } else {
+            topicSlides[topic.id] = null;
+            topicSlideCounts[topic.id] = 0;
+          }
+        })
+      );
+
+      return {
+        stage,
+        topics,
+        progress: progressResult.data.progress || [],
+        topicSlides,
+        topicSlideCounts,
+      };
+    },
+    enabled: !!teacherId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Calculate certification progress
+  const certificationStage = certificationData?.stage;
+  const certificationTopics = certificationData?.topics || [];
+  const certificationProgress = certificationData?.progress || [];
+  const topicSlides = certificationData?.topicSlides || {};
+  const topicSlideCounts = certificationData?.topicSlideCounts || {};
+  const totalTopics = certificationTopics.length;
+
+  // Count completed topics (status is "completed", "passed", or "failed")
+  const completedProgress = certificationProgress.filter(
+    (p) =>
+      p.status === "completed" || p.status === "passed" || p.status === "failed"
+  );
+
+  const completedTopics = completedProgress.length;
+
+  const progressPercentage =
+    totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0;
+
+  // Find the most recently completed topic
+  const mostRecentCompletedTopic =
+    completedProgress.length > 0
+      ? completedProgress.sort((a, b) => {
+          const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+          const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+          return dateB - dateA;
+        })[0]
+      : null;
+
+  // Get the topic and its thumbnail slide ID
+  const mostRecentTopic =
+    mostRecentCompletedTopic &&
+    certificationTopics.find((t) => t.id === mostRecentCompletedTopic.topicId);
+  const thumbnailSlideId =
+    mostRecentTopic && topicSlides[mostRecentTopic.id]
+      ? topicSlides[mostRecentTopic.id]
+      : null;
+
+  // Find the last topic with any progress data (sorted by updatedAt)
+  const topicsWithProgress = certificationProgress
+    .filter((p) => p.updatedAt)
+    .sort((a, b) => {
+      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+
+  const lastTopicProgress =
+    topicsWithProgress.length > 0 ? topicsWithProgress[0] : null;
+  const lastTopic =
+    lastTopicProgress &&
+    certificationTopics.find((t) => t.id === lastTopicProgress.topicId);
+
+  // Calculate progress percentage for the last topic
+  let lastTopicProgressPercentage = 0;
+  if (lastTopicProgress && lastTopic) {
+    const totalSlides = topicSlideCounts[lastTopic.id] || 0;
+    if (totalSlides > 0 && lastTopicProgress.slideProgress) {
+      const slideProgressData = lastTopicProgress.slideProgress as Record<
+        string,
+        any
+      >;
+      const slideIds = Object.keys(slideProgressData);
+      if (slideIds.length > 0) {
+        const completedSlides = slideIds.filter(
+          (slideId) =>
+            slideProgressData[slideId]?.viewed ||
+            slideProgressData[slideId]?.answered
+        ).length;
+        lastTopicProgressPercentage = Math.round(
+          (completedSlides / totalSlides) * 100
+        );
+      }
+    }
+  }
+
   return (
     <div className="space-y-6 grid grid-cols-1 md:grid-cols-2 gap-4 w-full items-stretch">
       <div className="col-span-1 flex gap-4 items-stretch">
@@ -288,22 +534,23 @@ export function TeacherOverviewSection() {
             <QuickActionsCard
               title="View Lessons"
               icon={<Book className="w-4 h-4" />}
-              link="/schools"
+              link={viewLessonsLink}
             />
             <QuickActionsCard
               title="My Classes"
               icon={<Users className="w-4 h-4" />}
-              link="/schools"
+              link={classesLink}
             />
             <QuickActionsCard
               title="View Content"
               icon={<GraduationCap className="w-4 h-4" />}
-              link="/schools"
+              link={viewContentLink}
             />
             <QuickActionsCard
               title="My Performance"
               icon={<FileText className="w-4 h-4" />}
               link="/schools"
+              disabled={true}
             />
             <QuickActionsCard
               disabled
@@ -421,7 +668,7 @@ export function TeacherOverviewSection() {
               </Card>
             </Link>
           ) : (
-            <Card className="flex-1 flex flex-col justify-center items-center p-6 min-h-0">
+            <Card className="flex-1 flex flex-col justify-center items-center p-6 min-h-0 border-2 border-dashed">
               <CardContent className="flex flex-col items-center justify-center h-full">
                 <BookOpen className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground text-center">
@@ -435,44 +682,84 @@ export function TeacherOverviewSection() {
       <div className="flex flex-col gap-4 w-full h-full">
         {/* AP Certification Card - Full Width, Fills Remaining Height */}
         <StaggeredAnimation index={0} className="flex-1 min-h-0">
-          <Card className="hover:shadow-md transition-shadow w-full h-full flex flex-col relative group">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground flex flex-row justify-between">
-                <div className="flex items-center gap-1">
-                  <BadgeCheck className="h-3 w-3" />
-                  <h2 className="text-sm font-medium text-muted-foreground">
-                    AP Certification
-                  </h2>
-                </div>
-              </CardTitle>
-            </CardHeader>
-          </Card>
+          <Link href="/ap-certification" className="block h-full">
+            <Card className="hover:shadow-md transition-shadow w-full h-full flex flex-col relative group cursor-pointer">
+              <CardHeader>
+                <CardTitle className="text-sm font-medium text-muted-foreground flex flex-row justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <BadgeCheck className="h-3 w-3" />
+                    <h2 className="text-sm font-medium text-muted-foreground">
+                      AP Certification
+                    </h2>
+                  </div>
+                  {certificationStage && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground text-right">
+                        {certificationStage.name}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {completedTopics}/{totalTopics}
+                      </span>
+                    </div>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4 flex-1">
+                {certificationStage ? (
+                  <>
+                    {/* Thumbnail on left, topic info on right */}
+                    <div className="flex gap-4 flex-1">
+                      {/* Thumbnail - Half width on the left */}
+                      {thumbnailSlideId && (
+                        <div className="w-1/3 flex-shrink-0">
+                          <CertificationThumbnailImage
+                            slideId={thumbnailSlideId}
+                            alt={
+                              mostRecentTopic?.title ||
+                              "Most recently completed topic"
+                            }
+                          />
+                        </div>
+                      )}
+                      {/* Topic information on the right */}
+                      <div className="flex-1 flex flex-col gap-2">
+                        <div className="space-y-2">
+                          {lastTopic && lastTopicProgress && (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <span className="text-2xl font-bold">
+                                  {lastTopic.title}
+                                </span>
+                              </div>
+                              {/* Progress bar underneath topic title */}
+                              <div className="space-y-1 pt-2">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                  <span>Progress</span>
+                                  <span>{lastTopicProgressPercentage}%</span>
+                                </div>
+                                <Progress
+                                  value={lastTopicProgressPercentage}
+                                  className="h-2"
+                                />
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      Under construction
+                    </p>
+                    <Progress value={0} className="h-2" />
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
         </StaggeredAnimation>
-
-        {/* Bottom row with two cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full">
-          {/* Completed Lessons Card */}
-          <StaggeredAnimation index={1}>
-            <SnapshotCardWithData
-              metricKey="lessons/completed"
-              title="Completed Lessons"
-              icon="BookOpen"
-              subtitle="Lessons completed this term"
-              scope="school"
-            />
-          </StaggeredAnimation>
-
-          {/* Engagement Rate Card */}
-          <StaggeredAnimation index={2}>
-            <SnapshotCardWithData
-              metricKey="lessons/engagement-rate"
-              title="Engagement Rate"
-              icon="Activity"
-              subtitle="Activity in last 30 days"
-              scope="school"
-            />
-          </StaggeredAnimation>
-        </div>
       </div>
     </div>
   );
