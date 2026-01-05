@@ -56,6 +56,8 @@ const data = {
       url: "/ap-certification",
       icon: BadgeCheck,
       isActive: false,
+      disabled: true,
+      disabledMessage: "Under Construction",
     },
     {
       title: "Welcome",
@@ -259,7 +261,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Fetch in-progress lesson on mount and when user changes
   // Wait for session to be ready before fetching
   React.useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser?.id) return;
 
     let retryCount = 0;
     const maxRetries = 3;
@@ -273,7 +275,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         
         // Only fetch if we have a valid session token
         if (sessionData?.session?.access_token) {
-          fetchInProgressLesson();
+          fetchInProgressLesson(currentUser.id);
         } else if (retryCount < maxRetries) {
           // Retry after a short delay if token isn't ready yet
           retryCount++;
@@ -296,7 +298,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         clearTimeout(retryTimeout);
       }
     };
-  }, [currentUser, fetchInProgressLesson]);
+  }, [currentUser?.id, fetchInProgressLesson]);
 
   const platformItemsWithLive = React.useMemo(() => {
     // Don't show live lesson if welcome is not completed

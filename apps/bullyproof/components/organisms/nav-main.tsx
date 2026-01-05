@@ -1,6 +1,12 @@
 "use client";
 
-import { ChevronRight, Hammer, Lock, type LucideIcon } from "lucide-react";
+import {
+  ChevronRight,
+  Hammer,
+  Lock,
+  AlertTriangle,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -34,6 +40,7 @@ function DisabledMenuItem({
 }) {
   const [isHovered, setIsHovered] = useState(false);
   const isLocked = disabledMessage === "Locked";
+  const isUnauthorized = disabledMessage === "Unauthorized";
 
   return (
     <SidebarMenuItem>
@@ -50,11 +57,13 @@ function DisabledMenuItem({
         <div className="relative w-4 h-4 flex items-center justify-center overflow-hidden">
           {isHovered ? (
             <div
-              key={isLocked ? "lock" : "hammer"}
+              key={isLocked ? "lock" : isUnauthorized ? "warning" : "hammer"}
               className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
             >
               {isLocked ? (
                 <Lock className="w-4 h-4" />
+              ) : isUnauthorized ? (
+                <AlertTriangle className="w-4 h-4" />
               ) : (
                 <Hammer className="w-4 h-4 animate-spin" />
               )}
