@@ -62,7 +62,7 @@ export function SchoolsDataTable({
 }: SchoolsDataTableProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
@@ -319,8 +319,8 @@ export function SchoolsDataTable({
   }, [filteredSchools]);
 
   // All possible sectors and statuses
-  const allSectors = ["government", "catholic", "independent"];
-  const allStatuses = ["active", "onboarding"];
+  const allSectors = ["government", "catholic", "independent"] as const;
+  const allStatuses = ["active", "onboarding"] as const;
 
   // Count schools for each filter option in current filtered results
   const getStateCount = (state: string) => {
@@ -400,7 +400,9 @@ export function SchoolsDataTable({
           <SelectContent>
             <SelectItem value="all">All Sectors</SelectItem>
             {allSectors.map((sector) => {
-              const isAvailable = currentAvailableSectors.has(sector);
+              const isAvailable = currentAvailableSectors.has(
+                sector as "government" | "catholic" | "independent"
+              );
               const isSelected = sectorFilter === sector;
               const sectorName =
                 sector.charAt(0).toUpperCase() + sector.slice(1);
@@ -433,7 +435,9 @@ export function SchoolsDataTable({
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
             {allStatuses.map((status) => {
-              const isAvailable = currentAvailableStatuses.has(status);
+              const isAvailable = currentAvailableStatuses.has(
+                status as "active" | "onboarding"
+              );
               const isSelected = statusFilter === status;
               const statusName =
                 status.charAt(0).toUpperCase() + status.slice(1);

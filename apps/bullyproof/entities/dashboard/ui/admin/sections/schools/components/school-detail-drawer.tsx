@@ -146,7 +146,9 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
 
   // Filter out null/undefined/non-string values and normalize level names to lowercase for comparison
   const normalizedLevels = levels
-    .filter((level): level is string => typeof level === "string" && level != null)
+    .filter(
+      (level): level is string => typeof level === "string" && level != null
+    )
     .map((level) => level.toLowerCase().trim())
     .filter((level) => level.length > 0); // Remove empty strings after trimming
 
@@ -1329,17 +1331,20 @@ function SchoolDetailDrawerContent({
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  {classItem.yearCodes && classItem.yearCodes.length > 0 ? (
+                                  {classItem.yearCodes &&
+                                  classItem.yearCodes.length > 0 ? (
                                     <div className="flex flex-wrap gap-1">
-                                      {classItem.yearCodes.map((yearCode, index) => (
-                                        <Badge
-                                          key={index}
-                                          variant="outline"
-                                          className="text-xs"
-                                        >
-                                          {yearCode}
-                                        </Badge>
-                                      ))}
+                                      {classItem.yearCodes.map(
+                                        (yearCode, index) => (
+                                          <Badge
+                                            key={index}
+                                            variant="outline"
+                                            className="text-xs"
+                                          >
+                                            {yearCode}
+                                          </Badge>
+                                        )
+                                      )}
                                     </div>
                                   ) : (
                                     <span className="text-sm text-muted-foreground">
@@ -1740,10 +1745,12 @@ function SchoolDetailDrawerContent({
                     console.warn("Failed to create licence:", result.error);
                     // Check if it's the constraint violation error
                     // Handle both string and object error formats
+                    const error = result.error;
                     const errorMessage =
-                      typeof result.error === "string"
-                        ? result.error
-                        : result.error?.message || String(result.error);
+                      typeof error === "string"
+                        ? error
+                        : (error as { message?: string })?.message ||
+                          String(error);
                     if (
                       errorMessage.includes("already been used") ||
                       errorMessage.includes("cannot have any other roles")
@@ -1753,7 +1760,8 @@ function SchoolDetailDrawerContent({
                       );
                     } else {
                       setLicenceError(
-                        errorMessage || "Failed to create licence. Please try again."
+                        errorMessage ||
+                          "Failed to create licence. Please try again."
                       );
                     }
                     setSubmitting(false);
@@ -1843,7 +1851,8 @@ function SchoolDetailDrawerContent({
                 } catch (error: any) {
                   console.warn("Error creating licence:", error);
                   // Check if it's the constraint violation error
-                  const errorMessage = error?.message || error?.toString() || "";
+                  const errorMessage =
+                    error?.message || error?.toString() || "";
                   if (
                     errorMessage.includes("already been used") ||
                     errorMessage.includes("cannot have any other roles")
@@ -1853,7 +1862,8 @@ function SchoolDetailDrawerContent({
                     );
                   } else {
                     setLicenceError(
-                      errorMessage || "Failed to create licence. Please try again."
+                      errorMessage ||
+                        "Failed to create licence. Please try again."
                     );
                   }
                 } finally {
