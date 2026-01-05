@@ -30,6 +30,24 @@ export type CreateSchoolLicenseResponse = {
   createdByUser?: any;
 };
 
+export type UpdateUserResponse = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  avatarUrl: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  metadata: any;
+  platformRoles: string[];
+  schoolRoles: Array<{
+    schoolId: string;
+    schoolName: string | null;
+    roleKey: string | null;
+    roleName: string | null;
+  }>;
+};
+
 export const usersApi = {
   post: {
     new: {
@@ -87,6 +105,21 @@ export const usersApi = {
           }
         );
       },
+    },
+  },
+  patch: {
+    update(
+      userId: string,
+      payload: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+      }
+    ): Promise<ApiResult<UpdateUserResponse>> {
+      return apiFetch<UpdateUserResponse>(`/users/${encodeURIComponent(userId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
     },
   },
 };
