@@ -64,7 +64,7 @@ import {
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import type { roles } from "@/server/db/schema";
-import type { School } from "@/entities/school/model/types";
+import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
   User,
   Mail,
@@ -101,13 +101,13 @@ function UserDetailDrawerContent({
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  
+
   // Add role dialog state
   const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
   const [isAssigningRole, setIsAssigningRole] = useState(false);
-  
+
   // Remove role dialog state
   const [isRemoveRoleDialogOpen, setIsRemoveRoleDialogOpen] = useState(false);
   const [roleToRemove, setRoleToRemove] = useState<{
@@ -204,16 +204,17 @@ function UserDetailDrawerContent({
   // Get available roles that the user doesn't already have
   const getAvailableRoles = () => {
     if (!user) return [];
-    
+
     // Platform roles the user already has (these are unique, can't have duplicates)
     const userPlatformRoleKeys = new Set(user.platformRoles);
 
     return roles.filter((role) => {
       const roleKey = role.key || "";
-      
+
       // Check if this is typically a platform role
-      const isPlatformRole = !roleKey.includes("SCHOOL") && !roleKey.includes("TEACHER");
-      
+      const isPlatformRole =
+        !roleKey.includes("SCHOOL") && !roleKey.includes("TEACHER");
+
       if (isPlatformRole) {
         // For platform roles, filter out if user already has it
         return !userPlatformRoleKeys.has(roleKey);
@@ -234,7 +235,7 @@ function UserDetailDrawerContent({
     // Determine if this is a platform or school role
     // We'll check if the role scope is "platform" or if it's typically a platform role
     const isPlatformRole = !selectedSchoolId;
-    
+
     // For school roles, we need schoolId
     if (!isPlatformRole && !selectedSchoolId) {
       alert("Please select a school for school roles");
@@ -258,7 +259,7 @@ function UserDetailDrawerContent({
       setSelectedRoleId("");
       setSelectedSchoolId("");
       setIsAddRoleDialogOpen(false);
-      
+
       // Refresh user data
       onUserUpdate?.();
     } catch (err: any) {
@@ -314,7 +315,7 @@ function UserDetailDrawerContent({
       // Close dialog and reset state
       setIsRemoveRoleDialogOpen(false);
       setRoleToRemove(null);
-      
+
       // Refresh user data
       onUserUpdate?.();
     } catch (err: any) {
@@ -327,20 +328,21 @@ function UserDetailDrawerContent({
 
   // Get the selected role
   const selectedRole = roles.find((r) => r.id === selectedRoleId);
-  
+
   // Determine if role typically requires a school based on role key
   // Roles with SCHOOL or TEACHER in the key are typically school roles
   const roleRequiresSchool = selectedRole
-    ? (selectedRole.key?.includes("SCHOOL") ||
-        selectedRole.key?.includes("TEACHER")) ?? false
+    ? ((selectedRole.key?.includes("SCHOOL") ||
+        selectedRole.key?.includes("TEACHER")) ??
+      false)
     : false;
-  
+
   // Get platform vs school roles for display
   const platformRoles = getAvailableRoles().filter((role) => {
     // Platform roles typically don't have school-specific keys
     return !role.key?.includes("SCHOOL") && !role.key?.includes("TEACHER");
   });
-  
+
   const schoolRoles = getAvailableRoles().filter((role) => {
     return role.key?.includes("SCHOOL") || role.key?.includes("TEACHER");
   });
@@ -422,14 +424,11 @@ function UserDetailDrawerContent({
                   {getDisplayName(user)}
                 </h2>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {user.email}
-              </p>
+              <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
-
               {/* User Information */}
               <Card>
                 <CardHeader>
@@ -455,9 +454,7 @@ function UserDetailDrawerContent({
                           onChange={(e) => setFirstName(e.target.value)}
                         />
                       ) : (
-                        <p className="text-sm">
-                          {user.firstName || "—"}
-                        </p>
+                        <p className="text-sm">{user.firstName || "—"}</p>
                       )}
                     </div>
                     <div className="space-y-2">
@@ -469,9 +466,7 @@ function UserDetailDrawerContent({
                           onChange={(e) => setLastName(e.target.value)}
                         />
                       ) : (
-                        <p className="text-sm">
-                          {user.lastName || "—"}
-                        </p>
+                        <p className="text-sm">{user.lastName || "—"}</p>
                       )}
                     </div>
                   </div>
@@ -552,7 +547,9 @@ function UserDetailDrawerContent({
                   {/* Platform Roles */}
                   {user.platformRoles.length > 0 && (
                     <div>
-                      <h4 className="text-sm font-medium mb-2">Platform Roles</h4>
+                      <h4 className="text-sm font-medium mb-2">
+                        Platform Roles
+                      </h4>
                       <div className="flex flex-wrap gap-2">
                         {user.platformRoles.map((roleKey, idx) => {
                           const role = roles.find((r) => r.key === roleKey);
@@ -565,9 +562,7 @@ function UserDetailDrawerContent({
                             backgroundColor?: string;
                             color?: string;
                           } = {};
-                          if (
-                            roleKey === "PLATFORM_ADMIN"
-                          ) {
+                          if (roleKey === "PLATFORM_ADMIN") {
                             badgeStyle = {
                               backgroundColor: "#ff7f00",
                               color: "white",
@@ -596,11 +591,7 @@ function UserDetailDrawerContent({
                                 size="sm"
                                 className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() =>
-                                  handleRemoveRoleClick(
-                                    roleKey,
-                                    roleName,
-                                    true
-                                  )
+                                  handleRemoveRoleClick(roleKey, roleName, true)
                                 }
                               >
                                 <Trash2 className="h-3 w-3 text-destructive" />
@@ -619,7 +610,9 @@ function UserDetailDrawerContent({
                       <div className="space-y-2">
                         {user.schoolRoles.map((schoolRole, idx) => {
                           const roleName =
-                            schoolRole.roleName || schoolRole.roleKey || "Unknown";
+                            schoolRole.roleName ||
+                            schoolRole.roleKey ||
+                            "Unknown";
                           const isAdmin =
                             schoolRole.roleKey?.includes("ADMIN") ||
                             schoolRole.roleKey?.includes("admin");
@@ -768,14 +761,23 @@ function UserDetailDrawerContent({
             {selectedRole && (
               <div className="space-y-2">
                 <Label htmlFor="school-select">
-                  School {roleRequiresSchool && <span className="text-destructive">*</span>}
+                  School{" "}
+                  {roleRequiresSchool && (
+                    <span className="text-destructive">*</span>
+                  )}
                 </Label>
                 <Select
                   value={selectedSchoolId}
                   onValueChange={setSelectedSchoolId}
                 >
                   <SelectTrigger id="school-select">
-                    <SelectValue placeholder={roleRequiresSchool ? "Select a school (required)" : "Select a school (optional)"} />
+                    <SelectValue
+                      placeholder={
+                        roleRequiresSchool
+                          ? "Select a school (required)"
+                          : "Select a school (optional)"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
                     {schools.map((school) => (

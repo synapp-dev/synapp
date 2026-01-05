@@ -13,16 +13,7 @@ import {
   useReactTable,
   VisibilityState,
 } from "@tanstack/react-table";
-import { ChevronDown } from "lucide-react";
-
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -40,7 +31,6 @@ import {
 } from "@workspace/ui/components/select";
 import { Badge } from "@workspace/ui/components/badge";
 import { ShieldCheck, Users as UsersIcon, FileBadge2 } from "lucide-react";
-import { rolesApi } from "@/entities/roles/api/endpoints";
 import type { roles } from "@/server/db/schema";
 import { columns, type User } from "./users-table-columns";
 
@@ -74,7 +64,7 @@ export function UsersDataTable({
   // Enhanced columns with role rendering
   const enhancedColumns = React.useMemo<ColumnDef<User>[]>(() => {
     return columns.map((col) => {
-      if (col.accessorKey === "roles") {
+      if ("accessorKey" in col && col.accessorKey === "roles") {
         return {
           ...col,
           cell: ({ row }) => {
