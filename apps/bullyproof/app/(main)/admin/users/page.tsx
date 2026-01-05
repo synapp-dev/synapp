@@ -53,6 +53,7 @@ function AdminUsersPageContent() {
   const roleFilter = searchParams?.get("role") || "";
   const schoolFilter = searchParams?.get("schoolId") || "";
   const userIdFromUrl = searchParams?.get("user") || null;
+  const addUserParam = searchParams?.get("add") === "user";
 
   // Handle drawer state from URL
   useEffect(() => {
@@ -67,6 +68,11 @@ function AdminUsersPageContent() {
       setSelectedUser(null);
     }
   }, [userIdFromUrl, users]);
+
+  // Handle add user sheet state from URL
+  useEffect(() => {
+    setIsAddUserSheetOpen(addUserParam);
+  }, [addUserParam]);
 
   const handleUserClick = (user: UserWithRolesAndSchools) => {
     setSelectedUser(user);
@@ -503,7 +509,18 @@ function AdminUsersPageContent() {
       {/* Add User Sheet */}
       <AddUserSheet
         open={isAddUserSheetOpen}
-        onOpenChange={setIsAddUserSheetOpen}
+        onOpenChange={(open) => {
+          setIsAddUserSheetOpen(open);
+          const params = new URLSearchParams(searchParams?.toString() || "");
+          if (open) {
+            params.set("add", "user");
+          } else {
+            params.delete("add");
+          }
+          router.replace(`/admin/users?${params.toString()}`, {
+            scroll: false,
+          });
+        }}
         onUserCreated={async () => {
           // Refresh users list
           await loadUsers(

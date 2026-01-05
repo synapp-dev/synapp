@@ -20,6 +20,7 @@ import {
 } from "@workspace/ui/components/select";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
+import { apiFetch } from "@/lib/api/fetcher.client";
 import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -162,11 +163,25 @@ export function AddUserSheet({
       setLoading(true);
       setError(null);
 
-      const response = await fetch("/api/users/new", {
+      // Check if the selected role is Platform Admin
+      const selectedRole = roles.find((r) => r.name === roleName);
+      const isPlatformAdmin = selectedRole?.key === "PLATFORM_ADMIN";
+
+      // Route to platform-admin endpoint if creating a platform admin
+      const endpoint = isPlatformAdmin
+        ? "/users/new/platform-admin"
+        : "/users/new";
+
+      type CreateUserResponse = {
+        userId: string;
+        email: string;
+        roleName: string;
+        roleScope: string;
+        schoolId?: string;
+      };
+
+      const result = await apiFetch<CreateUserResponse>(endpoint, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           email,
           roleScope,
@@ -175,10 +190,16 @@ export function AddUserSheet({
         }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to create user");
+      // Check for error using type narrowing
+      if (result.data === null) {
+        const errorObj = result as { error: { message: string } | string };
+        const errorMessage =
+          typeof errorObj.error === "object"
+            ? errorObj.error.message
+            : typeof errorObj.error === "string"
+              ? errorObj.error
+              : "Failed to create user";
+        throw new Error(errorMessage);
       }
 
       // Reset form

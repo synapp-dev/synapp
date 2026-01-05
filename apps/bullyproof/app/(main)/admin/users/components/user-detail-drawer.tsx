@@ -41,6 +41,11 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -63,6 +68,7 @@ import {
 } from "@/entities/me/api/endpoints";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
+import { usersApi } from "@/entities/users/api/endpoints";
 import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
@@ -98,6 +104,8 @@ function UserDetailDrawerContent({
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -437,7 +445,15 @@ function UserDetailDrawerContent({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setEditing(!editing)}
+                      onClick={() => {
+                        setEditing(!editing);
+                        setSaveError(null);
+                        if (user) {
+                          setFirstName(user.firstName || "");
+                          setLastName(user.lastName || "");
+                          setEmail(user.email || "");
+                        }
+                      }}
                     >
                       {editing ? "Cancel" : "Edit"}
                     </Button>
@@ -500,27 +516,74 @@ function UserDetailDrawerContent({
                     </span>
                   </div>
 
+                  {saveError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Error</AlertTitle>
+                      <AlertDescription>{saveError}</AlertDescription>
+                    </Alert>
+                  )}
+
                   {editing && (
                     <div className="flex justify-end gap-2 pt-4">
                       <Button
                         variant="outline"
                         onClick={() => {
                           setEditing(false);
-                          setFirstName(user.firstName || "");
-                          setLastName(user.lastName || "");
-                          setEmail(user.email || "");
+                          setSaveError(null);
+                          if (user) {
+                            setFirstName(user.firstName || "");
+                            setLastName(user.lastName || "");
+                            setEmail(user.email || "");
+                          }
                         }}
+                        disabled={saving}
                       >
                         Cancel
                       </Button>
                       <Button
                         onClick={async () => {
-                          // TODO: Implement update user API call
-                          setEditing(false);
-                          onUserUpdate?.();
+                          if (!user) return;
+
+                          try {
+                            setSaving(true);
+                            setSaveError(null);
+
+                            const result = await usersApi.patch.update(user.id, {
+                              firstName: firstName || undefined,
+                              lastName: lastName || undefined,
+                              email: email || undefined,
+                            });
+
+                            if (result.error) {
+                              const errorMessage =
+                                typeof result.error === "object"
+                                  ? result.error.message
+                                  : typeof result.error === "string"
+                                    ? result.error
+                                    : "Failed to update user";
+                              throw new Error(errorMessage);
+                            }
+
+                            setEditing(false);
+                            onUserUpdate?.();
+                          } catch (err: any) {
+                            console.error("Failed to update user:", err);
+                            setSaveError(err.message || "Failed to update user");
+                          } finally {
+                            setSaving(false);
+                          }
                         }}
+                        disabled={saving}
                       >
-                        Save Changes
+                        {saving ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save Changes"
+                        )}
                       </Button>
                     </div>
                   )}
