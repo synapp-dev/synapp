@@ -12,6 +12,7 @@ import {
 import { NavMain } from "@/components/organisms/nav-main";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useLessonStatusRealtime } from "@/hooks/use-lesson-status-realtime";
+import { useMeStore } from "@/entities/me/model/store";
 
 interface LessonSidebarNavProps {
   schoolId: string;
@@ -71,6 +72,11 @@ export function LessonSidebarNav({
   // Listen for real-time status changes to enable/disable feedback button
   useLessonStatusRealtime(lessonId);
 
+  // Check if current user is the lesson creator
+  const currentUser = useMeStore((s) => s.currentUser);
+  const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
+  const canDeliver = isLessonCreator;
+
   const isCompleted = lessonData?.status === "completed";
   const isPendingReview = lessonData?.status === "pending_review";
   const canProvideFeedback = isCompleted || isPendingReview;
@@ -92,16 +98,21 @@ export function LessonSidebarNav({
     url: `/schools/${schoolId}/lessons/${lessonId}${item.url}`,
     icon: iconMap[item.iconName],
     exact: item.exact,
+    // Disable Deliver if user is not the lesson creator
     // Enable feedback button if lesson is pending_review or completed
     disabled:
-      item.disabled || (item.title === "Feedback" && !canProvideFeedback),
-    // Show "Locked" for Feedback when disabled, "Under Construction" for History
+      item.disabled ||
+      (item.title === "Deliver" && !canDeliver) ||
+      (item.title === "Feedback" && !canProvideFeedback),
+    // Show appropriate disabled messages
     disabledMessage:
-      item.title === "Feedback" && !canProvideFeedback
-        ? "Locked"
-        : item.disabled
-          ? "Under Construction"
-          : undefined,
+      item.title === "Deliver" && !canDeliver
+        ? "Unauthorized"
+        : item.title === "Feedback" && !canProvideFeedback
+          ? "Locked"
+          : item.disabled
+            ? "Under Construction"
+            : undefined,
   }));
 
   return <NavMain items={navItems} />;

@@ -12,11 +12,14 @@ import {
   Minimize,
   Joystick,
   CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { SlideRenderer } from "./slide-renderer";
 import { useLessonLiveState } from "@/hooks/use-lesson-live-state";
 import { usePrefetchTopicImages } from "@/hooks/use-prefetch-topic-images";
+import { useLessonById } from "@/entities/lessons/api/useLessonById";
+import { useMeStore } from "@/entities/me/model/store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 
 interface PresentationModeProps {
@@ -33,6 +36,36 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     isLoading,
     error,
   } = useLessonLiveState(lessonId);
+
+  // Check if user is the lesson creator
+  const { data: lessonData, isLoading: isLoadingLesson } =
+    useLessonById(lessonId);
+  const currentUser = useMeStore((s) => s.currentUser);
+  const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
+
+  // Redirect if user is not the creator
+  useEffect(() => {
+    if (!isLoadingLesson && lessonData && currentUser) {
+      if (!isLessonCreator) {
+        // Extract school_id from current path or redirect to dashboard
+        const pathParts = window.location.pathname.split("/");
+        const schoolIndex = pathParts.indexOf("schools");
+        if (schoolIndex !== -1 && pathParts[schoolIndex + 1]) {
+          const schoolId = pathParts[schoolIndex + 1];
+          router.replace(`/schools/${schoolId}/lessons/${lessonId}`);
+        } else {
+          router.replace("/dashboard");
+        }
+      }
+    }
+  }, [
+    isLoadingLesson,
+    lessonData,
+    currentUser,
+    isLessonCreator,
+    router,
+    lessonId,
+  ]);
 
   // Pre-fetch all topic images in the background on page load
   usePrefetchTopicImages(slides, !isLoading && slides.length > 0);
@@ -179,6 +212,32 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       <div className="relative w-full h-full flex items-center justify-center">
         <div className="text-center text-muted-foreground">
           <p>Loading slides...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while checking permissions
+  if (isLoadingLesson || !currentUser || !lessonData) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Loading lesson details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show unauthorized message if not creator (will redirect, but show message briefly)
+  if (!isLessonCreator) {
+    return (
+      <div className="relative w-full h-full flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-destructive font-medium">
+            Only the teacher can deliver this lesson
+          </p>
+          <p className="text-muted-foreground mt-2">Redirecting...</p>
         </div>
       </div>
     );
