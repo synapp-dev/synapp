@@ -86,12 +86,7 @@ export default function APCertificationPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">
-          AP Certification Stages
-        </h2>
-        <p className="text-muted-foreground">
-          List of all certification stages from the certification_stages table.
-        </p>
+        <h2 className="text-2xl font-bold tracking-tight">AP Certification</h2>
       </div>
 
       <div className="flex flex-col gap-12">
