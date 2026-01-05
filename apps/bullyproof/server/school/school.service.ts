@@ -79,10 +79,7 @@ async function assertCanCreateSchool(ctx: AuthContext) {
   }
   const roles = await getUserScopedRoles(ctx.userId);
   // Only platform admins can create schools
-  if (
-    roles.platform.includes("PLATFORM_ADMIN") ||
-    roles.platform.includes("PLATFORM_ADMIN")
-  ) {
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
     return;
   }
   throw new Error("Unauthorized to create schools");
@@ -104,7 +101,9 @@ export const schoolService = {
     // Otherwise, filter by the accessible school IDs
     const queryParams = {
       ...params,
-      ...(accessibleSchoolIds !== undefined && { schoolIds: accessibleSchoolIds }),
+      ...(accessibleSchoolIds !== undefined && {
+        schoolIds: accessibleSchoolIds,
+      }),
     };
 
     const rows = await schoolRepo.getAllPaginated(queryParams);
@@ -123,7 +122,11 @@ export const schoolService = {
     const { levelIds, ...schoolData } = data;
 
     // Create the school
-    const result = await schoolRepo.create(schoolData);
+    const result = await schoolRepo.create({
+      name: schoolData.name,
+      stateId: schoolData.stateId,
+      sectorId: schoolData.sectorId,
+    });
     const createdSchool = result[0];
 
     // Create school level assignments
