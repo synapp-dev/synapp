@@ -95,6 +95,13 @@ export function LessonSidebarNav({
     // Enable feedback button if lesson is pending_review or completed
     disabled:
       item.disabled || (item.title === "Feedback" && !canProvideFeedback),
+    // Show "Locked" for Feedback when disabled, "Under Construction" for History
+    disabledMessage:
+      item.title === "Feedback" && !canProvideFeedback
+        ? "Locked"
+        : item.disabled
+          ? "Under Construction"
+          : undefined,
   }));
 
   return <NavMain items={navItems} />;

@@ -16,6 +16,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { SlideRenderer } from "./slide-renderer";
 import { useLessonLiveState } from "@/hooks/use-lesson-live-state";
+import { usePrefetchTopicImages } from "@/hooks/use-prefetch-topic-images";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 
 interface PresentationModeProps {
@@ -32,6 +33,10 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     isLoading,
     error,
   } = useLessonLiveState(lessonId);
+
+  // Pre-fetch all topic images in the background on page load
+  usePrefetchTopicImages(slides, !isLoading && slides.length > 0);
+
   const [showControls, setShowControls] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCompletionSlide, setShowCompletionSlide] = useState(false);
@@ -67,7 +72,10 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
           });
 
           if (result.error) {
-            console.error("Failed to mark lesson as pending review:", result.error);
+            console.error(
+              "Failed to mark lesson as pending review:",
+              result.error
+            );
           } else {
             setIsCompleted(true);
           }
@@ -205,7 +213,9 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
         <div className="flex flex-col items-center justify-center gap-8 p-8 text-center max-w-2xl">
           <CheckCircle2 className="h-24 w-24 text-primary" />
           <div className="space-y-4">
-            <h1 className="text-4xl font-bold text-foreground">Topic Complete</h1>
+            <h1 className="text-4xl font-bold text-foreground">
+              Topic Complete
+            </h1>
             <p className="text-lg text-muted-foreground">
               You have completed all slides in this topic.
             </p>

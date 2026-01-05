@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Hammer, type LucideIcon } from "lucide-react";
+import { ChevronRight, Hammer, Lock, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -26,16 +26,19 @@ import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 function DisabledMenuItem({
   title,
   icon: Icon,
+  disabledMessage = "Under Construction",
 }: {
   title: string;
   icon?: LucideIcon;
+  disabledMessage?: string;
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const isLocked = disabledMessage === "Locked";
 
   return (
     <SidebarMenuItem>
       <SidebarMenuButton
-        tooltip={isHovered ? "Under Construction" : title}
+        tooltip={isHovered ? disabledMessage : title}
         className="opacity-50 cursor-not-allowed"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -47,10 +50,14 @@ function DisabledMenuItem({
         <div className="relative w-4 h-4 flex items-center justify-center overflow-hidden">
           {isHovered ? (
             <div
-              key="hammer"
+              key={isLocked ? "lock" : "hammer"}
               className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
             >
-              <Hammer className="w-4 h-4 animate-spin" />
+              {isLocked ? (
+                <Lock className="w-4 h-4" />
+              ) : (
+                <Hammer className="w-4 h-4 animate-spin" />
+              )}
             </div>
           ) : (
             Icon && (
@@ -67,7 +74,7 @@ function DisabledMenuItem({
           key={isHovered ? "hover" : "default"}
           className="animate-slide-down-fade-in"
         >
-          {isHovered ? "Under Construction" : title}
+          {isHovered ? disabledMessage : title}
         </span>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -87,6 +94,7 @@ export function NavMain({
     isActive?: boolean;
     exact?: boolean;
     disabled?: boolean;
+    disabledMessage?: string;
     // Special flags for custom rendering
     disableActiveStyle?: boolean;
     liveStyle?: boolean;
@@ -156,6 +164,7 @@ export function NavMain({
               key={item.title}
               title={item.title}
               icon={item.icon}
+              disabledMessage={item.disabledMessage}
             />
           ) : (
             <Collapsible
