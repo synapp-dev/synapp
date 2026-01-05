@@ -10,13 +10,7 @@ import { rolesApi } from "@/entities/roles/api/endpoints";
 import type { roles } from "@/server/db/schema";
 
 type Role = typeof roles.$inferSelect;
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
+
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Input } from "@workspace/ui/components/input";
 import { Button } from "@workspace/ui/components/button";
@@ -27,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { Search, Users, Loader2, AlertCircle, X } from "lucide-react";
+import { Search, Users, Loader2, AlertCircle, X, Plus } from "lucide-react";
 import {
   Alert,
   AlertDescription,
@@ -36,6 +30,7 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { UserDetailDrawer } from "./components/user-detail-drawer";
 import { UsersDataTable } from "./components/users-data-table";
+import { AddUserSheet } from "./components/add-user-sheet";
 
 function AdminUsersPageContent() {
   const router = useRouter();
@@ -52,6 +47,7 @@ function AdminUsersPageContent() {
   const [selectedUser, setSelectedUser] =
     useState<UserWithRolesAndSchools | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isAddUserSheetOpen, setIsAddUserSheetOpen] = useState(false);
 
   // Get filters from URL query params
   const roleFilter = searchParams?.get("role") || "";
@@ -281,54 +277,60 @@ function AdminUsersPageContent() {
       <div className="sticky top-16 z-10 bg-background backdrop-blur supports-[backdrop-filter]:bg-background/90 -mx-6 px-6 border-b">
         {/* Header */}
         <div className="py-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Users className="w-8 h-8 text-foreground" />
-            <h1 className="text-2xl font-semibold">Users</h1>
-            {/* Active Filters Display */}
-            {hasActiveFilters && (
-              <div className="flex flex-wrap gap-2 ml-2">
-                {debouncedSearchQuery && (
-                  <Badge
-                    variant="secondary"
-                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
-                    onClick={() => setSearchQuery("")}
-                  >
-                    Search: {debouncedSearchQuery}
-                    <X className="h-3 w-3" />
-                  </Badge>
-                )}
-                {roleFilter && (
-                  <Badge
-                    variant="secondary"
-                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
-                    onClick={() => handleRoleFilterChange("all")}
-                  >
-                    Role:{" "}
-                    {availableRoles.find((r) => r.key === roleFilter)?.name ||
-                      roleFilter}
-                    <span className="ml-1 text-xs bg-background/50 px-1.5 py-0.5 rounded">
-                      {getRoleCount(roleFilter)}
-                    </span>
-                    <X className="h-3 w-3" />
-                  </Badge>
-                )}
-                {schoolFilter && (
-                  <Badge
-                    variant="secondary"
-                    className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
-                    onClick={() => handleSchoolFilterChange("all")}
-                  >
-                    School:{" "}
-                    {allAvailableSchools.find((s) => s.id === schoolFilter)
-                      ?.name || schoolFilter}
-                    <span className="ml-1 text-xs bg-background/50 px-1.5 py-0.5 rounded">
-                      {getSchoolCount(schoolFilter)}
-                    </span>
-                    <X className="h-3 w-3" />
-                  </Badge>
-                )}
-              </div>
-            )}
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Users className="w-8 h-8 text-foreground" />
+              <h1 className="text-2xl font-semibold">Users</h1>
+              {/* Active Filters Display */}
+              {hasActiveFilters && (
+                <div className="flex flex-wrap gap-2 ml-2">
+                  {debouncedSearchQuery && (
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      Search: {debouncedSearchQuery}
+                      <X className="h-3 w-3" />
+                    </Badge>
+                  )}
+                  {roleFilter && (
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                      onClick={() => handleRoleFilterChange("all")}
+                    >
+                      Role:{" "}
+                      {availableRoles.find((r) => r.key === roleFilter)?.name ||
+                        roleFilter}
+                      <span className="ml-1 text-xs bg-background/50 px-1.5 py-0.5 rounded">
+                        {getRoleCount(roleFilter)}
+                      </span>
+                      <X className="h-3 w-3" />
+                    </Badge>
+                  )}
+                  {schoolFilter && (
+                    <Badge
+                      variant="secondary"
+                      className="flex items-center gap-1 cursor-pointer hover:bg-secondary/80 transition-colors"
+                      onClick={() => handleSchoolFilterChange("all")}
+                    >
+                      School:{" "}
+                      {allAvailableSchools.find((s) => s.id === schoolFilter)
+                        ?.name || schoolFilter}
+                      <span className="ml-1 text-xs bg-background/50 px-1.5 py-0.5 rounded">
+                        {getSchoolCount(schoolFilter)}
+                      </span>
+                      <X className="h-3 w-3" />
+                    </Badge>
+                  )}
+                </div>
+              )}
+            </div>
+            <Button onClick={() => setIsAddUserSheetOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add New User
+            </Button>
           </div>
         </div>
 
@@ -489,6 +491,20 @@ function AdminUsersPageContent() {
         open={isDrawerOpen}
         onOpenChange={handleDrawerClose}
         onUserUpdate={async () => {
+          // Refresh users list
+          await loadUsers(
+            debouncedSearchQuery || undefined,
+            roleFilter || undefined,
+            schoolFilter || undefined
+          );
+        }}
+      />
+
+      {/* Add User Sheet */}
+      <AddUserSheet
+        open={isAddUserSheetOpen}
+        onOpenChange={setIsAddUserSheetOpen}
+        onUserCreated={async () => {
           // Refresh users list
           await loadUsers(
             debouncedSearchQuery || undefined,
