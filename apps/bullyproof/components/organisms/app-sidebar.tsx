@@ -169,12 +169,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     // If welcome is completed, show all items except Welcome
     // Filter out Admin menu if user is not a platform admin
+    // Filter out AP Certification if user is a platform admin
     return data.navBullyproof.filter((item) => {
       if (item.title === "Welcome") {
         return false; // Hide Welcome after completion
       }
       if (item.title === "Admin" && !isPlatformAdmin) {
         return false;
+      }
+      if (item.title === "AP Certification" && isPlatformAdmin) {
+        return false; // Hide AP Certification for platform admins
       }
       return true;
     });

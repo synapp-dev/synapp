@@ -11,7 +11,7 @@ import {
   CommandList,
 } from "@workspace/ui/components/command";
 import { Button } from "@workspace/ui/components/button";
-import { Command as CommandIcon, SquareTerminal } from "lucide-react";
+import { Command as CommandIcon, SquareTerminal, ShieldCheck } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { useRouter } from "next/navigation";
 import { schoolApi } from "@/entities/school/api/endpoints";
@@ -93,6 +93,20 @@ export function CommandMenu() {
               disabled={!currentSchool?.slug}
             >
               Start new lesson
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                router.push("/admin/schools?modal=add-new-school");
+                setOpen(false);
+              }}
+            >
+              <div className="flex w-full items-center justify-between gap-2">
+                <span>Invite a school</span>
+                <Badge variant="secondary" className="shrink-0 ml-auto flex items-center gap-1">
+                  <ShieldCheck className="h-3 w-3" />
+                  Admin
+                </Badge>
+              </div>
             </CommandItem>
           </CommandGroup>
           <CommandGroup heading="Schools">
