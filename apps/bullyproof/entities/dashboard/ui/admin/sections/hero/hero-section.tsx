@@ -9,10 +9,12 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { LiveActivityFeed } from "./components/live-activity-feed";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { useMeStore } from "@/entities/me/model/store";
 
 export function HeroSection() {
   const [date, setDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const currentUser = useMeStore((s) => s.currentUser);
 
   // Update time every minute
   useEffect(() => {
@@ -30,6 +32,20 @@ export function HeroSection() {
     if (hour < 17) return "Good afternoon!";
     return "Good evening!";
   };
+
+  // Get user name
+  const firstName = currentUser?.firstName || "";
+  const lastName = currentUser?.lastName || "";
+  const fullName =
+    currentUser?.fullName ||
+    [firstName, lastName].filter(Boolean).join(" ") ||
+    "Admin";
+  const nameParts = fullName.split(" ");
+  const displayFirstName = nameParts[0] || "";
+  const displayLastName = nameParts.slice(1).join(" ") || "";
+
+  // Get user role/title
+  const userTitle = "Admin";
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
@@ -59,7 +75,8 @@ export function HeroSection() {
             <CardContent className="flex items-end h-full gap-4">
               <div className="flex flex-col gap-0 h-full justify-end items-start">
                 <h1 className="text-3xl font-medium">
-                  Aaron <span className="font-black">Girton</span>
+                  {displayFirstName}{" "}
+                  <span className="font-black">{displayLastName}</span>
                 </h1>
                 <h2 className="text-muted-foreground">Platform Developer</h2>
               </div>
@@ -68,11 +85,12 @@ export function HeroSection() {
               <div className="absolute -top-4 sm:-top-6 md:-top-3 bottom-0 right-0 w-36 sm:w-44 md:w-56 pointer-events-none">
                 <div className="relative h-full w-full">
                   <Image
-                    src="/images/user/aaron-girton.png"
+                    src="/images/user/teacher-default.png"
                     alt="User Profile"
                     fill
                     className="object-top object-contain drop-shadow-xl"
                     priority
+                    style={{ transform: "scaleX(-1)" }}
                   />
                 </div>
               </div>
