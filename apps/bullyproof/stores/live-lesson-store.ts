@@ -26,7 +26,7 @@ interface LiveLessonState {
     startedAt?: string;
   }) => void;
   stopLiveLesson: () => void;
-  fetchInProgressLesson: () => Promise<void>;
+  fetchInProgressLesson: (teacherId?: string) => Promise<void>;
 }
 
 export const useLiveLessonStore = create<LiveLessonState>()(
@@ -89,16 +89,32 @@ export const useLiveLessonStore = create<LiveLessonState>()(
           classCount: null,
           startedAt: null,
         }),
-      fetchInProgressLesson: async () => {
+      fetchInProgressLesson: async (teacherId?: string) => {
         try {
-          // Fetch lessons with status 'in_progress' or 'pending_review'
+          // If no teacherId provided, we can't fetch user-specific lessons
+          if (!teacherId) {
+            console.warn("No teacherId provided to fetchInProgressLesson, clearing state");
+            set({
+              isLive: false,
+              schoolSlug: null,
+              lessonId: null,
+              title: null,
+              classCount: null,
+              startedAt: null,
+            });
+            return;
+          }
+
+          // Fetch lessons with status 'in_progress' or 'pending_review' for the current teacher
           // The API client (apiFetch) automatically handles authentication
           const [inProgressResult, pendingReviewResult] = await Promise.all([
             lessonsApi.get.list({
+              teacherId,
               status: "in_progress",
               limit: 1,
             }),
             lessonsApi.get.list({
+              teacherId,
               status: "pending_review",
               limit: 1,
             }),

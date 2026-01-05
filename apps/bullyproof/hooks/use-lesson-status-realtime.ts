@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
+import { useMeStore } from "@/entities/me/model/store";
 
 /**
  * Hook to listen for real-time changes to lesson status
@@ -13,6 +14,7 @@ import { useLiveLessonStore } from "@/stores/live-lesson-store";
 export function useLessonStatusRealtime(lessonId?: string) {
   const queryClient = useQueryClient();
   const supabase = createBrowserClient();
+  const currentUser = useMeStore((s) => s.currentUser);
   const fetchInProgressLesson = useLiveLessonStore(
     (s) => s.fetchInProgressLesson
   );
@@ -89,7 +91,7 @@ export function useLessonStatusRealtime(lessonId?: string) {
             if (isLiveStatus || wasLiveStatus || becameCompleted) {
               // Refetch the live lesson store to get updated list
               // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/pending_review)
-              fetchInProgressLesson();
+              fetchInProgressLesson(currentUser?.id);
             }
           }
         }
@@ -99,7 +101,7 @@ export function useLessonStatusRealtime(lessonId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [lessonId, queryClient, supabase, fetchInProgressLesson]);
+  }, [lessonId, queryClient, supabase, fetchInProgressLesson, currentUser?.id]);
 }
 
 /**
@@ -194,7 +196,7 @@ export function useUserLessonsStatusRealtime(userId?: string) {
             if (isLiveStatus || wasLiveStatus || becameCompleted) {
               // Refetch the live lesson store to get updated list
               // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/pending_review)
-              fetchInProgressLesson();
+              fetchInProgressLesson(userId);
             }
           }
         }
