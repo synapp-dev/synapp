@@ -20,7 +20,10 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useLessonById } from "@/entities/lessons/api/useLessonById";
+import { useMeStore } from "@/entities/me/model/store";
+import { Loader2 } from "lucide-react";
 
 export default function LessonDeliverPage({
   params,
@@ -30,16 +33,59 @@ export default function LessonDeliverPage({
   usePageTitle(["schools", "lessons", "deliver"]);
   const { school_id, lesson_id } = use(params);
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [presentDialogOpen, setPresentDialogOpen] = useState(false);
   // const [controlsDialogOpen, setControlsDialogOpen] = useState(false); // Commented out - control mode disabled
+
+  // Check if user is the lesson creator
+  const { data: lessonData, isLoading: isLoadingLesson } = useLessonById(lesson_id);
+  const currentUser = useMeStore((s) => s.currentUser);
+  const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
+
+  // Redirect if user is not the creator
+  useEffect(() => {
+    if (!isLoadingLesson && lessonData && currentUser) {
+      if (!isLessonCreator) {
+        router.replace(`/schools/${school_id}/lessons/${lesson_id}`);
+      }
+    }
+  }, [isLoadingLesson, lessonData, currentUser, isLessonCreator, router, school_id, lesson_id]);
 
   // Check for query param to auto-open dialog
   useEffect(() => {
     const dialog = searchParams?.get("dialog");
-    if (dialog === "present") {
+    if (dialog === "present" && isLessonCreator) {
       setPresentDialogOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, isLessonCreator]);
+
+  // Show loading state while checking permissions
+  if (isLoadingLesson || !currentUser || !lessonData) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Loading lesson details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show unauthorized message if not creator (will redirect, but show message briefly)
+  if (!isLessonCreator) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-destructive font-medium">
+            Only the teacher can deliver this lesson
+          </p>
+          <p className="text-muted-foreground mt-2">
+            Redirecting...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const handlePresentAccept = () => {
     const presentUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver/present`;

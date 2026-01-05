@@ -29,6 +29,12 @@ import Image from "next/image";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import { classesApi } from "@/entities/classes/api/endpoints";
 import { useMemo } from "react";
+import { useMeStore } from "@/entities/me/model/store";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 
 function getInitials(
   firstName?: string | null,
@@ -101,6 +107,81 @@ function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
 
   return (
     <div className="relative w-32 h-20 flex-shrink-0 rounded-md overflow-hidden bg-muted aspect-video">
+      <Image
+        src={imageUrl}
+        alt={alt}
+        fill
+        className="object-cover"
+        onError={() => setHasError(true)}
+      />
+    </div>
+  );
+}
+
+// Full-width thumbnail component for the topic card
+function FullWidthThumbnail({
+  slideId,
+  alt,
+}: {
+  slideId: string;
+  alt: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+  const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
+  const cachedUrl = useTopicSlidesCacheStore(
+    (state) => state.cache[slideId]?.url ?? null
+  );
+  const loading = useTopicSlidesCacheStore(
+    (state) => state.loading[slideId] ?? false
+  );
+  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
+
+  useEffect(() => {
+    if (slideId && !slideId.startsWith("temp_")) {
+      if (cachedUrl) {
+        setImageUrl(cachedUrl);
+        return;
+      }
+
+      let cancelled = false;
+      getSlideUrl(slideId).then((url) => {
+        if (!cancelled) {
+          setImageUrl(url);
+        }
+      });
+
+      return () => {
+        cancelled = true;
+      };
+    } else {
+      setImageUrl(null);
+    }
+  }, [slideId, getSlideUrl, cachedUrl]);
+
+  useEffect(() => {
+    if (cachedUrl && !loading) {
+      setImageUrl(cachedUrl);
+    }
+  }, [cachedUrl, loading]);
+
+  if (loading && !imageUrl) {
+    return (
+      <div className="w-full aspect-video rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (hasError || !imageUrl) {
+    return (
+      <div className="w-full aspect-video rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+        <FileText className="h-12 w-12 text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted">
       <Image
         src={imageUrl}
         alt={alt}
@@ -265,14 +346,162 @@ export default function LessonOverviewPage() {
   const hasSlides = totalSlides > 0;
   const deliverUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver?dialog=present`;
 
+  // Check if current user is the lesson creator
+  const currentUser = useMeStore((s) => s.currentUser);
+  const isLessonCreator = currentUser?.id === lessonData.createdByUserId;
+  const canDeliver = isLessonCreator;
+
   return (
     <div className="space-y-6">
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Teacher & Classes Card and Topic Card in a row */}
-        <div className="grid grid-cols-5 gap-6">
-          {/* Combined Teacher & Classes Card - 2/5 width */}
-          <div className="col-span-2">
-            <Card>
+        {/* Topic Card and Right Column (Teacher & Classes + Feedback) */}
+        <div className="grid grid-cols-2 gap-6 items-stretch">
+          {/* Topic Card - Left half, full height */}
+          <div className="flex h-full">
+            {hasSlides ? (
+              canDeliver ? (
+                <Link href={deliverUrl} className="block h-full w-full">
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer h-full flex flex-col">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <BookOpen className="h-5 w-5" />
+                        Topic
+                        {isInProgress && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                          >
+                            In Progress
+                          </Badge>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col gap-4">
+                      {/* Big Thumbnail Full Width */}
+                      {!isLoadingLiveState &&
+                      liveState !== null &&
+                      currentSlide &&
+                      currentSlide.kind === "image" ? (
+                        <FullWidthThumbnail
+                          slideId={currentSlide.topicSlideId}
+                          alt={`Slide ${currentSlideNumber} preview`}
+                        />
+                      ) : !isLoadingLiveState && liveState !== null ? (
+                        <div className="w-full aspect-video rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                          <FileText className="h-12 w-12 text-muted-foreground" />
+                        </div>
+                      ) : null}
+
+                      {/* Topic Title */}
+                      <p className="text-lg font-medium">
+                        {lessonData.topic?.title || "No topic assigned"}
+                      </p>
+
+                      {/* Slide Count */}
+                      {!isLoadingLiveState && liveState !== null && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <FileText className="h-4 w-4" />
+                          <span>
+                            Slide {currentSlideNumber} of {totalSlides}
+                          </span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="h-full w-full">
+                      <Card className="opacity-50 cursor-not-allowed h-full flex flex-col">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <BookOpen className="h-5 w-5" />
+                            Topic
+                            {isInProgress && (
+                              <Badge
+                                variant="secondary"
+                                className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                              >
+                                In Progress
+                              </Badge>
+                            )}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex-1 flex flex-col gap-4">
+                          {/* Big Thumbnail Full Width */}
+                          {!isLoadingLiveState &&
+                          liveState !== null &&
+                          currentSlide &&
+                          currentSlide.kind === "image" ? (
+                            <FullWidthThumbnail
+                              slideId={currentSlide.topicSlideId}
+                              alt={`Slide ${currentSlideNumber} preview`}
+                            />
+                          ) : !isLoadingLiveState && liveState !== null ? (
+                            <div className="w-full aspect-video rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                              <FileText className="h-12 w-12 text-muted-foreground" />
+                            </div>
+                          ) : null}
+
+                          {/* Topic Title */}
+                          <p className="text-lg font-medium">
+                            {lessonData.topic?.title || "No topic assigned"}
+                          </p>
+
+                          {/* Slide Count */}
+                          {!isLoadingLiveState && liveState !== null && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <FileText className="h-4 w-4" />
+                              <span>
+                                Slide {currentSlideNumber} of {totalSlides}
+                              </span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p>Only the teacher who created the lesson can present</p>
+                  </TooltipContent>
+                </Tooltip>
+              )
+            ) : (
+              <Card className="h-full flex flex-col">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BookOpen className="h-5 w-5" />
+                    Topic
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col gap-4">
+                  {/* Placeholder for thumbnail */}
+                  <div className="relative w-full aspect-video rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                    <FileText className="h-12 w-12 text-muted-foreground" />
+                  </div>
+
+                  {/* Topic Title */}
+                  <p className="text-lg font-medium">
+                    {lessonData.topic?.title || "No topic assigned"}
+                  </p>
+
+                  {/* No slides message */}
+                  {!isLoadingLiveState && totalSlides === 0 && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <FileText className="h-4 w-4" />
+                      <span>No slides available</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Right Column - Teacher & Classes (top) and Feedback (bottom) */}
+          <div className="flex flex-col gap-6 h-full">
+            {/* Teacher & Classes Card - Top half */}
+            <Card className="flex-1">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5" />
@@ -345,113 +574,42 @@ export default function LessonOverviewPage() {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Topic Card - 3/5 width */}
-          <div className="col-span-3">
-            {hasSlides ? (
-              <Link href={deliverUrl} className="block">
-                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BookOpen className="h-5 w-5" />
-                      Topic
-                    </CardTitle>
-                    <CardDescription>The topic for this lesson</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <p className="text-lg font-medium">
-                        {lessonData.topic?.title || "No topic assigned"}
-                      </p>
-                      {!isLoadingLiveState && liveState !== null && (
-                        <div className="flex items-center gap-4">
-                          {/* Thumbnail Preview */}
-                          {currentSlide && currentSlide.kind === "image" && (
-                            <ThumbnailImage
-                              slideId={currentSlide.topicSlideId}
-                              alt={`Slide ${currentSlideNumber} preview`}
-                            />
-                          )}
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <FileText className="h-4 w-4" />
-                              <span>
-                                Slide {currentSlideNumber} of {totalSlides}
-                              </span>
-                            </div>
-                            {isInProgress && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                              >
-                                In Progress
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ) : (
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5" />
-                    Topic
-                  </CardTitle>
-                  <CardDescription>The topic for this lesson</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-lg font-medium">
-                      {lessonData.topic?.title || "No topic assigned"}
-                    </p>
-                    {!isLoadingLiveState && totalSlides === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No slides available
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            {/* Feedback Card - Bottom half */}
+            <Card
+              className={`flex-1 ${canProvideFeedback ? "" : "opacity-50"}`}
+            >
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-5 w-5" />
+                  Feedback
+                </CardTitle>
+                <CardDescription>
+                  {isPendingReview
+                    ? "Provide feedback to mark this lesson as completed"
+                    : isCompleted
+                      ? "View your feedback for this lesson"
+                      : "Share your experience and mark this lesson as completed"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {canProvideFeedback ? (
+                  <Link
+                    href={`/schools/${school_id}/lessons/${lesson_id}/feedback`}
+                  >
+                    <Button variant="outline" className="w-full">
+                      {isPendingReview ? "Provide Feedback" : "View Feedback"}
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button variant="outline" className="w-full" disabled>
+                    Complete lesson to provide feedback
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
-
-        {/* Feedback Card */}
-        <Card className={canProvideFeedback ? "" : "opacity-50"}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5" />
-              Feedback
-            </CardTitle>
-            <CardDescription>
-              {isPendingReview
-                ? "Provide feedback to mark this lesson as completed"
-                : isCompleted
-                ? "View your feedback for this lesson"
-                : "Share your experience and mark this lesson as completed"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {canProvideFeedback ? (
-              <Link
-                href={`/schools/${school_id}/lessons/${lesson_id}/feedback`}
-              >
-                <Button variant="outline" className="w-full">
-                  {isPendingReview ? "Provide Feedback" : "View Feedback"}
-                </Button>
-              </Link>
-            ) : (
-              <Button variant="outline" className="w-full" disabled>
-                Complete lesson to provide feedback
-              </Button>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
