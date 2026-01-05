@@ -73,13 +73,10 @@ export async function POST(request: Request) {
     const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
 
     if (!isPlatformAdmin) {
-      console.error(
-        "[USER CREATE] Unauthorized - insufficient permissions:",
-        {
-          userId,
-          platformRoles: userRoles.platform,
-        }
-      );
+      console.error("[USER CREATE] Unauthorized - insufficient permissions:", {
+        userId,
+        platformRoles: userRoles.platform,
+      });
       return NextResponse.json(
         {
           error: "Unauthorized - Platform admin required",
@@ -134,7 +131,9 @@ export async function POST(request: Request) {
         "[USER CREATE] Failed to list users:",
         listUsersError.message
       );
-      throw new Error(`Failed to check existing users: ${listUsersError.message}`);
+      throw new Error(
+        `Failed to check existing users: ${listUsersError.message}`
+      );
     }
 
     const existingUser = existingUsers?.users?.find(
@@ -162,26 +161,20 @@ export async function POST(request: Request) {
         });
 
       if (createError) {
-        console.error(
-          "[USER CREATE] Database error - Failed to create user:",
-          {
-            error: createError,
-            message: createError.message,
-            status: createError.status,
-            email: data.email,
-          }
-        );
+        console.error("[USER CREATE] Database error - Failed to create user:", {
+          error: createError,
+          message: createError.message,
+          status: createError.status,
+          email: data.email,
+        });
         throw new Error(`Failed to create user: ${createError.message}`);
       }
 
       if (!newUser.user) {
-        console.error(
-          "[USER CREATE] Database error - No user returned:",
-          {
-            newUser,
-            email: data.email,
-          }
-        );
+        console.error("[USER CREATE] Database error - No user returned:", {
+          newUser,
+          email: data.email,
+        });
         throw new Error("Failed to create user: No user returned");
       }
 
@@ -280,9 +273,7 @@ export async function POST(request: Request) {
       });
       console.log("[USER CREATE] Role assigned successfully");
     } else {
-      console.log(
-        "[USER CREATE] User already has this role for this school"
-      );
+      console.log("[USER CREATE] User already has this role for this school");
     }
 
     console.log("[USER CREATE] User created successfully:", {
@@ -327,8 +318,8 @@ export async function POST(request: Request) {
       e.message?.includes("PLATFORM_ADMIN")
         ? 403
         : e.message?.includes("not found") || e.message?.includes("required")
-        ? 400
-        : 500;
+          ? 400
+          : 500;
 
     return NextResponse.json(
       { error: e.message ?? "Internal error" },

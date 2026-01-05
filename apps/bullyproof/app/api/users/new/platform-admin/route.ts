@@ -18,11 +18,13 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import { getUserScopedRoles } from "@/server/auth/rbac";
 
 /**
  * Handle POST /api/users/new/platform-admin
  *
  * Creates a new platform admin user.
+ * Only platform admins can create platform admins.
  *
  * @param request The incoming HTTP request.
  * @returns A JSON `NextResponse` with the created user or an error payload.
@@ -35,11 +37,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Check permissions: must be platform admin
+    const roles = await getUserScopedRoles(userId);
+    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
+
+    if (!isPlatformAdmin) {
+      console.error(
+        "[PLATFORM ADMIN CREATE] Unauthorized - insufficient permissions:",
+        {
+          userId,
+          platformRoles: roles.platform,
+        }
+      );
+      return NextResponse.json(
+        { error: "Unauthorized - Platform admin role required" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
 
     // TODO: Implement platform admin user creation logic
     // - Validate request body
-    // - Check permissions (must be platform admin)
     // - Create user in auth.users with platform admin role
     // - Create user_profile entry
     // - Assign PLATFORM_ADMIN role
