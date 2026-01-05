@@ -45,7 +45,51 @@ export function HeroSection() {
   const displayLastName = nameParts.slice(1).join(" ") || "";
 
   // Get user role/title
-  const userTitle = "Admin";
+  const getUserRoleDisplay = () => {
+    if (!currentUser) return "Admin";
+
+    // Helper to format role keys to display names
+    const formatRoleKey = (key: string): string => {
+      return key
+        .split("_")
+        .map(
+          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+        )
+        .join(" ");
+    };
+
+    // Check platform roles first (prioritize PLATFORM_ADMIN)
+    const platformRoles = currentUser.platformRoles;
+    if (
+      platformRoles &&
+      Array.isArray(platformRoles) &&
+      platformRoles.length > 0
+    ) {
+      // Prioritize PLATFORM_ADMIN if present
+      if (platformRoles.includes("PLATFORM_ADMIN")) {
+        return "Platform Admin";
+      }
+      // Return the first platform role formatted nicely
+      return formatRoleKey(platformRoles[0]);
+    }
+
+    // Fall back to school roles
+    const schoolRoles = currentUser.schoolRoles;
+    if (schoolRoles && Array.isArray(schoolRoles) && schoolRoles.length > 0) {
+      // Use roleName if available, otherwise format roleKey
+      const firstRole = schoolRoles[0];
+      if (firstRole.roleName) {
+        return firstRole.roleName;
+      }
+      if (firstRole.roleKey) {
+        return formatRoleKey(firstRole.roleKey);
+      }
+    }
+
+    return "Admin";
+  };
+
+  const userTitle = getUserRoleDisplay();
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
@@ -78,7 +122,7 @@ export function HeroSection() {
                   {displayFirstName}{" "}
                   <span className="font-black">{displayLastName}</span>
                 </h1>
-                <h2 className="text-muted-foreground">Platform Developer</h2>
+                <h2 className="text-muted-foreground">{userTitle}</h2>
               </div>
 
               {/* Profile Image - positioned to ignore card padding and bleed above */}
