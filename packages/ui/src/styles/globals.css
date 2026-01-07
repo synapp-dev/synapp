@@ -54,6 +54,8 @@
   --brand-steam: #1387b8;
   --brand-leetify: #f84982;
   --brand-faceit: #fd5a00;
+  --brand-bullyproof-primary: #038493;
+  --brand-bullyproof-secondary: #ea6f4d;
 }
 
 .dark {
@@ -135,6 +137,8 @@
   --brand-steam: #1387b8;
   --brand-leetify: #f84982;
   --brand-faceit: #fd5a00;
+  --brand-bullyproof-primary: #038493;
+  --brand-bullyproof-secondary: #ea6f4d;
 
   /* Stratum2 Font Weights */
   --font-weight-thin: 100;
@@ -351,6 +355,16 @@
       transform: translateY(0);
     }
   }
+  @keyframes slideUpFromBottom {
+    0% {
+      opacity: 0;
+      transform: translateY(100%);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
   @keyframes slide-left-fade-in {
     0% {
       opacity: 0;
@@ -372,6 +386,16 @@
     }
   }
   @keyframes float-up-fade-out {
+    0% {
+      opacity: 1;
+      transform: translateY(0px);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+  }
+  @keyframes float-up-fade-out-slow {
     0% {
       opacity: 1;
       transform: translateY(0px);
@@ -432,7 +456,8 @@
     }
   }
   @keyframes bounce-slow {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(-25%);
       animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
     }
