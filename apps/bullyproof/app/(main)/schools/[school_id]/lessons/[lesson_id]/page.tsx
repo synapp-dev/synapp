@@ -209,6 +209,9 @@ export default function LessonOverviewPage() {
   // Listen for real-time status changes
   useLessonStatusRealtime(lesson_id);
 
+  // Check if current user is the lesson creator (must be called before any early returns)
+  const currentUser = useMeStore((s) => s.currentUser);
+
   // Fetch live state to get current slide information
   const { data: liveStateData, isLoading: isLoadingLiveState } = useQuery({
     queryKey: ["lesson-live-state", lesson_id],
@@ -347,7 +350,6 @@ export default function LessonOverviewPage() {
   const deliverUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver?dialog=present`;
 
   // Check if current user is the lesson creator
-  const currentUser = useMeStore((s) => s.currentUser);
   const isLessonCreator = currentUser?.id === lessonData.createdByUserId;
   const canDeliver = isLessonCreator;
 
