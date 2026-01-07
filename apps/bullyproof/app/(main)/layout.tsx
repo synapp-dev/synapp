@@ -4,11 +4,9 @@ import { MeLoader } from "@/components/molecules/me-loader";
 import { TutorialGuard } from "@/components/molecules/tutorial-guard";
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
+import { ResponsiveSidebarProvider } from "@/components/organisms/responsive-sidebar-provider";
 
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@workspace/ui/components/sidebar";
+import { SidebarInset } from "@workspace/ui/components/sidebar";
 
 export default function MainLayout({
   children,
@@ -16,7 +14,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
+    <ResponsiveSidebarProvider>
       <MeLoader />
       <TutorialGuard />
       <AppSidebar />
@@ -26,6 +24,6 @@ export default function MainLayout({
           <div className="px-6 py-3">{children}</div>
         </SidebarInset>
       </div>
-    </SidebarProvider>
+    </ResponsiveSidebarProvider>
   );
 }
