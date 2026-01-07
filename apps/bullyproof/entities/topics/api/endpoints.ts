@@ -1,6 +1,5 @@
 import {
   apiFetch,
-  getAuthHeaders,
   type ApiResult,
 } from "@/lib/api/fetcher.client";
 import type { topics } from "@/server/db/schema";
@@ -133,36 +132,13 @@ export const topicsApi = {
     bulkSave(
       formData: FormData
     ): Promise<ApiResult<{ success: boolean; topic: any }>> {
-      // Use fetch directly for FormData (apiFetch sets JSON content-type)
-      // But we still need to add the authorization header
-      return getAuthHeaders()
-        .then((authHeaders) => {
-          return fetch(`/api/topic-slides/bulk-save`, {
-            method: "POST",
-            headers: authHeaders, // Add authorization header
-            body: formData,
-            // Don't set Content-Type header - browser will set it with boundary for FormData
-          });
-        })
-        .then(async (res) => {
-          const body = await res.json();
-          if (!res.ok || body?.error) {
-            return {
-              data: null,
-              error: body?.error ?? {
-                message: `HTTP ${res.status}`,
-                status: res.status,
-              },
-            };
-          }
-          return { data: body, error: null };
-        })
-        .catch((err) => ({
-          data: null,
-          error: {
-            message: err.message ?? "Network error",
-          },
-        }));
+      return apiFetch<{ success: boolean; topic: any }>(
+        "/topic-slides/bulk-save",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
     },
   },
   reorder(payload: {

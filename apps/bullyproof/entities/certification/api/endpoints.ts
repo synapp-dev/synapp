@@ -1,6 +1,5 @@
 import {
   apiFetch,
-  getAuthHeaders,
   type ApiResult,
 } from "@/lib/api/fetcher.client";
 import type {
@@ -126,37 +125,13 @@ export const certificationApi = {
         topicId: string,
         formData: FormData
       ): Promise<ApiResult<{ success: boolean; topic: Topic }>> {
-        // Use fetch directly for FormData
-        return getAuthHeaders()
-          .then((authHeaders) => {
-            return fetch(
-              `/api/certification/topics/${encodeURIComponent(topicId)}/slides/bulk`,
-              {
-                method: "POST",
-                headers: authHeaders,
-                body: formData,
-              }
-            );
-          })
-          .then(async (res) => {
-            const body = await res.json();
-            if (!res.ok || body?.error) {
-              return {
-                data: null,
-                error: body?.error ?? {
-                  message: `HTTP ${res.status}`,
-                  status: res.status,
-                },
-              };
-            }
-            return { data: body, error: null };
-          })
-          .catch((err) => ({
-            data: null,
-            error: {
-              message: err.message ?? "Network error",
-            },
-          }));
+        return apiFetch<{ success: boolean; topic: Topic }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/slides/bulk`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
       },
       getImageUrl(slideId: string): Promise<ApiResult<{ url: string | null }>> {
         return apiFetch<{ url: string | null }>(
