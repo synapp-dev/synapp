@@ -40,19 +40,49 @@ export async function apiFetch<T>(
     url = `http://localhost:3000/api${path}`;
   }
 
+  // Check if body is FormData - if so, don't set content-type (browser will set it with boundary)
+  const isFormData = req.body instanceof FormData;
+  
+  const headers = new Headers(req.headers);
+  if (!isFormData) {
+    headers.set("content-type", "application/json");
+  }
+
   const res = await fetch(url, {
     ...req,
-    headers: new Headers({
-      "content-type": "application/json",
-      ...Object.fromEntries(new Headers(req.headers)),
-    }),
+    headers,
     cache: "no-store",
   });
 
+  // Read response as text first (to avoid stream consumption issues)
+  const contentType = res.headers.get("content-type");
+  const text = await res.text();
+  
   let body: any = null;
-  try {
-    body = await res.json();
-  } catch {}
+  
+  if (contentType?.includes("application/json")) {
+    try {
+      body = JSON.parse(text);
+    } catch (parseError) {
+      // If JSON parsing fails, return error with text content
+      return {
+        data: null,
+        error: {
+          message: `Invalid JSON response: ${text.substring(0, 100)}`,
+          status: res.status,
+        },
+      };
+    }
+  } else {
+    // Non-JSON response (likely an error page)
+    return {
+      data: null,
+      error: {
+        message: text || `HTTP ${res.status} ${res.statusText}`,
+        status: res.status,
+      },
+    };
+  }
 
   if (!res.ok) {
     // Handle error responses
