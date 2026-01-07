@@ -116,6 +116,7 @@ function UserDetailDrawerContent({
   const [selectedRoleId, setSelectedRoleId] = useState<string>("");
   const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
   const [isAssigningRole, setIsAssigningRole] = useState(false);
+  const [assignRoleError, setAssignRoleError] = useState<string | null>(null);
 
   // Remove role dialog state
   const [isRemoveRoleDialogOpen, setIsRemoveRoleDialogOpen] = useState(false);
@@ -180,18 +181,21 @@ function UserDetailDrawerContent({
     return first + last || "?";
   };
 
-  const getFullName = (user: UserWithRolesAndSchools) => {
+  const getFullName = (user: UserWithRolesAndSchools | null) => {
+    if (!user) return "Unknown User";
     const parts = [user.firstName, user.lastName].filter(Boolean);
-    return parts.length > 0 ? parts.join(" ") : user.email;
+    return parts.length > 0 ? parts.join(" ") : user.email || "Unknown User";
   };
 
-  const isSchoolLicenceAccount = (user: UserWithRolesAndSchools) => {
+  const isSchoolLicenceAccount = (user: UserWithRolesAndSchools | null) => {
+    if (!user || !user.schoolRoles) return false;
     return user.schoolRoles.some((sr) => sr.roleKey === "SCHOOL_LICENCE");
   };
 
-  const getDisplayName = (user: UserWithRolesAndSchools) => {
+  const getDisplayName = (user: UserWithRolesAndSchools | null) => {
+    if (!user) return "Unknown User";
     if (isSchoolLicenceAccount(user)) {
-      const licenceSchoolRole = user.schoolRoles.find(
+      const licenceSchoolRole = user.schoolRoles?.find(
         (sr) => sr.roleKey === "SCHOOL_LICENCE"
       );
       const schoolName = licenceSchoolRole?.schoolName || "Unknown School";
@@ -210,28 +214,99 @@ function UserDetailDrawerContent({
     });
   };
 
+  // Platform role keys
+  const PLATFORM_ROLE_KEYS = [
+    "PLATFORM_ADMIN",
+    "GOVERNMENT_VIEWER",
+    "PLATFORM_STAFF",
+  ];
+
+  // Check if user has any platform role
+  const userHasPlatformRole =
+    user?.platformRoles?.some((key) => PLATFORM_ROLE_KEYS.includes(key)) ??
+    false;
+
+  // Check if user has any school role
+  const userHasSchoolRole = (user?.schoolRoles?.length ?? 0) > 0;
+
+  // Check if user has SCHOOL_LICENCE role
+  const userHasSchoolLicence = user ? isSchoolLicenceAccount(user) : false;
+
+  // Check if user has any non-SCHOOL_LICENCE school roles
+  const userHasNonLicenceSchoolRole =
+    user?.schoolRoles?.some((sr) => sr.roleKey !== "SCHOOL_LICENCE") ?? false;
+
+  // Get the platform role name for display (if user has one)
+  const userPlatformRoleKey = user?.platformRoles?.find((key) =>
+    PLATFORM_ROLE_KEYS.includes(key)
+  );
+  const platformRole = userPlatformRoleKey
+    ? roles.find((r) => r.key === userPlatformRoleKey)
+    : null;
+  const platformRoleName = platformRole?.name || "Platform Role";
+
   // Get available roles that the user doesn't already have
   const getAvailableRoles = () => {
     if (!user) return [];
 
-    // Platform roles the user already has (these are unique, can't have duplicates)
-    const userPlatformRoleKeys = new Set(user.platformRoles);
+    // Platform roles the user already has
+    const userPlatformRoleKeys = new Set(user.platformRoles || []);
+
+    // Check if role is a platform role
+    const isPlatformRole = (roleKey: string) =>
+      PLATFORM_ROLE_KEYS.includes(roleKey);
+
+    // Check if role is a school role
+    const isSchoolRole = (roleKey: string) =>
+      roleKey.includes("SCHOOL") || roleKey.includes("TEACHER");
 
     return roles.filter((role) => {
       const roleKey = role.key || "";
+      const isAssigningPlatformRole = isPlatformRole(roleKey);
+      const isAssigningSchoolRole = isSchoolRole(roleKey);
 
-      // Check if this is typically a platform role
-      const isPlatformRole =
-        !roleKey.includes("SCHOOL") && !roleKey.includes("TEACHER");
-
-      if (isPlatformRole) {
-        // For platform roles, filter out if user already has it
-        return !userPlatformRoleKeys.has(roleKey);
-      } else {
-        // For school roles, allow them to be assigned to different schools
-        // The backend will prevent duplicates at the same school
-        return true;
+      // If user has platform role, they can only have that one role
+      if (userHasPlatformRole) {
+        // Only allow the platform role they already have
+        return userPlatformRoleKeys.has(roleKey);
       }
+
+      // If user has school roles, they cannot have platform roles
+      if (userHasSchoolRole && isAssigningPlatformRole) {
+        return false;
+      }
+
+      // If assigning platform role and user has any roles, prevent it
+      if (
+        isAssigningPlatformRole &&
+        (userHasPlatformRole || userHasSchoolRole)
+      ) {
+        return false;
+      }
+
+      // For platform roles, filter out if user already has it
+      if (isAssigningPlatformRole) {
+        return !userPlatformRoleKeys.has(roleKey);
+      }
+
+      // For school roles, check SCHOOL_LICENCE exclusivity
+      if (isAssigningSchoolRole) {
+        const isSchoolLicenceRole = roleKey === "SCHOOL_LICENCE";
+
+        // If user has SCHOOL_LICENCE, they cannot have other school roles
+        if (userHasSchoolLicence && !isSchoolLicenceRole) {
+          return false;
+        }
+
+        // If user has other school roles, they cannot have SCHOOL_LICENCE
+        if (userHasNonLicenceSchoolRole && isSchoolLicenceRole) {
+          return false;
+        }
+      }
+
+      // For school roles, allow them to be assigned to different schools
+      // The backend will prevent duplicates at the same school
+      return true;
     });
   };
 
@@ -241,18 +316,91 @@ function UserDetailDrawerContent({
     const selectedRole = roles.find((r) => r.id === selectedRoleId);
     if (!selectedRole) return;
 
+    // Clear previous errors
+    setAssignRoleError(null);
+
     // Determine if this is a platform or school role
-    // We'll check if the role scope is "platform" or if it's typically a platform role
-    const isPlatformRole = !selectedSchoolId;
+    const roleKey = selectedRole.key || "";
+    const isAssigningPlatformRole = PLATFORM_ROLE_KEYS.includes(roleKey);
+    const isAssigningSchoolRole =
+      roleKey.includes("SCHOOL") || roleKey.includes("TEACHER");
 
     // For school roles, we need schoolId
-    if (!isPlatformRole && !selectedSchoolId) {
-      alert("Please select a school for school roles");
+    if (isAssigningSchoolRole && !selectedSchoolId) {
+      setAssignRoleError("Please select a school for school roles");
+      return;
+    }
+
+    // Validate platform role constraints
+    if (isAssigningPlatformRole) {
+      // Platform roles must have NULL school_id
+      if (selectedSchoolId) {
+        setAssignRoleError("Platform roles must have school_id set to NULL");
+        return;
+      }
+      // Platform roles are exclusive - user can only have one role total
+      if (userHasPlatformRole || userHasSchoolRole) {
+        setAssignRoleError(
+          "Users with platform roles can only have one role. Please remove all other roles first."
+        );
+        return;
+      }
+    }
+
+    // Validate school role constraints
+    if (isAssigningSchoolRole) {
+      // School roles must have a school_id
+      if (!selectedSchoolId) {
+        setAssignRoleError("School roles must have a school_id");
+        return;
+      }
+      // Users with platform roles cannot have school roles
+      if (userHasPlatformRole) {
+        setAssignRoleError(
+          "Users with platform roles cannot have school roles. Please remove platform roles first."
+        );
+        return;
+      }
+
+      // Check SCHOOL_LICENCE exclusivity
+      const isAssigningSchoolLicence = roleKey === "SCHOOL_LICENCE";
+
+      // If assigning SCHOOL_LICENCE, user cannot have other school roles
+      if (isAssigningSchoolLicence && userHasNonLicenceSchoolRole) {
+        setAssignRoleError(
+          "Users with school roles cannot have SCHOOL_LICENCE. Please remove all other school roles first."
+        );
+        return;
+      }
+
+      // If assigning non-SCHOOL_LICENCE school role, user cannot have SCHOOL_LICENCE
+      if (!isAssigningSchoolLicence && userHasSchoolLicence) {
+        setAssignRoleError(
+          "Users with SCHOOL_LICENCE cannot have other school roles. Please remove SCHOOL_LICENCE first."
+        );
+        return;
+      }
+    }
+
+    // If user has platform role, prevent assigning school roles
+    if (userHasPlatformRole && isAssigningSchoolRole) {
+      setAssignRoleError(
+        "Users with platform roles cannot have school roles. Please remove platform roles first."
+      );
+      return;
+    }
+
+    // If user has school roles, prevent assigning platform roles
+    if (userHasSchoolRole && isAssigningPlatformRole) {
+      setAssignRoleError(
+        "Users with school roles cannot have platform roles. Please remove school roles first."
+      );
       return;
     }
 
     try {
       setIsAssigningRole(true);
+      setAssignRoleError(null);
       const result = await rolesApi.post.assignRole({
         userId: user.id,
         roleId: selectedRoleId,
@@ -260,20 +408,23 @@ function UserDetailDrawerContent({
       });
 
       if (result.error) {
-        alert(result.error.message || "Failed to assign role");
+        const errorMessage = result.error.message || "Failed to assign role";
+        setAssignRoleError(errorMessage);
         return;
       }
 
       // Reset form and close dialog
       setSelectedRoleId("");
       setSelectedSchoolId("");
+      setAssignRoleError(null);
       setIsAddRoleDialogOpen(false);
 
       // Refresh user data
       onUserUpdate?.();
     } catch (err: any) {
       console.error("Failed to assign role:", err);
-      alert(err.message || "Failed to assign role");
+      const errorMessage = err.message || "Failed to assign role";
+      setAssignRoleError(errorMessage);
     } finally {
       setIsAssigningRole(false);
     }
@@ -338,22 +489,30 @@ function UserDetailDrawerContent({
   // Get the selected role
   const selectedRole = roles.find((r) => r.id === selectedRoleId);
 
-  // Determine if role typically requires a school based on role key
-  // Roles with SCHOOL or TEACHER in the key are typically school roles
+  // Determine if role requires a school based on role key
   const roleRequiresSchool = selectedRole
-    ? ((selectedRole.key?.includes("SCHOOL") ||
-        selectedRole.key?.includes("TEACHER")) ??
-      false)
+    ? selectedRole.key === "TEACHER" ||
+      selectedRole.key === "SCHOOL_ADMIN" ||
+      selectedRole.key === "SCHOOL_STAFF" ||
+      selectedRole.key === "SCHOOL_LICENCE"
     : false;
 
   // Get platform vs school roles for display
   const platformRoles = getAvailableRoles().filter((role) => {
-    // Platform roles typically don't have school-specific keys
-    return !role.key?.includes("SCHOOL") && !role.key?.includes("TEACHER");
+    const roleKey = role.key || "";
+    // Use the same logic as backend - check against platform role keys
+    return PLATFORM_ROLE_KEYS.includes(roleKey);
   });
 
   const schoolRoles = getAvailableRoles().filter((role) => {
-    return role.key?.includes("SCHOOL") || role.key?.includes("TEACHER");
+    const roleKey = role.key || "";
+    // School roles are TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF, SCHOOL_LICENCE
+    return (
+      roleKey === "TEACHER" ||
+      roleKey === "SCHOOL_ADMIN" ||
+      roleKey === "SCHOOL_STAFF" ||
+      roleKey === "SCHOOL_LICENCE"
+    );
   });
 
   if (!user) {
@@ -597,18 +756,45 @@ function UserDetailDrawerContent({
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle>Roles</CardTitle>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setIsAddRoleDialogOpen(true)}
-                      className="flex items-center gap-2"
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add New Role
-                    </Button>
+                    {!userHasPlatformRole && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAddRoleDialogOpen(true)}
+                        className="flex items-center gap-2"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add New Role
+                      </Button>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Warning alerts for restricted roles */}
+                  {userHasPlatformRole && (
+                    <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+                      <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                      <AlertTitle className="text-yellow-800 dark:text-yellow-200">
+                        Platform Role Restriction
+                      </AlertTitle>
+                      <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                        This user is a '{platformRoleName}' and can only have
+                        one role. They cannot have any other roles.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {userHasSchoolRole && !userHasPlatformRole && (
+                    <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+                      <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                      <AlertTitle className="text-yellow-800 dark:text-yellow-200">
+                        School Role Restriction
+                      </AlertTitle>
+                      <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                        This user has school roles and cannot have platform
+                        roles.
+                      </AlertDescription>
+                    </Alert>
+                  )}
                   {/* Platform Roles */}
                   {user.platformRoles.length > 0 && (
                     <div>
@@ -767,7 +953,18 @@ function UserDetailDrawerContent({
       </SheetContent>
 
       {/* Add Role Dialog */}
-      <Dialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen}>
+      <Dialog
+        open={isAddRoleDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddRoleDialogOpen(open);
+          if (!open) {
+            // Reset form when dialog closes
+            setSelectedRoleId("");
+            setSelectedSchoolId("");
+            setAssignRoleError(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New Role</DialogTitle>
@@ -776,54 +973,89 @@ function UserDetailDrawerContent({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="role-select">Role</Label>
-              <Select
-                value={selectedRoleId}
-                onValueChange={(value) => {
-                  setSelectedRoleId(value);
-                  // Reset school selection when role changes
-                  setSelectedSchoolId("");
-                }}
-              >
-                <SelectTrigger id="role-select">
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-                <SelectContent>
-                  {platformRoles.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                        Platform Roles
-                      </div>
-                      {platformRoles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {schoolRoles.length > 0 && (
-                    <>
-                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                        School Roles
-                      </div>
-                      {schoolRoles.map((role) => (
-                        <SelectItem key={role.id} value={role.id}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                  {getAvailableRoles().length === 0 && (
-                    <SelectItem value="no-roles" disabled>
-                      No available roles
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
+            {assignRoleError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{assignRoleError}</AlertDescription>
+              </Alert>
+            )}
+            {userHasPlatformRole && (
+              <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                <AlertTitle className="text-yellow-800 dark:text-yellow-200">
+                  Platform Role Restriction
+                </AlertTitle>
+                <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                  This user is a '{platformRoleName}' and can only have one
+                  role. They cannot have any other roles.
+                </AlertDescription>
+              </Alert>
+            )}
+            {userHasSchoolRole && !userHasPlatformRole && (
+              <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20">
+                <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+                <AlertTitle className="text-yellow-800 dark:text-yellow-200">
+                  School Role Restriction
+                </AlertTitle>
+                <AlertDescription className="text-yellow-700 dark:text-yellow-300">
+                  This user has school roles and cannot have platform roles.
+                </AlertDescription>
+              </Alert>
+            )}
+            {!userHasPlatformRole && (
+              <div className="space-y-2">
+                <Label htmlFor="role-select">Role</Label>
+                <Select
+                  value={selectedRoleId}
+                  onValueChange={(value) => {
+                    setSelectedRoleId(value);
+                    // Reset school selection when role changes
+                    setSelectedSchoolId("");
+                  }}
+                >
+                  <SelectTrigger id="role-select">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {platformRoles.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          Platform Roles
+                        </div>
+                        {platformRoles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {schoolRoles.length > 0 && (
+                      <>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          School Roles
+                        </div>
+                        {schoolRoles.map((role) => (
+                          <SelectItem key={role.id} value={role.id}>
+                            {role.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {getAvailableRoles().length === 0 && (
+                      <SelectItem value="no-roles" disabled>
+                        {user.platformRoles.length > 0 ||
+                        user.schoolRoles.length > 0
+                          ? "User has other roles and cannot be assigned PLATFORM_ADMIN or SCHOOL_LICENCE"
+                          : "No available roles"}
+                      </SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            {selectedRole && (
+            {selectedRole && !userHasPlatformRole && (
               <div className="space-y-2">
                 <Label htmlFor="school-select">
                   School{" "}
@@ -876,23 +1108,25 @@ function UserDetailDrawerContent({
             >
               Cancel
             </Button>
-            <Button
-              onClick={handleAddRole}
-              disabled={
-                !selectedRoleId ||
-                isAssigningRole ||
-                (roleRequiresSchool && !selectedSchoolId)
-              }
-            >
-              {isAssigningRole ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Assigning...
-                </>
-              ) : (
-                "Assign Role"
-              )}
-            </Button>
+            {!userHasPlatformRole && (
+              <Button
+                onClick={handleAddRole}
+                disabled={
+                  !selectedRoleId ||
+                  isAssigningRole ||
+                  (roleRequiresSchool && !selectedSchoolId)
+                }
+              >
+                {isAssigningRole ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Assigning...
+                  </>
+                ) : (
+                  "Assign Role"
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -929,7 +1163,7 @@ function UserDetailDrawerContent({
             <AlertDialogAction
               onClick={handleRemoveRole}
               disabled={isRemovingRole}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-secondary hover:bg-destructive/90 focus:ring-destructive"
             >
               {isRemovingRole ? (
                 <>

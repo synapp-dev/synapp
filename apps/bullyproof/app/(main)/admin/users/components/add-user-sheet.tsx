@@ -12,25 +12,49 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Button } from "@workspace/ui/components/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@workspace/ui/components/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
-import { Loader2, AlertCircle } from "lucide-react";
+import {
+  Loader2,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Check,
+  ShieldCheck,
+  Users as UsersIcon,
+  FileBadge2,
+  Landmark,
+  BicepsFlexed,
+  School as SchoolIcon,
+  ChevronsUpDown,
+} from "lucide-react";
+import { Badge } from "@workspace/ui/components/badge";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
+import { Separator } from "@workspace/ui/components/separator";
+import { cn } from "@workspace/ui/lib/utils";
 
 type Role = typeof roles.$inferSelect;
+
+type UserType = "bullyproof" | "government" | "school" | null;
 
 interface AddUserSheetProps {
   open: boolean;
@@ -43,16 +67,23 @@ export function AddUserSheet({
   onOpenChange,
   onUserCreated,
 }: AddUserSheetProps) {
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
-  const [roleScope, setRoleScope] = useState<"platform" | "school" | "">("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [userType, setUserType] = useState<UserType>(null);
+  const [selectedRoleKey, setSelectedRoleKey] = useState<string>("");
   const [schoolId, setSchoolId] = useState("");
-  const [roleName, setRoleName] = useState("");
   const [roles, setRoles] = useState<Role[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
+  const [roleComboboxOpen, setRoleComboboxOpen] = useState(false);
+
+  const totalSteps = 4;
 
   // Load roles and schools on mount
   useEffect(() => {
@@ -65,42 +96,20 @@ export function AddUserSheet({
   // Reset form when sheet closes
   useEffect(() => {
     if (!open) {
+      setStep(1);
       setEmail("");
-      setRoleScope("");
+      setFirstName("");
+      setLastName("");
+      setUserType(null);
+      setSelectedRoleKey("");
       setSchoolId("");
-      setRoleName("");
       setError(null);
     }
   }, [open]);
 
-  // Filter roles based on selected scope
-  useEffect(() => {
-    if (roleScope && roleName) {
-      // If scope changes, reset role name if current role doesn't match scope
-      const selectedRole = roles.find((r) => r.name === roleName);
-      if (selectedRole) {
-        const roleScopeId = selectedRole.scopeId;
-        // Check if role matches the selected scope
-        // We need to check the scope name, not the scopeId
-        // For now, we'll filter roles by checking if they're platform or school roles
-        const isPlatformRole =
-          !selectedRole.key?.includes("SCHOOL") &&
-          !selectedRole.key?.includes("TEACHER");
-        const roleMatchesScope =
-          (roleScope === "platform" && isPlatformRole) ||
-          (roleScope === "school" && !isPlatformRole);
-
-        if (!roleMatchesScope) {
-          setRoleName("");
-        }
-      }
-    }
-  }, [roleScope, roles, roleName]);
-
   const loadRoles = async () => {
     try {
       setLoadingRoles(true);
-      // Load all roles - we'll filter by scope client-side
       const result = await rolesApi.get.list();
       if (result.data) {
         setRoles(result.data);
@@ -130,32 +139,75 @@ export function AddUserSheet({
     }
   };
 
-  // Filter roles by scope
-  // Note: We filter client-side by checking role keys since scopeId is a UUID
-  // Platform roles typically don't have SCHOOL or TEACHER in their key
-  const getFilteredRoles = () => {
-    if (!roleScope) return [];
-
-    return roles
-      .filter((role) => {
-        const roleKey = role.key || "";
-        const isPlatformRole =
-          !roleKey.includes("SCHOOL") && !roleKey.includes("TEACHER");
-        return roleScope === "platform" ? isPlatformRole : !isPlatformRole;
-      })
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  const canProceedToNext = () => {
+    switch (step) {
+      case 1:
+        return (
+          email.trim() !== "" &&
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
+          firstName.trim() !== "" &&
+          lastName.trim() !== ""
+        );
+      case 2:
+        return userType !== null;
+      case 3:
+        if (userType === "school") {
+          return schoolId !== "" && selectedRoleKey !== "";
+        }
+        return selectedRoleKey !== "";
+      case 4:
+        return true; // Confirmation step, can always proceed (create user)
+      default:
+        return false;
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!email || !roleScope || !roleName) {
-      setError("Please fill in all required fields");
-      return;
+  const goNext = () => {
+    if (canProceedToNext()) {
+      setError(null);
+      setStep((prev) => Math.min(totalSteps, prev + 1));
     }
+  };
 
-    if (roleScope === "school" && !schoolId) {
-      setError("Please select a school for school-scoped roles");
+  const goBack = () => {
+    setError(null);
+    setStep((prev) => Math.max(1, prev - 1));
+  };
+
+  const getAvailableRolesForUserType = () => {
+    if (!userType) return [];
+
+    switch (userType) {
+      case "bullyproof":
+        return roles.filter(
+          (r) => r.key === "PLATFORM_ADMIN" || r.key === "PLATFORM_STAFF"
+        );
+      case "government":
+        return roles.filter((r) => r.key === "GOVERNMENT_VIEWER");
+      case "school":
+        return roles.filter(
+          (r) =>
+            r.key === "SCHOOL_ADMIN" ||
+            r.key === "TEACHER" ||
+            r.key === "SCHOOL_STAFF" ||
+            r.key === "SCHOOL_LICENCE"
+        );
+      default:
+        return [];
+    }
+  };
+
+  const getSelectedRole = () => {
+    return roles.find((r) => r.key === selectedRoleKey);
+  };
+
+  const getSelectedSchool = () => {
+    return schools.find((s) => s.id === schoolId);
+  };
+
+  const handleCreateUser = async () => {
+    if (!canProceedToNext()) {
+      setError("Please complete all required fields");
       return;
     }
 
@@ -163,14 +215,24 @@ export function AddUserSheet({
       setLoading(true);
       setError(null);
 
-      // Check if the selected role is Platform Admin
-      const selectedRole = roles.find((r) => r.name === roleName);
-      const isPlatformAdmin = selectedRole?.key === "PLATFORM_ADMIN";
+      const selectedRole = getSelectedRole();
+      if (!selectedRole) {
+        throw new Error("Please select a role");
+      }
 
-      // Route to platform-admin endpoint if creating a platform admin
-      const endpoint = isPlatformAdmin
-        ? "/users/new/platform-admin"
-        : "/users/new";
+      // Determine endpoint based on role
+      let endpoint = "/users/new";
+      if (selectedRole.key === "PLATFORM_ADMIN") {
+        endpoint = "/users/new/platform-admin";
+      } else if (selectedRole.key === "SCHOOL_LICENCE") {
+        endpoint = "/users/new/school-license";
+      } else if (selectedRole.key === "SCHOOL_ADMIN") {
+        endpoint = "/users/new/school-admin";
+      } else if (selectedRole.key === "TEACHER") {
+        endpoint = "/users/new/teacher";
+      }
+
+      const roleScope = userType === "school" ? "school" : "platform";
 
       type CreateUserResponse = {
         userId: string;
@@ -184,13 +246,14 @@ export function AddUserSheet({
         method: "POST",
         body: JSON.stringify({
           email,
+          firstName,
+          lastName,
           roleScope,
-          schoolId: roleScope === "school" ? schoolId : undefined,
-          roleName,
+          schoolId: userType === "school" ? schoolId : undefined,
+          roleName: selectedRole.name,
         }),
       });
 
-      // Check for error using type narrowing
       if (result.data === null) {
         const errorObj = result as { error: { message: string } | string };
         const errorMessage =
@@ -202,12 +265,6 @@ export function AddUserSheet({
         throw new Error(errorMessage);
       }
 
-      // Reset form
-      setEmail("");
-      setRoleScope("");
-      setSchoolId("");
-      setRoleName("");
-
       // Close sheet and refresh
       onOpenChange(false);
       onUserCreated?.();
@@ -218,28 +275,11 @@ export function AddUserSheet({
     }
   };
 
-  const filteredRoles = getFilteredRoles();
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="top"
-        className="w-full max-w-2xl mx-auto rounded-b-2xl border-b-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0"
-      >
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
-          <SheetTitle>Add New User</SheetTitle>
-        </SheetHeader>
-
-        <form onSubmit={handleSubmit}>
-          <div className="px-6 py-6 space-y-6">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
+  const renderStepContent = () => {
+    switch (step) {
+      case 1:
+        return (
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input
@@ -248,105 +288,458 @@ export function AddUserSheet({
                 placeholder="user@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && canProceedToNext()) {
+                    e.preventDefault();
+                    goNext();
+                  }
+                }}
+                autoFocus
                 disabled={loading}
               />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="roleScope">Role Scope *</Label>
-              <Select
-                value={roleScope}
-                onValueChange={(value) => {
-                  setRoleScope(value as "platform" | "school");
-                  // Reset school and role when scope changes
-                  setSchoolId("");
-                  setRoleName("");
-                }}
-                disabled={loading || loadingRoles}
-              >
-                <SelectTrigger id="roleScope">
-                  <SelectValue placeholder="Select role scope" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="platform">Platform</SelectItem>
-                  <SelectItem value="school">School</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name *</Label>
+                <Input
+                  id="firstName"
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canProceedToNext()) {
+                      e.preventDefault();
+                      goNext();
+                    }
+                  }}
+                  disabled={loading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canProceedToNext()) {
+                      e.preventDefault();
+                      goNext();
+                    }
+                  }}
+                  disabled={loading}
+                />
+              </div>
             </div>
+          </div>
+        );
 
-            {roleScope === "school" && (
+      case 2:
+        return (
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              What kind of user are you adding?
+            </p>
+            <div className="grid grid-cols-1 gap-3">
+              <Button
+                type="button"
+                variant={userType === "bullyproof" ? "default" : "outline"}
+                className="h-auto py-4 px-6 justify-start"
+                onClick={() => {
+                  setUserType("bullyproof");
+                  setSelectedRoleKey("");
+                  setSchoolId("");
+                }}
+                disabled={loading}
+              >
+                <div className="flex items-start gap-3 w-full">
+                  <BicepsFlexed className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-semibold">Bullyproof</span>
+                    <span className="text-xs text-muted-foreground">
+                      Platform admin or staff
+                    </span>
+                  </div>
+                </div>
+              </Button>
+              <Button
+                type="button"
+                variant={userType === "government" ? "default" : "outline"}
+                className="h-auto py-4 px-6 justify-start"
+                onClick={() => {
+                  setUserType("government");
+                  setSelectedRoleKey("");
+                  setSchoolId("");
+                }}
+                disabled={loading}
+              >
+                <div className="flex items-start gap-3 w-full">
+                  <Landmark className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-semibold">Government</span>
+                    <span className="text-xs text-muted-foreground">
+                      Government admin
+                    </span>
+                  </div>
+                </div>
+              </Button>
+              <Button
+                type="button"
+                variant={userType === "school" ? "default" : "outline"}
+                className="h-auto py-4 px-6 justify-start"
+                onClick={() => {
+                  setUserType("school");
+                  setSelectedRoleKey("");
+                  setSchoolId("");
+                }}
+                disabled={loading}
+              >
+                <div className="flex items-start gap-3 w-full">
+                  <SchoolIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="font-semibold">School Member</span>
+                    <span className="text-xs text-muted-foreground">
+                      School admin, teacher, staff, or school licence
+                    </span>
+                  </div>
+                </div>
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 3:
+        const availableRoles = getAvailableRolesForUserType();
+
+        return (
+          <div className="space-y-4">
+            {userType === "school" && (
               <div className="space-y-2">
                 <Label htmlFor="school">School *</Label>
-                <Select
-                  value={schoolId}
-                  onValueChange={(value) => {
-                    setSchoolId(value);
-                    // Reset role when school changes
-                    setRoleName("");
-                  }}
-                  disabled={loading || loadingSchools}
-                >
-                  <SelectTrigger id="school">
-                    <SelectValue placeholder="Select a school" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {schools.map((school) => (
-                      <SelectItem key={school.id} value={school.id}>
-                        {school.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {loadingSchools ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading schools...
+                  </div>
+                ) : (
+                  <Popover
+                    open={schoolComboboxOpen}
+                    onOpenChange={setSchoolComboboxOpen}
+                    modal
+                  >
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={schoolComboboxOpen}
+                        className="w-full justify-between"
+                        disabled={loading}
+                      >
+                        {schoolId
+                          ? schools.find((school) => school.id === schoolId)
+                              ?.name
+                          : "Select a school..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] max-h-[var(--radix-popover-content-available-height)] p-0 overflow-y-auto"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput
+                          placeholder="Search school..."
+                          className="h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No school found.</CommandEmpty>
+                          <CommandGroup>
+                            {schools.map((school) => (
+                              <CommandItem
+                                key={school.id}
+                                value={`${school.id} ${school.name}`}
+                                onSelect={() => {
+                                  setSchoolId(
+                                    school.id === schoolId ? "" : school.id
+                                  );
+                                  setSelectedRoleKey("");
+                                  setSchoolComboboxOpen(false);
+                                }}
+                              >
+                                {school.name}
+                                <Check
+                                  className={cn(
+                                    "ml-auto h-4 w-4",
+                                    schoolId === school.id
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                            {schools.length === 0 && (
+                              <CommandItem disabled>
+                                No schools available
+                              </CommandItem>
+                            )}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="roleName">Role Name *</Label>
+              <Label htmlFor="role">Role *</Label>
               {loadingRoles ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Loading roles...
                 </div>
               ) : (
-                <Select
-                  value={roleName}
-                  onValueChange={setRoleName}
-                  disabled={loading || !roleScope || filteredRoles.length === 0}
+                <Popover
+                  open={roleComboboxOpen}
+                  onOpenChange={setRoleComboboxOpen}
+                  modal
                 >
-                  <SelectTrigger id="roleName">
-                    <SelectValue placeholder="Select a role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {filteredRoles.map((role) => (
-                      <SelectItem key={role.id} value={role.name}>
-                        {role.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {roleScope && filteredRoles.length === 0 && !loadingRoles && (
-                <p className="text-sm text-muted-foreground">
-                  No roles available for {roleScope} scope
-                </p>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={roleComboboxOpen}
+                      className="w-full justify-between"
+                      disabled={loading || (userType === "school" && !schoolId)}
+                    >
+                      {selectedRoleKey
+                        ? availableRoles.find(
+                            (role) => role.key === selectedRoleKey
+                          )?.name
+                        : "Select a role..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] max-h-[var(--radix-popover-content-available-height)] p-0 overflow-y-auto"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput
+                        placeholder="Search role..."
+                        className="h-9"
+                      />
+                      <CommandList>
+                        <CommandEmpty>No role found.</CommandEmpty>
+                        <CommandGroup>
+                          {availableRoles.map((role) => (
+                            <CommandItem
+                              key={role.id}
+                              value={`${role.key || ""} ${role.name}`}
+                              onSelect={() => {
+                                setSelectedRoleKey(
+                                  role.key === selectedRoleKey
+                                    ? ""
+                                    : role.key || ""
+                                );
+                                setRoleComboboxOpen(false);
+                              }}
+                            >
+                              {role.name}
+                              <Check
+                                className={cn(
+                                  "ml-auto h-4 w-4",
+                                  selectedRoleKey === role.key
+                                    ? "opacity-100"
+                                    : "opacity-0"
+                                )}
+                              />
+                            </CommandItem>
+                          ))}
+                          {availableRoles.length === 0 && (
+                            <CommandItem disabled>
+                              {userType === "school" && !schoolId
+                                ? "Please select a school first"
+                                : "No roles available"}
+                            </CommandItem>
+                          )}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
           </div>
+        );
 
-          <SheetFooter className="px-6 py-4 border-t gap-2">
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                "Create User"
-              )}
+      case 4:
+        return renderConfirmation();
+
+      default:
+        return null;
+    }
+  };
+
+  const renderConfirmation = () => {
+    const selectedRole = getSelectedRole();
+    const selectedSchool = getSelectedSchool();
+    const roleKey = selectedRole?.key || "";
+
+    // Get badge styling based on role key (matching user-detail-drawer styles)
+    let badgeStyle: {
+      backgroundColor?: string;
+      color?: string;
+    } = {};
+
+    if (roleKey === "PLATFORM_ADMIN") {
+      badgeStyle = {
+        backgroundColor: "#ff7f00",
+        color: "white",
+      };
+    } else if (roleKey === "TEACHER") {
+      badgeStyle = {
+        backgroundColor: "#048393",
+        color: "white",
+      };
+    } else if (roleKey === "SCHOOL_ADMIN") {
+      badgeStyle = {
+        backgroundColor: "blue",
+        color: "white",
+      };
+    } else if (roleKey === "SCHOOL_LICENCE") {
+      badgeStyle = {
+        backgroundColor: "#6b7280",
+        color: "white",
+      };
+    }
+
+    const isAdmin = roleKey.includes("ADMIN") || roleKey.includes("admin");
+
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="w-full max-w-sm border-2 border-border rounded-lg p-6 bg-card shadow-lg">
+          {/* ID Badge Style Card */}
+          <div className="space-y-4">
+            {/* Name */}
+            <div className="text-center">
+              <h2 className="text-2xl font-bold">
+                {firstName} {lastName}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">{email}</p>
+            </div>
+
+            {/* Role Badge */}
+            {selectedRole && (
+              <div className="flex justify-center">
+                <Badge
+                  variant="default"
+                  className="flex items-center gap-2 px-4 py-2 text-base"
+                  style={badgeStyle}
+                >
+                  {isAdmin ? (
+                    <ShieldCheck className="h-4 w-4" />
+                  ) : roleKey === "SCHOOL_LICENCE" ? (
+                    <FileBadge2 className="h-4 w-4" />
+                  ) : (
+                    <UsersIcon className="h-4 w-4" />
+                  )}
+                  {selectedRole.name}
+                </Badge>
+              </div>
+            )}
+
+            {/* School (if applicable) */}
+            {selectedSchool && (
+              <div className="text-center pt-2 border-t">
+                <p className="text-sm font-medium text-muted-foreground">
+                  {selectedSchool.name}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="top"
+        className="w-full max-w-md mx-auto rounded-b-2xl border-b-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0"
+      >
+        <SheetHeader className="px-6 pt-6 pb-4 border-b">
+          <SheetTitle>Add New User</SheetTitle>
+          {/* Progress indicator */}
+          <div className="flex items-center gap-2 mt-4">
+            {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => (
+              <div key={s} className="flex items-center gap-2">
+                <div
+                  className={`size-2 rounded-full transition-colors ${
+                    s <= step ? "bg-primary" : "bg-muted-foreground/30"
+                  }`}
+                />
+                {s < totalSteps && <div className="h-px w-6 bg-border" />}
+              </div>
+            ))}
+          </div>
+        </SheetHeader>
+
+        <div className="px-6 py-6 min-h-[300px]">
+          {error && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {renderStepContent()}
+        </div>
+
+        <SheetFooter className="px-6 py-4 border-t gap-2">
+          <div className="flex items-center justify-between w-full">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={goBack}
+              disabled={step === 1 || loading}
+            >
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              Back
             </Button>
-          </SheetFooter>
-        </form>
+            {step < totalSteps ? (
+              <Button
+                type="button"
+                onClick={goNext}
+                disabled={!canProceedToNext() || loading}
+              >
+                Next
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleCreateUser}
+                disabled={!canProceedToNext() || loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-2 h-4 w-4" />
+                    Create User
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </SheetFooter>
       </SheetContent>
     </Sheet>
   );
