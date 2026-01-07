@@ -9,7 +9,7 @@ import type { ClassOption } from "@/types/lesson-wizard";
 import { classesApi } from "@/entities/classes/api/endpoints";
 
 interface LessonWizardClassesProps {
-  schoolId: string;
+  schoolId: string | null;
   selectedClasses: ClassOption[];
   onClassesChange: (classes: ClassOption[]) => void;
 }

@@ -58,6 +58,19 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
     selectedTopic: null as TopicOption | null,
   });
 
+  // Reset state when drawer closes to ensure clean state on next open
+  useEffect(() => {
+    if (!open) {
+      setState({
+        step: 1,
+        selectedClasses: [],
+        selectedTopic: null,
+      });
+      setError(null);
+      setLoading(false);
+    }
+  }, [open]);
+
   const totalSteps = 3;
 
   const goToStep = (step: number) => {
@@ -203,23 +216,19 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
 
         <div className="flex-1 overflow-auto p-6">
           <div className="max-w-4xl mx-auto">
-            {state.step === 1 && (
-              schoolUuid ? (
-                <LessonWizardClasses
-                  schoolId={schoolUuid}
-                  selectedClasses={state.selectedClasses}
-                  onClassesChange={(classes) =>
-                    setState((prev) => ({ ...prev, selectedClasses: classes }))
-                  }
-                />
-              ) : (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              )
-            )}
+            {/* Always render all step components to maintain consistent hook order */}
+            {/* Hide inactive steps using CSS to prevent hook order issues */}
+            <div className={state.step === 1 ? 'block' : 'hidden'}>
+              <LessonWizardClasses
+                schoolId={schoolUuid}
+                selectedClasses={state.selectedClasses}
+                onClassesChange={(classes) =>
+                  setState((prev) => ({ ...prev, selectedClasses: classes }))
+                }
+              />
+            </div>
 
-            {state.step === 2 && (
+            <div className={state.step === 2 ? 'block' : 'hidden'}>
               <LessonWizardTopic
                 selectedTopic={state.selectedTopic}
                 selectedClasses={state.selectedClasses}
@@ -227,14 +236,14 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
                   setState((prev) => ({ ...prev, selectedTopic: topic }))
                 }
               />
-            )}
+            </div>
 
-            {state.step === 3 && (
+            <div className={state.step === 3 ? 'block' : 'hidden'}>
               <LessonWizardConfirm
                 selectedClasses={state.selectedClasses}
                 selectedTopic={state.selectedTopic}
               />
-            )}
+            </div>
 
             {error && (
               <div className="mt-4 p-4 rounded-lg border border-destructive/50 bg-destructive/10 text-destructive text-sm">
