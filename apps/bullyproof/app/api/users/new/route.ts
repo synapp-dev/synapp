@@ -32,6 +32,8 @@ const createUserSchema = z.object({
   roleScope: z.enum(["platform", "school"]),
   schoolId: z.uuid().optional(),
   roleName: z.string().min(1),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
 });
 
 /**
@@ -151,6 +153,41 @@ export async function POST(request: Request) {
 
       // Wait a bit for profile to be ready
       await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Update user_profile with firstName and lastName if provided
+      if (data.firstName || data.lastName) {
+        const updateData: {
+          first_name?: string;
+          last_name?: string;
+        } = {};
+        if (data.firstName) updateData.first_name = data.firstName;
+        if (data.lastName) updateData.last_name = data.lastName;
+
+        try {
+          const { error: updateError } = await adminClient
+            .from("user_profile")
+            .update(updateData)
+            .eq("id", newUserId);
+
+          if (updateError) {
+            console.error(
+              "[USER CREATE] Failed to update user profile:",
+              updateError
+            );
+            // Non-fatal error, continue
+          } else {
+            console.log(
+              "[USER CREATE] User profile updated with firstName/lastName"
+            );
+          }
+        } catch (updateErr: any) {
+          console.error(
+            "[USER CREATE] Error updating user profile:",
+            updateErr
+          );
+          // Non-fatal error, continue
+        }
+      }
     } else {
       // Create new user in auth.users
       console.log("[USER CREATE] Creating new user in auth.users");
@@ -217,6 +254,8 @@ export async function POST(request: Request) {
           const { error } = await adminClient.from("user_profile").insert({
             id: newUserId,
             email: data.email,
+            first_name: data.firstName,
+            last_name: data.lastName,
           });
 
           if (!error) {

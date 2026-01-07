@@ -32,6 +32,8 @@ const createPlatformAdminSchema = z.object({
   roleScope: z.enum(["platform", "school"]),
   roleName: z.string().min(1),
   schoolId: z.uuid().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
 });
 
 /**
@@ -201,6 +203,8 @@ export async function POST(request: Request) {
           await db.insert(userProfile).values({
             id: newUserId,
             email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
           });
 
           profileExists = true;
@@ -236,6 +240,32 @@ export async function POST(request: Request) {
             );
           }
         }
+      }
+    }
+
+    // Update user_profile with firstName and lastName if provided
+    if (data.firstName || data.lastName) {
+      const updateData: {
+        firstName?: string;
+        lastName?: string;
+      } = {};
+      if (data.firstName) updateData.firstName = data.firstName;
+      if (data.lastName) updateData.lastName = data.lastName;
+
+      try {
+        await db
+          .update(userProfile)
+          .set(updateData)
+          .where(eq(userProfile.id, newUserId));
+        console.log(
+          "[PLATFORM ADMIN CREATE] User profile updated with firstName/lastName"
+        );
+      } catch (updateError: any) {
+        console.error(
+          "[PLATFORM ADMIN CREATE] Failed to update user profile:",
+          updateError
+        );
+        // Non-fatal error, continue
       }
     }
 

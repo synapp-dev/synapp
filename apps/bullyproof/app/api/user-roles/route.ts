@@ -79,9 +79,22 @@ export async function POST(request: Request) {
     const assignment = await rolesService.assignRole({ userId }, body);
     return NextResponse.json(assignment, { status: 201 });
   } catch (e: any) {
-    console.error(e);
+    console.error("[POST /api/user-roles] Error:", e);
+    
+    // Check for PLATFORM_ADMIN constraint errors
+    const errorMessage = e.message ?? "Internal error";
+    if (
+      errorMessage.includes("PLATFORM_ADMIN") ||
+      errorMessage.includes("cannot have any other roles")
+    ) {
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 400 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: e.message ?? "Internal error" },
+      { error: errorMessage },
       { status: 500 }
     );
   }
