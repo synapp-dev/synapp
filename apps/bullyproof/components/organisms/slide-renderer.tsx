@@ -172,7 +172,13 @@ export function SlideRenderer({
         return (
           <div className="flex items-center justify-center h-full w-full">
             {!isTempSlide && loading ? (
-              <div className="text-foreground">Loading image...</div>
+              <div className="flex items-center justify-center">
+                <img
+                  src="/images/bp-small-logo.svg"
+                  alt="Loading"
+                  className={`${thumbnailOnly ? "h-8" : "h-16"} w-auto animate-pulse`}
+                />
+              </div>
             ) : !isTempSlide && error ? (
               <div className="text-destructive">Error: {error}</div>
             ) : hasImageUrl ? (
