@@ -160,7 +160,9 @@ export function SchoolSwitcher() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
+  // On mobile, always render as expanded
+  const displayState = isMobile ? "expanded" : state;
   const router = useRouter();
   const pathname = usePathname();
 
@@ -427,7 +429,7 @@ export function SchoolSwitcher() {
       <SidebarMenuItem
         className={cn(
           "items-center w-full flex pb-2",
-          state === "expanded" ? "" : "pl-2"
+          displayState === "expanded" ? "" : "pl-2"
         )}
       >
         {hasOnlyOneSchool ? (
@@ -436,11 +438,11 @@ export function SchoolSwitcher() {
             tooltip={selectedSchool?.name || "School"}
             className={cn(
               "w-full flex items-center gap-2 group/school-switcher py-6",
-              state === "expanded" ? "justify-start" : "justify-center"
+              displayState === "expanded" ? "justify-start" : "justify-center"
             )}
             onClick={handleSchoolToggle}
           >
-            {state === "expanded" ? (
+            {displayState === "expanded" ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <SchoolIconBadge size="md" />
                 <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
@@ -462,10 +464,10 @@ export function SchoolSwitcher() {
                 tooltip={selectedSchool?.name || "Select school"}
                 className={cn(
                   "w-full flex items-center gap-2 group/school-switcher py-6",
-                  state === "expanded" ? "justify-between" : "justify-center"
+                  displayState === "expanded" ? "justify-between" : "justify-center"
                 )}
               >
-                {state === "expanded" ? (
+                {displayState === "expanded" ? (
                   <>
                     <div
                       className={cn(

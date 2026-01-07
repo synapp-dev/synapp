@@ -68,11 +68,11 @@ export function CommandMenu() {
       <Button
         variant="outline"
         onClick={() => setOpen(true)}
-        className="h-9 gap-2 w-[240px] justify-start text-muted-foreground"
+        className="h-9 gap-2 w-9 lg:w-[240px] lg:justify-start justify-center text-muted-foreground"
       >
         <SquareTerminal className="h-4 w-4" />
-        <span>Command Menu</span>
-        <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
+        <span className="hidden lg:inline">Command Menu</span>
+        <kbd className="pointer-events-none ml-auto hidden lg:inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
           {shortcut}
         </kbd>
       </Button>

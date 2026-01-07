@@ -148,7 +148,9 @@ const data = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
+  // On mobile, always render as expanded
+  const displayState = isMobile ? "expanded" : state;
   const pathname = usePathname();
   const isPlatformAdmin = useIsPlatformAdmin();
   const currentUser = useMeStore((s) => s.currentUser);
@@ -252,11 +254,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     [filterItems]
   );
 
+  // Track if component has mounted to prevent hydration mismatch
+  const [mounted, setMounted] = React.useState(false);
+
   const isLive = useLiveLessonStore((s) => s.isLive);
   const liveUrl = useLiveLessonStore((s) => s.getUrl());
   const fetchInProgressLesson = useLiveLessonStore(
     (s) => s.fetchInProgressLesson
   );
+
+  // Set mounted to true after component mounts (client-side only)
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Fetch in-progress lesson on mount and when user changes
   // Wait for session to be ready before fetching
@@ -306,7 +316,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       return platformItems;
     }
 
-    if (!isLive || !liveUrl) return platformItems;
+    // Only add live lesson item after component has mounted to prevent hydration mismatch
+    // This ensures server and client render the same initial HTML
+    if (!mounted || !isLive || !liveUrl) return platformItems;
+    
     const items = [...platformItems];
     const dashboardIndex = items.findIndex((i) => i.title === "Dashboard");
     const liveItem = {
@@ -323,13 +336,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items.unshift(liveItem);
     }
     return items;
-  }, [platformItems, isLive, liveUrl, isWelcomeCompleted]);
+  }, [platformItems, isLive, liveUrl, isWelcomeCompleted, mounted]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mb-2">
         <Link href="/" className="block">
-          {state === "expanded" ? (
+          {displayState === "expanded" ? (
             <Image
               src="/images/bullyproof-logo.svg"
               alt="Bullyproof Logo"

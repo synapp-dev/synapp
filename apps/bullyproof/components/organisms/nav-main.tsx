@@ -25,6 +25,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar,
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
@@ -39,6 +40,10 @@ function DisabledMenuItem({
   disabledMessage?: string;
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const { state, isMobile } = useSidebar();
+  // On mobile, always render as expanded
+  const displayState = isMobile ? "expanded" : state;
+  const isCollapsed = displayState === "collapsed";
   const isLocked = disabledMessage === "Locked";
   const isUnauthorized = disabledMessage === "Unauthorized";
 
@@ -55,7 +60,7 @@ function DisabledMenuItem({
         }}
       >
         <div className="relative w-4 h-4 flex items-center justify-center overflow-hidden">
-          {isHovered ? (
+          {isHovered && !isCollapsed ? (
             <div
               key={isLocked ? "lock" : isUnauthorized ? "warning" : "hammer"}
               className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
@@ -79,12 +84,14 @@ function DisabledMenuItem({
             )
           )}
         </div>
-        <span
-          key={isHovered ? "hover" : "default"}
-          className="animate-slide-down-fade-in"
-        >
-          {isHovered ? disabledMessage : title}
-        </span>
+        {!isCollapsed && (
+          <span
+            key={isHovered ? "hover" : "default"}
+            className="animate-slide-down-fade-in"
+          >
+            {isHovered ? disabledMessage : title}
+          </span>
+        )}
       </SidebarMenuButton>
     </SidebarMenuItem>
   );
