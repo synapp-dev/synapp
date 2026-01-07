@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
+import CountUp from "react-countup";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { certificationApi } from "@/entities/certification/api/endpoints";
@@ -38,6 +39,7 @@ import {
   Plus,
   Trash2,
   Check,
+  Save,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import {
@@ -46,6 +48,8 @@ import {
   TabsTrigger,
   TabsContent,
 } from "@workspace/ui/components/tabs";
+import { Skeleton } from "@workspace/ui/components/skeleton";
+import { Progress } from "@workspace/ui/components/progress";
 import {
   SlideRenderer,
   type SlideData,
@@ -74,6 +78,11 @@ import {
   TooltipContent,
 } from "@workspace/ui/components/tooltip";
 import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@workspace/ui/components/hover-card";
+import {
   RadioGroup,
   RadioGroupItem,
 } from "@workspace/ui/components/radio-group";
@@ -81,6 +90,7 @@ import { uploadSlideImage } from "@/utils/supabase/upload";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
+import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -170,8 +180,14 @@ export function TopicDetailSection({
   const [originalSlides, setOriginalSlides] = useState<ExtendedSlideData[]>([]);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [showChangesDialog, setShowChangesDialog] = useState(false);
+  const [showSaveProgressDialog, setShowSaveProgressDialog] = useState(false);
   const [pendingSave, setPendingSave] = useState(false);
   const [showImageSelectorDialog, setShowImageSelectorDialog] = useState(false);
+  const [insertAfterIndexForDialog, setInsertAfterIndexForDialog] = useState<
+    number | null
+  >(null);
+  const [saveProgress, setSaveProgress] = useState(0);
+  const [saveStatus, setSaveStatus] = useState<string>("");
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -819,6 +835,23 @@ export function TopicDetailSection({
     }
   }, [currentSlideIndex, slides.length]);
 
+  // Prevent navigation/refresh while saving
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isSaving) {
+        e.preventDefault();
+        e.returnValue = "Changes are being saved. Please wait...";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isSaving]);
+
   // Handle slide reordering via drag and drop
   const handleSlideDragStart = (slideId: string, index: number) => {
     setDraggedSlideId(slideId);
@@ -1021,17 +1054,95 @@ export function TopicDetailSection({
   const handleCreateSlide = (insertAfterIndex: number) => {
     if (!topic) return;
 
+    // Open image selector dialog in multiple selection mode
+    setInsertAfterIndexForDialog(insertAfterIndex);
+    setShowImageSelectorDialog(true);
+  };
+
+  // Handle inserting multiple slides at a specific position
+  const handleInsertMultipleSlides = async (
+    images: Array<{ imageData: Blob; blobUrl: string }>,
+    insertAfterIndex: number
+  ) => {
+    if (!topic || images.length === 0) return;
+
+    // Create new slides for each image and collect files
+    const newPendingUploads = new Map(pendingFileUploads);
+    const newSlides: ExtendedSlideData[] = images.map((image, index) => {
+      const tempId = `temp_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Convert blob to File object for upload
+      const file = new File(
+        [image.imageData],
+        `image-${Date.now()}-${index}.jpg`,
+        {
+          type: image.imageData.type || "image/jpeg",
+        }
+      );
+
+      // Store file for bulk upload (add to the same Map)
+      newPendingUploads.set(tempId, file);
+
+      return {
+        id: tempId,
+        kind: "image" as const,
+        orderIndex: insertAfterIndex + 1 + index, // Will be reordered below
+        textHtml: null,
+        imageUrl: image.blobUrl, // Use blob URL for preview
+        videoUrl: null,
+        videoStartS: null,
+        videoEndS: null,
+        effectiveNotes: null,
+        quizData: null,
+      };
+    });
+
+    // Update pending uploads once with all files
+    setPendingFileUploads(newPendingUploads);
+
+    // Insert slides at correct position (after insertAfterIndex)
+    const updatedSlides = [...localSlides];
+    updatedSlides.splice(insertAfterIndex + 1, 0, ...newSlides);
+
+    // Reorder all slides to have sequential orderIndex
+    const reorderedSlides = updatedSlides.map((slide, index) => ({
+      ...slide,
+      orderIndex: index,
+    }));
+
+    setLocalSlides(reorderedSlides);
+    setHasUnsavedChanges(true);
+
+    // Navigate to the first newly created slide
+    const firstNewSlideIndex = reorderedSlides.findIndex(
+      (s) => s.id === newSlides[0].id
+    );
+    if (firstNewSlideIndex !== -1) {
+      setCurrentSlideIndex(firstNewSlideIndex);
+    }
+
+    setHoveredSlideIndex(null);
+    setSlideRefreshKey((prev) => prev + 1);
+  };
+
+  // Handle inserting a YouTube video slide at a specific position
+  const handleInsertYouTubeVideo = (
+    videoUrl: string,
+    insertAfterIndex: number
+  ) => {
+    if (!topic) return;
+
     // Generate temporary ID for new slide
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Create new slide in local state
+    // Create new video slide
     const newSlide: ExtendedSlideData = {
       id: tempId,
-      kind: "image",
+      kind: "video" as const,
       orderIndex: insertAfterIndex + 1, // Will be reordered below
       textHtml: null,
       imageUrl: null,
-      videoUrl: null,
+      videoUrl: videoUrl,
       videoStartS: null,
       videoEndS: null,
       effectiveNotes: null,
@@ -1058,6 +1169,7 @@ export function TopicDetailSection({
     }
 
     setHoveredSlideIndex(null);
+    setSlideRefreshKey((prev) => prev + 1);
   };
 
   // Handle deleting the current slide (local state only)
@@ -1135,9 +1247,32 @@ export function TopicDetailSection({
     return { isValid: true };
   };
 
+  // Change type for the changes dialog
+  type ChangeItem =
+    | {
+        type: "delete";
+        message: string;
+        slideNumber: number;
+        slide: ExtendedSlideData;
+      }
+    | {
+        type: "new";
+        message: string;
+        slide: ExtendedSlideData;
+        slideNumber: number;
+      }
+    | {
+        type: "replace";
+        message: string;
+        slideNumber: number;
+        slide: ExtendedSlideData;
+        oldSlide: ExtendedSlideData;
+      }
+    | { type: "reorder"; message: string };
+
   // Calculate differences between original and current slides
-  const calculateChanges = (): string[] => {
-    const changes: string[] = [];
+  const calculateChanges = (): ChangeItem[] => {
+    const changes: ChangeItem[] = [];
 
     // Get original slides sorted by orderIndex
     const originalSorted = [...originalSlides].sort(
@@ -1159,78 +1294,60 @@ export function TopicDetailSection({
         (s) => s.id === deletedSlide.id
       );
       if (originalIdx >= 0) {
-        changes.push(`Slide ${originalIdx + 1} deleted`);
+        changes.push({
+          type: "delete",
+          message: `Slide ${originalIdx + 1} deleted`,
+          slideNumber: originalIdx + 1,
+          slide: deletedSlide as ExtendedSlideData,
+        });
+      }
+    }
+
+    // Find replaced images (existing slides with changed imageUrl)
+    const existingSlides = currentSorted.filter(
+      (s) => !s.id.startsWith("temp_")
+    );
+    for (const currentSlide of existingSlides) {
+      const originalSlide = originalSlides.find(
+        (s) => s.id === currentSlide.id
+      );
+      if (originalSlide) {
+        // Check if image was replaced
+        const imageReplaced =
+          originalSlide.imageUrl !== currentSlide.imageUrl &&
+          (originalSlide.imageUrl || currentSlide.imageUrl);
+        if (imageReplaced) {
+          const slideIndex = currentSorted.findIndex(
+            (s) => s.id === currentSlide.id
+          );
+          const slideNumber = slideIndex + 1;
+          changes.push({
+            type: "replace",
+            message: `Slide ${slideNumber} image replaced`,
+            slideNumber: slideNumber,
+            slide: currentSlide as ExtendedSlideData,
+            oldSlide: originalSlide as ExtendedSlideData,
+          });
+        }
       }
     }
 
     // Find new slides (temp IDs) and determine their insertion points
     const newSlides = currentSorted.filter((s) => s.id.startsWith("temp_"));
 
-    // Build a map of final positions for existing slides (non-temp)
-    const existingSlidesInFinalOrder = currentSorted.filter(
-      (s) => !s.id.startsWith("temp_")
-    );
-
     for (const newSlide of newSlides) {
       const newSlideIndex = currentSorted.findIndex(
         (s) => s.id === newSlide.id
       );
+      // Final slide number (1-indexed) in the final order
+      const finalSlideNumber = newSlideIndex + 1;
 
-      // Find the existing slide before this new slide
-      const beforeExisting = existingSlidesInFinalOrder
-        .filter((s) => {
-          const idx = currentSorted.findIndex((slide) => slide.id === s.id);
-          return idx < newSlideIndex;
-        })
-        .pop();
-
-      // Find the existing slide after this new slide
-      const afterExisting = existingSlidesInFinalOrder.find((s) => {
-        const idx = currentSorted.findIndex((slide) => slide.id === s.id);
-        return idx > newSlideIndex;
+      changes.push({
+        type: "new",
+        message: `Added slide ${finalSlideNumber}`,
+        slide: newSlide,
+        slideNumber: finalSlideNumber,
       });
-
-      if (beforeExisting && afterExisting) {
-        // Find the original positions of these slides
-        const beforeOriginalIdx = originalSorted.findIndex(
-          (s) => s.id === beforeExisting.id
-        );
-        const afterOriginalIdx = originalSorted.findIndex(
-          (s) => s.id === afterExisting.id
-        );
-
-        if (beforeOriginalIdx >= 0 && afterOriginalIdx >= 0) {
-          changes.push(
-            `New slide inserted between slide ${beforeOriginalIdx + 1} and slide ${afterOriginalIdx + 1}`
-          );
-        } else {
-          changes.push("New slide inserted");
-        }
-      } else if (beforeExisting) {
-        const beforeOriginalIdx = originalSorted.findIndex(
-          (s) => s.id === beforeExisting.id
-        );
-        if (beforeOriginalIdx >= 0) {
-          changes.push(
-            `New slide inserted after slide ${beforeOriginalIdx + 1}`
-          );
-        } else {
-          changes.push("New slide inserted at the end");
-        }
-      } else if (afterExisting) {
-        const afterOriginalIdx = originalSorted.findIndex(
-          (s) => s.id === afterExisting.id
-        );
-        if (afterOriginalIdx >= 0) {
-          changes.push(
-            `New slide inserted before slide ${afterOriginalIdx + 1}`
-          );
-        } else {
-          changes.push("New slide inserted at the beginning");
-        }
-      } else {
-        changes.push("New slide inserted");
-      }
     }
 
     // Check for reordering (only if no new slides and no deletions)
@@ -1248,7 +1365,7 @@ export function TopicDetailSection({
         originalExistingIds.some((id, idx) => currentExistingIds[idx] !== id);
 
       if (orderChanged) {
-        changes.push("Slides reordered");
+        changes.push({ type: "reorder", message: "Slides reordered" });
       }
     }
 
@@ -1262,6 +1379,8 @@ export function TopicDetailSection({
 
     setIsSaving(true);
     setUploadError(null);
+    setSaveProgress(0);
+    setSaveStatus("Uploading new slides");
 
     try {
       // Extract stage code/number for file paths
@@ -1290,9 +1409,48 @@ export function TopicDetailSection({
       const activeSlides = localSlides.filter(
         (s) => !deletedSlideIds.has(s.id)
       );
-      const sortedSlides = [...activeSlides].sort(
+
+      // Filter out empty slides (slides without images, videos, quiz data, or text)
+      // Also automatically mark empty existing slides for deletion
+      const validSlides: typeof activeSlides = [];
+      const newDeletedIds = new Set(deletedSlideIds);
+
+      for (const slide of activeSlides) {
+        const extendedSlide = slide as ExtendedSlideData;
+        const hasImageUrl = !!slide.imageUrl;
+        const hasVideoUrl = !!slide.videoUrl;
+        const hasQuizData =
+          isCertification &&
+          extendedSlide.kind === "quiz" &&
+          extendedSlide.quizData;
+        const hasTextHtml =
+          !isCertification && slide.kind === "text" && slide.textHtml;
+        const hasPendingUpload = pendingFileUploads.has(slide.id);
+
+        // Keep slide if it has any content or a pending upload
+        if (
+          hasImageUrl ||
+          hasVideoUrl ||
+          hasQuizData ||
+          hasTextHtml ||
+          hasPendingUpload
+        ) {
+          validSlides.push(slide);
+        } else {
+          // Empty slide - mark for deletion if it's an existing slide (not a temp slide)
+          if (!slide.id.startsWith("temp_")) {
+            newDeletedIds.add(slide.id);
+          }
+          // Temp slides without content are simply not included (they won't be created)
+        }
+      }
+
+      const sortedSlides = [...validSlides].sort(
         (a, b) => a.orderIndex - b.orderIndex
       );
+
+      // Use the updated deleted IDs set (includes empty slides marked for deletion)
+      const finalDeletedIds = Array.from(newDeletedIds);
 
       // Separate slides into creates and updates
       const creates: any[] = [];
@@ -1356,7 +1514,7 @@ export function TopicDetailSection({
           topicId: topic.id,
           creates,
           updates,
-          deletes: Array.from(deletedSlideIds),
+          deletes: finalDeletedIds,
           reorder: slideIds,
         })
       );
@@ -1375,14 +1533,29 @@ export function TopicDetailSection({
         }
       }
 
+      // Update progress: files prepared
+      setSaveProgress(30);
+
       // Step 3: Call bulk save API with FormData
       const result = isCertification
         ? await certificationApi.topics.slides.bulkSave(topic.id, formData)
         : await topicsApi.slides.bulkSave(formData);
 
+      // Update progress: upload complete, encrypting URLs
+      setSaveProgress(60);
+      setSaveStatus("Encrypting URLs");
+
+      // Small delay to show the status change
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       if (result.error) {
         throw new Error(result.error.message || "Failed to save changes");
       }
+
+      // Update progress: processing response
+      setSaveProgress(80);
+      setSaveStatus("Optimising sort index");
+      await new Promise((resolve) => setTimeout(resolve, 200));
 
       // Step 4: Update local state with server response
       let updatedSlides: ExtendedSlideData[] = [];
@@ -1418,9 +1591,12 @@ export function TopicDetailSection({
         if (responseTopic?.slides && responseTopic.slides.length > 0) {
           // Create a map of slide IDs that had pending uploads
           const slidesWithUploads = new Set(pendingFileUploads.keys());
+          // Create a set of deleted slide IDs for filtering
+          const deletedIdsSet = new Set(deletedSlideIds);
 
           updatedSlides =
             responseTopic.slides
+              ?.filter((slide: any) => !deletedIdsSet.has(slide.id)) // Filter out any deleted slides that might still be in response
               ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
               .map((slide: any) => {
                 // If this slide had a pending upload, ensure we use the server's imageUrl
@@ -1474,6 +1650,7 @@ export function TopicDetailSection({
           } else if (responseTopic) {
             // No slides in response but no uploads - set empty array
             setLocalSlides([]);
+            setOriginalSlides([]);
           }
         }
 
@@ -1503,10 +1680,12 @@ export function TopicDetailSection({
           }
         }
 
-        // Clear pending changes
+        // Clear pending changes and update original slides to match saved state
         setPendingFileUploads(new Map());
         setDeletedSlideIds(new Set());
         setHasUnsavedChanges(false);
+        // Update originalSlides to match the saved state so future change calculations are correct
+        setOriginalSlides(JSON.parse(JSON.stringify(updatedSlides)));
         setSlideRefreshKey((prev) => prev + 1);
 
         // Invalidate all slide caches for slides that were updated/created
@@ -1531,10 +1710,19 @@ export function TopicDetailSection({
           }
         });
 
+        // Update progress: finalizing changes
+        setSaveProgress(95);
+        setSaveStatus("Finalising changes");
+        await new Promise((resolve) => setTimeout(resolve, 200));
+
         // Completely refetch topic data the same way as initial page load
         // This will repopulate the cache store and ensure we have the latest data
         // Skip loading state since we're already in a save operation
         await fetchTopicData(true);
+
+        // Complete progress
+        setSaveProgress(100);
+        await new Promise((resolve) => setTimeout(resolve, 300));
 
         // Show success feedback on button
         setShowSaveSuccess(true);
@@ -1558,7 +1746,12 @@ export function TopicDetailSection({
     } finally {
       setIsSaving(false);
       setPendingSave(false);
-      setShowChangesDialog(false);
+      // Reset progress after a short delay to allow user to see completion
+      setTimeout(() => {
+        setSaveProgress(0);
+        setSaveStatus("");
+        setShowSaveProgressDialog(false);
+      }, 500);
     }
   };
 
@@ -1589,16 +1782,90 @@ export function TopicDetailSection({
 
   // Handle confirmation of changes
   const handleConfirmChanges = () => {
+    // Close the changes dialog and open the progress dialog
     setShowChangesDialog(false);
+    setShowSaveProgressDialog(true);
+    // Start the save process
     performSave();
   };
 
+  // Show skeleton loaders while loading
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading topic...</p>
+      <div className="space-y-6">
+        {/* Topic Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center justify-start gap-8">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-6 rounded" />
+              <Skeleton className="h-9 w-64" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-6 w-20 rounded-full" />
+              <Skeleton className="h-6 w-24 rounded-full" />
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+        </div>
+
+        {/* Slides Section Skeleton */}
+        <div className="space-y-8">
+          {/* First Row: Current Slide Preview + Slide Info */}
+          <div className="grid grid-cols-5 gap-6">
+            {/* Current Slide Preview Skeleton - 3/5 width */}
+            <div className="col-span-3 relative aspect-video">
+              <Card className="h-full">
+                <CardContent className="p-0 h-full">
+                  <Skeleton className="w-full h-full rounded-lg" />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Slide Info Panel Skeleton - 2/5 width */}
+            <div className="col-span-2 h-full">
+              <Card className="p-6 h-full">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <Skeleton className="h-4 w-24" />
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-8 w-32" />
+                      <Skeleton className="h-8 w-8 rounded" />
+                    </div>
+                  </div>
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-32 w-full" />
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Slide Gallery Skeleton */}
+          <Card className="relative overflow-visible p-0 border-none shadow-none">
+            <CardContent className="relative space-y-4 overflow-visible p-0 border-none">
+              {/* Navigation Controls Skeleton */}
+              <div className="flex items-center justify-center gap-2">
+                <Skeleton className="h-9 w-24" />
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-9 w-20" />
+              </div>
+
+              {/* Slide Gallery Skeleton */}
+              <div className="flex gap-4 overflow-x-auto py-3 px-4">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton
+                    key={i}
+                    className="h-[101px] w-[180px] flex-shrink-0 rounded-lg"
+                    style={{ aspectRatio: "16 / 9" }}
+                  />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -1692,7 +1959,6 @@ export function TopicDetailSection({
           </div>
         </div>
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline">Preview</Button>
           <Button
             variant={
               showSaveSuccess
@@ -1706,7 +1972,9 @@ export function TopicDetailSection({
             className={
               showSaveSuccess
                 ? "bg-green-500 hover:bg-green-600 text-white"
-                : ""
+                : hasUnsavedChanges
+                  ? "bg-blue-500 hover:bg-blue-600 text-white"
+                  : ""
             }
           >
             {isSaving ? (
@@ -1720,7 +1988,10 @@ export function TopicDetailSection({
                 Saved!
               </>
             ) : (
-              "Save Changes"
+              <>
+                <Save className="h-4 w-4" />
+                Save Changes
+              </>
             )}
           </Button>
         </div>
@@ -1762,7 +2033,7 @@ export function TopicDetailSection({
             {/* Current Slide Preview - 3/5 width */}
             <div className="col-span-3 relative aspect-video">
               {/* Background card - inset by 1px */}
-              <Card 
+              <Card
                 className="absolute inset-[1px] overflow-hidden border-none shadow-none p-0 pointer-events-none"
                 style={{
                   backgroundImage: `repeating-linear-gradient(
@@ -1775,71 +2046,69 @@ export function TopicDetailSection({
                 }}
               >
                 <div className="relative w-full h-full p-[2px]">
-                  <div 
-                    className="relative w-full h-full border-2 border-dashed border-muted-foreground/30 rounded-sm"
-                  />
+                  <div className="relative w-full h-full border-2 border-dashed border-muted-foreground/30 rounded-sm" />
                 </div>
               </Card>
               {/* Content - fills outer container */}
               <div className="relative w-full h-full">
                 {currentSlide.kind === "quiz" ? (
-                    <>
-                      {/* Bullyproof Logo - Top Center */}
-                      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
-                        <Image
-                          src="/images/bullyproof-logo.svg"
-                          alt="Bullyproof"
-                          width={168}
-                          height={45}
-                          className="h-11 w-auto"
-                        />
+                  <>
+                    {/* Bullyproof Logo - Top Center */}
+                    <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10">
+                      <Image
+                        src="/images/bullyproof-logo.svg"
+                        alt="Bullyproof"
+                        width={168}
+                        height={45}
+                        className="h-11 w-auto"
+                      />
+                    </div>
+                    <div className="flex flex-col h-full justify-center space-y-4 pt-4">
+                      {/* Question - Centered and Bold */}
+                      <div className="text-center">
+                        <h2 className="text-2xl font-bold">
+                          {(currentSlide as ExtendedSlideData).quizData
+                            ?.question || "Question"}
+                        </h2>
                       </div>
-                      <div className="flex flex-col h-full justify-center space-y-4 pt-4">
-                        {/* Question - Centered and Bold */}
-                        <div className="text-center">
-                          <h2 className="text-2xl font-bold">
-                            {(currentSlide as ExtendedSlideData).quizData
-                              ?.question || "Question"}
-                          </h2>
-                        </div>
-                        {/* Answers - Single Column Grid with Radio Buttons */}
-                        <div className="flex justify-center">
-                          <RadioGroup
-                            className="w-full max-w-md space-y-0"
-                            disabled
-                          >
-                            {(
-                              currentSlide as ExtendedSlideData
-                            ).quizData?.answers.map(
-                              (answer: any, index: number) => (
-                                <div
-                                  key={answer.id || index}
-                                  className="flex items-center space-x-3 p-3 border rounded-md bg-card"
+                      {/* Answers - Single Column Grid with Radio Buttons */}
+                      <div className="flex justify-center">
+                        <RadioGroup
+                          className="w-full max-w-md space-y-0"
+                          disabled
+                        >
+                          {(
+                            currentSlide as ExtendedSlideData
+                          ).quizData?.answers.map(
+                            (answer: any, index: number) => (
+                              <div
+                                key={answer.id || index}
+                                className="flex items-center space-x-3 p-3 border rounded-md bg-card"
+                              >
+                                <RadioGroupItem
+                                  value={answer.id || `answer-${index}`}
+                                  id={answer.id || `answer-${index}`}
+                                />
+                                <Label
+                                  htmlFor={answer.id || `answer-${index}`}
+                                  className="flex-1 cursor-pointer"
                                 >
-                                  <RadioGroupItem
-                                    value={answer.id || `answer-${index}`}
-                                    id={answer.id || `answer-${index}`}
-                                  />
-                                  <Label
-                                    htmlFor={answer.id || `answer-${index}`}
-                                    className="flex-1 cursor-pointer"
-                                  >
-                                    {answer.text || `Answer ${index + 1}`}
-                                  </Label>
-                                </div>
-                              )
-                            ) || []}
-                          </RadioGroup>
-                        </div>
+                                  {answer.text || `Answer ${index + 1}`}
+                                </Label>
+                              </div>
+                            )
+                          ) || []}
+                        </RadioGroup>
                       </div>
-                    </>
-                  ) : (
-                    <SlideRenderer
-                      key={`${currentSlide.id}-${slideRefreshKey}`}
-                      slide={currentSlide}
-                      className="w-full h-full"
-                      isCertification={isCertification}
-                    />
+                    </div>
+                  </>
+                ) : (
+                  <SlideRenderer
+                    key={`${currentSlide.id}-${slideRefreshKey}`}
+                    slide={currentSlide}
+                    className="w-full h-full"
+                    isCertification={isCertification}
+                  />
                 )}
               </div>
             </div>
@@ -2131,8 +2400,12 @@ export function TopicDetailSection({
                   const showInsertAfter = insertAfterIndex === index;
 
                   // Show add button on the right side after 1 second of hovering
+                  // Always show for the last slide, otherwise show on hover
+                  const isLastSlide = index === slides.length - 1;
                   const showAddButtonForSlide =
-                    showAddButton === index && !draggedSlideId && !isReordering;
+                    (isLastSlide || showAddButton === index) &&
+                    !draggedSlideId &&
+                    !isReordering;
 
                   return (
                     <div key={slide.id} className="flex items-center relative">
@@ -2218,33 +2491,41 @@ export function TopicDetailSection({
                         onMouseEnter={() => {
                           if (!draggedSlideId && !isReordering) {
                             setHoveredSlideIndex(index);
-                            // Clear any existing timeout
-                            if (hoverTimeoutRef.current) {
-                              clearTimeout(hoverTimeoutRef.current);
+                            // Don't show add button on hover for the last slide (it's always visible)
+                            const isLastSlide = index === slides.length - 1;
+                            if (!isLastSlide) {
+                              // Clear any existing timeout
+                              if (hoverTimeoutRef.current) {
+                                clearTimeout(hoverTimeoutRef.current);
+                              }
+                              // Set timeout to show button after 300ms
+                              hoverTimeoutRef.current = setTimeout(() => {
+                                setShowAddButton(index);
+                              }, 300);
                             }
-                            // Set timeout to show button after 300ms
-                            hoverTimeoutRef.current = setTimeout(() => {
-                              setShowAddButton(index);
-                            }, 300);
                           }
                         }}
                         onMouseLeave={() => {
                           setHoveredSlideIndex(null);
-                          // Clear timeout if mouse leaves before 300ms
-                          if (hoverTimeoutRef.current) {
-                            clearTimeout(hoverTimeoutRef.current);
-                            hoverTimeoutRef.current = null;
+                          // Don't hide add button for the last slide (it's always visible)
+                          const isLastSlide = index === slides.length - 1;
+                          if (!isLastSlide) {
+                            // Clear timeout if mouse leaves before 300ms
+                            if (hoverTimeoutRef.current) {
+                              clearTimeout(hoverTimeoutRef.current);
+                              hoverTimeoutRef.current = null;
+                            }
+                            // Hide button after a short delay to allow moving to button
+                            if (hideButtonTimeoutRef.current) {
+                              clearTimeout(hideButtonTimeoutRef.current);
+                            }
+                            hideButtonTimeoutRef.current = setTimeout(() => {
+                              setShowAddButton((current) => {
+                                // Only hide if we're not hovering over the button itself
+                                return current === index ? null : current;
+                              });
+                            }, 200);
                           }
-                          // Hide button after a short delay to allow moving to button
-                          if (hideButtonTimeoutRef.current) {
-                            clearTimeout(hideButtonTimeoutRef.current);
-                          }
-                          hideButtonTimeoutRef.current = setTimeout(() => {
-                            setShowAddButton((current) => {
-                              // Only hide if we're not hovering over the button itself
-                              return current === index ? null : current;
-                            });
-                          }, 200);
                         }}
                         className={`
                           flex-shrink-0 relative group transition-all rounded-lg overflow-hidden shadow-lg bg-background
@@ -2311,13 +2592,17 @@ export function TopicDetailSection({
                           setShowAddButton(index);
                         }}
                         onMouseLeave={() => {
-                          // Hide button after a short delay
-                          if (hideButtonTimeoutRef.current) {
-                            clearTimeout(hideButtonTimeoutRef.current);
+                          // Don't hide add button for the last slide (it's always visible)
+                          const isLastSlide = index === slides.length - 1;
+                          if (!isLastSlide) {
+                            // Hide button after a short delay
+                            if (hideButtonTimeoutRef.current) {
+                              clearTimeout(hideButtonTimeoutRef.current);
+                            }
+                            hideButtonTimeoutRef.current = setTimeout(() => {
+                              setShowAddButton(null);
+                            }, 200);
                           }
-                          hideButtonTimeoutRef.current = setTimeout(() => {
-                            setShowAddButton(null);
-                          }, 200);
                         }}
                       >
                         {showAddButtonForSlide && (
@@ -2498,53 +2783,96 @@ export function TopicDetailSection({
       </Dialog>
 
       {/* Changes Summary Dialog */}
-      <Dialog open={showChangesDialog} onOpenChange={setShowChangesDialog}>
-        <DialogContent>
+      <ConfirmChangesDialog
+        open={showChangesDialog}
+        onOpenChange={setShowChangesDialog}
+        changes={calculateChanges()}
+        onConfirm={handleConfirmChanges}
+        onCancel={() => {
+          setShowChangesDialog(false);
+          setPendingSave(false);
+        }}
+        isSaving={isSaving}
+        isCertification={isCertification}
+      />
+
+      {/* Save Progress Dialog */}
+      <Dialog
+        open={showSaveProgressDialog}
+        onOpenChange={(open) => {
+          // Prevent closing dialog while saving
+          if (!isSaving) {
+            setShowSaveProgressDialog(open);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm Changes</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Save className="h-5 w-5" />
+              Saving Changes
+            </DialogTitle>
             <DialogDescription>
-              The following changes will be saved:
+              Please wait while your changes are being saved...
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <ul className="space-y-2 list-disc list-inside text-sm">
-              {calculateChanges().map((change, index) => (
-                <li key={index} className="text-muted-foreground">
-                  {change}
-                </li>
-              ))}
-            </ul>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground font-medium">
+                  {saveStatus || "Saving..."}
+                </span>
+                <span className="text-muted-foreground">
+                  <CountUp
+                    end={saveProgress}
+                    duration={2}
+                    decimals={0}
+                    preserveValue={true}
+                  />
+                  %
+                </span>
+              </div>
+              <Progress
+                value={saveProgress}
+                className="h-2"
+                indicatorStyle={{
+                  transition: "transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}
+              />
+            </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowChangesDialog(false);
-                setPendingSave(false);
-              }}
-              disabled={isSaving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleConfirmChanges} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "OK"
-              )}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Image Selector Dialog */}
       <ImageSelectorDialog
         open={showImageSelectorDialog}
-        onOpenChange={setShowImageSelectorDialog}
+        onOpenChange={(open) => {
+          setShowImageSelectorDialog(open);
+          if (!open) {
+            setInsertAfterIndexForDialog(null);
+          }
+        }}
         onSelectImage={handleImageSelect}
+        onSelectMultipleImages={
+          insertAfterIndexForDialog !== null
+            ? (images) => {
+                handleInsertMultipleSlides(images, insertAfterIndexForDialog);
+                setShowImageSelectorDialog(false);
+                setInsertAfterIndexForDialog(null);
+              }
+            : undefined
+        }
+        onAddYouTubeVideo={
+          insertAfterIndexForDialog !== null
+            ? (videoUrl) => {
+                handleInsertYouTubeVideo(videoUrl, insertAfterIndexForDialog);
+                setShowImageSelectorDialog(false);
+                setInsertAfterIndexForDialog(null);
+              }
+            : undefined
+        }
+        allowMultipleSelection={insertAfterIndexForDialog !== null}
       />
     </div>
   );
