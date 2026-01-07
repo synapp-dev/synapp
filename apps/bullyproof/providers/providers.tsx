@@ -21,7 +21,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           enableColorScheme
         >
           <LiveLessonPrompt />
-          <Toaster position="bottom-right" />
+          <Toaster position="top-center" />
           {children}
         </NextThemesProvider>
       </TooltipProvider>

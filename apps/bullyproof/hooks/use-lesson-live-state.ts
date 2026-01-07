@@ -59,9 +59,22 @@ export function useLessonLiveState(
           throw new Error(result.error.message || "Failed to fetch lesson data");
         }
 
+        if (!result.data) {
+          throw new Error("No data returned from API");
+        }
+
         const { liveState: apiLiveState, slides: fetchedSlides } = result.data;
 
         if (!mounted) return;
+
+        // Ensure slides is an array
+        if (!Array.isArray(fetchedSlides)) {
+          console.warn("Expected slides to be an array, got:", fetchedSlides);
+          setSlides([]);
+          setCurrentSlideIndex(0);
+          setIsLoading(false);
+          return;
+        }
 
         // Convert slides to SlideData format and ensure they're sorted by orderIndex
         const formattedSlides: SlideData[] = fetchedSlides
@@ -82,13 +95,19 @@ export function useLessonLiveState(
 
         // Also query the database directly via Supabase to get the absolute latest state
         // This ensures we have the most up-to-date slide index on initial load
+        // Use maybeSingle() instead of single() to handle case where no row exists
         const { data: latestLiveState, error: dbError } = await supabase
           .from("lesson_live_state")
           .select("*")
           .eq("lesson_id", actualLessonId)
-          .single();
+          .maybeSingle();
 
         if (!mounted) return;
+
+        // Log database errors but don't fail - we can fallback to API state
+        if (dbError && dbError.code !== 'PGRST116') {
+          console.warn("Error fetching latest live state from database:", dbError);
+        }
 
         // Use the latest state from database (most recent), fallback to API state
         const liveState = latestLiveState || apiLiveState;
