@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { topicsApi } from "@/entities/topics/api/endpoints";
+import { useTopicsStore } from "@/entities/topics/model/store-enhanced";
 
 interface SlideUrlCache {
   url: string;
@@ -43,6 +44,27 @@ export const useTopicSlidesCacheStore = create<TopicSlidesCacheState>(
       const state = get();
       const cached = state.cache[slideId];
       const now = Date.now();
+
+      // First check the new topics store for cached URLs (from API responses with includeUrls)
+      if (!forceRefresh) {
+        const topicsStoreState = useTopicsStore.getState();
+        const newStoreCached = topicsStoreState.slideUrls[slideId];
+        if (newStoreCached && now - newStoreCached.timestamp < CACHE_EXPIRY_MS) {
+          // Also cache it in this store for consistency
+          if (!cached || cached.url !== newStoreCached.url) {
+            set((s) => ({
+              cache: {
+                ...s.cache,
+                [slideId]: {
+                  url: newStoreCached.url,
+                  timestamp: newStoreCached.timestamp,
+                },
+              },
+            }));
+          }
+          return newStoreCached.url;
+        }
+      }
 
       // Return cached URL if it exists and is still valid (and not forcing refresh)
       if (!forceRefresh && cached && now - cached.timestamp < CACHE_EXPIRY_MS) {
