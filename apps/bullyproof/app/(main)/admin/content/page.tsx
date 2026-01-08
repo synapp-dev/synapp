@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,63 +12,25 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { GraduationCap, BookOpenText, Loader2 } from "lucide-react";
-import { certificationApi } from "@/entities/certification/api/endpoints";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
-import type { certificationStages } from "@/server/db/schema";
-import type { curriculumStages } from "@/server/db/schema";
-
-type CertificationStage = typeof certificationStages.$inferSelect;
-type CurriculumStage = typeof curriculumStages.$inferSelect;
+import { useStages } from "@/entities/stages/model/store";
+import { useCertificationStages } from "@/entities/certification/model/store";
 
 export default function AdminContentPage() {
   const router = useRouter();
-  const [certificationStages, setCertificationStages] = useState<
-    CertificationStage[]
-  >([]);
-  const [curriculumStages, setCurriculumStages] = useState<CurriculumStage[]>(
-    []
-  );
-  const [isLoadingCertification, setIsLoadingCertification] = useState(true);
-  const [isLoadingCurriculum, setIsLoadingCurriculum] = useState(true);
+  
+  // Use cached React Query hooks instead of manual fetching
+  const { stages: curriculumStages, isLoading: isLoadingCurriculum, refetch: refetchCurriculum } = useStages();
+  const { stages: certificationStages, isLoading: isLoadingCertification, refetch: refetchCertification } = useCertificationStages();
 
+  // Trigger background refetch on mount to ensure complete data
+  // This ensures that even if we navigated from a page that only cached
+  // partial data, we'll fetch all stages in the background while showing cached data
   useEffect(() => {
-    const fetchCertificationStages = async () => {
-      try {
-        const result = await certificationApi.stages.list();
-        if (result.data) {
-          // Sort by sortIndex to ensure correct order
-          const sorted = [...result.data].sort(
-            (a, b) => a.sortIndex - b.sortIndex
-          );
-          setCertificationStages(sorted);
-        }
-      } catch (err) {
-        console.error("Failed to fetch certification stages:", err);
-      } finally {
-        setIsLoadingCertification(false);
-      }
-    };
-
-    const fetchCurriculumStages = async () => {
-      try {
-        const result = await curriculumApi.stages.list();
-        if (result.data) {
-          // Sort by sortIndex to ensure correct order
-          const sorted = [...result.data].sort(
-            (a, b) => a.sortIndex - b.sortIndex
-          );
-          setCurriculumStages(sorted);
-        }
-      } catch (err) {
-        console.error("Failed to fetch curriculum stages:", err);
-      } finally {
-        setIsLoadingCurriculum(false);
-      }
-    };
-
-    fetchCertificationStages();
-    fetchCurriculumStages();
-  }, []);
+    // Refetch in the background without blocking the UI
+    // The cached data will display immediately, and the UI will update when fresh data arrives
+    refetchCurriculum();
+    refetchCertification();
+  }, [refetchCurriculum, refetchCertification]);
 
   return (
     <div className="space-y-6">
@@ -101,7 +63,7 @@ export default function AdminContentPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              {isLoadingCertification ? (
+              {isLoadingCertification && certificationStages.length === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading stages...</span>
@@ -151,7 +113,7 @@ export default function AdminContentPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              {isLoadingCurriculum ? (
+              {isLoadingCurriculum && curriculumStages.length === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Loading stages...</span>
