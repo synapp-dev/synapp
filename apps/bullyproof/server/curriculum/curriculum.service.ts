@@ -64,6 +64,11 @@ export const curriculumService = {
     const params: GetYearsParams = getYearsSchema.parse(query);
     await assertCanViewCurriculum(ctx);
 
+    // Support both single levelId (for backward compatibility) and multiple levelIds
+    if (params.levelIds && params.levelIds.length > 0) {
+      return await curriculumRepo.getYears(params.levelIds);
+    }
+
     if (params.levelId) {
       return await curriculumRepo.getYearsByLevel(params.levelId);
     }

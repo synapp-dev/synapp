@@ -19,6 +19,9 @@ import {
 import { topicsRepo } from "./topics.repo";
 import { getUserScopedRoles } from "../auth/rbac";
 import { createServerClient } from "@/utils/supabase/server";
+import { db } from "@/server/db/drizzle";
+import { curriculumStages } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -81,6 +84,106 @@ export const topicsService = {
     }
 
     if (params.stageId) {
+      // If includeSlides is true, fetch topics with slides
+      if ((params as any).includeSlides) {
+        const topicsWithSlides = await topicsRepo.getByStageIdWithSlides(
+          params.stageId
+        );
+
+        // If includeUrls is true, generate signed URLs for image slides
+        if ((params as any).includeUrls) {
+          const supabase = await createServerClient();
+          const topicsWithUrls = await Promise.all(
+            topicsWithSlides.map(async (topic) => {
+              if (!topic.slides || topic.slides.length === 0) {
+                return topic;
+              }
+
+              // Get stage info for URL generation
+              const stageData = await db
+                .select()
+                .from(curriculumStages)
+                .where(eq(curriculumStages.id, topic.stageId))
+                .limit(1);
+
+              if (stageData.length === 0) {
+                return topic;
+              }
+
+              const stage = stageData[0];
+              const stageNumberMatch = stage.code.match(/^S(\d+)$/);
+              if (!stageNumberMatch) {
+                return topic;
+              }
+              const stageNumber = parseInt(stageNumberMatch[1], 10);
+              const topicNumber = topic.stageOrder;
+
+              if (topicNumber === null || topicNumber === undefined) {
+                return topic;
+              }
+
+              // Generate signed URLs for image slides
+              const slidesWithUrls = await Promise.all(
+                topic.slides.map(async (slide) => {
+                  if (slide.kind !== "image" || !slide.imageUrl) {
+                    return slide;
+                  }
+
+                  // Extract file extension
+                  let fileExtension = "jpg";
+                  if (slide.imageUrl) {
+                    const urlMatch = slide.imageUrl.match(
+                      /\.([a-zA-Z0-9]+)(?:\?|$)/
+                    );
+                    if (urlMatch) {
+                      fileExtension = urlMatch[1];
+                    }
+                  }
+
+                  // Construct file path
+                  const fileName = `${slide.id}.${fileExtension}`;
+                  const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+
+                  // Check if file exists
+                  const { data: fileList } = await supabase.storage
+                    .from("content")
+                    .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
+
+                  const fileExists =
+                    fileList &&
+                    fileList.some((file) => file.name === fileName);
+
+                  if (!fileExists) {
+                    return { ...slide, signedUrl: null };
+                  }
+
+                  // Generate signed URL with 1-week expiry
+                  const { data, error } = await supabase.storage
+                    .from("content")
+                    .createSignedUrl(filePath, 604800);
+
+                  if (error) {
+                    console.warn(
+                      `Failed to generate signed URL for slide ${slide.id}:`,
+                      error.message
+                    );
+                    return { ...slide, signedUrl: null };
+                  }
+
+                  return { ...slide, signedUrl: data.signedUrl };
+                })
+              );
+
+              return { ...topic, slides: slidesWithUrls };
+            })
+          );
+
+          return topicsWithUrls;
+        }
+
+        return topicsWithSlides;
+      }
+
       return await topicsRepo.getByStageId(params.stageId);
     }
 
@@ -92,10 +195,84 @@ export const topicsService = {
   },
 
   async getTopicById(ctx: AuthContext, params: unknown) {
-    const { id } = getTopicByIdSchema.parse(params);
+    const parsed = getTopicByIdSchema.parse(params);
+    const { id, includeSlides, includeUrls } = parsed as any;
     await assertCanViewTopics(ctx);
 
-    return await topicsRepo.getWithDetails(id);
+    // getWithDetails already includes slides, so we always use it if includeSlides is true or not specified
+    const topicData = await topicsRepo.getWithDetails(id);
+    if (!topicData) return null;
+
+    // If includeUrls is true, generate signed URLs for image slides
+    if (includeUrls && topicData.slides && topicData.slides.length > 0) {
+      const supabase = await createServerClient();
+      const stage = topicData.stage;
+      
+      if (!stage) return topicData;
+
+      const stageNumberMatch = stage.code.match(/^S(\d+)$/);
+      if (!stageNumberMatch) return topicData;
+      
+      const stageNumber = parseInt(stageNumberMatch[1], 10);
+      const topicNumber = topicData.stageOrder;
+
+      if (topicNumber === null || topicNumber === undefined) {
+        return topicData;
+      }
+
+      // Generate signed URLs for image slides
+      const slidesWithUrls = await Promise.all(
+        topicData.slides.map(async (slide) => {
+          if (slide.kind !== "image" || !slide.imageUrl) {
+            return slide;
+          }
+
+          // Extract file extension
+          let fileExtension = "jpg";
+          if (slide.imageUrl) {
+            const urlMatch = slide.imageUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+            if (urlMatch) {
+              fileExtension = urlMatch[1];
+            }
+          }
+
+          // Construct file path
+          const fileName = `${slide.id}.${fileExtension}`;
+          const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+
+          // Check if file exists
+          const { data: fileList } = await supabase.storage
+            .from("content")
+            .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
+
+          const fileExists =
+            fileList && fileList.some((file) => file.name === fileName);
+
+          if (!fileExists) {
+            return { ...slide, signedUrl: null };
+          }
+
+          // Generate signed URL with 1-week expiry
+          const { data, error } = await supabase.storage
+            .from("content")
+            .createSignedUrl(filePath, 604800);
+
+          if (error) {
+            console.warn(
+              `Failed to generate signed URL for slide ${slide.id}:`,
+              error.message
+            );
+            return { ...slide, signedUrl: null };
+          }
+
+          return { ...slide, signedUrl: data.signedUrl };
+        })
+      );
+
+      return { ...topicData, slides: slidesWithUrls };
+    }
+
+    return topicData;
   },
 
   async createTopic(ctx: AuthContext, params: unknown) {
