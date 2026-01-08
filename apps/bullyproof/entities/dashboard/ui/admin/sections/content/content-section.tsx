@@ -3,12 +3,12 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { StageCards } from "@/entities/curriculum/ui/stage-cards";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import type { curriculumStages } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, Plus } from "lucide-react";
 import { AddStageSheet } from "./add-stage-sheet";
+import { useStages, useInvalidateStage } from "@/entities/stages/model/store";
 
 type Stage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
@@ -26,38 +26,20 @@ type Stage = typeof curriculumStages.$inferSelect & {
 
 export function ContentSection() {
   const router = useRouter();
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
+  
+  // Use the cached React Query hook instead of manual fetching
+  const { stages, isLoading, error, refetch } = useStages();
+  const { invalidateAllStages } = useInvalidateStage();
 
-  const fetchStages = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      const result = await curriculumApi.stages.list({
-        limit: 100,
-        offset: 0,
-      });
-      if (result.data) {
-        // Years are now included directly from the API
-        setStages(result.data as Stage[]);
-      } else if (result.error) {
-        setError(result.error.message ?? "Failed to fetch curriculum stages");
-      }
-    } catch (err) {
-      console.error("Failed to fetch curriculum stages:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to fetch curriculum stages"
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // Trigger background refetch on mount to ensure complete data
+  // This ensures that even if we navigated from a topic page that only cached
+  // a single stage, we'll fetch all stages in the background while showing cached data
   useEffect(() => {
-    fetchStages();
-  }, []);
+    // Refetch in the background without blocking the UI
+    // The cached data will display immediately, and the UI will update when fresh data arrives
+    refetch();
+  }, [refetch]);
 
   const handleStageClick = (stage: Stage) => {
     // Navigate to stage detail page using the stage code as slug
@@ -69,11 +51,12 @@ export function ContentSection() {
   };
 
   const handleStageCreated = () => {
-    // Refresh the stages list after creating a new stage
-    fetchStages();
+    // Invalidate cache and refetch after creating a new stage
+    invalidateAllStages();
+    refetch();
   };
 
-  if (isLoading) {
+  if (isLoading && stages.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
@@ -92,7 +75,9 @@ export function ContentSection() {
         <CardContent className="pt-6">
           <div className="text-center text-destructive">
             <p className="font-medium">Error loading curriculum stages</p>
-            <p className="text-sm text-muted-foreground mt-2">{error}</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              {error instanceof Error ? error.message : "Failed to fetch curriculum stages"}
+            </p>
           </div>
         </CardContent>
       </Card>

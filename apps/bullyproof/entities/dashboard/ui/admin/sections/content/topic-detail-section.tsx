@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -88,6 +88,11 @@ import {
 } from "@workspace/ui/components/radio-group";
 import { uploadSlideImage } from "@/utils/supabase/upload";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
+import {
+  useTopicsStore,
+  useTopicsByStage,
+} from "@/entities/topics/model/store-enhanced";
+import { useStageByCode } from "@/entities/stages/model/store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
@@ -181,6 +186,17 @@ export function TopicDetailSection({
   const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [showChangesDialog, setShowChangesDialog] = useState(false);
   const [showSaveProgressDialog, setShowSaveProgressDialog] = useState(false);
+  const [changesToShow, setChangesToShow] = useState<ChangeItem[]>([]);
+
+  // Debug: Log when showChangesDialog changes
+  useEffect(() => {
+    console.log(
+      "showChangesDialog changed to:",
+      showChangesDialog,
+      "changesToShow:",
+      changesToShow.length
+    );
+  }, [showChangesDialog, changesToShow]);
   const [pendingSave, setPendingSave] = useState(false);
   const [showImageSelectorDialog, setShowImageSelectorDialog] = useState(false);
   const [insertAfterIndexForDialog, setInsertAfterIndexForDialog] = useState<
@@ -320,7 +336,16 @@ export function TopicDetailSection({
     (state) => state.invalidateSlide
   );
   const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
-  const setSlideUrl = useTopicSlidesCacheStore((state) => state.setSlideUrl);
+  const setSlideUrlOldStore = useTopicSlidesCacheStore(
+    (state) => state.setSlideUrl
+  );
+  const setSlideUrlNewStore = useTopicsStore((state) => state.setSlideUrl);
+
+  // Helper to set URL in both stores
+  const setSlideUrl = (slideId: string, url: string) => {
+    setSlideUrlOldStore(slideId, url);
+    setSlideUrlNewStore(slideId, url);
+  };
 
   // Certification cache store methods
   const invalidateCertificationSlide = useCertificationSlidesCacheStore(
@@ -332,7 +357,30 @@ export function TopicDetailSection({
     ? parseInt(topicSlug.substring(1), 10)
     : null;
 
-  // Extract fetchData function so it can be reused after save
+  // Use React Query hooks for caching (curriculum flow only)
+  const {
+    stage: cachedStage,
+    isLoading: isLoadingStage,
+    error: stageError,
+    refetch: refetchStage,
+  } = useStageByCode(isCertification ? null : stageSlug || null);
+
+  const {
+    topics: cachedTopics,
+    isLoading: isLoadingTopics,
+    error: topicsError,
+    refetch: refetchTopics,
+  } = useTopicsByStage(
+    isCertification ? null : cachedStage?.id || null,
+    isCertification
+      ? undefined
+      : {
+          includeSlides: true,
+          includeUrls: true,
+        }
+  );
+
+  // Extract fetchData function so it can be reused after save (for certification and manual refetch)
   const fetchTopicData = useCallback(
     async (skipLoading = false) => {
       try {
@@ -386,67 +434,9 @@ export function TopicDetailSection({
             });
           }
         } else {
-          // Curriculum flow: fetch stage, then topics, then find by order
-          if (!stageSlug || !topicOrder) return;
-
-          const stageResult = await curriculumApi.stages.byCode(stageSlug);
-          if (!stageResult.data) {
-            setError(
-              stageResult.error?.message ?? "Failed to fetch curriculum stage"
-            );
-            return;
-          }
-          setStage(stageResult.data);
-
-          const topicsResult = await topicsApi.get.list({
-            stageId: stageResult.data.id,
-          });
-          if (!topicsResult.data) {
-            setError(topicsResult.error?.message ?? "Failed to fetch topics");
-            return;
-          }
-
-          const foundTopic = topicsResult.data.find(
-            (t) => t.stageOrder === topicOrder
-          );
-
-          if (!foundTopic) {
-            setError(`Topic with order ${topicOrder} not found`);
-            return;
-          }
-
-          const topicResult = await topicsApi.get.byId(foundTopic.id);
-          if (topicResult.data) {
-            setTopic(topicResult.data);
-            const initialSlides =
-              topicResult.data.slides
-                ?.sort((a, b) => a.orderIndex - b.orderIndex)
-                .map((slide) => ({
-                  id: slide.id,
-                  kind: slide.kind as "text" | "image" | "video",
-                  orderIndex: slide.orderIndex,
-                  textHtml: slide.textHtml ?? null,
-                  imageUrl: slide.imageUrl ?? null,
-                  videoUrl: slide.videoUrl ?? null,
-                  videoStartS: slide.videoStartS ?? null,
-                  videoEndS: slide.videoEndS ?? null,
-                  effectiveNotes: slide.officialNotes ?? null,
-                })) ?? [];
-            setLocalSlides(initialSlides);
-            setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
-            setHasUnsavedChanges(false);
-            setDeletedSlideIds(new Set());
-            setPendingFileUploads(new Map());
-
-            // Invalidate all slide caches to force refresh
-            initialSlides.forEach((slide) => {
-              invalidateSlide(slide.id);
-            });
-          } else {
-            setError(
-              topicResult.error?.message ?? "Failed to fetch topic details"
-            );
-          }
+          // Curriculum flow: use cached data from hooks
+          // This will be handled by useEffect below
+          return;
         }
       } catch (err) {
         console.error("Failed to fetch topic:", err);
@@ -459,19 +449,138 @@ export function TopicDetailSection({
         }
       }
     },
-    [
-      isCertification,
-      stageSlug,
-      topicOrder,
-      topicId,
-      invalidateSlide,
-      invalidateCertificationSlide,
-    ]
+    [isCertification, topicId, invalidateCertificationSlide]
   );
 
+  // Handle certification flow
   useEffect(() => {
-    fetchTopicData();
-  }, [fetchTopicData]);
+    if (isCertification) {
+      fetchTopicData();
+    }
+  }, [isCertification, fetchTopicData]);
+
+  // Find the current topic from cached data (memoized to prevent unnecessary recalculations)
+  // Use topic IDs as a stable reference to detect actual changes
+  const topicsKey = useMemo(() => {
+    if (!cachedTopics || cachedTopics.length === 0) return null;
+    return cachedTopics
+      .map((t) => t.id)
+      .sort()
+      .join(",");
+  }, [cachedTopics]);
+
+  const foundTopic = useMemo(() => {
+    if (isCertification || !cachedTopics || !topicOrder) return null;
+    return cachedTopics.find((t) => t.stageOrder === topicOrder) as any;
+  }, [isCertification, cachedTopics, topicOrder]);
+
+  // Track the last processed topic ID to prevent infinite loops
+  const lastProcessedTopicIdRef = useRef<string | null>(null);
+  const lastTopicOrderRef = useRef<number | null>(null);
+
+  // Reset ref when topic order changes (navigating to different topic)
+  useEffect(() => {
+    if (topicOrder !== lastTopicOrderRef.current) {
+      lastProcessedTopicIdRef.current = null;
+      lastTopicOrderRef.current = topicOrder;
+    }
+  }, [topicOrder]);
+
+  // Handle curriculum flow with cached data
+  useEffect(() => {
+    if (isCertification) return;
+    if (!stageSlug || !topicOrder) return;
+
+    // Set loading state based on hooks
+    setIsLoading(isLoadingStage || isLoadingTopics);
+
+    // Handle errors
+    if (stageError) {
+      setError(stageError.message || "Failed to fetch curriculum stage");
+      setIsLoading(false);
+      return;
+    }
+    if (topicsError) {
+      setError(topicsError.message || "Failed to fetch topics");
+      setIsLoading(false);
+      return;
+    }
+
+    // Wait for data to be available
+    if (!cachedStage || !foundTopic) {
+      if (!foundTopic && cachedTopics && cachedTopics.length > 0) {
+        // Topics loaded but this specific topic not found
+        setError(`Topic with order ${topicOrder} not found`);
+        setIsLoading(false);
+        lastProcessedTopicIdRef.current = null;
+      }
+      return;
+    }
+
+    // Prevent re-processing the same topic (avoid infinite loop)
+    // Only reset state if this is a NEW topic (different from what we've processed)
+    const isNewTopic = lastProcessedTopicIdRef.current !== foundTopic.id;
+
+    if (!isNewTopic) {
+      // Same topic - just update loading state, don't reset user changes
+      setIsLoading(false);
+      return;
+    }
+
+    // Mark this topic as processed BEFORE any state updates
+    lastProcessedTopicIdRef.current = foundTopic.id;
+
+    // Set stage from cached data
+    setStage(cachedStage);
+
+    // Topic already has slides and URLs from the cached data
+    setTopic(foundTopic as Topic);
+    const initialSlides =
+      foundTopic.slides
+        ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+        .map((slide: any) => ({
+          id: slide.id,
+          kind: slide.kind as "text" | "image" | "video",
+          orderIndex: slide.orderIndex,
+          textHtml: slide.textHtml ?? null,
+          imageUrl: slide.imageUrl ?? null,
+          videoUrl: slide.videoUrl ?? null,
+          videoStartS: slide.videoStartS ?? null,
+          videoEndS: slide.videoEndS ?? null,
+          effectiveNotes: slide.officialNotes ?? null,
+          signedUrl: slide.signedUrl ?? null,
+        })) ?? [];
+    setLocalSlides(initialSlides);
+    setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
+    // Only reset hasUnsavedChanges if this is a new topic (user navigated to different topic)
+    // Don't reset if we're just re-rendering the same topic
+    setHasUnsavedChanges(false);
+    setDeletedSlideIds(new Set());
+    setPendingFileUploads(new Map());
+
+    // Cache signed URLs if they exist (don't invalidate - we just cached them!)
+    // Batch these updates - Zustand will batch them automatically
+    initialSlides.forEach((slide) => {
+      if (slide.kind === "image" && (slide as any).signedUrl) {
+        setSlideUrl(slide.id, (slide as any).signedUrl);
+      }
+    });
+
+    setIsLoading(false);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isCertification,
+    stageSlug,
+    topicOrder,
+    cachedStage?.id, // Use ID instead of whole object
+    foundTopic?.id, // Use found topic ID - this is stable and changes only when topic changes
+    isLoadingStage,
+    isLoadingTopics,
+    stageError,
+    topicsError,
+    // Note: setSlideUrl is stable from Zustand, cachedTopics is tracked via foundTopic
+  ]);
 
   // Use local slides instead of topic.slides
   const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
@@ -748,11 +857,38 @@ export function TopicDetailSection({
           throw new Error(result.error.message || "Failed to update slide");
         }
 
-        // Refresh topic data
+        // Refresh topic data with slides and URLs
         if (topic) {
-          const topicResult = await topicsApi.get.byId(topic.id);
+          const topicResult = await topicsApi.get.byId(topic.id, {
+            includeSlides: true,
+            includeUrls: true,
+          });
           if (topicResult.data) {
             setTopic(topicResult.data);
+            // Update slides if they exist
+            if ((topicResult.data as any).slides) {
+              const updatedSlides = (topicResult.data as any).slides
+                .sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+                .map((slide: any) => ({
+                  id: slide.id,
+                  kind: slide.kind as "text" | "image" | "video",
+                  orderIndex: slide.orderIndex,
+                  textHtml: slide.textHtml ?? null,
+                  imageUrl: slide.imageUrl ?? null,
+                  videoUrl: slide.videoUrl ?? null,
+                  videoStartS: slide.videoStartS ?? null,
+                  videoEndS: slide.videoEndS ?? null,
+                  effectiveNotes: slide.officialNotes ?? null,
+                  signedUrl: slide.signedUrl ?? null,
+                }));
+              setLocalSlides(updatedSlides);
+              // Cache signed URLs
+              updatedSlides.forEach((slide) => {
+                if (slide.kind === "image" && (slide as any).signedUrl) {
+                  setSlideUrl(slide.id, (slide as any).signedUrl);
+                }
+              });
+            }
           }
         }
       } catch (err) {
@@ -1718,7 +1854,12 @@ export function TopicDetailSection({
         // Completely refetch topic data the same way as initial page load
         // This will repopulate the cache store and ensure we have the latest data
         // Skip loading state since we're already in a save operation
-        await fetchTopicData(true);
+        if (isCertification) {
+          await fetchTopicData(true);
+        } else {
+          // For curriculum flow, use React Query refetch
+          await refetchTopics();
+        }
 
         // Complete progress
         setSaveProgress(100);
@@ -1757,27 +1898,69 @@ export function TopicDetailSection({
 
   // Handle save button click - validate first, then show confirmation
   const handleBulkSave = () => {
-    if (!topic || isSaving || !hasUnsavedChanges) return;
-    if (!isCertification && !stage) return;
+    console.log("handleBulkSave called", {
+      topic: !!topic,
+      isSaving,
+      hasUnsavedChanges,
+      stage: !!stage,
+      isCertification,
+    });
+
+    if (!topic || isSaving) {
+      console.log("Early return: !topic or isSaving");
+      return;
+    }
+
+    if (!isCertification && !stage) {
+      console.log("Early return: !stage for curriculum");
+      return;
+    }
 
     // Step 1: Validate new slides
     const validation = validateNewSlides();
     if (!validation.isValid) {
+      console.log("Validation failed, showing validation dialog");
       setShowValidationDialog(true);
       return;
     }
 
     // Step 2: Calculate and show changes
     const changes = calculateChanges();
+    console.log("Calculated changes:", changes.length, changes);
+
+    // If no changes detected but user clicked save, check if flag was wrong
     if (changes.length === 0) {
-      // No changes to show, save directly
+      console.log("No changes detected");
+      if (!hasUnsavedChanges) {
+        // No changes at all
+        console.log("No changes and flag is false, showing toast");
+        toast.info("No changes to save");
+        return;
+      }
+      // Flag says there are changes but calculateChanges found none
+      // This can happen if changes were reverted - save anyway to sync state
+      console.log(
+        "Flag says changes but calculateChanges found none, saving directly"
+      );
       performSave();
       return;
     }
 
     // Step 3: Show changes confirmation dialog
-    setShowChangesDialog(true);
-    setPendingSave(true);
+    console.log(
+      "Setting showChangesDialog to true, changes count:",
+      changes.length
+    );
+    // Store the changes before showing dialog to avoid recalculation issues
+    if (changes.length > 0) {
+      setChangesToShow(changes);
+      setShowChangesDialog(true);
+      setPendingSave(true);
+      console.log("Dialog state set, showChangesDialog should be true now");
+    } else {
+      console.error("ERROR: Trying to show dialog but changes array is empty!");
+      toast.error("No changes detected to save");
+    }
   };
 
   // Handle confirmation of changes
@@ -1959,41 +2142,54 @@ export function TopicDetailSection({
           </div>
         </div>
         <div className="flex items-center justify-end gap-2">
-          <Button
-            variant={
-              showSaveSuccess
-                ? "default"
-                : hasUnsavedChanges
-                  ? "default"
-                  : "outline"
-            }
-            onClick={handleBulkSave}
-            disabled={isSaving || (!hasUnsavedChanges && !showSaveSuccess)}
-            className={
-              showSaveSuccess
-                ? "bg-green-500 hover:bg-green-600 text-white"
-                : hasUnsavedChanges
-                  ? "bg-blue-500 hover:bg-blue-600 text-white"
-                  : ""
-            }
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : showSaveSuccess ? (
-              <>
-                <Check className="mr-2 h-4 w-4" />
-                Saved!
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                Save Changes
-              </>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="inline-block">
+                <Button
+                  variant={
+                    showSaveSuccess
+                      ? "default"
+                      : hasUnsavedChanges
+                        ? "default"
+                        : "outline"
+                  }
+                  onClick={handleBulkSave}
+                  disabled={
+                    isSaving || (!hasUnsavedChanges && !showSaveSuccess)
+                  }
+                  className={
+                    showSaveSuccess
+                      ? "bg-green-500 hover:bg-green-600 text-white"
+                      : hasUnsavedChanges
+                        ? "bg-blue-500 hover:bg-blue-600 text-white"
+                        : ""
+                  }
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : showSaveSuccess ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Saved!
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            </TooltipTrigger>
+            {!hasUnsavedChanges && !showSaveSuccess && !isSaving && (
+              <TooltipContent side="left">
+                <p>No changes to save</p>
+              </TooltipContent>
             )}
-          </Button>
+          </Tooltip>
         </div>
       </div>
 
@@ -2786,11 +2982,12 @@ export function TopicDetailSection({
       <ConfirmChangesDialog
         open={showChangesDialog}
         onOpenChange={setShowChangesDialog}
-        changes={calculateChanges()}
+        changes={changesToShow}
         onConfirm={handleConfirmChanges}
         onCancel={() => {
           setShowChangesDialog(false);
           setPendingSave(false);
+          setChangesToShow([]);
         }}
         isSaving={isSaving}
         isCertification={isCertification}
