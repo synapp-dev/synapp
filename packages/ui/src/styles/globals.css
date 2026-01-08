@@ -183,6 +183,9 @@
   --animate-slide-left-fade-in-slowest: slide-left-fade-in 1s ease-out forwards;
   --animate-slide-right-fade-in-slowest: slide-right-fade-in 1s ease-out
     forwards;
+  --animate-bounce-right: bounce-right 1s ease-in-out infinite;
+  --animate-bounce-right-delayed: bounce-right 1s ease-in-out infinite 0.3s;
+  --animate-bounce-left: bounce-left 0.5s ease-in-out;
   --animate-shake-once: shake 0.3s ease-in-out;
   --animate-shake-twice: shake 0.3s ease-in-out 2;
   --animate-float-up-loop: float-up-loop 1.2s linear infinite;
@@ -403,6 +406,24 @@
     100% {
       opacity: 0;
       transform: translateY(-20px);
+    }
+  }
+  @keyframes bounce-right {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(4px);
+    }
+  }
+  @keyframes bounce-left {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(-4px);
     }
   }
   @keyframes shake {
