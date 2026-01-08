@@ -11,6 +11,14 @@ export type GetStagesParams = z.infer<typeof getStagesSchema>;
 // Schema for getting school years
 export const getYearsSchema = z.object({
   levelId: z.string().trim().min(1).max(500).optional(),
+  levelIds: z
+    .string()
+    .trim()
+    .optional()
+    .transform((val) => {
+      if (!val) return undefined;
+      return val.split(",").filter((id) => id.trim().length > 0);
+    }),
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),
   offset: z.coerce.number().int().min(0).max(10000).optional().default(0),
 });

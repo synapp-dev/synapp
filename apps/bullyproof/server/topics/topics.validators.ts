@@ -26,6 +26,8 @@ export const listTopicsSchema = z.object({
   offset: z.coerce.number().int().min(0).max(10000).optional().default(0),
   search: z.string().trim().max(100).optional(),
   useView: z.string().optional().transform((val) => val === "true"),
+  includeSlides: z.string().optional().transform((val) => val === "true"),
+  includeUrls: z.string().optional().transform((val) => val === "true"),
 });
 
 export type ListTopicsParams = z.infer<typeof listTopicsSchema>;
@@ -33,6 +35,8 @@ export type ListTopicsParams = z.infer<typeof listTopicsSchema>;
 // Schema for getting topic by ID
 export const getTopicByIdSchema = z.object({
   id: z.string().trim().min(1).max(500),
+  includeSlides: z.string().optional().transform((val) => val === "true"),
+  includeUrls: z.string().optional().transform((val) => val === "true"),
 });
 
 export type GetTopicByIdParams = z.infer<typeof getTopicByIdSchema>;
