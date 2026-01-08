@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -18,10 +19,9 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { BookOpen, Plus, Loader2, Image } from "lucide-react";
+import { BookOpen, Plus, Loader2 } from "lucide-react";
 import type { curriculumStages, topics } from "@/server/db/schema";
-import { topicsApi } from "@/entities/topics/api/endpoints";
-import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
+import { useTopicsByStage, useTopicsStore } from "@/entities/topics/model/store-enhanced";
 
 type Stage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
@@ -40,61 +40,98 @@ type Stage = typeof curriculumStages.$inferSelect & {
 type Topic = typeof topics.$inferSelect;
 
 type TopicWithImage = Topic & {
+  slides?: Array<{
+    id: string;
+    kind: string;
+    orderIndex: number;
+    signedUrl?: string | null;
+  }>;
   imageSlideId?: string | null;
 };
 
 interface TopicImageThumbnailProps {
   topic: TopicWithImage;
   onTopicClick: (topic: Topic, e: React.MouseEvent) => void;
+  index?: number; // Index for staggered animation start
 }
 
 function TopicImageThumbnail({
   topic,
   onTopicClick,
+  index = 0,
 }: TopicImageThumbnailProps) {
-  const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
-  const cachedUrl = useTopicSlidesCacheStore(
-    (state) => (topic.imageSlideId ? state.cache[topic.imageSlideId]?.url ?? null : null)
-  );
-  const loading = useTopicSlidesCacheStore(
-    (state) => (topic.imageSlideId ? state.loading[topic.imageSlideId] ?? false : false)
-  );
-  const [imageUrl, setImageUrl] = useState<string | null>(cachedUrl);
+  // Get all image slides sorted by orderIndex
+  const imageSlides = useMemo(() => {
+    if (!topic.slides) return [];
+    return topic.slides
+      .filter((slide) => slide.kind === "image")
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+  }, [topic.slides]);
 
-  // Fetch URL using cache store (same as ThumbnailImage component)
-  useEffect(() => {
-    if (topic.imageSlideId && !topic.imageSlideId.startsWith("temp_")) {
-      // If we already have a cached URL, use it immediately
-      if (cachedUrl) {
-        setImageUrl(cachedUrl);
-        return;
-      }
+  // Access store directly to get URLs for all slides
+  const { slideUrls: storeSlideUrls } = useTopicsStore();
 
-      // Otherwise, fetch it
-      let cancelled = false;
-      getSlideUrl(topic.imageSlideId).then((url) => {
-        if (!cancelled) {
-          setImageUrl(url);
+  // Get URLs for all image slides
+  const slideUrls = useMemo(() => {
+    return imageSlides
+      .map((slide) => {
+        // Prefer direct signedUrl from API
+        if (slide.signedUrl) {
+          return slide.signedUrl;
         }
-      });
+        // Fall back to cached URL from store
+        const cached = storeSlideUrls[slide.id];
+        if (cached) {
+          // Check if expired (1 week)
+          const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+          if (Date.now() - cached.timestamp <= CACHE_EXPIRY_MS) {
+            return cached.url;
+          }
+        }
+        return null;
+      })
+      .filter((url): url is string => url !== null);
+  }, [imageSlides, storeSlideUrls]);
 
-      return () => {
-        cancelled = true;
-      };
-    } else {
-      setImageUrl(null);
-    }
-  }, [topic.imageSlideId, getSlideUrl, cachedUrl]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Update when cached URL changes (for instant updates after cache updates)
+  // Cycle through slides with slide-up animation
+  // Offset start time based on index to stagger animations
   useEffect(() => {
-    if (cachedUrl && !loading) {
-      setImageUrl(cachedUrl);
-    }
-  }, [cachedUrl, loading]);
+    if (slideUrls.length <= 1) return;
 
-  const isLoading = loading && !imageUrl;
-  const hasImage = !isLoading && imageUrl;
+    // Stagger the initial delay: each thumbnail starts 200ms after the previous one
+    const initialDelay = index * 200;
+
+    const startAnimation = () => {
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % slideUrls.length);
+        setIsTransitioning(false);
+      }, 600); // Match transition duration
+    };
+
+    let interval: NodeJS.Timeout | null = null;
+
+    // Initial delay to stagger the start
+    const initialTimeout = setTimeout(() => {
+      startAnimation();
+      // Then continue with regular interval
+      interval = setInterval(startAnimation, 1500); // Change every 1.5 seconds
+    }, initialDelay);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [slideUrls.length, index]);
+
+  const currentUrl = slideUrls[currentIndex];
+  const nextIndex = (currentIndex + 1) % slideUrls.length;
+  const nextUrl = slideUrls[nextIndex];
 
   return (
     <Tooltip>
@@ -103,22 +140,52 @@ function TopicImageThumbnail({
           className="relative aspect-video rounded-md overflow-hidden border border-border cursor-pointer hover:opacity-80 transition-opacity bg-muted"
           onClick={(e) => onTopicClick(topic, e)}
         >
-          {isLoading ? (
-            <div className="w-full h-full flex items-center justify-center">
-              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            </div>
-          ) : imageUrl ? (
-            <img
-              src={imageUrl}
-              alt={topic.title}
-              className="w-full h-full object-cover"
-              onError={() => {
-                setImageUrl(null);
-              }}
-            />
+          {slideUrls.length > 0 ? (
+            <>
+              {/* Current image - slides up and out when transitioning */}
+              {currentUrl && (
+                <div
+                  key={`current-${currentIndex}`}
+                  className={`absolute inset-0 transition-transform duration-[600ms] ease-in-out ${
+                    isTransitioning ? "-translate-y-full" : "translate-y-0"
+                  }`}
+                >
+                  <Image
+                    src={currentUrl}
+                    alt={topic.title}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  />
+                </div>
+              )}
+              {/* Next image - slides up from bottom, always rendered but positioned below when not transitioning */}
+              {nextUrl && slideUrls.length > 1 && (
+                <div
+                  key={`next-${nextIndex}`}
+                  className={`absolute inset-0 transition-transform duration-[600ms] ease-in-out ${
+                    isTransitioning ? "translate-y-0" : "translate-y-full"
+                  }`}
+                >
+                  <Image
+                    src={nextUrl}
+                    alt={topic.title}
+                    fill
+                    className="object-contain"
+                    sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground p-2 gap-2">
-              <Image className="h-8 w-8 flex-shrink-0" />
+              <Image
+                src="/images/bp-small-logo.svg"
+                alt="BullyProof Logo"
+                width={32}
+                height={32}
+                className="flex-shrink-0"
+              />
               <p className="text-xs text-center line-clamp-1 truncate w-full">
                 {topic.title}
               </p>
@@ -142,66 +209,12 @@ interface StageCardProps {
 
 function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
   const router = useRouter();
-  const [topics, setTopics] = useState<TopicWithImage[]>([]);
-  const [isLoadingTopics, setIsLoadingTopics] = useState(false);
-  const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
-
-  useEffect(() => {
-    const fetchTopics = async () => {
-      try {
-        setIsLoadingTopics(true);
-        const result = await topicsApi.get.list({ 
-          stageId: stage.id,
-          limit: 100 
-        });
-        if (result.data) {
-          // Sort by stageOrder
-          const sorted = [...result.data].sort((a, b) => {
-            if (a.stageOrder === null) return 1;
-            if (b.stageOrder === null) return -1;
-            return a.stageOrder - b.stageOrder;
-          });
-
-          // Fetch slides for first 4 topics to get image slide IDs
-          const topicsWithSlideIds = await Promise.all(
-            sorted.slice(0, 4).map(async (topic) => {
-              try {
-                const topicResult = await topicsApi.get.byId(topic.id);
-                if (topicResult.data?.slides) {
-                  // Find first image slide
-                  const imageSlide = topicResult.data.slides
-                    .sort((a, b) => a.orderIndex - b.orderIndex)
-                    .find((slide) => slide.kind === "image" && slide.imageUrl);
-
-                  if (imageSlide) {
-                    return { ...topic, imageSlideId: imageSlide.id };
-                  }
-                }
-                return { ...topic, imageSlideId: null };
-              } catch (err) {
-                console.error(`Failed to fetch slides for topic ${topic.id}:`, err);
-                return { ...topic, imageSlideId: null };
-              }
-            })
-          );
-
-          // Add remaining topics without images
-          const remainingTopics = sorted.slice(4).map((topic) => ({
-            ...topic,
-            imageSlideId: null,
-          }));
-
-          setTopics([...topicsWithSlideIds, ...remainingTopics]);
-        }
-      } catch (err) {
-        console.error(`Failed to fetch topics for stage ${stage.id}:`, err);
-      } finally {
-        setIsLoadingTopics(false);
-      }
-    };
-
-    fetchTopics();
-  }, [stage.id, getSlideUrl]);
+  
+  // Use new store hook to fetch topics with slides and URLs
+  const { topics, isLoading: isLoadingTopics } = useTopicsByStage(stage.id, {
+    includeSlides: true,
+    includeUrls: true,
+  });
 
   const displayedTopics = topics.slice(0, 4);
   const hasMoreTopics = topics.length > 4;
@@ -264,11 +277,12 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
             <>
               <TooltipProvider>
                 <div className="grid grid-cols-2 gap-2">
-                  {displayedTopics.map((topic) => (
+                  {displayedTopics.map((topic, topicIndex) => (
                     <TopicImageThumbnail
                       key={topic.id}
                       topic={topic}
                       onTopicClick={handleTopicClick}
+                      index={topicIndex}
                     />
                   ))}
                 </div>
