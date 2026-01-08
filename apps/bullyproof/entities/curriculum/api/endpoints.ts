@@ -77,11 +77,15 @@ export const curriculumApi = {
   years: {
     list(params?: {
       levelId?: string;
+      levelIds?: string[];
       limit?: number;
       offset?: number;
     }): Promise<ApiResult<Year[]>> {
       const searchParams = new URLSearchParams();
       if (params?.levelId) searchParams.set("levelId", params.levelId);
+      if (params?.levelIds && params.levelIds.length > 0) {
+        searchParams.set("levelIds", params.levelIds.join(","));
+      }
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
 

@@ -14,6 +14,8 @@ export const topicsApi = {
       offset?: number;
       search?: string;
       useView?: boolean;
+      includeSlides?: boolean;
+      includeUrls?: boolean;
     }): Promise<ApiResult<Topic[]>> {
       const searchParams = new URLSearchParams();
       if (params?.stageId) searchParams.set("stageId", params.stageId);
@@ -21,15 +23,26 @@ export const topicsApi = {
       if (params?.offset) searchParams.set("offset", params.offset.toString());
       if (params?.search) searchParams.set("search", params.search);
       if (params?.useView) searchParams.set("useView", "true");
+      if (params?.includeSlides) searchParams.set("includeSlides", "true");
+      if (params?.includeUrls) searchParams.set("includeUrls", "true");
 
       const query = searchParams.toString();
       return apiFetch<Topic[]>(`/topics${query ? `?${query}` : ""}`);
     },
     byId(
-      id: string
+      id: string,
+      params?: {
+        includeSlides?: boolean;
+        includeUrls?: boolean;
+      }
     ): Promise<ApiResult<Topic & { stage?: any; slides?: any[] }>> {
+      const searchParams = new URLSearchParams();
+      if (params?.includeSlides) searchParams.set("includeSlides", "true");
+      if (params?.includeUrls) searchParams.set("includeUrls", "true");
+
+      const query = searchParams.toString();
       return apiFetch<Topic & { stage?: any; slides?: any[] }>(
-        `/topics/${encodeURIComponent(id)}`
+        `/topics/${encodeURIComponent(id)}${query ? `?${query}` : ""}`
       );
     },
   },
