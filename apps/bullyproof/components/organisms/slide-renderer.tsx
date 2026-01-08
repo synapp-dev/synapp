@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { cn } from "@workspace/ui/lib/utils";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
+import { useTopicsStore } from "@/entities/topics/model/store-enhanced";
 import {
   isYouTubeUrl,
   convertToYouTubeEmbedUrl,
@@ -58,13 +59,20 @@ export function SlideRenderer({
     : topicGetSlideUrl;
 
   // Subscribe to cache changes for this specific slide
+  // Check new store first (from API responses with includeUrls)
+  const newStoreCachedUrl = useTopicsStore(
+    (state) => (!isCertification ? state.slideUrls[slide.id]?.url ?? null : null)
+  );
   const topicCachedUrl = useTopicSlidesCacheStore(
     (state) => state.cache[slide.id]?.url ?? null
   );
   const certificationCachedUrl = useCertificationSlidesCacheStore(
     (state) => state.cache[slide.id]?.url ?? null
   );
-  const cachedUrl = isCertification ? certificationCachedUrl : topicCachedUrl;
+  // Prefer new store URL if available, otherwise fall back to old store
+  const cachedUrl = isCertification 
+    ? certificationCachedUrl 
+    : (newStoreCachedUrl || topicCachedUrl);
 
   const topicLoading = useTopicSlidesCacheStore(
     (state) => state.loading[slide.id] ?? false
@@ -95,8 +103,22 @@ export function SlideRenderer({
 
       // Only fetch signed URL for existing slides with actual image URLs
       if (slide.imageUrl && !slide.imageUrl.startsWith("blob:")) {
-        let cancelled = false;
+        // Check new store first (from API responses with includeUrls)
+        if (!isCertification && !forceRefresh) {
+          const topicsStoreState = useTopicsStore.getState();
+          const newStoreUrl = topicsStoreState.slideUrls[slide.id];
+          if (newStoreUrl && Date.now() - newStoreUrl.timestamp < 7 * 24 * 60 * 60 * 1000) {
+            setImageUrl(newStoreUrl.url);
+            // Also populate old store for consistency
+            if (!topicCachedUrl) {
+              useTopicSlidesCacheStore.getState().setSlideUrl(slide.id, newStoreUrl.url);
+            }
+            return;
+          }
+        }
 
+        // Fall back to old cache store if not in new store
+        let cancelled = false;
         getSlideUrl(slide.id, forceRefresh).then((url) => {
           if (!cancelled) {
             setImageUrl(url);

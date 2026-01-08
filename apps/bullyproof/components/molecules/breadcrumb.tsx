@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSchoolStore } from "@/stores/school-store";
@@ -34,6 +34,12 @@ export function Breadcrumb() {
   const pathname = usePathname();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
   const isPlatformAdmin = useIsPlatformAdmin();
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Ensure component only renders DropdownMenu on client to avoid hydration errors
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Fetch schools to check if user has only one school
   const { data: mySchools = [] } = useMySchoolsQuery(
@@ -179,7 +185,7 @@ export function Breadcrumb() {
           ))}
 
         {/* Ellipsis dropdown for middle items - visible only below xl breakpoint when collapsing, but hidden below md */}
-        {shouldCollapse && middleItems.length > 0 && (
+        {shouldCollapse && middleItems.length > 0 && isMounted && (
           <>
             <BreadcrumbItem className="hidden md:inline-flex xl:hidden">
               <DropdownMenu>
@@ -217,7 +223,7 @@ export function Breadcrumb() {
         )}
 
         {/* Mobile: Ellipsis with dropdown - visible only between sm and md breakpoints when there are items before last */}
-        {allItemsBeforeLast.length > 0 && (
+        {allItemsBeforeLast.length > 0 && isMounted && (
           <>
             <BreadcrumbItem className="hidden sm:inline-flex md:hidden">
               <DropdownMenu>
