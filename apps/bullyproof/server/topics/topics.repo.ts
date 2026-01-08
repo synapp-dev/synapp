@@ -1,6 +1,11 @@
 import { db } from "@/server/db/drizzle";
-import { topics, curriculumStages, topicSlides, vTopicsWithCompletion } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc, ilike, sql } from "drizzle-orm";
+import {
+  topics,
+  curriculumStages,
+  topicSlides,
+  vTopicsWithCompletion,
+} from "@/server/db/schema";
+import { eq, and, inArray, desc, asc, ilike, sql, SQL } from "drizzle-orm";
 
 export const topicsRepo = {
   getAll: () => db.select().from(topics),
@@ -14,6 +19,41 @@ export const topicsRepo = {
       .from(topics)
       .where(eq(topics.stageId, stageId))
       .orderBy(asc(topics.stageOrder), asc(topics.title)),
+
+  getByStageIdWithSlides: async (stageId: string) => {
+    const topicsData = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.stageId, stageId))
+      .orderBy(asc(topics.stageOrder), asc(topics.title));
+
+    // Fetch slides for all topics
+    const topicIds = topicsData.map((t) => t.id);
+    if (topicIds.length === 0) {
+      return topicsData.map((topic) => ({ ...topic, slides: [] }));
+    }
+
+    const slidesData = await db
+      .select()
+      .from(topicSlides)
+      .where(inArray(topicSlides.topicId, topicIds))
+      .orderBy(asc(topicSlides.topicId), asc(topicSlides.orderIndex));
+
+    // Group slides by topicId
+    const slidesByTopic = new Map<string, typeof slidesData>();
+    for (const slide of slidesData) {
+      if (!slidesByTopic.has(slide.topicId)) {
+        slidesByTopic.set(slide.topicId, []);
+      }
+      slidesByTopic.get(slide.topicId)!.push(slide);
+    }
+
+    // Attach slides to topics
+    return topicsData.map((topic) => ({
+      ...topic,
+      slides: slidesByTopic.get(topic.id) || [],
+    }));
+  },
 
   getWithDetails: async (id: string) => {
     const topicData = await db
@@ -42,11 +82,14 @@ export const topicsRepo = {
   },
 
   getFromView: () =>
-    db.select().from(vTopicsWithCompletion).orderBy(
-      asc(vTopicsWithCompletion.stageSortIndex),
-      asc(vTopicsWithCompletion.stageOrder),
-      asc(vTopicsWithCompletion.topicTitle)
-    ),
+    db
+      .select()
+      .from(vTopicsWithCompletion)
+      .orderBy(
+        asc(vTopicsWithCompletion.stageSortIndex),
+        asc(vTopicsWithCompletion.stageOrder),
+        asc(vTopicsWithCompletion.topicTitle)
+      ),
 
   search: async (params: {
     search?: string;
@@ -94,14 +137,15 @@ export const topicsRepo = {
         .from(topics)
         .where(eq(topics.stageId, data.stageId))
         .orderBy(desc(topics.stageOrder));
-      
-      const maxOrder = existingTopics.length > 0 && existingTopics[0].stageOrder !== null
-        ? existingTopics[0].stageOrder!
-        : 0;
-      
+
+      const maxOrder =
+        existingTopics.length > 0 && existingTopics[0].stageOrder !== null
+          ? existingTopics[0].stageOrder!
+          : 0;
+
       data.stageOrder = maxOrder + 1;
     }
-    
+
     return db.insert(topics).values(data).returning();
   },
 
@@ -243,77 +287,82 @@ export const topicsRepo = {
   },
 
   // Reorder slides based on an array of slide IDs in the desired order
+  // Optimized to use bulk UPDATE queries with CASE statements
+  // Uses two-phase update to avoid unique constraint violations
   reorderSlides: async (topicId: string, slideIds: string[]) => {
-    // First, move all slides to temporary high indices to avoid conflicts
-    const tempOffset = 100000;
+    if (slideIds.length === 0) {
+      return;
+    }
+
+    // Get all slides for this topic to handle any not in slideIds array
     const allSlides = await db
       .select()
       .from(topicSlides)
       .where(eq(topicSlides.topicId, topicId));
 
-    // Phase 1: Move all slides to temporary indices
-    for (let i = 0; i < allSlides.length; i++) {
-      await db
-        .update(topicSlides)
-        .set({
-          orderIndex: tempOffset + i,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(topicSlides.id, allSlides[i].id));
-    }
-
-    // Phase 2: Assign new orderIndex values based on slideIds array (0-indexed)
-    for (let i = 0; i < slideIds.length; i++) {
-      await db
-        .update(topicSlides)
-        .set({
-          orderIndex: i,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(topicSlides.id, slideIds[i]));
-    }
-
-    // Phase 3: Handle any slides not in the slideIds array (shouldn't happen, but handle gracefully)
-    // Get all slides again to find any that still have temp indices
-    const remainingSlides = await db
-      .select()
-      .from(topicSlides)
-      .where(eq(topicSlides.topicId, topicId));
-
-    // Find slides that weren't in the slideIds array (they still have temp indices)
-    const slidesNotInArray = remainingSlides.filter(
+    const slidesNotInArray = allSlides.filter(
       (slide) => !slideIds.includes(slide.id)
     );
 
-    // Assign sequential orderIndex to remaining slides (append to end)
+    // Phase 1: Move all slides to temporary high indices to avoid conflicts
+    // This ensures we don't have unique constraint violations when reassigning
+    const tempOffset = 1000000;
+    const tempSqlChunks: SQL[] = [sql`(CASE`];
+    const allSlideIds = [...slideIds, ...slidesNotInArray.map((s) => s.id)];
+
+    for (let i = 0; i < allSlideIds.length; i++) {
+      tempSqlChunks.push(
+        sql`WHEN ${topicSlides.id} = ${allSlideIds[i]} THEN ${tempOffset + i}`
+      );
+    }
+
+    tempSqlChunks.push(sql`ELSE ${topicSlides.orderIndex} END)`);
+    const tempOrderIndexCase = sql.join(tempSqlChunks, sql.raw(" "));
+
+    await db
+      .update(topicSlides)
+      .set({
+        orderIndex: tempOrderIndexCase,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(topicSlides.topicId, topicId),
+          inArray(topicSlides.id, allSlideIds)
+        )
+      );
+
+    // Phase 2: Assign final orderIndex values based on slideIds array (0-indexed)
+    const finalSqlChunks: SQL[] = [sql`(CASE`];
+
+    for (let i = 0; i < slideIds.length; i++) {
+      finalSqlChunks.push(
+        sql`WHEN ${topicSlides.id} = ${slideIds[i]} THEN ${i}`
+      );
+    }
+
+    // Assign remaining slides (not in slideIds array) to positions after slideIds
     for (let i = 0; i < slidesNotInArray.length; i++) {
-      await db
-        .update(topicSlides)
-        .set({
-          orderIndex: slideIds.length + i,
-          updatedAt: sql`now()`,
-        })
-        .where(eq(topicSlides.id, slidesNotInArray[i].id));
+      finalSqlChunks.push(
+        sql`WHEN ${topicSlides.id} = ${slidesNotInArray[i].id} THEN ${slideIds.length + i}`
+      );
     }
 
-    // Final normalization to ensure sequential order (0, 1, 2, 3...)
-    const finalSlides = await db
-      .select()
-      .from(topicSlides)
-      .where(eq(topicSlides.topicId, topicId))
-      .orderBy(asc(topicSlides.orderIndex));
+    finalSqlChunks.push(sql`ELSE ${topicSlides.orderIndex} END)`);
+    const finalOrderIndexCase = sql.join(finalSqlChunks, sql.raw(" "));
 
-    for (let i = 0; i < finalSlides.length; i++) {
-      if (finalSlides[i].orderIndex !== i) {
-        await db
-          .update(topicSlides)
-          .set({
-            orderIndex: i,
-            updatedAt: sql`now()`,
-          })
-          .where(eq(topicSlides.id, finalSlides[i].id));
-      }
-    }
+    await db
+      .update(topicSlides)
+      .set({
+        orderIndex: finalOrderIndexCase,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(topicSlides.topicId, topicId),
+          inArray(topicSlides.id, allSlideIds)
+        )
+      );
   },
 
   getSlideWithTopicAndStage: async (slideId: string) => {

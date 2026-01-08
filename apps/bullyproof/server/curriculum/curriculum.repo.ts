@@ -82,7 +82,7 @@ export const curriculumRepo = {
       .where(eq(curriculumStages.code, code))
       .limit(1),
 
-  getYears: () =>
+  getYears: (levelIds?: string[]) =>
     db
       .select({
         year: schoolYears,
@@ -90,12 +90,21 @@ export const curriculumRepo = {
       })
       .from(schoolYears)
       .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
+      .where(
+        levelIds && levelIds.length > 0
+          ? inArray(schoolYears.levelId, levelIds)
+          : undefined
+      )
       .orderBy(asc(schoolYears.sortIndex)),
 
   getYearsByLevel: (levelId: string) =>
     db
-      .select()
+      .select({
+        year: schoolYears,
+        level: schoolLevels,
+      })
       .from(schoolYears)
+      .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
       .where(eq(schoolYears.levelId, levelId))
       .orderBy(asc(schoolYears.sortIndex)),
 
