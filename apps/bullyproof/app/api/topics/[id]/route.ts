@@ -44,7 +44,9 @@ export async function GET(
     }
 
     const { id } = await params;
-    const topicData = await topicsService.getTopicById({ userId }, { id });
+    const { searchParams } = new URL(request.url);
+    const query = Object.fromEntries(searchParams.entries());
+    const topicData = await topicsService.getTopicById({ userId }, { id, ...query });
 
     if (!topicData) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });

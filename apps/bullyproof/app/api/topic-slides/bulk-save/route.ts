@@ -33,6 +33,9 @@ import { topicsRepo } from "@/server/topics/topics.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 import { getUserScopedRoles } from "@/server/auth/rbac";
+import { db } from "@/server/db/drizzle";
+import { topicSlides } from "@/server/db/schema";
+import { eq, and, inArray } from "drizzle-orm";
 
 export async function POST(request: Request) {
   console.log("[bulk-save] Starting bulk save request");
@@ -488,35 +491,98 @@ export async function POST(request: Request) {
       }
 
       // Build final order by inserting new slides at their intended positions
+      // The orderIndex values from creates represent the final position in the sorted array
+      // The reorder array contains existing slide IDs in the order they appear in the frontend's sorted array
+      // The frontend has already calculated the correct order, so we just need to merge them correctly
+
+      // Calculate total number of slides in final order
+      const totalSlides = validReorderIds.length + newSlidePositions.length;
+
       const finalOrder: string[] = [];
       let existingIndex = 0;
       let newSlideIndex = 0;
-      let currentPosition = 0;
 
-      // Merge: insert new slides at their orderIndex positions, existing slides fill gaps
-      while (
-        existingIndex < validReorderIds.length ||
-        newSlideIndex < newSlidePositions.length
+      // Build final order by going through each position
+      for (
+        let currentPosition = 0;
+        currentPosition < totalSlides;
+        currentPosition++
       ) {
-        // Check if we should insert a new slide at current position
+        // Check if a new slide should be inserted at this position
         if (
           newSlideIndex < newSlidePositions.length &&
           newSlidePositions[newSlideIndex][0] === currentPosition
         ) {
+          // Insert new slide at this position
           finalOrder.push(newSlidePositions[newSlideIndex][1]);
           newSlideIndex++;
-        }
-
-        // Add existing slide
-        if (existingIndex < validReorderIds.length) {
+        } else if (existingIndex < validReorderIds.length) {
+          // This position should be filled by an existing slide
+          // The reorder array contains existing slides in their final order
+          // We place them sequentially, skipping positions where new slides go
           finalOrder.push(validReorderIds[existingIndex]);
           existingIndex++;
         }
-
-        currentPosition++;
       }
 
       console.log(`[bulk-save] Final order has ${finalOrder.length} slide(s)`);
+
+      // Validate that all slides belong to this topic (security check)
+      if (finalOrder.length > 0) {
+        console.log(
+          "[bulk-save] Validating slide ownership before reordering..."
+        );
+
+        // Get current slides after creates/deletes to validate ownership
+        // Use a targeted query to check only the slides in finalOrder
+        const slidesToValidate = await db
+          .select({ id: topicSlides.id })
+          .from(topicSlides)
+          .where(
+            and(
+              eq(topicSlides.topicId, topicId),
+              inArray(topicSlides.id, finalOrder)
+            )
+          );
+
+        const validSlideIds = new Set(slidesToValidate.map((s) => s.id));
+
+        // Check if all slides in finalOrder belong to this topic
+        const invalidSlideIds = finalOrder.filter(
+          (slideId) => !validSlideIds.has(slideId)
+        );
+
+        if (invalidSlideIds.length > 0) {
+          console.error(
+            `[bulk-save] ERROR: Found ${invalidSlideIds.length} slide(s) that do not belong to topic ${topicId}:`,
+            invalidSlideIds
+          );
+          return NextResponse.json(
+            {
+              error: `Some slides do not belong to this topic: ${invalidSlideIds.join(", ")}`,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Verify that finalOrder length matches expected count (existing + new - deleted)
+        // We already have currentTopicData from earlier, but need to account for creates/deletes
+        const expectedCount =
+          (currentTopicData?.slides?.length || 0) +
+          createdSlideIds.length -
+          deletedSlideIds.size;
+
+        if (finalOrder.length !== expectedCount) {
+          console.warn(
+            `[bulk-save] WARNING: Final order count (${finalOrder.length}) does not match expected count (${expectedCount}). Proceeding anyway.`
+          );
+        }
+
+        console.log(
+          "[bulk-save] Validation passed - all slides belong to topic"
+        );
+      }
+
       console.log(
         `[bulk-save] Calling topicsRepo.reorderSlides with topicId: ${topicId}`
       );
