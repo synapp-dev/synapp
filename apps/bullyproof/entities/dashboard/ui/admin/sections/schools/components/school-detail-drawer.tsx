@@ -49,22 +49,18 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar";
+
 import {
   meApi,
   type UserWithRolesAndSchools,
 } from "@/entities/me/api/endpoints";
 import { classesApi } from "@/entities/classes/api/endpoints";
 import type { classes } from "@/server/db/schema";
-import { invitesApi } from "@/entities/invites/api/endpoints";
-import { apiFetch } from "@/lib/api/fetcher.client";
+
 import { licencesApi } from "@/entities/licences/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { usersApi } from "@/entities/users/api/endpoints";
+import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
 import type { schoolYears } from "@/server/db/schema";
 import {
   Popover,
@@ -107,6 +103,9 @@ import {
   Check,
   X,
   ChevronDown,
+  Upload,
+  FileText,
+  ArrowLeft,
 } from "lucide-react";
 import { type School as SchoolType } from "./schools-table-columns";
 
@@ -213,6 +212,20 @@ function SchoolDetailDrawerContent({
   const [addAdminSuccess, setAddAdminSuccess] = useState(false);
   const [addTeacherDialogOpen, setAddTeacherDialogOpen] = useState(false);
   const [addTeacherSuccess, setAddTeacherSuccess] = useState(false);
+  const [addTeacherStep, setAddTeacherStep] = useState<
+    "selection" | "manual" | "csv"
+  >("selection");
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvData, setCsvData] = useState<
+    Array<{ email: string; firstName?: string; lastName?: string }>
+  >([]);
+  const [csvError, setCsvError] = useState<string | null>(null);
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({
+    completed: 0,
+    total: 0,
+    errors: 0,
+  });
   const [addClassDialogOpen, setAddClassDialogOpen] = useState(false);
 
   // Class form states
@@ -225,6 +238,9 @@ function SchoolDetailDrawerContent({
   >([]);
   const [loadingYears, setLoadingYears] = useState(false);
   const [yearComboboxOpen, setYearComboboxOpen] = useState(false);
+  const [schoolLevelsMap, setSchoolLevelsMap] = useState<Map<string, string>>(
+    new Map()
+  ); // Maps level name/key to level ID
 
   // Licence state
   const [schoolLicence, setSchoolLicence] = useState<any | null>(null);
@@ -270,6 +286,237 @@ function SchoolDetailDrawerContent({
     ? isValidEmail(teacherEmail)
     : false;
 
+  // CSV parsing function - handles quoted fields and commas within quotes
+  const parseCSV = (
+    file: File
+  ): Promise<
+    Array<{ email: string; firstName?: string; lastName?: string }>
+  > => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target?.result as string;
+          const lines = text.split(/\r?\n/).filter((line) => line.trim());
+
+          if (lines.length === 0) {
+            reject(new Error("CSV file is empty"));
+            return;
+          }
+
+          // Helper function to parse CSV line handling quoted fields
+          const parseCSVLine = (line: string): string[] => {
+            const result: string[] = [];
+            let current = "";
+            let inQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+              const char = line[i];
+              const nextChar = line[i + 1];
+
+              if (char === '"') {
+                if (inQuotes && nextChar === '"') {
+                  // Escaped quote
+                  current += '"';
+                  i++; // Skip next quote
+                } else {
+                  // Toggle quote state
+                  inQuotes = !inQuotes;
+                }
+              } else if (char === "," && !inQuotes) {
+                // Field separator
+                result.push(current.trim());
+                current = "";
+              } else {
+                current += char;
+              }
+            }
+            result.push(current.trim()); // Add last field
+            return result;
+          };
+
+          // Parse header row
+          const header = parseCSVLine(lines[0]).map((h) =>
+            h.toLowerCase().replace(/^"|"$/g, "")
+          );
+          const emailIndex = header.findIndex(
+            (h) => h === "email" || h === "e-mail"
+          );
+          const firstNameIndex = header.findIndex(
+            (h) => h === "firstname" || h === "first name" || h === "first_name"
+          );
+          const lastNameIndex = header.findIndex(
+            (h) => h === "lastname" || h === "last name" || h === "last_name"
+          );
+
+          if (emailIndex === -1) {
+            reject(new Error("CSV file must contain an 'email' column"));
+            return;
+          }
+
+          // Parse data rows
+          const data: Array<{
+            email: string;
+            firstName?: string;
+            lastName?: string;
+          }> = [];
+          const errors: string[] = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const values = parseCSVLine(lines[i]).map((v) =>
+              v.replace(/^"|"$/g, "")
+            );
+            const email = values[emailIndex]?.trim();
+
+            if (!email) {
+              errors.push(`Row ${i + 1}: Missing email`);
+              continue;
+            }
+
+            if (!isValidEmail(email)) {
+              errors.push(`Row ${i + 1}: Invalid email "${email}"`);
+              continue;
+            }
+
+            data.push({
+              email,
+              firstName:
+                firstNameIndex >= 0 && values[firstNameIndex]
+                  ? values[firstNameIndex].trim()
+                  : undefined,
+              lastName:
+                lastNameIndex >= 0 && values[lastNameIndex]
+                  ? values[lastNameIndex].trim()
+                  : undefined,
+            });
+          }
+
+          if (data.length === 0) {
+            reject(new Error("No valid teacher data found in CSV file"));
+            return;
+          }
+
+          if (errors.length > 0) {
+            setCsvError(
+              `Some rows had errors:\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? `\n... and ${errors.length - 5} more` : ""}`
+            );
+          }
+
+          resolve(data);
+        } catch (error: any) {
+          reject(new Error(`Failed to parse CSV: ${error.message}`));
+        }
+      };
+      reader.onerror = () => reject(new Error("Failed to read file"));
+      reader.readAsText(file);
+    });
+  };
+
+  // Handle CSV file selection
+  const handleCsvFileSelect = async (file: File) => {
+    if (!file.name.endsWith(".csv")) {
+      setCsvError("Please select a CSV file");
+      return;
+    }
+
+    setCsvFile(file);
+    setCsvError(null);
+
+    try {
+      const parsed = await parseCSV(file);
+      setCsvData(parsed);
+      setAddTeacherStep("csv");
+    } catch (error: any) {
+      setCsvError(error.message);
+      setCsvFile(null);
+      setCsvData([]);
+    }
+  };
+
+  // Handle bulk teacher creation
+  const handleBulkCreateTeachers = async () => {
+    if (!school || csvData.length === 0) return;
+
+    setBulkSubmitting(true);
+    setBulkProgress({ completed: 0, total: csvData.length, errors: 0 });
+    setCsvError(null);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < csvData.length; i++) {
+      const teacher = csvData[i];
+      try {
+        const result = await usersApi.post.new.teacher({
+          schoolId: school.id,
+          email: teacher.email,
+          firstName: teacher.firstName?.trim() || undefined,
+          lastName: teacher.lastName?.trim() || undefined,
+        });
+
+        if (result.error) {
+          errorCount++;
+          console.error(
+            `Failed to create teacher ${teacher.email}:`,
+            result.error
+          );
+        } else {
+          successCount++;
+        }
+      } catch (error) {
+        errorCount++;
+        console.error(`Failed to create teacher ${teacher.email}:`, error);
+      }
+
+      setBulkProgress({
+        completed: i + 1,
+        total: csvData.length,
+        errors: errorCount,
+      });
+    }
+
+    // Refresh users list
+    if (activeSection === "users") {
+      const usersResult = await meApi.get.listAllUsers();
+      if (!usersResult.error && usersResult.data) {
+        const schoolUsers = usersResult.data.filter((user) =>
+          user.schoolRoles.some((role) => role.schoolId === school.id)
+        );
+        setUsers(schoolUsers);
+      }
+    }
+
+    // Refresh school data to update counts
+    onSchoolUpdate?.();
+
+    if (errorCount > 0) {
+      setCsvError(
+        `${successCount} teachers added successfully. ${errorCount} failed.`
+      );
+    } else {
+      setAddTeacherSuccess(true);
+      setTimeout(() => {
+        // Reset and close dialog
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.delete("dialog");
+        const newUrl = params.toString()
+          ? `/admin/schools?${params.toString()}`
+          : "/admin/schools";
+        router.replace(newUrl, { scroll: false });
+
+        setAddTeacherSuccess(false);
+        setAddTeacherStep("selection");
+        setCsvFile(null);
+        setCsvData([]);
+        setCsvError(null);
+        setBulkProgress({ completed: 0, total: 0, errors: 0 });
+        setAddTeacherDialogOpen(false);
+      }, 2000);
+    }
+
+    setBulkSubmitting(false);
+  };
+
   useEffect(() => {
     if (activeSection === "users" && school) {
       setLoadingUsers(true);
@@ -312,12 +559,48 @@ function SchoolDetailDrawerContent({
     }
   }, [activeSection, school]);
 
+  // Fetch school levels on mount to create mapping
+  useEffect(() => {
+    schoolLevelsApi.get
+      .list()
+      .then((result) => {
+        if (!result.error && result.data) {
+          const map = new Map<string, string>();
+          result.data.forEach((level) => {
+            // Map both by key and by name (case-insensitive)
+            if (level.key) {
+              map.set(level.key.toLowerCase(), level.id);
+            }
+            if (level.name) {
+              map.set(level.name.toLowerCase(), level.id);
+            }
+          });
+          setSchoolLevelsMap(map);
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to fetch school levels:", error);
+      });
+  }, []);
+
   // Fetch school years when dialog opens
   useEffect(() => {
-    if (addClassDialogOpen && school) {
+    if (addClassDialogOpen && school && schoolLevelsMap.size > 0) {
       setLoadingYears(true);
+
+      // Extract level IDs from school's levels array
+      // School levels structure: string[] (level names like ["Primary", "Secondary"])
+      const levelIds = school.levels
+        ?.map((levelName: string) => {
+          // Look up level ID by name (case-insensitive)
+          const normalizedName = levelName.toLowerCase().trim();
+          return schoolLevelsMap.get(normalizedName);
+        })
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+      // Fetch years filtered by school's level IDs
       curriculumApi.years
-        .list()
+        .list(levelIds && levelIds.length > 0 ? { levelIds } : undefined)
         .then((result) => {
           if (!result.error && result.data) {
             // Extract year objects from the nested response structure
@@ -353,7 +636,7 @@ function SchoolDetailDrawerContent({
       setClassRunningYear("");
       setSelectedYearIds([]);
     }
-  }, [addClassDialogOpen, school]);
+  }, [addClassDialogOpen, school, schoolLevelsMap]);
 
   // Generate year options for class running year (current year - 2 to current year + 8)
   const getClassRunningYearOptions = () => {
@@ -531,7 +814,7 @@ function SchoolDetailDrawerContent({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[95vh] w-full max-w-4xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-hidden flex flex-col"
+        className="h-[95vh] w-full max-w-6xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-hidden flex flex-col"
       >
         <SheetTitle className="sr-only">
           {school.name} - School Details
@@ -2099,6 +2382,11 @@ function SchoolDetailDrawerContent({
             setTeacherEmail("");
             setTeacherFirstName("");
             setTeacherLastName("");
+            setAddTeacherStep("selection");
+            setCsvFile(null);
+            setCsvData([]);
+            setCsvError(null);
+            setBulkProgress({ completed: 0, total: 0, errors: 0 });
           }
           setAddTeacherDialogOpen(open);
         }}
@@ -2111,164 +2399,416 @@ function SchoolDetailDrawerContent({
           }
         >
           <DialogHeader>
-            <DialogTitle>Add Teacher</DialogTitle>
+            <DialogTitle>
+              {addTeacherStep === "selection"
+                ? "Add Teacher"
+                : addTeacherStep === "manual"
+                  ? "Add Single Teacher"
+                  : "Upload CSV File"}
+            </DialogTitle>
             <DialogDescription>
-              Invite a user to become a teacher for this school.
+              {addTeacherStep === "selection"
+                ? "Choose how you want to add teachers to this school."
+                : addTeacherStep === "manual"
+                  ? "Invite a user to become a teacher for this school."
+                  : "Upload a CSV file to bulk add teachers. The CSV should have columns: email, firstname (optional), lastname (optional)."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="teacher-first-name">
-                  First Name (Optional)
-                </Label>
-                <Input
-                  id="teacher-first-name"
-                  type="text"
-                  placeholder="Enter first name"
-                  value={teacherFirstName}
-                  onChange={(e) => setTeacherFirstName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="teacher-last-name">Last Name (Optional)</Label>
-                <Input
-                  id="teacher-last-name"
-                  type="text"
-                  placeholder="Enter last name"
-                  value={teacherLastName}
-                  onChange={(e) => setTeacherLastName(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="teacher-email">Email Address</Label>
-              <Input
-                id="teacher-email"
-                type="email"
-                placeholder="Enter email address"
-                value={teacherEmail}
-                onChange={(e) => setTeacherEmail(e.target.value)}
-                className={
-                  teacherEmail && !hasValidTeacherEmail
-                    ? "border-red-500 focus-visible:ring-red-500"
-                    : ""
-                }
-              />
-              {teacherEmail && !hasValidTeacherEmail && (
-                <p className="text-sm text-red-500">
-                  Please enter a valid email address (e.g., name@domain.com)
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                // Remove dialog query parameter from URL
-                const params = new URLSearchParams(
-                  searchParams?.toString() || ""
-                );
-                params.delete("dialog");
-                const newUrl = params.toString()
-                  ? `/admin/schools?${params.toString()}`
-                  : "/admin/schools";
-                router.replace(newUrl, { scroll: false });
 
-                // Reset form and state
-                setAddTeacherSuccess(false);
-                setTeacherEmail("");
-                setTeacherFirstName("");
-                setTeacherLastName("");
-                setAddTeacherDialogOpen(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (!school || !hasValidTeacherEmail) return;
-                setSubmitting(true);
-                try {
-                  const result = await usersApi.post.new.teacher({
-                    schoolId: school.id,
-                    email: teacherEmail,
-                    firstName: teacherFirstName.trim() || undefined,
-                    lastName: teacherLastName.trim() || undefined,
-                  });
-                  if (result.error) {
-                    console.error("Failed to create teacher:", result.error);
-                  } else {
-                    // Show success state
-                    setAddTeacherSuccess(true);
-                    setSubmitting(false);
-
-                    // Refresh users list
-                    if (activeSection === "users") {
-                      const usersResult = await meApi.get.listAllUsers();
-                      if (!usersResult.error && usersResult.data) {
-                        const schoolUsers = usersResult.data.filter((user) =>
-                          user.schoolRoles.some(
-                            (role) => role.schoolId === school.id
-                          )
-                        );
-                        setUsers(schoolUsers);
+          {/* Selection Step */}
+          {addTeacherStep === "selection" && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card
+                  className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
+                  onClick={() => setAddTeacherStep("manual")}
+                >
+                  <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
+                    <UserPlus className="h-12 w-12 text-primary" />
+                    <h3 className="font-semibold text-lg">
+                      Add Single Teacher
+                    </h3>
+                    <p className="text-sm text-muted-foreground text-center">
+                      Manually enter teacher details one at a time
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card
+                  className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = ".csv";
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        handleCsvFileSelect(file);
                       }
+                    };
+                    input.click();
+                  }}
+                >
+                  <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
+                    <Upload className="h-12 w-12 text-primary" />
+                    <h3 className="font-semibold text-lg">Upload CSV File</h3>
+                    <p className="text-sm text-muted-foreground text-center">
+                      Bulk import multiple teachers from a CSV file
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          )}
+
+          {/* Manual Entry Step */}
+          {addTeacherStep === "manual" && (
+            <>
+              <div className="space-y-4 py-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="teacher-first-name">
+                      First Name (Optional)
+                    </Label>
+                    <Input
+                      id="teacher-first-name"
+                      type="text"
+                      placeholder="Enter first name"
+                      value={teacherFirstName}
+                      onChange={(e) => setTeacherFirstName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="teacher-last-name">
+                      Last Name (Optional)
+                    </Label>
+                    <Input
+                      id="teacher-last-name"
+                      type="text"
+                      placeholder="Enter last name"
+                      value={teacherLastName}
+                      onChange={(e) => setTeacherLastName(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="teacher-email">Email Address</Label>
+                  <Input
+                    id="teacher-email"
+                    type="email"
+                    placeholder="Enter email address"
+                    value={teacherEmail}
+                    onChange={(e) => setTeacherEmail(e.target.value)}
+                    className={
+                      teacherEmail && !hasValidTeacherEmail
+                        ? "border-red-500 focus-visible:ring-red-500"
+                        : ""
                     }
+                  />
+                  {teacherEmail && !hasValidTeacherEmail && (
+                    <p className="text-sm text-red-500">
+                      Please enter a valid email address (e.g., name@domain.com)
+                    </p>
+                  )}
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setAddTeacherStep("selection")}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const params = new URLSearchParams(
+                      searchParams?.toString() || ""
+                    );
+                    params.delete("dialog");
+                    const newUrl = params.toString()
+                      ? `/admin/schools?${params.toString()}`
+                      : "/admin/schools";
+                    router.replace(newUrl, { scroll: false });
 
-                    // Refresh school data to update counts
-                    onSchoolUpdate?.();
+                    setAddTeacherSuccess(false);
+                    setTeacherEmail("");
+                    setTeacherFirstName("");
+                    setTeacherLastName("");
+                    setAddTeacherStep("selection");
+                    setAddTeacherDialogOpen(false);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!school || !hasValidTeacherEmail) return;
+                    setSubmitting(true);
+                    try {
+                      const result = await usersApi.post.new.teacher({
+                        schoolId: school.id,
+                        email: teacherEmail,
+                        firstName: teacherFirstName.trim() || undefined,
+                        lastName: teacherLastName.trim() || undefined,
+                      });
+                      if (result.error) {
+                        console.error(
+                          "Failed to create teacher:",
+                          result.error
+                        );
+                      } else {
+                        // Show success state
+                        setAddTeacherSuccess(true);
+                        setSubmitting(false);
 
-                    // Wait 2 seconds, then remove dialog param from URL (which will close dialog)
-                    setTimeout(() => {
-                      // Set flag to prevent effect from interfering
-                      isClosingDialogRef.current = true;
+                        // Refresh users list
+                        if (activeSection === "users") {
+                          const usersResult = await meApi.get.listAllUsers();
+                          if (!usersResult.error && usersResult.data) {
+                            const schoolUsers = usersResult.data.filter(
+                              (user) =>
+                                user.schoolRoles.some(
+                                  (role) => role.schoolId === school.id
+                                )
+                            );
+                            setUsers(schoolUsers);
+                          }
+                        }
 
-                      // Remove dialog query parameter from URL
-                      const params = new URLSearchParams(
-                        searchParams?.toString() || ""
-                      );
-                      params.delete("dialog");
-                      const newUrl = params.toString()
-                        ? `/admin/schools?${params.toString()}`
-                        : "/admin/schools";
-                      router.replace(newUrl, { scroll: false });
+                        // Refresh school data to update counts
+                        onSchoolUpdate?.();
 
-                      // Reset form and state
-                      setAddTeacherSuccess(false);
-                      setTeacherEmail("");
-                      setTeacherFirstName("");
-                      setTeacherLastName("");
+                        // Wait 2 seconds, then remove dialog param from URL (which will close dialog)
+                        setTimeout(() => {
+                          // Set flag to prevent effect from interfering
+                          isClosingDialogRef.current = true;
 
-                      // Reset flag after a brief delay to allow URL update to complete
-                      setTimeout(() => {
-                        isClosingDialogRef.current = false;
-                      }, 100);
-                    }, 2000);
+                          // Remove dialog query parameter from URL
+                          const params = new URLSearchParams(
+                            searchParams?.toString() || ""
+                          );
+                          params.delete("dialog");
+                          const newUrl = params.toString()
+                            ? `/admin/schools?${params.toString()}`
+                            : "/admin/schools";
+                          router.replace(newUrl, { scroll: false });
+
+                          // Reset form and state
+                          setAddTeacherSuccess(false);
+                          setTeacherEmail("");
+                          setTeacherFirstName("");
+                          setTeacherLastName("");
+                          setAddTeacherStep("selection");
+
+                          // Reset flag after a brief delay to allow URL update to complete
+                          setTimeout(() => {
+                            isClosingDialogRef.current = false;
+                          }, 100);
+                        }, 2000);
+                      }
+                    } catch (error) {
+                      console.error("Failed to create teacher:", error);
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  disabled={
+                    submitting || !hasValidTeacherEmail || addTeacherSuccess
                   }
-                } catch (error) {
-                  console.error("Failed to create teacher:", error);
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              disabled={
-                submitting || !hasValidTeacherEmail || addTeacherSuccess
-              }
-              className={
-                addTeacherSuccess
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : ""
-              }
-            >
-              {addTeacherSuccess
-                ? "Add Successful"
-                : submitting
-                  ? "Creating..."
-                  : "Add Teacher"}
-            </Button>
-          </DialogFooter>
+                  className={
+                    addTeacherSuccess
+                      ? "bg-green-600 hover:bg-green-700 text-white"
+                      : ""
+                  }
+                >
+                  {addTeacherSuccess
+                    ? "Add Successful"
+                    : submitting
+                      ? "Creating..."
+                      : "Add Teacher"}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {/* CSV Upload Step */}
+          {addTeacherStep === "csv" && (
+            <>
+              <div className="space-y-4 py-4">
+                {csvError && (
+                  <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md">
+                    <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-line">
+                      {csvError}
+                    </p>
+                  </div>
+                )}
+
+                {csvFile && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+                      <FileText className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm font-medium">
+                        {csvFile.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">
+                        {csvData.length} teacher
+                        {csvData.length !== 1 ? "s" : ""} found
+                      </span>
+                    </div>
+
+                    {csvData.length > 0 && (
+                      <div className="border rounded-md max-h-[300px] overflow-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Email</TableHead>
+                              <TableHead>First Name</TableHead>
+                              <TableHead>Last Name</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {csvData.slice(0, 10).map((row, idx) => (
+                              <TableRow key={idx}>
+                                <TableCell className="font-medium">
+                                  {row.email}
+                                </TableCell>
+                                <TableCell>{row.firstName || "—"}</TableCell>
+                                <TableCell>{row.lastName || "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                        {csvData.length > 10 && (
+                          <div className="p-2 text-xs text-muted-foreground text-center">
+                            ... and {csvData.length - 10} more
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {bulkSubmitting && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Processing teachers...</span>
+                          <span>
+                            {bulkProgress.completed} / {bulkProgress.total}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary h-2 rounded-full transition-all"
+                            style={{
+                              width: `${(bulkProgress.completed / bulkProgress.total) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        {bulkProgress.errors > 0 && (
+                          <p className="text-sm text-red-500">
+                            {bulkProgress.errors} error
+                            {bulkProgress.errors !== 1 ? "s" : ""} occurred
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {!csvFile && (
+                  <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8">
+                    <div className="flex flex-col items-center justify-center gap-4">
+                      <Upload className="h-12 w-12 text-muted-foreground" />
+                      <div className="text-center">
+                        <p className="font-medium">Upload CSV File</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Select a CSV file with columns: email, firstname
+                          (optional), lastname (optional)
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".csv";
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement)
+                              .files?.[0];
+                            if (file) {
+                              handleCsvFileSelect(file);
+                            }
+                          };
+                          input.click();
+                        }}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        Choose File
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAddTeacherStep("selection");
+                    setCsvFile(null);
+                    setCsvData([]);
+                    setCsvError(null);
+                  }}
+                  disabled={bulkSubmitting}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const params = new URLSearchParams(
+                      searchParams?.toString() || ""
+                    );
+                    params.delete("dialog");
+                    const newUrl = params.toString()
+                      ? `/admin/schools?${params.toString()}`
+                      : "/admin/schools";
+                    router.replace(newUrl, { scroll: false });
+
+                    setAddTeacherSuccess(false);
+                    setAddTeacherStep("selection");
+                    setCsvFile(null);
+                    setCsvData([]);
+                    setCsvError(null);
+                    setBulkProgress({ completed: 0, total: 0, errors: 0 });
+                    setAddTeacherDialogOpen(false);
+                  }}
+                  disabled={bulkSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleBulkCreateTeachers}
+                  disabled={
+                    !csvFile ||
+                    csvData.length === 0 ||
+                    bulkSubmitting ||
+                    addTeacherSuccess
+                  }
+                  className={
+                    addTeacherSuccess
+                      ? "bg-green-600 hover:bg-green-700 text-white"
+                      : ""
+                  }
+                >
+                  {addTeacherSuccess
+                    ? "Upload Successful"
+                    : bulkSubmitting
+                      ? `Adding... (${bulkProgress.completed}/${bulkProgress.total})`
+                      : `Add ${csvData.length} Teacher${csvData.length !== 1 ? "s" : ""}`}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -2315,7 +2855,10 @@ function SchoolDetailDrawerContent({
             {/* Class Running Year - Full width */}
             <div className="space-y-2">
               <Label htmlFor="class-running-year">
-                What year is this class running?
+                What year is this class running?{" "}
+                <span className="text-muted-foreground font-normal">
+                  (Optional)
+                </span>
               </Label>
               <Select
                 value={classRunningYear}
@@ -2338,7 +2881,9 @@ function SchoolDetailDrawerContent({
             <div className="grid grid-cols-4 gap-4">
               {/* Class Name - 3/4 width */}
               <div className="col-span-3 space-y-2">
-                <Label htmlFor="class-name">Class Name</Label>
+                <Label htmlFor="class-name">
+                  Class Name <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="class-name"
                   placeholder="Enter class name"
@@ -2360,7 +2905,9 @@ function SchoolDetailDrawerContent({
 
             {/* School Years Multi-Select - Full width */}
             <div className="space-y-2">
-              <Label>School Years</Label>
+              <Label>
+                School Years <span className="text-red-500">*</span>
+              </Label>
               <Popover
                 modal
                 open={yearComboboxOpen}
@@ -2497,7 +3044,8 @@ function SchoolDetailDrawerContent({
             </Button>
             <Button
               onClick={async () => {
-                if (!school || !className) return;
+                if (!school || !className || selectedYearIds.length === 0)
+                  return;
                 setSubmitting(true);
                 try {
                   // Convert selected year to January 1st of that year
@@ -2507,12 +3055,14 @@ function SchoolDetailDrawerContent({
                       ).toISOString()
                     : undefined;
 
+                  // If no code provided, use the class name as the code
+                  const finalCode = classCode.trim() || className.trim();
+
                   const result = await classesApi.post.create({
                     schoolId: school.id,
                     name: className,
-                    code: classCode || undefined,
-                    yearIds:
-                      selectedYearIds.length > 0 ? selectedYearIds : undefined,
+                    code: finalCode,
+                    yearIds: selectedYearIds,
                     startYear: startYearDate,
                   });
                   if (result.error) {
@@ -2568,7 +3118,9 @@ function SchoolDetailDrawerContent({
                   setSubmitting(false);
                 }
               }}
-              disabled={submitting || !className}
+              disabled={
+                submitting || !className || selectedYearIds.length === 0
+              }
             >
               {submitting ? "Creating..." : "Create"}
             </Button>
@@ -2586,7 +3138,7 @@ export function SchoolDetailDrawer(props: SchoolDetailDrawerProps) {
         <Sheet open={props.open} onOpenChange={props.onOpenChange}>
           <SheetContent
             side="bottom"
-            className="h-[95vh] w-full max-w-4xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-hidden flex flex-col"
+            className="h-[95vh] w-full max-w-6xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-hidden flex flex-col"
           >
             <div className="flex items-center justify-center min-h-[400px]">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
