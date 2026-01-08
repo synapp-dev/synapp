@@ -121,11 +121,6 @@ export function StageView({
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
                           <p className="font-medium text-sm">{topic.title}</p>
-                          {topic.description && (
-                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                              {topic.description}
-                            </p>
-                          )}
                         </div>
                         {topic.slides && topic.slides.length > 0 && (
                           <Badge variant="secondary" className="ml-2">
