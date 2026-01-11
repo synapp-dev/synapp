@@ -5,6 +5,30 @@ import type { vUserProfileExpanded, vSchoolsEnriched } from "@/drizzle/schema";
 type UserProfile = typeof vUserProfileExpanded.$inferSelect;
 type School = typeof vSchoolsEnriched.$inferSelect;
 
+export type UpdateLogChange = {
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+};
+
+export type UpdateLog = {
+  type?: "creation" | "update";
+  updatedAt: string;
+  updatedBy: string;
+  changes?: UpdateLogChange[];
+};
+
+export type RoleLog = {
+  action: "assigned" | "removed";
+  roleId: string;
+  roleName: string;
+  roleKey: string | null;
+  schoolId: string | null;
+  schoolName: string | null;
+  updatedAt: string;
+  updatedBy: string;
+};
+
 export type UserWithRolesAndSchools = {
   id: string;
   firstName: string | null;
@@ -13,7 +37,11 @@ export type UserWithRolesAndSchools = {
   avatarUrl: string | null;
   createdAt: string | null;
   updatedAt: string | null;
-  metadata: any;
+  metadata: {
+    updateLogs?: UpdateLog[];
+    roleLogs?: RoleLog[];
+    [key: string]: any;
+  } | null;
   platformRoles: string[];
   schoolRoles: Array<{
     schoolId: string;
@@ -27,6 +55,13 @@ export type TutorialProgress = {
   [key: string]: {
     completed: boolean;
     completedAt?: string;
+  };
+};
+
+export type DialogProgress = {
+  [key: string]: {
+    dismissed: boolean;
+    dismissedAt?: string;
   };
 };
 
@@ -113,6 +148,24 @@ export const meApi = {
 
         return apiFetch<School[]>(`/me/schools?${searchParams.toString()}`);
       },
+    },
+  },
+  teacherClasses: {
+    get(): Promise<ApiResult<{ hasClasses: boolean }>> {
+      return apiFetch<{ hasClasses: boolean }>("/me/teacher-classes");
+    },
+    getSchoolsWithClasses(): Promise<ApiResult<{ schoolIds: string[] }>> {
+      return apiFetch<{ schoolIds: string[] }>("/me/teacher-classes/schools");
+    },
+  },
+  dialogs: {
+    dismiss(
+      dialogKey: string
+    ): Promise<ApiResult<{ dialogs: DialogProgress }>> {
+      return apiFetch<{ dialogs: DialogProgress }>("/me/dialogs", {
+        method: "PATCH",
+        body: JSON.stringify({ dialogKey, dismissed: true }),
+      });
     },
   },
 };

@@ -30,6 +30,30 @@ export type CreateSchoolLicenseResponse = {
   createdByUser?: any;
 };
 
+export type UpdateLogChange = {
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+};
+
+export type UpdateLog = {
+  type?: "creation" | "update";
+  updatedAt: string;
+  updatedBy: string;
+  changes?: UpdateLogChange[];
+};
+
+export type RoleLog = {
+  action: "assigned" | "removed";
+  roleId: string;
+  roleName: string;
+  roleKey: string | null;
+  schoolId: string | null;
+  schoolName: string | null;
+  updatedAt: string;
+  updatedBy: string;
+};
+
 export type UpdateUserResponse = {
   id: string;
   firstName: string | null;
@@ -38,7 +62,11 @@ export type UpdateUserResponse = {
   avatarUrl: string | null;
   createdAt: string | null;
   updatedAt: string | null;
-  metadata: any;
+  metadata: {
+    updateLogs?: UpdateLog[];
+    roleLogs?: RoleLog[];
+    [key: string]: any;
+  } | null;
   platformRoles: string[];
   schoolRoles: Array<{
     schoolId: string;
