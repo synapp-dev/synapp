@@ -56,6 +56,18 @@
   --brand-faceit: #fd5a00;
   --brand-bullyproof-primary: #038493;
   --brand-bullyproof-secondary: #ea6f4d;
+  
+  /* Role badge colors */
+  --role-teacher: var(--brand-bullyproof-primary);
+  --role-teacher-text: #ffffff; /* White text for WCAG AA contrast on #038493 */
+  --role-platform-admin: var(--brand-bullyproof-secondary);
+  --role-platform-admin-text: #ffffff; /* White text for WCAG AA contrast on #ea6f4d */
+  --role-school-admin: #0000ff;
+  --role-school-admin-text: #ffffff; /* White text for WCAG AA contrast on blue */
+  --role-school-staff: var(--foreground);
+  --role-school-staff-text: var(--background); /* Inverted foreground/background */
+  --role-school-licence: #6b7280;
+  --role-school-licence-text: #ffffff; /* White text for WCAG AA contrast on gray */
 }
 
 .dark {
@@ -91,6 +103,18 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
+  
+  /* Role badge colors (dark mode) */
+  --role-teacher: var(--brand-bullyproof-primary);
+  --role-teacher-text: #ffffff; /* White text for WCAG AA contrast */
+  --role-platform-admin: var(--brand-bullyproof-secondary);
+  --role-platform-admin-text: #ffffff; /* White text for WCAG AA contrast */
+  --role-school-admin: #0000ff;
+  --role-school-admin-text: #ffffff; /* White text for WCAG AA contrast */
+  --role-school-staff: var(--foreground);
+  --role-school-staff-text: var(--background); /* Inverted foreground/background */
+  --role-school-licence: #6b7280;
+  --role-school-licence-text: #ffffff; /* White text for WCAG AA contrast */
 }
 
 @theme inline {
@@ -152,6 +176,7 @@
   --animate-ellipsis: ellipsis 1.5s steps(4, end) infinite;
   --animate-border-flash-red: border-flash-red 0.75s ease-in-out 1;
   --animate-border-flash-green: border-flash-green 0.75s ease-in-out 1;
+  --animate-border-pulse-blue: border-pulse-blue 2s ease-in-out infinite;
   --animate-gavel-hit: gavel-hit 0.75s ease-in-out infinite;
   --animate-float-up-fade-out: float-up-fade-out 0.5s ease-out forwards;
   --animate-float-up: float-up 0.5s ease-out forwards;
@@ -184,6 +209,7 @@
   --animate-slide-right-fade-in-slowest: slide-right-fade-in 1s ease-out
     forwards;
   --animate-bounce-right: bounce-right 1s ease-in-out infinite;
+  --animate-bounce-right-subtle: bounce-right-subtle 1s ease-in-out infinite;
   --animate-bounce-right-delayed: bounce-right 1s ease-in-out infinite 0.3s;
   --animate-bounce-left: bounce-left 0.5s ease-in-out;
   --animate-shake-once: shake 0.3s ease-in-out;
@@ -221,7 +247,19 @@
       content: "";
     }
   }
-  @keyframes border-flash-red {
+  @keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-4px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes border-flash-red {
     0% {
       border-color: hsl(var(--border));
       background-color: hsl(var(--card));
@@ -247,6 +285,15 @@
     100% {
       border-color: rgb(187 247 208);
       background-color: hsl(var(--card));
+    }
+  }
+  @keyframes border-pulse-blue {
+    0%,
+    100% {
+      border-color: rgb(147 197 253);
+    }
+    50% {
+      border-color: rgb(59 130 246);
     }
   }
   @keyframes float-up {
@@ -417,6 +464,15 @@
       transform: translateX(4px);
     }
   }
+  @keyframes bounce-right-subtle {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(2px);
+    }
+  }
   @keyframes bounce-left {
     0%,
     100% {
@@ -499,5 +555,30 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Global scrollbar styling - thin, rounded, matching shadcn ScrollArea */
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+  }
+  
+  *::-webkit-scrollbar-thumb:hover {
+    opacity: 0.8;
+  }
+  
+  /* Firefox scrollbar styling */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
 }
