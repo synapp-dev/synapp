@@ -1,37 +1,42 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useSchoolStore } from "@/stores/school-store";
+import { LibraryBig } from "lucide-react";
 
 export default function ResourcesPage({
   params,
 }: {
   params: Promise<{ school_id: string }>;
 }) {
-  const router = useRouter();
-  const [schoolId, setSchoolId] = React.useState<string | null>(null);
+  const [schoolSlug, setSchoolSlug] = React.useState<string>("");
+  const currentSchool = useSchoolStore((state) => state.currentSchool);
 
   React.useEffect(() => {
-    params.then((p) => setSchoolId(p.school_id));
+    params.then(({ school_id }) => setSchoolSlug(school_id));
   }, [params]);
-
-  React.useEffect(() => {
-    if (!schoolId) return;
-
-    const timer = setTimeout(() => {
-      router.push(`/schools/${schoolId}/home`);
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [schoolId, router]);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Resources</h1>
-        <p className="text-muted-foreground">
-          This page is currently unavailable. Redirecting...
+        <h1 className="text-3xl font-bold flex items-center gap-2">
+          <LibraryBig className="h-8 w-8" />
+          Resources
+        </h1>
+        <p className="text-muted-foreground mt-2">
+          Access educational resources and materials for your school.
         </p>
+      </div>
+
+      <div className="bg-card rounded-lg p-8 border border-border">
+        <div className="text-center py-12">
+          <LibraryBig className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Resources Coming Soon</h2>
+          <p className="text-muted-foreground">
+            This section will contain educational resources, materials, and
+            tools for your school.
+          </p>
+        </div>
       </div>
     </div>
   );
