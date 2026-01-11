@@ -28,6 +28,25 @@ import { userProfile } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+type UpdateLogChange = {
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+};
+
+type UpdateLog = {
+  type?: "creation" | "update";
+  updatedAt: string;
+  updatedBy: string;
+  changes?: UpdateLogChange[];
+};
+
+type UserMetadata = {
+  updateLogs?: UpdateLog[];
+  roleLogs?: unknown[];
+  [key: string]: unknown;
+};
+
 // Request body schema for PATCH
 const updateUserSchema = z.object({
   firstName: z.string().optional(),
@@ -133,21 +152,82 @@ export async function PATCH(
       );
     }
 
-    // Build update object with only provided fields
+    // Build update object with only provided fields and track changes
     const updateData: {
       firstName?: string;
       lastName?: string;
       email?: string;
+      metadata?: any;
     } = {};
 
+    const changes: Array<{
+      field: string;
+      oldValue: string | null;
+      newValue: string | null;
+    }> = [];
+
     if (data.firstName !== undefined) {
-      updateData.firstName = data.firstName || null;
+      const oldValue = existingUser[0].firstName;
+      const newValue = data.firstName || null;
+      if (oldValue !== newValue) {
+        changes.push({
+          field: "firstName",
+          oldValue,
+          newValue,
+        });
+        updateData.firstName = newValue;
+      }
     }
     if (data.lastName !== undefined) {
-      updateData.lastName = data.lastName || null;
+      const oldValue = existingUser[0].lastName;
+      const newValue = data.lastName || null;
+      if (oldValue !== newValue) {
+        changes.push({
+          field: "lastName",
+          oldValue,
+          newValue,
+        });
+        updateData.lastName = newValue;
+      }
     }
     if (data.email !== undefined) {
-      updateData.email = data.email;
+      const oldValue = existingUser[0].email;
+      const newValue = data.email;
+      if (oldValue !== newValue) {
+        changes.push({
+          field: "email",
+          oldValue,
+          newValue,
+        });
+        updateData.email = newValue;
+      }
+    }
+
+    // Only proceed if there are actual changes
+    if (Object.keys(updateData).length === 0 && changes.length === 0) {
+      // No changes to make, return existing user
+      const existingUserData = await meService.getUserById({ userId }, { id: targetUserId });
+      return NextResponse.json(existingUserData, { status: 200 });
+    }
+
+    // Update metadata with update log if there are changes
+    if (changes.length > 0) {
+      const currentMetadata = (existingUser[0].metadata as UserMetadata | null) || ({} as UserMetadata);
+      const updateLogs = Array.isArray(currentMetadata.updateLogs) 
+        ? currentMetadata.updateLogs 
+        : [];
+      
+      updateLogs.push({
+        type: "update",
+        updatedAt: new Date().toISOString(),
+        updatedBy: userId,
+        changes,
+      });
+
+      updateData.metadata = {
+        ...currentMetadata,
+        updateLogs,
+      };
     }
 
     // Update user profile using Drizzle (bypasses RLS)

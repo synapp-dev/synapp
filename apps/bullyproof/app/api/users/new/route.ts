@@ -26,6 +26,23 @@ import { userProfile, scopes, roles } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
+type UpdateLog = {
+  type?: "creation" | "update";
+  updatedAt: string;
+  updatedBy: string;
+  changes?: Array<{
+    field: string;
+    oldValue: string | null;
+    newValue: string | null;
+  }>;
+};
+
+type UserMetadata = {
+  updateLogs?: UpdateLog[];
+  roleLogs?: unknown[];
+  [key: string]: unknown;
+};
+
 // Request body schema
 const createUserSchema = z.object({
   email: z.email(),
@@ -154,39 +171,66 @@ export async function POST(request: Request) {
       // Wait a bit for profile to be ready
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Update user_profile with firstName and lastName if provided
-      if (data.firstName || data.lastName) {
-        const updateData: {
-          first_name?: string;
-          last_name?: string;
-        } = {};
-        if (data.firstName) updateData.first_name = data.firstName;
-        if (data.lastName) updateData.last_name = data.lastName;
+      // Update user_profile with firstName and lastName if provided, and add creation log
+      const updateData: {
+        first_name?: string;
+        last_name?: string;
+        metadata?: any;
+      } = {};
+      if (data.firstName) updateData.first_name = data.firstName;
+      if (data.lastName) updateData.last_name = data.lastName;
 
-        try {
-          const { error: updateError } = await adminClient
-            .from("user_profile")
-            .update(updateData)
-            .eq("id", newUserId);
+      // Get current metadata and add creation log
+      const { data: currentProfile } = await adminClient
+        .from("user_profile")
+        .select("metadata")
+        .eq("id", newUserId)
+        .single();
 
-          if (updateError) {
-            console.error(
-              "[USER CREATE] Failed to update user profile:",
-              updateError
-            );
-            // Non-fatal error, continue
-          } else {
-            console.log(
-              "[USER CREATE] User profile updated with firstName/lastName"
-            );
-          }
-        } catch (updateErr: any) {
+      const currentMetadata = (currentProfile?.metadata as UserMetadata | null) || ({} as UserMetadata);
+      const updateLogs = Array.isArray(currentMetadata.updateLogs)
+        ? currentMetadata.updateLogs
+        : [];
+
+      // Add creation log if it doesn't already exist
+      const hasCreationLog = updateLogs.some(
+        (log: any) => log.type === "creation"
+      );
+      if (!hasCreationLog) {
+        updateLogs.push({
+          type: "creation",
+          updatedAt: new Date().toISOString(),
+          updatedBy: userId,
+        });
+        updateData.metadata = {
+          ...currentMetadata,
+          updateLogs,
+        };
+      }
+
+      try {
+        const { error: updateError } = await adminClient
+          .from("user_profile")
+          .update(updateData)
+          .eq("id", newUserId);
+
+        if (updateError) {
           console.error(
-            "[USER CREATE] Error updating user profile:",
-            updateErr
+            "[USER CREATE] Failed to update user profile:",
+            updateError
           );
           // Non-fatal error, continue
+        } else {
+          console.log(
+            "[USER CREATE] User profile updated with firstName/lastName and creation log"
+          );
         }
+      } catch (updateErr: any) {
+        console.error(
+          "[USER CREATE] Error updating user profile:",
+          updateErr
+        );
+        // Non-fatal error, continue
       }
     } else {
       // Create new user in auth.users
@@ -242,56 +286,128 @@ export async function POST(request: Request) {
         );
       }
 
-      // If profile doesn't exist, create it
-      if (!profile) {
-        console.log("[USER CREATE] Creating user_profile manually");
-        const maxAttempts = 5;
-        let attempts = 0;
-        let updateError: any = null;
+        // If profile doesn't exist, create it
+        if (!profile) {
+          console.log("[USER CREATE] Creating user_profile manually");
+          const maxAttempts = 5;
+          let attempts = 0;
+          let updateError: any = null;
 
-        while (attempts < maxAttempts) {
-          attempts++;
-          const { error } = await adminClient.from("user_profile").insert({
-            id: newUserId,
-            email: data.email,
-            first_name: data.firstName,
-            last_name: data.lastName,
-          });
+          while (attempts < maxAttempts) {
+            attempts++;
+            const { error } = await adminClient.from("user_profile").insert({
+              id: newUserId,
+              email: data.email,
+              first_name: data.firstName,
+              last_name: data.lastName,
+              metadata: {
+                updateLogs: [
+                  {
+                    type: "creation",
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: userId,
+                  },
+                ],
+              },
+            });
 
-          if (!error) {
-            updateError = null;
-            break;
-          }
-
-          updateError = error;
-
-          if (error.code === "23505") {
-            // Unique constraint violation - profile was created by trigger
-            console.log(
-              "[USER CREATE] Profile already exists (created by trigger)"
-            );
-            updateError = null;
-            break;
-          }
-
-          // Wait before retrying
-          await new Promise((resolve) => setTimeout(resolve, 200 * attempts));
-        }
-
-        if (updateError) {
-          console.error(
-            "[USER CREATE] Failed to create user_profile after all retries:",
-            {
-              error: updateError,
-              attempts,
-              userId: newUserId,
+            if (!error) {
+              updateError = null;
+              break;
             }
+
+            updateError = error;
+
+            if (error.code === "23505") {
+              // Unique constraint violation - profile was created by trigger
+              console.log(
+                "[USER CREATE] Profile already exists (created by trigger)"
+              );
+              updateError = null;
+              // Update metadata with creation log since trigger created it
+              const { data: currentProfile } = await adminClient
+                .from("user_profile")
+                .select("metadata")
+                .eq("id", newUserId)
+                .single();
+
+              const currentMetadata = (currentProfile?.metadata as UserMetadata | null) || ({} as UserMetadata);
+              const updateLogs = Array.isArray(currentMetadata.updateLogs)
+                ? currentMetadata.updateLogs
+                : [];
+
+              const hasCreationLog = updateLogs.some(
+                (log: any) => log.type === "creation"
+              );
+              if (!hasCreationLog) {
+                updateLogs.push({
+                  type: "creation",
+                  updatedAt: new Date().toISOString(),
+                  updatedBy: userId,
+                });
+                await adminClient
+                  .from("user_profile")
+                  .update({
+                    metadata: {
+                      ...currentMetadata,
+                      updateLogs,
+                    } as any,
+                  })
+                  .eq("id", newUserId);
+              }
+              break;
+            }
+
+            // Wait before retrying
+            await new Promise((resolve) => setTimeout(resolve, 200 * attempts));
+          }
+
+          if (updateError) {
+            console.error(
+              "[USER CREATE] Failed to create user_profile after all retries:",
+              {
+                error: updateError,
+                attempts,
+                userId: newUserId,
+              }
+            );
+            throw new Error(
+              `Failed to create user profile after ${maxAttempts} attempts: ${updateError.message}`
+            );
+          }
+        } else {
+          // Profile exists, ensure creation log is present
+          const { data: currentProfile } = await adminClient
+            .from("user_profile")
+            .select("metadata")
+            .eq("id", newUserId)
+            .single();
+
+          const currentMetadata = (currentProfile?.metadata as UserMetadata | null) || ({} as UserMetadata);
+          const updateLogs = Array.isArray(currentMetadata.updateLogs)
+            ? currentMetadata.updateLogs
+            : [];
+
+          const hasCreationLog = updateLogs.some(
+            (log: any) => log.type === "creation"
           );
-          throw new Error(
-            `Failed to create user profile after ${maxAttempts} attempts: ${updateError.message}`
-          );
+          if (!hasCreationLog) {
+            updateLogs.push({
+              type: "creation",
+              updatedAt: new Date().toISOString(),
+              updatedBy: userId,
+            });
+            await adminClient
+              .from("user_profile")
+              .update({
+                metadata: {
+                  ...currentMetadata,
+                  updateLogs,
+                } as any,
+              })
+              .eq("id", newUserId);
+          }
         }
-      }
     }
 
     // Check if user already has this role for this school (if applicable)
