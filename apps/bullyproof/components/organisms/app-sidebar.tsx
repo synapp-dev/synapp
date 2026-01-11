@@ -123,17 +123,10 @@ const data = {
       isActive: false,
     },
     {
-      title: "Content",
-      url: "/content",
-      icon: BookOpenText,
-      isActive: false,
-    },
-    {
       title: "Resources",
       url: "/resources",
       icon: LibraryBig,
       isActive: false,
-      disabled: true,
     },
   ],
   navData: [
@@ -389,10 +382,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                       enableStaggeredAnimation
                       startIndex={3}
                     />
-                    {/* navCurriculum: 3 items, has title - title at 6, items at 7-9 */}
+                    {/* navCurriculum: 2 items, has title - title at 6, items at 7-8 */}
                     <NavMain
                       items={withSlug(data.navCurriculum)}
-                      title="Curriculum"
+                      title="Bullyproof"
                       enableStaggeredAnimation
                       startIndex={6}
                     />

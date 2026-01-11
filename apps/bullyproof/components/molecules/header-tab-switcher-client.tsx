@@ -74,7 +74,7 @@ const tabCategories = [
     ],
   },
   {
-    name: "Curriculum",
+    name: "Bullyproof",
     items: [
       {
         title: "Lessons",
@@ -82,15 +82,9 @@ const tabCategories = [
         icon: Presentation,
       },
       {
-        title: "Content",
-        url: "/content",
-        icon: BookOpenText,
-      },
-      {
         title: "Resources",
         url: "/resources",
         icon: LibraryBig,
-        disabled: true,
       },
     ],
   },

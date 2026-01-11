@@ -198,7 +198,7 @@ export function NavMain({
                         item.liveStyle
                           ? "border border-orange-500/30 bg-orange-500/10 text-orange-700 font-medium hover:bg-orange-500/15"
                           : itemActiveEffective
-                            ? "bg-primary text-primary-foreground font-semibold hover:bg-primary hover:text-primary-foreground"
+                            ? "bg-[var(--brand-bullyproof-primary)] text-white font-semibold hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
                             : undefined
                       }
                     >
@@ -225,7 +225,7 @@ export function NavMain({
                               asChild
                               className={
                                 subActive
-                                  ? "gap-1 bg-primary/60 text-primary-foreground hover:bg-primary/60 hover:text-primary-foreground"
+                                  ? "gap-1 bg-[var(--brand-bullyproof-primary)]/60 text-white hover:bg-[var(--brand-bullyproof-primary)]/60 hover:text-white"
                                   : "gap-1"
                               }
                             >
