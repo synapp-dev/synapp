@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-} from "@workspace/ui/components/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Button } from "@workspace/ui/components/button";
@@ -32,8 +33,8 @@ import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
   Loader2,
   AlertCircle,
-  ChevronLeft,
-  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   Check,
   ShieldCheck,
   Users as UsersIcon,
@@ -42,14 +43,18 @@ import {
   BicepsFlexed,
   School as SchoolIcon,
   ChevronsUpDown,
+  UserPlus,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
+import { Card } from "@workspace/ui/components/card";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
 import { Separator } from "@workspace/ui/components/separator";
+import { Progress } from "@workspace/ui/components/progress";
+import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { cn } from "@workspace/ui/lib/utils";
 
 type Role = typeof roles.$inferSelect;
@@ -357,7 +362,7 @@ export function AddUserSheet({
                   <BicepsFlexed className="h-5 w-5 mt-0.5 flex-shrink-0" />
                   <div className="flex flex-col items-start gap-1">
                     <span className="font-semibold">Bullyproof</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-secondary/75">
                       Platform admin or staff
                     </span>
                   </div>
@@ -412,165 +417,229 @@ export function AddUserSheet({
       case 3:
         const availableRoles = getAvailableRolesForUserType();
 
+        // Helper function to extract school metadata
+        const extractSchoolMetadata = (school: School | null) => {
+          if (!school) {
+            return { stateText: "", sectorText: "", levelsText: "" };
+          }
+
+          const st = (school as any)?.state;
+          const stateText = st
+            ? typeof st === "string"
+              ? st.toUpperCase()
+              : (st as any)?.code?.toUpperCase() || ""
+            : "";
+
+          const sector = (school as any)?.sector;
+          const sectorText =
+            typeof sector === "string"
+              ? sector
+              : sector && typeof sector === "object"
+                ? (sector as any)?.name || ""
+                : "";
+
+          const lvls = (school as any)?.levels;
+          let levelsText = "";
+          if (Array.isArray(lvls) && lvls.length > 0) {
+            const levelNames = lvls.map((lvl) =>
+              typeof lvl === "string"
+                ? lvl
+                : (lvl as any)?.name || (lvl as any)?.key || ""
+            );
+            const lower = levelNames.map((s) => s.toLowerCase());
+            const hasPrimary = lower.some((s) => s.includes("primary"));
+            const hasSecondary = lower.some((s) => s.includes("secondary"));
+            if (hasPrimary && hasSecondary) levelsText = "P-12";
+            else if (hasPrimary) levelsText = "Primary";
+            else if (hasSecondary) levelsText = "Secondary";
+            else levelsText = levelNames.join(", ");
+          }
+
+          return { stateText, sectorText, levelsText };
+        };
+
+        if (userType === "school") {
+          return (
+            <div className="space-y-4">
+              <DialogHeader className="text-center shrink-0">
+                <DialogTitle className="flex items-center justify-center gap-2 text-2xl">
+                  <SchoolIcon className="h-8 w-8" />
+                  Select a School
+                </DialogTitle>
+                <DialogDescription className="text-center">
+                  Choose which school this user belongs to.
+                </DialogDescription>
+              </DialogHeader>
+
+              <ScrollArea className="flex-1 min-h-0">
+                <div className="space-y-2 py-2 pr-4">
+                  {loadingSchools ? (
+                    <>
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i} className="px-4 py-2.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
+                            <div className="flex flex-col gap-1 flex-1">
+                              <div className="h-4 w-3/4 bg-muted rounded" />
+                              <div className="h-3 w-1/2 bg-muted rounded" />
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </>
+                  ) : schools.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-sm text-muted-foreground">
+                        No schools found.
+                      </div>
+                    </div>
+                  ) : (
+                    schools.map((school) => {
+                      const { stateText, sectorText, levelsText } =
+                        extractSchoolMetadata(school);
+                      const parts = [stateText, sectorText, levelsText].filter(
+                        Boolean
+                      );
+                      const isSelected = schoolId === school.id;
+
+                      return (
+                        <Card
+                          key={school.id}
+                          className={cn(
+                            "px-4 py-2.5 cursor-pointer transition-all hover:shadow-md",
+                            isSelected
+                              ? "border-primary shadow-md bg-primary/5"
+                              : "hover:border-primary/50"
+                          )}
+                          onClick={() => {
+                            setSchoolId(isSelected ? "" : school.id);
+                            setSelectedRoleKey("");
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                              style={{ backgroundColor: "#008993" }}
+                            >
+                              <SchoolIcon className="w-4 h-4 text-white" />
+                            </div>
+                            <div className="flex flex-col -space-y-0.5 flex-1">
+                              <h3 className="font-semibold text-base truncate">
+                                {school.name}
+                              </h3>
+                              {parts.length > 0 && (
+                                <div className="flex items-center gap-1 text-muted-foreground text-[0.65rem]">
+                                  {parts.map((part, index) => (
+                                    <div
+                                      key={index}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <div className="truncate capitalize">
+                                        {part}
+                                      </div>
+                                      {index < parts.length - 1 && (
+                                        <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {isSelected && (
+                              <Check className="h-5 w-5 text-primary shrink-0" />
+                            )}
+                          </div>
+                        </Card>
+                      );
+                    })
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-4">
-            {userType === "school" && (
-              <div className="space-y-2">
-                <Label htmlFor="school">School *</Label>
-                {loadingSchools ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading schools...
+            <DialogHeader className="text-center shrink-0">
+              <DialogTitle className="flex items-center justify-center gap-2 text-2xl">
+                <ShieldCheck className="h-8 w-8" />
+                Select a Role
+              </DialogTitle>
+              <DialogDescription className="text-center">
+                Choose the role for this user.
+              </DialogDescription>
+            </DialogHeader>
+
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="space-y-2 py-2 pr-4">
+                {loadingRoles ? (
+                  <>
+                    {[1, 2, 3].map((i) => (
+                      <Card key={i} className="px-4 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
+                          <div className="flex flex-col gap-1 flex-1">
+                            <div className="h-4 w-3/4 bg-muted rounded" />
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </>
+                ) : availableRoles.length === 0 ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="text-sm text-muted-foreground">
+                      No roles available.
+                    </div>
                   </div>
                 ) : (
-                  <Popover
-                    open={schoolComboboxOpen}
-                    onOpenChange={setSchoolComboboxOpen}
-                    modal
-                  >
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={schoolComboboxOpen}
-                        className="w-full justify-between"
-                        disabled={loading}
+                  availableRoles.map((role) => {
+                    const isSelected = selectedRoleKey === role.key;
+                    const roleKey = role.key || "";
+
+                    // Get icon based on role
+                    let RoleIcon = ShieldCheck;
+                    if (roleKey === "TEACHER") {
+                      RoleIcon = UsersIcon;
+                    } else if (roleKey === "SCHOOL_LICENCE") {
+                      RoleIcon = FileBadge2;
+                    }
+
+                    return (
+                      <Card
+                        key={role.id}
+                        className={cn(
+                          "px-4 py-2.5 cursor-pointer transition-all hover:shadow-md",
+                          isSelected
+                            ? "border-primary shadow-md bg-primary/5"
+                            : "hover:border-primary/50"
+                        )}
+                        onClick={() => {
+                          setSelectedRoleKey(isSelected ? "" : roleKey);
+                        }}
                       >
-                        {schoolId
-                          ? schools.find((school) => school.id === schoolId)
-                              ?.name
-                          : "Select a school..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-[var(--radix-popover-trigger-width)] max-h-[var(--radix-popover-content-available-height)] p-0 overflow-y-auto"
-                      align="start"
-                    >
-                      <Command>
-                        <CommandInput
-                          placeholder="Search school..."
-                          className="h-9"
-                        />
-                        <CommandList>
-                          <CommandEmpty>No school found.</CommandEmpty>
-                          <CommandGroup>
-                            {schools.map((school) => (
-                              <CommandItem
-                                key={school.id}
-                                value={`${school.id} ${school.name}`}
-                                onSelect={() => {
-                                  setSchoolId(
-                                    school.id === schoolId ? "" : school.id
-                                  );
-                                  setSelectedRoleKey("");
-                                  setSchoolComboboxOpen(false);
-                                }}
-                              >
-                                {school.name}
-                                <Check
-                                  className={cn(
-                                    "ml-auto h-4 w-4",
-                                    schoolId === school.id
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                              </CommandItem>
-                            ))}
-                            {schools.length === 0 && (
-                              <CommandItem disabled>
-                                No schools available
-                              </CommandItem>
-                            )}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: "#008993" }}
+                          >
+                            <RoleIcon className="w-4 h-4 text-white" />
+                          </div>
+                          <div className="flex flex-col -space-y-0.5 flex-1">
+                            <h3 className="font-semibold text-base truncate">
+                              {role.name}
+                            </h3>
+                          </div>
+                          {isSelected && (
+                            <Check className="h-5 w-5 text-primary shrink-0" />
+                          )}
+                        </div>
+                      </Card>
+                    );
+                  })
                 )}
               </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="role">Role *</Label>
-              {loadingRoles ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading roles...
-                </div>
-              ) : (
-                <Popover
-                  open={roleComboboxOpen}
-                  onOpenChange={setRoleComboboxOpen}
-                  modal
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={roleComboboxOpen}
-                      className="w-full justify-between"
-                      disabled={loading || (userType === "school" && !schoolId)}
-                    >
-                      {selectedRoleKey
-                        ? availableRoles.find(
-                            (role) => role.key === selectedRoleKey
-                          )?.name
-                        : "Select a role..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] max-h-[var(--radix-popover-content-available-height)] p-0 overflow-y-auto"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput
-                        placeholder="Search role..."
-                        className="h-9"
-                      />
-                      <CommandList>
-                        <CommandEmpty>No role found.</CommandEmpty>
-                        <CommandGroup>
-                          {availableRoles.map((role) => (
-                            <CommandItem
-                              key={role.id}
-                              value={`${role.key || ""} ${role.name}`}
-                              onSelect={() => {
-                                setSelectedRoleKey(
-                                  role.key === selectedRoleKey
-                                    ? ""
-                                    : role.key || ""
-                                );
-                                setRoleComboboxOpen(false);
-                              }}
-                            >
-                              {role.name}
-                              <Check
-                                className={cn(
-                                  "ml-auto h-4 w-4",
-                                  selectedRoleKey === role.key
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                            </CommandItem>
-                          ))}
-                          {availableRoles.length === 0 && (
-                            <CommandItem disabled>
-                              {userType === "school" && !schoolId
-                                ? "Please select a school first"
-                                : "No roles available"}
-                            </CommandItem>
-                          )}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
+            </ScrollArea>
           </div>
         );
 
@@ -664,83 +733,111 @@ export function AddUserSheet({
     );
   };
 
+  // For step 3, render content directly without ScrollArea wrapper
+  const isStep3WithCards = step === 3;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="top"
-        className="w-full max-w-md mx-auto rounded-b-2xl border-b-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="sm:max-w-xs max-h-[65vh] flex flex-col"
+        showCloseButton={false}
       >
-        <SheetHeader className="px-6 pt-6 pb-4 border-b">
-          <SheetTitle>Add New User</SheetTitle>
-          {/* Progress indicator */}
-          <div className="flex items-center gap-2 mt-4">
-            {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => (
-              <div key={s} className="flex items-center gap-2">
-                <div
-                  className={`size-2 rounded-full transition-colors ${
-                    s <= step ? "bg-primary" : "bg-muted-foreground/30"
-                  }`}
-                />
-                {s < totalSteps && <div className="h-px w-6 bg-border" />}
-              </div>
-            ))}
-          </div>
-        </SheetHeader>
-
-        <div className="px-6 py-6 min-h-[300px]">
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {renderStepContent()}
-        </div>
-
-        <SheetFooter className="px-6 py-4 border-t gap-2">
-          <div className="flex items-center justify-between w-full">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={goBack}
-              disabled={step === 1 || loading}
-            >
-              <ChevronLeft className="mr-2 h-4 w-4" />
-              Back
-            </Button>
-            {step < totalSteps ? (
-              <Button
-                type="button"
-                onClick={goNext}
-                disabled={!canProceedToNext() || loading}
-              >
-                Next
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                onClick={handleCreateUser}
-                disabled={!canProceedToNext() || loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Create User
-                  </>
-                )}
-              </Button>
+        {isStep3WithCards ? (
+          <>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-          </div>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+
+            {renderStepContent()}
+
+            <DialogFooter className="shrink-0">
+              <div className="flex w-full items-center justify-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={goBack}
+                  disabled={loading}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  onClick={goNext}
+                  disabled={!canProceedToNext() || loading}
+                  className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
+                >
+                  {loading ? "Loading..." : "Next"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <ScrollArea className="flex-1 min-h-0">
+              <div className="pr-4">
+                {error && (
+                  <Alert variant="destructive" className="mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                {renderStepContent()}
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="shrink-0">
+              <div className="flex w-full items-center justify-center gap-2">
+                {step > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={goBack}
+                    disabled={loading}
+                  >
+                    Back
+                  </Button>
+                )}
+                {step < totalSteps ? (
+                  <Button
+                    type="button"
+                    onClick={goNext}
+                    disabled={!canProceedToNext() || loading}
+                    className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
+                  >
+                    Next
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={handleCreateUser}
+                    disabled={!canProceedToNext() || loading}
+                    className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        Create User
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

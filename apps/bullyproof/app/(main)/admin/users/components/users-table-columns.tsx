@@ -15,7 +15,7 @@ export const columns: ColumnDef<User>[] = [
     accessorKey: "name",
     header: ({ column }) => {
       return (
-        <div className="text-left">
+        <div className="text-left pl-4">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -44,15 +44,25 @@ export const columns: ColumnDef<User>[] = [
             (sr) => sr.roleKey === "SCHOOL_LICENCE"
           );
           const schoolName = licenceSchoolRole?.schoolName || "Unknown School";
-          return `${schoolName} (LICENCE)`;
+          return schoolName;
         }
         return getFullName(user);
       };
 
       return (
-        <div className="text-left">
-          <div className="font-medium">{getDisplayName(user)}</div>
-          <div className="text-sm text-muted-foreground">{user.email}</div>
+        <div className="text-left pl-4">
+          <div className="font-medium text-base flex items-center gap-2">
+            {getDisplayName(user)}
+            {isSchoolLicenceAccount(user) && (
+              <Badge
+                variant="outline"
+                className="text-[10px] py-0 px-2 bg-transparent text-muted-foreground mt-0.5"
+              >
+                Licence
+              </Badge>
+            )}
+          </div>
+          <div className="text-xs text-muted-foreground -mt-0.5">{user.email}</div>
         </div>
       );
     },
