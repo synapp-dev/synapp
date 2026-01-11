@@ -260,9 +260,9 @@ export function TeacherOverviewSection() {
     ? `/schools/${schoolSlug}/lessons`
     : "/schools";
 
-  // Build the view content link using slug
-  const viewContentLink = schoolSlug
-    ? `/schools/${schoolSlug}/content`
+  // Build the view resources link using slug
+  const viewResourcesLink = schoolSlug
+    ? `/schools/${schoolSlug}/resources`
     : "/schools";
 
   // Build the classes link using slug
@@ -542,9 +542,9 @@ export function TeacherOverviewSection() {
               link={classesLink}
             />
             <QuickActionsCard
-              title="View Content"
+              title="View Resources"
               icon={<GraduationCap className="w-4 h-4" />}
-              link={viewContentLink}
+              link={viewResourcesLink}
             />
             <QuickActionsCard
               title="My Performance"

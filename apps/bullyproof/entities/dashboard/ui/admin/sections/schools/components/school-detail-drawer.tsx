@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Sheet,
@@ -49,6 +49,23 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
+import {
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu";
 
 import {
   meApi,
@@ -106,8 +123,12 @@ import {
   Upload,
   FileText,
   ArrowLeft,
+  MoreHorizontal,
+  ChevronsRight,
 } from "lucide-react";
 import { type School as SchoolType } from "./schools-table-columns";
+import { createSchoolUsersColumns } from "./school-users-table-columns";
+import { AddUserDialog } from "./add-user-dialog";
 
 type TabId =
   | "onboarding"
@@ -206,8 +227,18 @@ function SchoolDetailDrawerContent({
   const [classes, setClasses] = useState<ClassWithYearCodes[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
+  // Table state for users
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = useState({});
+
   // Dialog states
   const [addLicenceDialogOpen, setAddLicenceDialogOpen] = useState(false);
+  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [addClassDialogOpen, setAddClassDialogOpen] = useState(false);
+
+  // Legacy states for backward compatibility (will be removed)
   const [addAdminDialogOpen, setAddAdminDialogOpen] = useState(false);
   const [addAdminSuccess, setAddAdminSuccess] = useState(false);
   const [addTeacherDialogOpen, setAddTeacherDialogOpen] = useState(false);
@@ -215,23 +246,13 @@ function SchoolDetailDrawerContent({
   const [addTeacherStep, setAddTeacherStep] = useState<
     "selection" | "manual" | "csv"
   >("selection");
-  const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvData, setCsvData] = useState<
-    Array<{ email: string; firstName?: string; lastName?: string }>
-  >([]);
-  const [csvError, setCsvError] = useState<string | null>(null);
-  const [bulkSubmitting, setBulkSubmitting] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({
-    completed: 0,
-    total: 0,
-    errors: 0,
-  });
-  const [addClassDialogOpen, setAddClassDialogOpen] = useState(false);
 
   // Class form states
   const [className, setClassName] = useState("");
   const [classCode, setClassCode] = useState("");
-  const [classRunningYear, setClassRunningYear] = useState<string>("");
+  const [classRunningYear, setClassRunningYear] = useState<string>(
+    new Date().getFullYear().toString()
+  );
   const [selectedYearIds, setSelectedYearIds] = useState<string[]>([]);
   const [availableYears, setAvailableYears] = useState<
     Array<typeof schoolYears.$inferSelect>
@@ -253,12 +274,6 @@ function SchoolDetailDrawerContent({
     string | null
   >(null);
   const [loadingLicenceEmail, setLoadingLicenceEmail] = useState(false);
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminFirstName, setAdminFirstName] = useState("");
-  const [adminLastName, setAdminLastName] = useState("");
-  const [teacherEmail, setTeacherEmail] = useState("");
-  const [teacherFirstName, setTeacherFirstName] = useState("");
-  const [teacherLastName, setTeacherLastName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [licenceError, setLicenceError] = useState<string | null>(null);
   const isClosingDialogRef = useRef(false);
@@ -277,245 +292,6 @@ function SchoolDetailDrawerContent({
     : schoolLicenceEmail
       ? isValidEmail(schoolLicenceEmail)
       : false;
-
-  // Check if admin email is valid
-  const hasValidAdminEmail = adminEmail ? isValidEmail(adminEmail) : false;
-
-  // Check if teacher email is valid
-  const hasValidTeacherEmail = teacherEmail
-    ? isValidEmail(teacherEmail)
-    : false;
-
-  // CSV parsing function - handles quoted fields and commas within quotes
-  const parseCSV = (
-    file: File
-  ): Promise<
-    Array<{ email: string; firstName?: string; lastName?: string }>
-  > => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const text = e.target?.result as string;
-          const lines = text.split(/\r?\n/).filter((line) => line.trim());
-
-          if (lines.length === 0) {
-            reject(new Error("CSV file is empty"));
-            return;
-          }
-
-          // Helper function to parse CSV line handling quoted fields
-          const parseCSVLine = (line: string): string[] => {
-            const result: string[] = [];
-            let current = "";
-            let inQuotes = false;
-
-            for (let i = 0; i < line.length; i++) {
-              const char = line[i];
-              const nextChar = line[i + 1];
-
-              if (char === '"') {
-                if (inQuotes && nextChar === '"') {
-                  // Escaped quote
-                  current += '"';
-                  i++; // Skip next quote
-                } else {
-                  // Toggle quote state
-                  inQuotes = !inQuotes;
-                }
-              } else if (char === "," && !inQuotes) {
-                // Field separator
-                result.push(current.trim());
-                current = "";
-              } else {
-                current += char;
-              }
-            }
-            result.push(current.trim()); // Add last field
-            return result;
-          };
-
-          // Parse header row
-          const header = parseCSVLine(lines[0]).map((h) =>
-            h.toLowerCase().replace(/^"|"$/g, "")
-          );
-          const emailIndex = header.findIndex(
-            (h) => h === "email" || h === "e-mail"
-          );
-          const firstNameIndex = header.findIndex(
-            (h) => h === "firstname" || h === "first name" || h === "first_name"
-          );
-          const lastNameIndex = header.findIndex(
-            (h) => h === "lastname" || h === "last name" || h === "last_name"
-          );
-
-          if (emailIndex === -1) {
-            reject(new Error("CSV file must contain an 'email' column"));
-            return;
-          }
-
-          // Parse data rows
-          const data: Array<{
-            email: string;
-            firstName?: string;
-            lastName?: string;
-          }> = [];
-          const errors: string[] = [];
-
-          for (let i = 1; i < lines.length; i++) {
-            const values = parseCSVLine(lines[i]).map((v) =>
-              v.replace(/^"|"$/g, "")
-            );
-            const email = values[emailIndex]?.trim();
-
-            if (!email) {
-              errors.push(`Row ${i + 1}: Missing email`);
-              continue;
-            }
-
-            if (!isValidEmail(email)) {
-              errors.push(`Row ${i + 1}: Invalid email "${email}"`);
-              continue;
-            }
-
-            data.push({
-              email,
-              firstName:
-                firstNameIndex >= 0 && values[firstNameIndex]
-                  ? values[firstNameIndex].trim()
-                  : undefined,
-              lastName:
-                lastNameIndex >= 0 && values[lastNameIndex]
-                  ? values[lastNameIndex].trim()
-                  : undefined,
-            });
-          }
-
-          if (data.length === 0) {
-            reject(new Error("No valid teacher data found in CSV file"));
-            return;
-          }
-
-          if (errors.length > 0) {
-            setCsvError(
-              `Some rows had errors:\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? `\n... and ${errors.length - 5} more` : ""}`
-            );
-          }
-
-          resolve(data);
-        } catch (error: any) {
-          reject(new Error(`Failed to parse CSV: ${error.message}`));
-        }
-      };
-      reader.onerror = () => reject(new Error("Failed to read file"));
-      reader.readAsText(file);
-    });
-  };
-
-  // Handle CSV file selection
-  const handleCsvFileSelect = async (file: File) => {
-    if (!file.name.endsWith(".csv")) {
-      setCsvError("Please select a CSV file");
-      return;
-    }
-
-    setCsvFile(file);
-    setCsvError(null);
-
-    try {
-      const parsed = await parseCSV(file);
-      setCsvData(parsed);
-      setAddTeacherStep("csv");
-    } catch (error: any) {
-      setCsvError(error.message);
-      setCsvFile(null);
-      setCsvData([]);
-    }
-  };
-
-  // Handle bulk teacher creation
-  const handleBulkCreateTeachers = async () => {
-    if (!school || csvData.length === 0) return;
-
-    setBulkSubmitting(true);
-    setBulkProgress({ completed: 0, total: csvData.length, errors: 0 });
-    setCsvError(null);
-
-    let successCount = 0;
-    let errorCount = 0;
-
-    for (let i = 0; i < csvData.length; i++) {
-      const teacher = csvData[i];
-      try {
-        const result = await usersApi.post.new.teacher({
-          schoolId: school.id,
-          email: teacher.email,
-          firstName: teacher.firstName?.trim() || undefined,
-          lastName: teacher.lastName?.trim() || undefined,
-        });
-
-        if (result.error) {
-          errorCount++;
-          console.error(
-            `Failed to create teacher ${teacher.email}:`,
-            result.error
-          );
-        } else {
-          successCount++;
-        }
-      } catch (error) {
-        errorCount++;
-        console.error(`Failed to create teacher ${teacher.email}:`, error);
-      }
-
-      setBulkProgress({
-        completed: i + 1,
-        total: csvData.length,
-        errors: errorCount,
-      });
-    }
-
-    // Refresh users list
-    if (activeSection === "users") {
-      const usersResult = await meApi.get.listAllUsers();
-      if (!usersResult.error && usersResult.data) {
-        const schoolUsers = usersResult.data.filter((user) =>
-          user.schoolRoles.some((role) => role.schoolId === school.id)
-        );
-        setUsers(schoolUsers);
-      }
-    }
-
-    // Refresh school data to update counts
-    onSchoolUpdate?.();
-
-    if (errorCount > 0) {
-      setCsvError(
-        `${successCount} teachers added successfully. ${errorCount} failed.`
-      );
-    } else {
-      setAddTeacherSuccess(true);
-      setTimeout(() => {
-        // Reset and close dialog
-        const params = new URLSearchParams(searchParams?.toString() || "");
-        params.delete("dialog");
-        const newUrl = params.toString()
-          ? `/admin/schools?${params.toString()}`
-          : "/admin/schools";
-        router.replace(newUrl, { scroll: false });
-
-        setAddTeacherSuccess(false);
-        setAddTeacherStep("selection");
-        setCsvFile(null);
-        setCsvData([]);
-        setCsvError(null);
-        setBulkProgress({ completed: 0, total: 0, errors: 0 });
-        setAddTeacherDialogOpen(false);
-      }, 2000);
-    }
-
-    setBulkSubmitting(false);
-  };
 
   useEffect(() => {
     if (activeSection === "users" && school) {
@@ -633,7 +409,7 @@ function SchoolDetailDrawerContent({
       // Reset form when dialog closes
       setClassName("");
       setClassCode("");
-      setClassRunningYear("");
+      setClassRunningYear(new Date().getFullYear().toString());
       setSelectedYearIds([]);
     }
   }, [addClassDialogOpen, school, schoolLevelsMap]);
@@ -716,26 +492,11 @@ function SchoolDetailDrawerContent({
 
     if (open && school && activeSection === "users") {
       const dialogParam = searchParams?.get("dialog");
-      if (dialogParam === "add-school-admin" && !addAdminDialogOpen) {
-        setAddAdminDialogOpen(true);
-      } else if (dialogParam !== "add-school-admin" && addAdminDialogOpen) {
+      if (dialogParam === "add-user" && !addUserDialogOpen) {
+        setAddUserDialogOpen(true);
+      } else if (dialogParam !== "add-user" && addUserDialogOpen) {
         // Close dialog when param is removed
-        setAddAdminDialogOpen(false);
-        setAddAdminSuccess(false);
-        setAdminEmail("");
-        setAdminFirstName("");
-        setAdminLastName("");
-      }
-
-      if (dialogParam === "add-teacher" && !addTeacherDialogOpen) {
-        setAddTeacherDialogOpen(true);
-      } else if (dialogParam !== "add-teacher" && addTeacherDialogOpen) {
-        // Close dialog when param is removed
-        setAddTeacherDialogOpen(false);
-        setAddTeacherSuccess(false);
-        setTeacherEmail("");
-        setTeacherFirstName("");
-        setTeacherLastName("");
+        setAddUserDialogOpen(false);
       }
     }
 
@@ -748,7 +509,7 @@ function SchoolDetailDrawerContent({
         setAddClassDialogOpen(false);
         setClassName("");
         setClassCode("");
-        setClassRunningYear("");
+        setClassRunningYear(new Date().getFullYear().toString());
         setSelectedYearIds([]);
       }
     }
@@ -758,8 +519,7 @@ function SchoolDetailDrawerContent({
     activeSection,
     searchParams,
     addLicenceDialogOpen,
-    addAdminDialogOpen,
-    addTeacherDialogOpen,
+    addUserDialogOpen,
     addClassDialogOpen,
   ]);
 
@@ -797,6 +557,47 @@ function SchoolDetailDrawerContent({
         });
     }
   }, [addLicenceDialogOpen, school]);
+
+  // Set up columns for users table (memoized to avoid recreation on every render)
+  const usersColumns = useMemo(
+    () => (school ? createSchoolUsersColumns(school.id) : []),
+    [school?.id]
+  );
+
+  // Set up users table
+  const usersTable = useReactTable({
+    data: users,
+    columns: usersColumns,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+  });
+
+  // Handler for opening add user dialog
+  const handleAddUserClick = () => {
+    setAddUserDialogOpen(true);
+    // Add dialog query parameter to URL
+    if (school?.slug) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("school", school.slug);
+      params.set("tab", "users");
+      params.set("dialog", "add-user");
+      router.push(`/admin/schools?${params.toString()}`, {
+        scroll: false,
+      });
+    }
+  };
 
   if (!school) return null;
 
@@ -1382,162 +1183,179 @@ function SchoolDetailDrawerContent({
                   <div className="flex items-center justify-end gap-4">
                     <Card
                       className="cursor-pointer py-2 hover:bg-muted/50 transition-colors"
-                      onClick={() => {
-                        setAddAdminDialogOpen(true);
-                        // Add dialog query parameter to URL
-                        if (school?.slug) {
-                          const params = new URLSearchParams(
-                            searchParams?.toString() || ""
-                          );
-                          params.set("school", school.slug);
-                          params.set("tab", "users");
-                          params.set("dialog", "add-school-admin");
-                          router.push(`/admin/schools?${params.toString()}`, {
-                            scroll: false,
-                          });
-                        }
-                      }}
+                      onClick={handleAddUserClick}
                     >
                       <CardContent className="flex items-center gap-1.5">
-                        <Shield className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                        <h4 className="font-semibold text-sm">
-                          Add School Admin
-                        </h4>
-                      </CardContent>
-                    </Card>
-
-                    <Card
-                      className="cursor-pointer py-2 hover:bg-muted/50 transition-colors"
-                      onClick={() => {
-                        if (school?.slug) {
-                          const params = new URLSearchParams(
-                            searchParams?.toString() || ""
-                          );
-                          params.set("school", school.slug);
-                          params.set("tab", "users");
-                          params.set("dialog", "add-teacher");
-                          router.push(`/admin/schools?${params.toString()}`, {
-                            scroll: false,
-                          });
-                        }
-                      }}
-                    >
-                      <CardContent className="flex items-center gap-1.5">
-                        <UserPlus className="h-5 w-5 text-green-600 dark:text-green-400" />
-                        <h4 className="font-semibold text-sm">Add Teacher</h4>
+                        <UserPlus className="h-5 w-5 text-primary" />
+                        <h4 className="font-semibold text-sm">Add User</h4>
                       </CardContent>
                     </Card>
                   </div>
 
-                  <Card>
-                    {/* <CardHeader className="p-0">
-                      <CardTitle className="sr-only p-0">Users</CardTitle>
-                    </CardHeader> */}
-                    <CardContent>
-                      {loadingUsers ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : users.length === 0 ? (
-                        <div className="text-center py-8">
-                          <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <h3 className="text-lg font-medium mb-2">
-                            No Users Found
-                          </h3>
-                          <p className="text-muted-foreground">
-                            No users have been assigned to this school yet.
-                          </p>
-                        </div>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>User</TableHead>
-                              <TableHead>Email</TableHead>
-                              <TableHead>Role</TableHead>
-                              <TableHead>Created</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {users.map((user) => {
-                              const fullName = [user.firstName, user.lastName]
-                                .filter(Boolean)
-                                .join(" ");
-                              const initials =
-                                [user.firstName?.[0], user.lastName?.[0]]
-                                  .filter(Boolean)
-                                  .join("")
-                                  .toUpperCase() || "?";
-
+                  <div className="w-full space-y-4">
+                    <div className="flex items-center py-4 gap-4">
+                      <Input
+                        placeholder="Filter emails..."
+                        value={
+                          (usersTable
+                            .getColumn("email")
+                            ?.getFilterValue() as string) ?? ""
+                        }
+                        onChange={(event) =>
+                          usersTable
+                            .getColumn("email")
+                            ?.setFilterValue(event.target.value)
+                        }
+                        className="max-w-sm"
+                      />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="ml-auto">
+                            Columns <ChevronDown className="ml-2 h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {usersTable
+                            .getAllColumns()
+                            .filter((column) => column.getCanHide())
+                            .map((column) => {
                               return (
-                                <TableRow key={user.id}>
-                                  <TableCell>
-                                    <div className="flex items-center gap-3">
-                                      {/* <Avatar className="h-10 w-10">
-                                        <AvatarImage
-                                          src={user.avatarUrl || undefined}
-                                        />
-                                        <AvatarFallback>
-                                          {initials}
-                                        </AvatarFallback>
-                                      </Avatar> */}
-                                      <div>
-                                        <div className="font-medium">
-                                          {fullName || "Unknown User"}
-                                        </div>
-                                        {/* {user.id && (
-                                          <div className="text-xs text-muted-foreground font-mono">
-                                            {user.id.slice(0, 8)}...
-                                          </div>
-                                        )} */}
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex items-center gap-2">
-                                      <Mail className="h-4 w-4 text-muted-foreground" />
-                                      <span className="text-sm">
-                                        {user.email}
-                                      </span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex flex-wrap gap-1">
-                                      {user.schoolRoles
-                                        .filter(
-                                          (role) => role.schoolId === school.id
-                                        )
-                                        .map((role) => (
-                                          <Badge
-                                            key={role.roleKey}
-                                            variant="secondary"
-                                          >
-                                            {role.roleName || role.roleKey}
-                                          </Badge>
-                                        ))}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell>
-                                    {user.createdAt ? (
-                                      <span className="text-sm text-muted-foreground">
-                                        {new Date(
-                                          user.createdAt
-                                        ).toLocaleDateString()}
-                                      </span>
-                                    ) : (
-                                      <span className="text-sm text-muted-foreground">
-                                        —
-                                      </span>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
+                                <DropdownMenuCheckboxItem
+                                  key={column.id}
+                                  className="capitalize"
+                                  checked={column.getIsVisible()}
+                                  onCheckedChange={(value) =>
+                                    column.toggleVisibility(!!value)
+                                  }
+                                >
+                                  {column.id}
+                                </DropdownMenuCheckboxItem>
                               );
                             })}
-                          </TableBody>
-                        </Table>
-                      )}
-                    </CardContent>
-                  </Card>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div className="overflow-hidden rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          {usersTable.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                              {headerGroup.headers.map((header) => {
+                                return (
+                                  <TableHead key={header.id}>
+                                    {header.isPlaceholder
+                                      ? null
+                                      : flexRender(
+                                          header.column.columnDef.header,
+                                          header.getContext()
+                                        )}
+                                  </TableHead>
+                                );
+                              })}
+                            </TableRow>
+                          ))}
+                        </TableHeader>
+                        <TableBody>
+                          {/* Add User Row */}
+                          <TableRow
+                            className="cursor-pointer hover:bg-muted/50 transition-colors border-dashed"
+                            onClick={handleAddUserClick}
+                          >
+                            <TableCell
+                              colSpan={usersColumns.length}
+                              className="h-auto py-3"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground pl-0.5">
+                                  <UserPlus className="h-4 w-4" />
+                                  <span className="font-medium pl-2">
+                                    Add New User
+                                  </span>
+                                </div>
+                                <div>
+                                  <ChevronsRight className="h-3 w-3 text-muted-foreground mt-0.5" />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5 pl-2">
+                                  Add a member to {school.name}
+                                </p>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                          {loadingUsers ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={usersColumns.length}
+                                className="h-24 text-center"
+                              >
+                                <div className="flex items-center justify-center">
+                                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ) : usersTable.getRowModel().rows?.length ? (
+                            usersTable.getRowModel().rows.map((row) => (
+                              <TableRow
+                                key={row.id}
+                                data-state={row.getIsSelected() && "selected"}
+                              >
+                                {row.getVisibleCells().map((cell) => (
+                                  <TableCell key={cell.id}>
+                                    {flexRender(
+                                      cell.column.columnDef.cell,
+                                      cell.getContext()
+                                    )}
+                                  </TableCell>
+                                ))}
+                              </TableRow>
+                            ))
+                          ) : (
+                            <TableRow>
+                              <TableCell
+                                colSpan={usersColumns.length}
+                                className="h-24 text-center"
+                              >
+                                <div className="flex flex-col items-center justify-center">
+                                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
+                                  <h3 className="text-lg font-medium mb-2">
+                                    No Users Found
+                                  </h3>
+                                  <p className="text-muted-foreground">
+                                    No users have been assigned to this school
+                                    yet.
+                                  </p>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <div className="flex items-center justify-end space-x-2 py-4">
+                      <div className="text-muted-foreground flex-1 text-sm">
+                        {usersTable.getFilteredSelectedRowModel().rows.length}{" "}
+                        of {usersTable.getFilteredRowModel().rows.length} row(s)
+                        selected.
+                      </div>
+                      <div className="space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => usersTable.previousPage()}
+                          disabled={!usersTable.getCanPreviousPage()}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => usersTable.nextPage()}
+                          disabled={!usersTable.getCanNextPage()}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -2161,20 +1979,16 @@ function SchoolDetailDrawerContent({
         </DialogContent>
       </Dialog>
 
-      {/* Add School Admin Dialog */}
-      <Dialog
-        open={addAdminDialogOpen}
+      {/* Add User Wizard Dialog */}
+      <AddUserDialog
+        open={addUserDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
             // Set flag to prevent effect from interfering
             isClosingDialogRef.current = true;
 
             // Close dialog immediately
-            setAddAdminDialogOpen(false);
-            setAddAdminSuccess(false);
-            setAdminEmail("");
-            setAdminFirstName("");
-            setAdminLastName("");
+            setAddUserDialogOpen(false);
 
             // Remove dialog query parameter from URL
             const params = new URLSearchParams(searchParams?.toString() || "");
@@ -2189,628 +2003,26 @@ function SchoolDetailDrawerContent({
               isClosingDialogRef.current = false;
             }, 100);
           } else {
-            setAddAdminDialogOpen(open);
+            setAddUserDialogOpen(open);
           }
         }}
-      >
-        <DialogContent
-          className={
-            addAdminSuccess
-              ? "bg-green-50 dark:bg-green-950 border-green-300 dark:border-green-800 transition-colors duration-300"
-              : ""
+        school={school}
+        onSuccess={async () => {
+          // Refresh users list
+          if (activeSection === "users") {
+            const usersResult = await meApi.get.listAllUsers();
+            if (!usersResult.error && usersResult.data) {
+              const schoolUsers = usersResult.data.filter((user) =>
+                user.schoolRoles.some((role) => role.schoolId === school.id)
+              );
+              setUsers(schoolUsers);
+            }
           }
-        >
-          <DialogHeader>
-            <DialogTitle>Add School Admin</DialogTitle>
-            <DialogDescription>
-              Invite a user to become a school admin for this school.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="admin-first-name">First Name (Optional)</Label>
-                <Input
-                  id="admin-first-name"
-                  type="text"
-                  placeholder="Enter first name"
-                  value={adminFirstName}
-                  onChange={(e) => setAdminFirstName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="admin-last-name">Last Name (Optional)</Label>
-                <Input
-                  id="admin-last-name"
-                  type="text"
-                  placeholder="Enter last name"
-                  value={adminLastName}
-                  onChange={(e) => setAdminLastName(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="admin-email">Email Address</Label>
-              <Input
-                id="admin-email"
-                type="email"
-                placeholder="Enter email address"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                className={
-                  adminEmail && !hasValidAdminEmail
-                    ? "border-red-500 focus-visible:ring-red-500"
-                    : ""
-                }
-              />
-              {adminEmail && !hasValidAdminEmail && (
-                <p className="text-sm text-red-500">
-                  Please enter a valid email address (e.g., name@domain.com)
-                </p>
-              )}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setAddAdminDialogOpen(false);
-                setAddAdminSuccess(false);
-                setAdminEmail("");
-                setAdminFirstName("");
-                setAdminLastName("");
-              }}
-              disabled={addAdminSuccess}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (!school || !hasValidAdminEmail || addAdminSuccess) return;
-                setSubmitting(true);
-                try {
-                  const payload: {
-                    schoolId: string;
-                    email: string;
-                    firstName?: string;
-                    lastName?: string;
-                  } = {
-                    schoolId: school.id,
-                    email: adminEmail,
-                  };
-                  if (adminFirstName.trim()) {
-                    payload.firstName = adminFirstName.trim();
-                  }
-                  if (adminLastName.trim()) {
-                    payload.lastName = adminLastName.trim();
-                  }
 
-                  const result = await usersApi.post.new.schoolAdmin(payload);
-
-                  if (result.error) {
-                    console.error(
-                      "Failed to create school admin:",
-                      result.error
-                    );
-                    // You might want to show an error toast/alert here
-                  } else {
-                    // Show success state
-                    setAddAdminSuccess(true);
-                    setSubmitting(false);
-
-                    // Refresh users list
-                    if (activeSection === "users") {
-                      const usersResult = await meApi.get.listAllUsers();
-                      if (!usersResult.error && usersResult.data) {
-                        const schoolUsers = usersResult.data.filter((user) =>
-                          user.schoolRoles.some(
-                            (role) => role.schoolId === school.id
-                          )
-                        );
-                        setUsers(schoolUsers);
-                      }
-                    }
-
-                    // Refresh school data to update counts
-                    onSchoolUpdate?.();
-
-                    // Wait 2 seconds, then remove dialog param from URL (which will close dialog)
-                    setTimeout(() => {
-                      // Set flag to prevent effect from interfering
-                      isClosingDialogRef.current = true;
-
-                      // Remove dialog query parameter from URL
-                      const params = new URLSearchParams(
-                        searchParams?.toString() || ""
-                      );
-                      params.delete("dialog");
-                      const newUrl = params.toString()
-                        ? `/admin/schools?${params.toString()}`
-                        : "/admin/schools";
-                      router.replace(newUrl, { scroll: false });
-
-                      // Reset form and state
-                      setAddAdminSuccess(false);
-                      setAdminEmail("");
-                      setAdminFirstName("");
-                      setAdminLastName("");
-
-                      // Reset flag after a brief delay to allow URL update to complete
-                      setTimeout(() => {
-                        isClosingDialogRef.current = false;
-                      }, 100);
-                    }, 2000);
-                  }
-                } catch (error) {
-                  console.error("Failed to create school admin:", error);
-                } finally {
-                  setSubmitting(false);
-                }
-              }}
-              disabled={submitting || !hasValidAdminEmail || addAdminSuccess}
-              className={
-                addAdminSuccess
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : ""
-              }
-            >
-              {addAdminSuccess
-                ? "Add Successful"
-                : submitting
-                  ? "Creating..."
-                  : "Add School Admin"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Teacher Dialog */}
-      <Dialog
-        open={addTeacherDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            // Remove dialog query parameter from URL
-            const params = new URLSearchParams(searchParams?.toString() || "");
-            params.delete("dialog");
-            const newUrl = params.toString()
-              ? `/admin/schools?${params.toString()}`
-              : "/admin/schools";
-            router.replace(newUrl, { scroll: false });
-
-            // Reset form and state
-            setAddTeacherSuccess(false);
-            setTeacherEmail("");
-            setTeacherFirstName("");
-            setTeacherLastName("");
-            setAddTeacherStep("selection");
-            setCsvFile(null);
-            setCsvData([]);
-            setCsvError(null);
-            setBulkProgress({ completed: 0, total: 0, errors: 0 });
-          }
-          setAddTeacherDialogOpen(open);
+          // Refresh school data to update counts
+          onSchoolUpdate?.();
         }}
-      >
-        <DialogContent
-          className={
-            addTeacherSuccess
-              ? "bg-green-50 border-green-300 dark:bg-green-950 dark:border-green-800 transition-colors duration-300"
-              : ""
-          }
-        >
-          <DialogHeader>
-            <DialogTitle>
-              {addTeacherStep === "selection"
-                ? "Add Teacher"
-                : addTeacherStep === "manual"
-                  ? "Add Single Teacher"
-                  : "Upload CSV File"}
-            </DialogTitle>
-            <DialogDescription>
-              {addTeacherStep === "selection"
-                ? "Choose how you want to add teachers to this school."
-                : addTeacherStep === "manual"
-                  ? "Invite a user to become a teacher for this school."
-                  : "Upload a CSV file to bulk add teachers. The CSV should have columns: email, firstname (optional), lastname (optional)."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Selection Step */}
-          {addTeacherStep === "selection" && (
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card
-                  className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
-                  onClick={() => setAddTeacherStep("manual")}
-                >
-                  <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
-                    <UserPlus className="h-12 w-12 text-primary" />
-                    <h3 className="font-semibold text-lg">
-                      Add Single Teacher
-                    </h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Manually enter teacher details one at a time
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card
-                  className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = ".csv";
-                    input.onchange = (e) => {
-                      const file = (e.target as HTMLInputElement).files?.[0];
-                      if (file) {
-                        handleCsvFileSelect(file);
-                      }
-                    };
-                    input.click();
-                  }}
-                >
-                  <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
-                    <Upload className="h-12 w-12 text-primary" />
-                    <h3 className="font-semibold text-lg">Upload CSV File</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Bulk import multiple teachers from a CSV file
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          {/* Manual Entry Step */}
-          {addTeacherStep === "manual" && (
-            <>
-              <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="teacher-first-name">
-                      First Name (Optional)
-                    </Label>
-                    <Input
-                      id="teacher-first-name"
-                      type="text"
-                      placeholder="Enter first name"
-                      value={teacherFirstName}
-                      onChange={(e) => setTeacherFirstName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="teacher-last-name">
-                      Last Name (Optional)
-                    </Label>
-                    <Input
-                      id="teacher-last-name"
-                      type="text"
-                      placeholder="Enter last name"
-                      value={teacherLastName}
-                      onChange={(e) => setTeacherLastName(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="teacher-email">Email Address</Label>
-                  <Input
-                    id="teacher-email"
-                    type="email"
-                    placeholder="Enter email address"
-                    value={teacherEmail}
-                    onChange={(e) => setTeacherEmail(e.target.value)}
-                    className={
-                      teacherEmail && !hasValidTeacherEmail
-                        ? "border-red-500 focus-visible:ring-red-500"
-                        : ""
-                    }
-                  />
-                  {teacherEmail && !hasValidTeacherEmail && (
-                    <p className="text-sm text-red-500">
-                      Please enter a valid email address (e.g., name@domain.com)
-                    </p>
-                  )}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setAddTeacherStep("selection")}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const params = new URLSearchParams(
-                      searchParams?.toString() || ""
-                    );
-                    params.delete("dialog");
-                    const newUrl = params.toString()
-                      ? `/admin/schools?${params.toString()}`
-                      : "/admin/schools";
-                    router.replace(newUrl, { scroll: false });
-
-                    setAddTeacherSuccess(false);
-                    setTeacherEmail("");
-                    setTeacherFirstName("");
-                    setTeacherLastName("");
-                    setAddTeacherStep("selection");
-                    setAddTeacherDialogOpen(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    if (!school || !hasValidTeacherEmail) return;
-                    setSubmitting(true);
-                    try {
-                      const result = await usersApi.post.new.teacher({
-                        schoolId: school.id,
-                        email: teacherEmail,
-                        firstName: teacherFirstName.trim() || undefined,
-                        lastName: teacherLastName.trim() || undefined,
-                      });
-                      if (result.error) {
-                        console.error(
-                          "Failed to create teacher:",
-                          result.error
-                        );
-                      } else {
-                        // Show success state
-                        setAddTeacherSuccess(true);
-                        setSubmitting(false);
-
-                        // Refresh users list
-                        if (activeSection === "users") {
-                          const usersResult = await meApi.get.listAllUsers();
-                          if (!usersResult.error && usersResult.data) {
-                            const schoolUsers = usersResult.data.filter(
-                              (user) =>
-                                user.schoolRoles.some(
-                                  (role) => role.schoolId === school.id
-                                )
-                            );
-                            setUsers(schoolUsers);
-                          }
-                        }
-
-                        // Refresh school data to update counts
-                        onSchoolUpdate?.();
-
-                        // Wait 2 seconds, then remove dialog param from URL (which will close dialog)
-                        setTimeout(() => {
-                          // Set flag to prevent effect from interfering
-                          isClosingDialogRef.current = true;
-
-                          // Remove dialog query parameter from URL
-                          const params = new URLSearchParams(
-                            searchParams?.toString() || ""
-                          );
-                          params.delete("dialog");
-                          const newUrl = params.toString()
-                            ? `/admin/schools?${params.toString()}`
-                            : "/admin/schools";
-                          router.replace(newUrl, { scroll: false });
-
-                          // Reset form and state
-                          setAddTeacherSuccess(false);
-                          setTeacherEmail("");
-                          setTeacherFirstName("");
-                          setTeacherLastName("");
-                          setAddTeacherStep("selection");
-
-                          // Reset flag after a brief delay to allow URL update to complete
-                          setTimeout(() => {
-                            isClosingDialogRef.current = false;
-                          }, 100);
-                        }, 2000);
-                      }
-                    } catch (error) {
-                      console.error("Failed to create teacher:", error);
-                    } finally {
-                      setSubmitting(false);
-                    }
-                  }}
-                  disabled={
-                    submitting || !hasValidTeacherEmail || addTeacherSuccess
-                  }
-                  className={
-                    addTeacherSuccess
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : ""
-                  }
-                >
-                  {addTeacherSuccess
-                    ? "Add Successful"
-                    : submitting
-                      ? "Creating..."
-                      : "Add Teacher"}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-
-          {/* CSV Upload Step */}
-          {addTeacherStep === "csv" && (
-            <>
-              <div className="space-y-4 py-4">
-                {csvError && (
-                  <div className="p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-md">
-                    <p className="text-sm text-red-600 dark:text-red-400 whitespace-pre-line">
-                      {csvError}
-                    </p>
-                  </div>
-                )}
-
-                {csvFile && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-                      <FileText className="h-5 w-5 text-muted-foreground" />
-                      <span className="text-sm font-medium">
-                        {csvFile.name}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        {csvData.length} teacher
-                        {csvData.length !== 1 ? "s" : ""} found
-                      </span>
-                    </div>
-
-                    {csvData.length > 0 && (
-                      <div className="border rounded-md max-h-[300px] overflow-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Email</TableHead>
-                              <TableHead>First Name</TableHead>
-                              <TableHead>Last Name</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {csvData.slice(0, 10).map((row, idx) => (
-                              <TableRow key={idx}>
-                                <TableCell className="font-medium">
-                                  {row.email}
-                                </TableCell>
-                                <TableCell>{row.firstName || "—"}</TableCell>
-                                <TableCell>{row.lastName || "—"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                        {csvData.length > 10 && (
-                          <div className="p-2 text-xs text-muted-foreground text-center">
-                            ... and {csvData.length - 10} more
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {bulkSubmitting && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Processing teachers...</span>
-                          <span>
-                            {bulkProgress.completed} / {bulkProgress.total}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary h-2 rounded-full transition-all"
-                            style={{
-                              width: `${(bulkProgress.completed / bulkProgress.total) * 100}%`,
-                            }}
-                          />
-                        </div>
-                        {bulkProgress.errors > 0 && (
-                          <p className="text-sm text-red-500">
-                            {bulkProgress.errors} error
-                            {bulkProgress.errors !== 1 ? "s" : ""} occurred
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!csvFile && (
-                  <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8">
-                    <div className="flex flex-col items-center justify-center gap-4">
-                      <Upload className="h-12 w-12 text-muted-foreground" />
-                      <div className="text-center">
-                        <p className="font-medium">Upload CSV File</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Select a CSV file with columns: email, firstname
-                          (optional), lastname (optional)
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          const input = document.createElement("input");
-                          input.type = "file";
-                          input.accept = ".csv";
-                          input.onchange = (e) => {
-                            const file = (e.target as HTMLInputElement)
-                              .files?.[0];
-                            if (file) {
-                              handleCsvFileSelect(file);
-                            }
-                          };
-                          input.click();
-                        }}
-                      >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Choose File
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setAddTeacherStep("selection");
-                    setCsvFile(null);
-                    setCsvData([]);
-                    setCsvError(null);
-                  }}
-                  disabled={bulkSubmitting}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const params = new URLSearchParams(
-                      searchParams?.toString() || ""
-                    );
-                    params.delete("dialog");
-                    const newUrl = params.toString()
-                      ? `/admin/schools?${params.toString()}`
-                      : "/admin/schools";
-                    router.replace(newUrl, { scroll: false });
-
-                    setAddTeacherSuccess(false);
-                    setAddTeacherStep("selection");
-                    setCsvFile(null);
-                    setCsvData([]);
-                    setCsvError(null);
-                    setBulkProgress({ completed: 0, total: 0, errors: 0 });
-                    setAddTeacherDialogOpen(false);
-                  }}
-                  disabled={bulkSubmitting}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleBulkCreateTeachers}
-                  disabled={
-                    !csvFile ||
-                    csvData.length === 0 ||
-                    bulkSubmitting ||
-                    addTeacherSuccess
-                  }
-                  className={
-                    addTeacherSuccess
-                      ? "bg-green-600 hover:bg-green-700 text-white"
-                      : ""
-                  }
-                >
-                  {addTeacherSuccess
-                    ? "Upload Successful"
-                    : bulkSubmitting
-                      ? `Adding... (${bulkProgress.completed}/${bulkProgress.total})`
-                      : `Add ${csvData.length} Teacher${csvData.length !== 1 ? "s" : ""}`}
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* Add Class Dialog */}
       <Dialog
@@ -2824,7 +2036,7 @@ function SchoolDetailDrawerContent({
             setAddClassDialogOpen(false);
             setClassName("");
             setClassCode("");
-            setClassRunningYear("");
+            setClassRunningYear(new Date().getFullYear().toString());
             setSelectedYearIds([]);
 
             // Remove dialog query parameter from URL
@@ -2848,40 +2060,18 @@ function SchoolDetailDrawerContent({
           <DialogHeader>
             <DialogTitle>Add Class</DialogTitle>
             <DialogDescription>
-              Create a new class for this school.
+              Create a new class for {school?.name || "this school"}.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* Class Running Year - Full width */}
-            <div className="space-y-2">
-              <Label htmlFor="class-running-year">
-                What year is this class running?{" "}
-                <span className="text-muted-foreground font-normal">
-                  (Optional)
-                </span>
-              </Label>
-              <Select
-                value={classRunningYear}
-                onValueChange={setClassRunningYear}
-              >
-                <SelectTrigger id="class-running-year">
-                  <SelectValue placeholder="Select year" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getClassRunningYearOptions().map((year) => (
-                    <SelectItem key={year.value} value={year.value}>
-                      {year.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="space-y-4 py-2">
             {/* Class Name and Class Code in same row */}
-            <div className="grid grid-cols-4 gap-4">
-              {/* Class Name - 3/4 width */}
-              <div className="col-span-3 space-y-2">
-                <Label htmlFor="class-name">
+            <div className="grid grid-cols-5 gap-4">
+              {/* Class Name - 3/5 width */}
+              <div className="col-span-3 space-y-1.5">
+                <Label
+                  htmlFor="class-name"
+                  className="text-xs text-muted-foreground ml-2"
+                >
                   Class Name <span className="text-red-500">*</span>
                 </Label>
                 <Input
@@ -2891,9 +2081,14 @@ function SchoolDetailDrawerContent({
                   onChange={(e) => setClassName(e.target.value)}
                 />
               </div>
-              {/* Class Code - 1/4 width */}
-              <div className="col-span-1 space-y-2">
-                <Label htmlFor="class-code">Class Code</Label>
+              {/* Class Code - 2/5 width */}
+              <div className="col-span-2 space-y-1.5">
+                <Label
+                  htmlFor="class-code"
+                  className="text-xs text-muted-foreground ml-2"
+                >
+                  Class Code
+                </Label>
                 <Input
                   id="class-code"
                   placeholder="Code (optional)"
@@ -2903,111 +2098,179 @@ function SchoolDetailDrawerContent({
               </div>
             </div>
 
-            {/* School Years Multi-Select - Full width */}
-            <div className="space-y-2">
-              <Label>
-                School Years <span className="text-red-500">*</span>
-              </Label>
-              <Popover
-                modal
-                open={yearComboboxOpen}
-                onOpenChange={setYearComboboxOpen}
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={yearComboboxOpen}
-                    className="w-full justify-between"
+            {/* Class Running Year and School Years - Side by side */}
+            <div className="flex gap-4 mt-6">
+              {/* Class Running Year - Half width */}
+              <div className="flex-1 space-y-1.5">
+                <Label
+                  htmlFor="class-running-year"
+                  className="text-xs text-muted-foreground ml-2"
+                >
+                  Running Year
+                </Label>
+                <Select
+                  value={classRunningYear}
+                  onValueChange={setClassRunningYear}
+                >
+                  <SelectTrigger id="class-running-year" className="w-full">
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                    {getClassRunningYearOptions().map((year) => (
+                      <SelectItem key={year.value} value={year.value}>
+                        {year.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* School Years Multi-Select - Half width */}
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground ml-2">
+                  School Years <span className="text-red-500">*</span>
+                </Label>
+                <Popover
+                  modal
+                  open={yearComboboxOpen}
+                  onOpenChange={setYearComboboxOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={yearComboboxOpen}
+                      className="w-full justify-between"
+                    >
+                      {selectedYearIds.length === 0
+                        ? "Select years..."
+                        : `${selectedYearIds.length} year${
+                            selectedYearIds.length > 1 ? "s" : ""
+                          } selected`}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
+                    align="start"
                   >
-                    {selectedYearIds.length === 0
-                      ? "Select years..."
-                      : `${selectedYearIds.length} year${
-                          selectedYearIds.length > 1 ? "s" : ""
-                        } selected`}
-                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search years..." />
-                    <CommandList>
-                      <CommandEmpty>
-                        {loadingYears ? "Loading..." : "No years found."}
-                      </CommandEmpty>
-                      <CommandGroup>
-                        {availableYears.map((year) => {
-                          const isSelected = selectedYearIds.includes(year.id);
-                          return (
-                            <CommandItem
-                              key={year.id}
-                              value={`${year.displayName} ${year.code || ""}`}
-                              onSelect={() => {
-                                if (isSelected) {
-                                  setSelectedYearIds(
-                                    selectedYearIds.filter(
-                                      (id) => id !== year.id
-                                    )
-                                  );
-                                } else {
-                                  setSelectedYearIds([
-                                    ...selectedYearIds,
-                                    year.id,
-                                  ]);
+                    <Command>
+                      <CommandInput placeholder="Search years..." />
+                      <CommandList className="[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:hover:bg-border/80">
+                        <CommandEmpty>
+                          {loadingYears ? "Loading..." : "No years found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {availableYears.map((year) => {
+                            const isSelected = selectedYearIds.includes(
+                              year.id
+                            );
+                            return (
+                              <CommandItem
+                                key={year.id}
+                                value={`${year.displayName} ${year.code || ""}`}
+                                onSelect={() => {
+                                  if (isSelected) {
+                                    setSelectedYearIds(
+                                      selectedYearIds.filter(
+                                        (id) => id !== year.id
+                                      )
+                                    );
+                                  } else {
+                                    setSelectedYearIds([
+                                      ...selectedYearIds,
+                                      year.id,
+                                    ]);
+                                  }
+                                }}
+                                className={
+                                  isSelected
+                                    ? "bg-[var(--brand-bullyproof-primary)]/10"
+                                    : ""
                                 }
-                              }}
-                            >
-                              <Check
-                                className={`mr-2 h-4 w-4 ${
-                                  isSelected ? "opacity-100" : "opacity-0"
-                                }`}
-                              />
-                              <div className="flex flex-col">
-                                <span>{year.displayName}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {year.code}
+                              >
+                                <span className="flex-1">
+                                  {year.displayName}
                                 </span>
-                              </div>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                                <Check
+                                  className={`ml-2 h-4 w-4 ${
+                                    isSelected ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
 
-            {/* Selected Years Badges - Full width row */}
-            {selectedYearIds.length > 0 && (
-              <div className="space-y-2">
-                <Label>Selected Years</Label>
-                <div className="flex flex-wrap gap-2">
-                  {selectedYearIds.map((yearId) => {
-                    const year = availableYears.find((y) => y.id === yearId);
-                    if (!year) return null;
-                    return (
-                      <Badge
-                        key={yearId}
-                        variant="secondary"
-                        className="gap-1 pr-1"
-                      >
-                        <span>{year.displayName}</span>
-                        <button
-                          onClick={() => {
-                            setSelectedYearIds(
-                              selectedYearIds.filter((id) => id !== yearId)
-                            );
-                          }}
-                          className="ml-1 rounded-full hover:bg-secondary-foreground/20 p-0.5"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
+            <Separator className="mt-6 mb-6" />
+
+            {/* Class Preview Card */}
+            {(className ||
+              classCode ||
+              classRunningYear ||
+              selectedYearIds.length > 0) && (
+              <Card className="border-2 border-dashed bg-muted/30 py-4">
+                <CardContent className="px-4">
+                  <div className="space-y-1.5">
+                    {/* Header: School name and Year */}
+                    <div className="flex items-center justify-between">
+                      {school?.name && (
+                        <div className="text-sm text-muted-foreground">
+                          {school.name}
+                        </div>
+                      )}
+                      {classRunningYear && (
+                        <div className="text-sm font-medium text-muted-foreground">
+                          {classRunningYear}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Class name with icon */}
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-6 w-6 text-muted-foreground" />
+                      {className ? (
+                        <span className="text-xl font-bold">{className}</span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground/50 italic">
+                          N/A
+                        </span>
+                      )}
+                      {classCode && (
+                        <p className="text-xs text-muted-foreground">
+                          {classCode}
+                        </p>
+                      )}
+                    </div>
+                    {/* Year level badges */}
+                    {selectedYearIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {selectedYearIds.map((yearId) => {
+                          const year = availableYears.find(
+                            (y) => y.id === yearId
+                          );
+                          if (!year) return null;
+                          return (
+                            <Badge
+                              key={yearId}
+                              variant="secondary"
+                              className="text-xs"
+                            >
+                              {year.displayName}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
           <DialogFooter>
