@@ -27,7 +27,6 @@ type Stage = typeof curriculumStages.$inferSelect & {
 export function ContentSection() {
   const router = useRouter();
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
-  
   // Use the cached React Query hook instead of manual fetching
   const { stages, isLoading, error, refetch } = useStages();
   const { invalidateAllStages } = useInvalidateStage();
@@ -76,7 +75,9 @@ export function ContentSection() {
           <div className="text-center text-destructive">
             <p className="font-medium">Error loading curriculum stages</p>
             <p className="text-sm text-muted-foreground mt-2">
-              {error instanceof Error ? error.message : "Failed to fetch curriculum stages"}
+              {error instanceof Error
+                ? error.message
+                : "Failed to fetch curriculum stages"}
             </p>
           </div>
         </CardContent>

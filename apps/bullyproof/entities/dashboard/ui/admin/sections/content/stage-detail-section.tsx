@@ -74,6 +74,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
+import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 
 // Component to handle thumbnail image with error fallback
 function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
@@ -1401,197 +1402,205 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                             hoveredSide === "left"));
 
                       return (
-                        <TopicCard
+                        <StaggeredAnimation
                           key={topic.id}
-                          topic={topic}
-                          isHovered={isHovered}
-                          isLeaving={isLeaving}
-                          hoveredSide={hoveredSide}
-                          showPlaceholderOverlay={showPlaceholderOverlay}
-                          isDragHandleHovered={hoveredDragHandle === topic.id}
-                          showDragHint={showDragHintIndex === index}
-                          isDragActive={isDragActive}
-                          cardIndex={index}
-                          onMouseEnter={() => {
-                            // Skip all hover logic during drag to prevent state update loops
-                            if (activeId) return;
+                          index={index}
+                          incrementDelay={0.075}
+                        >
+                          <TopicCard
+                            topic={topic}
+                            isHovered={isHovered}
+                            isLeaving={isLeaving}
+                            hoveredSide={hoveredSide}
+                            showPlaceholderOverlay={showPlaceholderOverlay}
+                            isDragHandleHovered={hoveredDragHandle === topic.id}
+                            showDragHint={showDragHintIndex === index}
+                            isDragActive={isDragActive}
+                            cardIndex={index}
+                            onMouseEnter={() => {
+                              // Skip all hover logic during drag to prevent state update loops
+                              if (activeId) return;
 
-                            // Clear any leave timeout from previous card
-                            if (leaveDelayTimeoutRef.current) {
-                              clearTimeout(leaveDelayTimeoutRef.current);
-                              leaveDelayTimeoutRef.current = null;
-                            }
-                            // Clear drag hint timeout from previous card
-                            if (dragHintTimeoutRef.current) {
-                              clearTimeout(dragHintTimeoutRef.current);
-                              dragHintTimeoutRef.current = null;
-                            }
-                            // Clear leaving state immediately when entering new card
-                            setLeavingIndex(null);
-                            setShowDragHintIndex(null);
-
-                            // Clear previous card's hover states (including drag handle)
-                            if (
-                              hoveredIndex !== null &&
-                              hoveredIndex !== index
-                            ) {
-                              setHoveredIndex(null);
-                              setHoveredSide(null);
-                              setHoveredDragHandle(null);
-                            }
-
-                            // Set hover state immediately
-                            setHoveredIndex(index);
-
-                            // Show drag hint after 1 second
-                            dragHintTimeoutRef.current = setTimeout(() => {
-                              setShowDragHintIndex(index);
-                            }, 1000);
-                          }}
-                          onMouseLeave={(e) => {
-                            // Skip all hover logic during drag to prevent state update loops
-                            if (activeId) return;
-
-                            // Check if we're moving to a child element (drag handle) or another card
-                            const relatedTarget =
-                              e?.relatedTarget as Node | null;
-                            const isMovingToDragHandle =
-                              relatedTarget instanceof Element &&
-                              relatedTarget.closest("[data-drag-handle]");
-                            const isMovingToAnotherCard =
-                              relatedTarget instanceof Element &&
-                              relatedTarget.closest("[data-topic-card]");
-
-                            // If moving to drag handle, keep hover states (don't clear)
-                            if (isMovingToDragHandle) {
-                              // Keep hover states when moving to drag handle
-                              return;
-                            }
-
-                            // If moving to another card, clear this card's states
-                            if (isMovingToAnotherCard) {
-                              setHoveredIndex(null);
-                              setHoveredSide(null);
+                              // Clear any leave timeout from previous card
+                              if (leaveDelayTimeoutRef.current) {
+                                clearTimeout(leaveDelayTimeoutRef.current);
+                                leaveDelayTimeoutRef.current = null;
+                              }
+                              // Clear drag hint timeout from previous card
+                              if (dragHintTimeoutRef.current) {
+                                clearTimeout(dragHintTimeoutRef.current);
+                                dragHintTimeoutRef.current = null;
+                              }
+                              // Clear leaving state immediately when entering new card
                               setLeavingIndex(null);
                               setShowDragHintIndex(null);
+
+                              // Clear previous card's hover states (including drag handle)
+                              if (
+                                hoveredIndex !== null &&
+                                hoveredIndex !== index
+                              ) {
+                                setHoveredIndex(null);
+                                setHoveredSide(null);
+                                setHoveredDragHandle(null);
+                              }
+
+                              // Set hover state immediately
+                              setHoveredIndex(index);
+
+                              // Show drag hint after 1 second
+                              dragHintTimeoutRef.current = setTimeout(() => {
+                                setShowDragHintIndex(index);
+                              }, 1000);
+                            }}
+                            onMouseLeave={(e) => {
+                              // Skip all hover logic during drag to prevent state update loops
+                              if (activeId) return;
+
+                              // Check if we're moving to a child element (drag handle) or another card
+                              const relatedTarget =
+                                e?.relatedTarget as Node | null;
+                              const isMovingToDragHandle =
+                                relatedTarget instanceof Element &&
+                                relatedTarget.closest("[data-drag-handle]");
+                              const isMovingToAnotherCard =
+                                relatedTarget instanceof Element &&
+                                relatedTarget.closest("[data-topic-card]");
+
+                              // If moving to drag handle, keep hover states (don't clear)
+                              if (isMovingToDragHandle) {
+                                // Keep hover states when moving to drag handle
+                                return;
+                              }
+
+                              // If moving to another card, clear this card's states
+                              if (isMovingToAnotherCard) {
+                                setHoveredIndex(null);
+                                setHoveredSide(null);
+                                setLeavingIndex(null);
+                                setShowDragHintIndex(null);
+                                // Clear drag hint timeout
+                                if (dragHintTimeoutRef.current) {
+                                  clearTimeout(dragHintTimeoutRef.current);
+                                  dragHintTimeoutRef.current = null;
+                                }
+                                if (hoveredDragHandle === topic.id) {
+                                  setHoveredDragHandle(null);
+                                }
+                                return;
+                              }
+
                               // Clear drag hint timeout
                               if (dragHintTimeoutRef.current) {
                                 clearTimeout(dragHintTimeoutRef.current);
                                 dragHintTimeoutRef.current = null;
                               }
-                              if (hoveredDragHandle === topic.id) {
-                                setHoveredDragHandle(null);
-                              }
-                              return;
-                            }
 
-                            // Clear drag hint timeout
-                            if (dragHintTimeoutRef.current) {
-                              clearTimeout(dragHintTimeoutRef.current);
-                              dragHintTimeoutRef.current = null;
-                            }
-
-                            // Set leaving state to trigger fade-out animation only if truly leaving
-                            if (isHovered) {
-                              setLeavingIndex(index);
-                              setShowDragHintIndex(null);
-                              // After animation completes, clear all states
-                              leaveDelayTimeoutRef.current = setTimeout(() => {
+                              // Set leaving state to trigger fade-out animation only if truly leaving
+                              if (isHovered) {
+                                setLeavingIndex(index);
+                                setShowDragHintIndex(null);
+                                // After animation completes, clear all states
+                                leaveDelayTimeoutRef.current = setTimeout(
+                                  () => {
+                                    setHoveredIndex(null);
+                                    setHoveredSide(null);
+                                    setLeavingIndex(null);
+                                    // Also clear drag handle hover if we're leaving the card
+                                    if (hoveredDragHandle === topic.id) {
+                                      setHoveredDragHandle(null);
+                                    }
+                                    leaveDelayTimeoutRef.current = null;
+                                  },
+                                  500
+                                ); // Match animation duration
+                              } else {
+                                // If not hovered, clear immediately
                                 setHoveredIndex(null);
                                 setHoveredSide(null);
-                                setLeavingIndex(null);
-                                // Also clear drag handle hover if we're leaving the card
+                                setShowDragHintIndex(null);
                                 if (hoveredDragHandle === topic.id) {
                                   setHoveredDragHandle(null);
                                 }
-                                leaveDelayTimeoutRef.current = null;
-                              }, 500); // Match animation duration
-                            } else {
-                              // If not hovered, clear immediately
-                              setHoveredIndex(null);
-                              setHoveredSide(null);
-                              setShowDragHintIndex(null);
-                              if (hoveredDragHandle === topic.id) {
-                                setHoveredDragHandle(null);
                               }
-                            }
-                          }}
-                          onChevronHover={(side) => {
-                            if (!activeId) {
-                              setHoveredSide(side);
-                            }
-                          }}
-                          onChevronLeave={() => {
-                            setHoveredSide(null);
-                          }}
-                          onDragHandleEnter={() => {
-                            // Don't update hover states during drag
-                            if (activeId) return;
+                            }}
+                            onChevronHover={(side) => {
+                              if (!activeId) {
+                                setHoveredSide(side);
+                              }
+                            }}
+                            onChevronLeave={() => {
+                              setHoveredSide(null);
+                            }}
+                            onDragHandleEnter={() => {
+                              // Don't update hover states during drag
+                              if (activeId) return;
 
-                            // Only update if values actually need to change to prevent unnecessary re-renders
-                            if (hoveredDragHandle !== topic.id) {
-                              setHoveredDragHandle(topic.id);
-                            }
-                            if (hoveredIndex !== index) {
-                              setHoveredIndex(index);
-                            }
-                            if (showDragHintIndex !== index) {
-                              setShowDragHintIndex(index);
-                            }
-                          }}
-                          onDragHandleLeave={(e) => {
-                            // Don't update hover states during drag
-                            if (activeId) return;
+                              // Only update if values actually need to change to prevent unnecessary re-renders
+                              if (hoveredDragHandle !== topic.id) {
+                                setHoveredDragHandle(topic.id);
+                              }
+                              if (hoveredIndex !== index) {
+                                setHoveredIndex(index);
+                              }
+                              if (showDragHintIndex !== index) {
+                                setShowDragHintIndex(index);
+                              }
+                            }}
+                            onDragHandleLeave={(e) => {
+                              // Don't update hover states during drag
+                              if (activeId) return;
 
-                            const relatedTarget =
-                              e.relatedTarget as Node | null;
-                            const isMovingToThisCard =
-                              relatedTarget instanceof Element &&
-                              relatedTarget.closest(
-                                `[data-topic-card="${topic.id}"]`
-                              );
-                            const isMovingToAnyCard =
-                              relatedTarget instanceof Element &&
-                              relatedTarget.closest("[data-topic-card]");
+                              const relatedTarget =
+                                e.relatedTarget as Node | null;
+                              const isMovingToThisCard =
+                                relatedTarget instanceof Element &&
+                                relatedTarget.closest(
+                                  `[data-topic-card="${topic.id}"]`
+                                );
+                              const isMovingToAnyCard =
+                                relatedTarget instanceof Element &&
+                                relatedTarget.closest("[data-topic-card]");
 
-                            // If moving to this card, keep hover states (including drag hint)
-                            if (isMovingToThisCard) {
-                              return;
-                            }
+                              // If moving to this card, keep hover states (including drag hint)
+                              if (isMovingToThisCard) {
+                                return;
+                              }
 
-                            // If moving to another card, clear this card's hover states immediately
-                            if (isMovingToAnyCard) {
+                              // If moving to another card, clear this card's hover states immediately
+                              if (isMovingToAnyCard) {
+                                setHoveredDragHandle(null);
+                                setHoveredIndex(null);
+                                setHoveredSide(null);
+                                setLeavingIndex(null);
+                                setShowDragHintIndex(null);
+                                if (dragHintTimeoutRef.current) {
+                                  clearTimeout(dragHintTimeoutRef.current);
+                                  dragHintTimeoutRef.current = null;
+                                }
+                                return;
+                              }
+
+                              // If not moving to any card, clear everything
                               setHoveredDragHandle(null);
                               setHoveredIndex(null);
                               setHoveredSide(null);
-                              setLeavingIndex(null);
                               setShowDragHintIndex(null);
                               if (dragHintTimeoutRef.current) {
                                 clearTimeout(dragHintTimeoutRef.current);
                                 dragHintTimeoutRef.current = null;
                               }
-                              return;
-                            }
-
-                            // If not moving to any card, clear everything
-                            setHoveredDragHandle(null);
-                            setHoveredIndex(null);
-                            setHoveredSide(null);
-                            setShowDragHintIndex(null);
-                            if (dragHintTimeoutRef.current) {
-                              clearTimeout(dragHintTimeoutRef.current);
-                              dragHintTimeoutRef.current = null;
-                            }
-                          }}
-                          onClick={(e) => handleTopicClick(topic, e)}
-                          onAddTopicClick={(e) => {
-                            e.stopPropagation();
-                            setIsAddTopicDrawerOpen(true);
-                          }}
-                          onDeleteTopic={() => handleDeleteTopic(topic)}
-                          onAddSlideBefore={() => handleAddSlideBefore(topic)}
-                          onAddSlideAfter={() => handleAddSlideAfter(topic)}
-                        />
+                            }}
+                            onClick={(e) => handleTopicClick(topic, e)}
+                            onAddTopicClick={(e) => {
+                              e.stopPropagation();
+                              setIsAddTopicDrawerOpen(true);
+                            }}
+                            onDeleteTopic={() => handleDeleteTopic(topic)}
+                            onAddSlideBefore={() => handleAddSlideBefore(topic)}
+                            onAddSlideAfter={() => handleAddSlideAfter(topic)}
+                          />
+                        </StaggeredAnimation>
                       );
                     })}
                   </div>
