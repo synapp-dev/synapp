@@ -3,7 +3,12 @@
 import { useStageByCode, useStage } from "@/entities/stages/model/store";
 import { useTopicsByStage } from "@/entities/topics/model/store-enhanced";
 import { Badge } from "@workspace/ui/components/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Loader2, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -27,15 +32,12 @@ export function StageView({
   // Fetch stage by ID or code
   const stageByIdQuery = useStage(stageId || null);
   const stageByCodeQuery = useStageByCode(stageCode || null);
-  
+
   const stageQuery = stageId ? stageByIdQuery : stageByCodeQuery;
   const { stage, isLoading: isLoadingStage, error: stageError } = stageQuery;
 
   // Fetch topics if stage is loaded and showTopics is true
-  const {
-    topics,
-    isLoading: isLoadingTopics,
-  } = useTopicsByStage(stage?.id, {
+  const { topics, isLoading: isLoadingTopics } = useTopicsByStage(stage?.id, {
     includeSlides: true,
     includeUrls: true,
   });
@@ -89,11 +91,7 @@ export function StageView({
               <h3 className="text-sm font-medium mb-2">Year Levels</h3>
               <div className="flex flex-wrap gap-2">
                 {stage.years.map((year) => (
-                  <Badge
-                    key={year.id}
-                    variant="outline"
-                    className="text-xs"
-                  >
+                  <Badge key={year.id} variant="outline" className="text-xs">
                     {year.displayName}
                   </Badge>
                 ))}
@@ -116,7 +114,9 @@ export function StageView({
                     <div
                       key={topic.id}
                       className="p-3 rounded-md border hover:bg-muted/50 cursor-pointer transition-colors"
-                      onClick={() => handleTopicClick(topic.id, topic.stageOrder)}
+                      onClick={() =>
+                        handleTopicClick(topic.id, topic.stageOrder)
+                      }
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -124,7 +124,8 @@ export function StageView({
                         </div>
                         {topic.slides && topic.slides.length > 0 && (
                           <Badge variant="secondary" className="ml-2">
-                            {topic.slides.length} slide{topic.slides.length !== 1 ? "s" : ""}
+                            {topic.slides.length} slide
+                            {topic.slides.length !== 1 ? "s" : ""}
                           </Badge>
                         )}
                       </div>

@@ -204,7 +204,7 @@ interface StageCardProps {
   stage: Stage;
   index: number;
   onStageClick?: (stage: Stage) => void;
-  basePath?: string; // e.g., "/admin/content/curriculum" or "/schools/{schoolId}/content"
+  basePath?: string; // e.g., "/admin/content/curriculum"
 }
 
 function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
@@ -326,7 +326,7 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
 interface StageCardsProps {
   stages: Stage[];
   onStageClick?: (stage: Stage) => void;
-  basePath?: string; // e.g., "/admin/content/curriculum" or "/schools/{schoolId}/content"
+  basePath?: string; // e.g., "/admin/content/curriculum"
 }
 
 export function StageCards({
