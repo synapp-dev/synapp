@@ -11,7 +11,7 @@ import {
   SidebarProvider,
   SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
-import { User, ShieldCheck, History, Trash2 } from "lucide-react";
+import { User, ShieldCheck, History, Trash2, Briefcase, GraduationCap } from "lucide-react";
 import type { TabType } from "./types";
 
 interface UserDetailSidebarProps {
@@ -65,6 +65,34 @@ export function UserDetailSidebar({
                     </SidebarMenuItem>
                     <SidebarMenuItem>
                       <SidebarMenuButton
+                        isActive={activeTab === "positions"}
+                        onClick={() => onTabChange("positions")}
+                        className={
+                          activeTab === "positions"
+                            ? "!bg-[var(--brand-bullyproof-primary)] !text-white hover:!bg-[var(--brand-bullyproof-primary)]/90 hover:!text-white data-[active=true]:!bg-[var(--brand-bullyproof-primary)] data-[active=true]:!text-white"
+                            : ""
+                        }
+                      >
+                        <Briefcase className="h-4 w-4" />
+                        <span>Positions</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={activeTab === "classes"}
+                        onClick={() => onTabChange("classes")}
+                        className={
+                          activeTab === "classes"
+                            ? "!bg-[var(--brand-bullyproof-primary)] !text-white hover:!bg-[var(--brand-bullyproof-primary)]/90 hover:!text-white data-[active=true]:!bg-[var(--brand-bullyproof-primary)] data-[active=true]:!text-white"
+                            : ""
+                        }
+                      >
+                        <GraduationCap className="h-4 w-4" />
+                        <span>Classes</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
                         isActive={activeTab === "history"}
                         onClick={() => onTabChange("history")}
                         className={
@@ -79,7 +107,7 @@ export function UserDetailSidebar({
                     </SidebarMenuItem>
                     <SidebarSeparator className="!mx-0 !ml-0 my-1" />
                     <SidebarMenuItem>
-                      <SidebarMenuButton className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                      <SidebarMenuButton disabled className="text-destructive hover:text-destructive hover:bg-destructive/10">
                         <Trash2 className="h-4 w-4" />
                         <span>Delete user</span>
                       </SidebarMenuButton>

@@ -66,7 +66,7 @@ export function UsersDataTable({
         const isAllSelected = table.getIsAllPageRowsSelected();
         const isSomeSelected = table.getIsSomePageRowsSelected();
         return (
-          <div className="pl-4">
+          <div className="pl-2">
             <Checkbox
               checked={
                 isAllSelected ? true : isSomeSelected ? "indeterminate" : false
@@ -80,7 +80,7 @@ export function UsersDataTable({
         );
       },
       cell: ({ row }) => (
-        <div className="pl-4">
+        <div className="pl-2">
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -412,7 +412,7 @@ export function UsersDataTable({
                   let width = "auto";
                   const columnId = header.column.id;
                   if (columnId === "select") {
-                    width = "48px";
+                    width = "40px";
                   } else if (columnId === "name") {
                     width = "25%";
                   } else if (columnId === "roles") {

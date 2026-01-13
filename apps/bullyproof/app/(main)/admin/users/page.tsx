@@ -43,7 +43,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { UserDetailDrawer } from "./components/user-detail-drawer";
-import { UsersDataTable } from "./components/users-data-table";
+import { UsersTable } from "@/entities/users/ui/users-table";
 import { AddUserSheet } from "./components/add-user-sheet";
 import {
   Dialog,
@@ -58,6 +58,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
+import { apiFetch } from "@/lib/api/fetcher.client";
 
 function AdminUsersPageContent() {
   const router = useRouter();
@@ -73,6 +74,8 @@ function AdminUsersPageContent() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] =
     useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Get filters from URL query params
   const roleFilter = searchParams?.get("role") || "";
@@ -284,12 +287,14 @@ function AdminUsersPageContent() {
             <div className="overflow-x-auto">
               <Table className="w-full table-fixed">
                 <colgroup>
+                  <col style={{ width: "40px" }} />
                   <col style={{ width: "25%" }} />
                   <col style={{ width: "60%" }} />
                   <col style={{ width: "15%" }} />
                 </colgroup>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="text-left pl-2"></TableHead>
                     <TableHead className="text-left pl-4">User</TableHead>
                     <TableHead className="text-left">Roles</TableHead>
                     <TableHead className="text-left">Created</TableHead>
@@ -300,34 +305,44 @@ function AdminUsersPageContent() {
           </div>
           <div className="flex-1 h-full relative">
             <ScrollArea className="h-full w-full">
-              <Table className="w-full table-fixed">
-                <colgroup>
-                  <col style={{ width: "25%" }} />
-                  <col style={{ width: "60%" }} />
-                  <col style={{ width: "15%" }} />
-                </colgroup>
-                <TableBody>
-                  {skeletonRows.map((row) => (
-                    <TableRow key={row}>
-                      <TableCell className="pl-4">
-                        <div className="space-y-2">
-                          <Skeleton className="h-4 w-32" />
-                          <Skeleton className="h-3 w-48" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Skeleton className="h-5 w-16" />
-                          <Skeleton className="h-5 w-20" />
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
+              <div className="pb-3">
+                <Table className="w-full table-fixed">
+                  <colgroup>
+                    <col style={{ width: "40px" }} />
+                    <col style={{ width: "25%" }} />
+                    <col style={{ width: "60%" }} />
+                    <col style={{ width: "15%" }} />
+                  </colgroup>
+                  <TableBody>
+                    {skeletonRows.map((row) => (
+                      <TableRow key={row} className="h-[56px]">
+                        <TableCell className="pl-2 py-2">
+                          <Skeleton className="h-4 w-4" />
+                        </TableCell>
+                        <TableCell className="pl-4 py-2">
+                          <div className="space-y-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-48" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-2 py-2">
+                          <div className="flex gap-2 flex-wrap">
+                            <Skeleton className="h-5 w-16" />
+                            <Skeleton className="h-5 w-20" />
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-2 py-2">
+                          <Skeleton className="h-4 w-20" />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Spacer row to ensure last row is fully visible */}
+                    <TableRow className="h-8 pointer-events-none">
+                      <TableCell colSpan={4} className="p-0" />
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableBody>
+                </Table>
+              </div>
             </ScrollArea>
           </div>
         </div>
@@ -584,13 +599,14 @@ function AdminUsersPageContent() {
         {loading ? (
           <SkeletonTable />
         ) : (
-          <UsersDataTable
+          <UsersTable
             users={users}
             roles={roles}
             onUserClick={handleUserClick}
             isLoading={loading}
             error={error}
             onRowSelectionChange={setRowSelection}
+            showSelection={true}
           />
         )}
       </div>
@@ -691,7 +707,13 @@ function AdminUsersPageContent() {
       {/* Confirm Delete Dialog */}
       <Dialog
         open={isConfirmDeleteDialogOpen}
-        onOpenChange={setIsConfirmDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsConfirmDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteError(null);
+            setIsDeleting(false);
+          }
+        }}
       >
         <DialogContent>
           <DialogHeader>
@@ -701,28 +723,127 @@ function AdminUsersPageContent() {
               delete these users?
             </DialogDescription>
           </DialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
                 setIsConfirmDeleteDialogOpen(false);
                 setRowSelection({});
+                setDeleteError(null);
+                setIsDeleting(false);
               }}
+              disabled={isDeleting}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                // TODO: Implement actual delete logic
-                setIsConfirmDeleteDialogOpen(false);
-                setRowSelection({});
-                // Refresh users list after deletion
-                refetchUsers();
-                refetchAllUsers();
+              onClick={async () => {
+                const selectedUserIds = Object.keys(rowSelection)
+                  .filter((key) => rowSelection[key])
+                  .map((rowIndex) => {
+                    const user = users[parseInt(rowIndex)];
+                    return user?.id;
+                  })
+                  .filter(Boolean) as string[];
+
+                if (selectedUserIds.length === 0) {
+                  setIsConfirmDeleteDialogOpen(false);
+                  setRowSelection({});
+                  return;
+                }
+
+                setIsDeleting(true);
+                setDeleteError(null);
+
+                try {
+                  const result = await apiFetch<{
+                    success: boolean;
+                    deleted: number;
+                    failed: number;
+                    results: {
+                      successful: string[];
+                      failed: Array<{ userId: string; error: string }>;
+                    };
+                  }>("/users/delete", {
+                    method: "DELETE",
+                    body: JSON.stringify({ userIds: selectedUserIds }),
+                  });
+
+                  if (result.error) {
+                    setDeleteError(
+                      result.error.message || "Failed to delete users"
+                    );
+                    setIsDeleting(false);
+                    return;
+                  }
+
+                  if (result.data) {
+                    const { deleted, failed, results } = result.data;
+
+                    // Always refresh the list to show current state
+                    await refetchUsers();
+                    await refetchAllUsers();
+
+                    if (failed > 0) {
+                      // Partial success - show error but keep dialog open
+                      const failedMessages = results.failed
+                        .map((f) => {
+                          const failedUser = users.find(
+                            (u) => u.id === f.userId
+                          );
+                          const userName = failedUser
+                            ? [failedUser.firstName, failedUser.lastName]
+                                .filter(Boolean)
+                                .join(" ") || failedUser.email
+                            : f.userId;
+                          return `${userName}: ${f.error}`;
+                        })
+                        .join(", ");
+                      setDeleteError(
+                        `Successfully deleted ${deleted} user(s), but failed to delete ${failed} user(s): ${failedMessages}`
+                      );
+                      // Clear selection for successfully deleted users
+                      const newSelection: Record<string, boolean> = {};
+                      Object.keys(rowSelection).forEach((key) => {
+                        const user = users[parseInt(key)];
+                        if (user && !results.successful.includes(user.id)) {
+                          newSelection[key] = true;
+                        }
+                      });
+                      setRowSelection(newSelection);
+                    } else {
+                      // Complete success - close dialogs and clear selection
+                      setIsConfirmDeleteDialogOpen(false);
+                      setRowSelection({});
+                    }
+                  }
+                } catch (error: any) {
+                  console.error("[USER DELETE] Error:", error);
+                  setDeleteError(
+                    error.message || "An unexpected error occurred"
+                  );
+                } finally {
+                  setIsDeleting(false);
+                }
               }}
+              disabled={isDeleting}
             >
-              Delete
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
