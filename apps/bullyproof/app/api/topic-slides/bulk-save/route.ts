@@ -37,6 +37,103 @@ import { db } from "@/server/db/drizzle";
 import { topicSlides } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
+/**
+ * Helper function to check if a slide has valid content
+ * Returns true if the slide has content, false if it's empty
+ */
+async function slideHasContent(
+  slide: {
+    id: string;
+    kind: string;
+    imageUrl?: string | null;
+    videoUrl?: string | null;
+    textHtml?: string | null;
+  },
+  supabase: any,
+  stageNumber?: number,
+  topicNumber?: number
+): Promise<boolean> {
+  // Text slides must have textHtml
+  if (slide.kind === "text") {
+    const hasText = !!slide.textHtml && slide.textHtml.trim() !== "";
+    if (!hasText) {
+      console.log(`[bulk-save] [cleanup] Text slide ${slide.id} has no textHtml`);
+    }
+    return hasText;
+  }
+
+  // Video slides must have videoUrl
+  if (slide.kind === "video") {
+    const hasVideo = !!slide.videoUrl && slide.videoUrl.trim() !== "";
+    if (!hasVideo) {
+      console.log(`[bulk-save] [cleanup] Video slide ${slide.id} has no videoUrl`);
+    }
+    return hasVideo;
+  }
+
+  // Image slides must have imageUrl AND the file must exist in storage
+  if (slide.kind === "image") {
+    if (!slide.imageUrl || slide.imageUrl.trim() === "") {
+      console.log(`[bulk-save] [cleanup] Image slide ${slide.id} has no imageUrl`);
+      return false;
+    }
+
+    // If we have stage and topic info, verify the file exists in storage
+    if (stageNumber !== undefined && topicNumber !== undefined) {
+      try {
+        // Extract file extension from URL or use default
+        let fileExtension = "jpg";
+        const urlMatch = slide.imageUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+        if (urlMatch) {
+          fileExtension = urlMatch[1];
+        }
+
+        const fileName = `${slide.id}.${fileExtension}`;
+        const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+
+        // Check if file exists in storage
+        const { data: fileList, error: listError } = await supabase.storage
+          .from("content")
+          .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
+
+        if (listError) {
+          console.warn(
+            `[bulk-save] [cleanup] Error checking file existence for slide ${slide.id}:`,
+            listError.message
+          );
+          // If we can't check, assume it exists (don't delete on uncertainty)
+          return true;
+        }
+
+        const fileExists =
+          fileList && fileList.some((file) => file.name === fileName);
+
+        if (!fileExists) {
+          console.log(
+            `[bulk-save] [cleanup] Image slide ${slide.id} has imageUrl but file doesn't exist in storage: ${filePath}`
+          );
+          return false;
+        }
+
+        return true;
+      } catch (error: any) {
+        console.warn(
+          `[bulk-save] [cleanup] Error verifying file for slide ${slide.id}:`,
+          error.message
+        );
+        // If we can't verify, assume it exists (don't delete on uncertainty)
+        return true;
+      }
+    }
+
+    // If we don't have stage/topic info, just check if imageUrl exists
+    return true;
+  }
+
+  // Unknown slide kind - assume it's valid
+  return true;
+}
+
 export async function POST(request: Request) {
   console.log("[bulk-save] Starting bulk save request");
 
@@ -229,9 +326,9 @@ export async function POST(request: Request) {
     const createdSlideIds: string[] = [];
     if (creates && Array.isArray(creates) && creates.length > 0) {
       console.log(`[bulk-save] Found ${creates.length} slide(s) to create`);
-      for (let i = 0; i < creates.length; i++) {
-        const slideData = creates[i];
-        const tempId = slideData.tempId; // Store tempId from client
+      
+      // Batch create slides using single insert with multiple values
+      const createPayloads = creates.map((slideData, i) => {
         // Use a temporary high orderIndex to avoid unique constraint violations
         // We'll reorder everything after all operations
         const tempOrderIndex = maxOrderIndex + 1000 + i;
@@ -242,8 +339,7 @@ export async function POST(request: Request) {
             ? slideData.textHtml || ""
             : slideData.textHtml;
 
-        // Create slide WITHOUT imageUrl first (we'll upload file and update after)
-        const createPayload = {
+        const payload = {
           topicId,
           orderIndex: tempOrderIndex,
           kind: slideData.kind,
@@ -253,36 +349,51 @@ export async function POST(request: Request) {
           videoStartS: slideData.videoStartS || null,
           videoEndS: slideData.videoEndS || null,
         };
+        
+        console.log(`[bulk-save] Creating slide ${i + 1}/${creates.length}:`, {
+          tempId: slideData.tempId,
+          kind: payload.kind,
+          hasVideoUrl: !!payload.videoUrl,
+          hasTextHtml: !!payload.textHtml,
+          hasImageUrl: !!payload.imageUrl,
+          willHaveFileUpload: true, // We expect a file upload for image slides
+        });
+        
+        return payload;
+      });
+
+      console.log(`[bulk-save] Batch creating ${createPayloads.length} slide(s)`);
+      try {
+        // Batch insert all slides at once
+        const createdSlides = await db
+          .insert(topicSlides)
+          .values(createPayloads)
+          .returning();
+
+        // Map tempId to slideId for file uploads
+        createdSlides.forEach((slide, index) => {
+          const slideData = creates[index];
+          const tempId = slideData?.tempId;
+          
+          if (slide?.id) {
+            createdSlideIds.push(slide.id);
+            if (tempId) {
+              tempIdToSlideIdMap.set(tempId, slide.id);
+            }
+          }
+        });
 
         console.log(
-          `[bulk-save] Creating slide ${i + 1}/${creates.length} with tempId: ${tempId}`
+          `[bulk-save] Successfully batch created ${createdSlides.length} slide(s)`
         );
-        try {
-          const result = await topicsRepo.createSlide(createPayload);
-          if (result?.[0]?.id) {
-            const slideId = result[0].id;
-            console.log(
-              `[bulk-save] Successfully created slide with ID: ${slideId}`
-            );
-            createdSlideIds.push(slideId);
-            if (tempId) {
-              tempIdToSlideIdMap.set(tempId, slideId);
-            }
-          } else {
-            console.warn(`[bulk-save] Created slide but no ID returned`);
-          }
-        } catch (error: any) {
-          console.error(`[bulk-save] ERROR: Failed to create slide ${i + 1}:`, {
-            error: error,
-            message: error?.message,
-            stack: error?.stack,
-          });
-          throw error;
-        }
+      } catch (error: any) {
+        console.error(`[bulk-save] ERROR: Failed to batch create slides:`, {
+          error: error,
+          message: error?.message,
+          stack: error?.stack,
+        });
+        throw error;
       }
-      console.log(
-        `[bulk-save] Completed creating ${createdSlideIds.length} slide(s)`
-      );
     } else {
       console.log("[bulk-save] No slides to create");
     }
@@ -370,8 +481,16 @@ export async function POST(request: Request) {
     }
 
     // Step 3.6: Update newly created slides with imageUrl if files were uploaded
+    console.log(`[bulk-save] Updating ${Object.keys(uploadedUrls).length} slide(s) with uploaded image URLs`);
     for (const [slideId, imageUrl] of Object.entries(uploadedUrls)) {
+      console.log(`[bulk-save] Updating slide ${slideId} with imageUrl:`, imageUrl?.substring(0, 50) + "...");
       await topicsRepo.updateSlide(slideId, { imageUrl });
+    }
+    
+    // Check for slides that were created but don't have image URLs
+    const slidesWithoutImages = createdSlideIds.filter(id => !uploadedUrls[id]);
+    if (slidesWithoutImages.length > 0) {
+      console.warn(`[bulk-save] WARNING: ${slidesWithoutImages.length} slide(s) were created but have no image URL:`, slidesWithoutImages);
     }
 
     // Step 3.7: Upload files for existing slides that have pending uploads
@@ -430,7 +549,14 @@ export async function POST(request: Request) {
     if (updates && Array.isArray(updates) && updates.length > 0) {
       console.log(`[bulk-save] Found ${updates.length} slide(s) to update`);
       for (const slideData of updates) {
-        console.log(`[bulk-save] Updating slide: ${slideData.id}`);
+        console.log(`[bulk-save] Updating slide: ${slideData.id}`, {
+          kind: slideData.kind,
+          hasImageUrl: !!slideData.imageUrl,
+          hasVideoUrl: !!slideData.videoUrl,
+          hasTextHtml: !!slideData.textHtml,
+          hasUploadedFile: !!uploadedUrls[slideData.id],
+        });
+        
         const updateData: any = { ...slideData };
         delete updateData.id; // Remove id from update data
         delete updateData.orderIndex; // Don't update orderIndex here, reorder handles it
@@ -438,6 +564,9 @@ export async function POST(request: Request) {
         // If there's an uploaded file for this slide, use its URL
         if (uploadedUrls[slideData.id]) {
           updateData.imageUrl = uploadedUrls[slideData.id];
+          console.log(`[bulk-save] Setting imageUrl from uploaded file for slide ${slideData.id}`);
+        } else if (slideData.kind === "image" && !updateData.imageUrl) {
+          console.warn(`[bulk-save] WARNING: Image slide ${slideData.id} has no imageUrl and no uploaded file!`);
         }
 
         try {
@@ -624,17 +753,261 @@ export async function POST(request: Request) {
       }
     }
 
-    // Step 6: Return updated topic with slides
-    console.log("[bulk-save] Step 6: Fetching final topic data...");
+    // Step 6: Cleanup - Remove empty slides
+    // SAFETY: Only delete slides that are CLEARLY empty (no content at all)
+    // We are conservative - if there's any uncertainty, we keep the slide
+    console.log("[bulk-save] Step 6: Cleaning up empty slides (conservative mode)...");
+    let topicDataForCleanup;
+    try {
+      topicDataForCleanup = await topicsRepo.getWithDetails(topicId);
+    } catch (error: any) {
+      console.error("[bulk-save] ERROR: Failed to get topic data for cleanup:", {
+        error: error,
+        message: error?.message,
+      });
+      // Skip cleanup if we can't get data - better safe than sorry
+      console.log("[bulk-save] [cleanup] Skipping cleanup due to error - keeping all slides");
+      topicDataForCleanup = null;
+    }
+
+    // Track slides that were just created/updated in this request - NEVER delete these
+    const slidesModifiedInThisRequest = new Set<string>([
+      ...createdSlideIds,
+      ...(updates?.map((u: any) => u.id) || []),
+    ]);
+
+    if (topicDataForCleanup?.slides && topicDataForCleanup.slides.length > 0) {
+      const stage = topicDataForCleanup.stage;
+      const topicData = topicDataForCleanup;
+      
+      // Extract stage and topic numbers for file verification
+      let stageNumber: number | undefined;
+      let topicNumber: number | undefined;
+      
+      if (stage?.code) {
+        const stageNumberMatch = stage.code.match(/^S(\d+)$/);
+        if (stageNumberMatch) {
+          stageNumber = parseInt(stageNumberMatch[1], 10);
+        }
+      }
+      
+      if (topicData.stageOrder !== null && topicData.stageOrder !== undefined) {
+        topicNumber = topicData.stageOrder;
+      }
+      
+      console.log("[bulk-save] [cleanup] Cleanup context:", {
+        stageNumber,
+        topicNumber,
+        totalSlides: topicDataForCleanup.slides.length,
+        slidesModifiedInThisRequest: slidesModifiedInThisRequest.size,
+        protectedSlides: Array.from(slidesModifiedInThisRequest),
+      });
+
+      // Check each slide for content
+      // SAFETY: Only mark for deletion if slide is CLEARLY empty AND wasn't just modified
+      const emptySlideIds: string[] = [];
+      for (const slide of topicDataForCleanup.slides) {
+        // SAFETY CHECK: Never delete slides that were just created/updated in this request
+        if (slidesModifiedInThisRequest.has(slide.id)) {
+          console.log(
+            `[bulk-save] [cleanup] PROTECTED: Skipping slide ${slide.id} - was modified in this request`
+          );
+          continue;
+        }
+
+        // SAFETY CHECK: Only check slides that are clearly empty (no URL fields at all)
+        // If slide has any URL field set, we verify it exists before deleting
+        const hasAnyUrl = !!slide.imageUrl || !!slide.videoUrl || !!slide.textHtml;
+        
+        if (!hasAnyUrl) {
+          // Slide has no content fields at all - safe to delete
+          emptySlideIds.push(slide.id);
+          console.log(
+            `[bulk-save] [cleanup] Marking clearly empty slide for deletion: ${slide.id} (kind: ${slide.kind}, orderIndex: ${slide.orderIndex}, no URLs at all)`
+          );
+          continue;
+        }
+
+        // For slides with URLs, verify they're actually empty
+        const hasContent = await slideHasContent(
+          slide,
+          supabase,
+          stageNumber,
+          topicNumber
+        );
+        
+        if (!hasContent) {
+          // Double-check: Only delete if we're CERTAIN it's empty
+          // slideHasContent already returns true on uncertainty, so if it returns false, we're sure
+          emptySlideIds.push(slide.id);
+          console.log(
+            `[bulk-save] [cleanup] Marking verified empty slide for deletion: ${slide.id} (kind: ${slide.kind}, orderIndex: ${slide.orderIndex})`
+          );
+        } else {
+          console.log(
+            `[bulk-save] [cleanup] Keeping slide ${slide.id} - has content or verification uncertain`
+          );
+        }
+      }
+
+      // Delete empty slides if any found
+      // SAFETY: Log detailed info before deletion for audit trail
+      if (emptySlideIds.length > 0) {
+        console.log(
+          `[bulk-save] [cleanup] Found ${emptySlideIds.length} empty slide(s) to delete:`,
+          emptySlideIds
+        );
+        
+        // Log details of each slide being deleted for audit
+        for (const slideId of emptySlideIds) {
+          const slide = topicDataForCleanup.slides.find((s: any) => s.id === slideId);
+          if (slide) {
+            console.log(`[bulk-save] [cleanup] Slide to delete:`, {
+              id: slide.id,
+              kind: slide.kind,
+              orderIndex: slide.orderIndex,
+              imageUrl: slide.imageUrl ? "exists but invalid" : "missing",
+              videoUrl: slide.videoUrl ? "exists" : "missing",
+              textHtml: slide.textHtml ? "exists" : "missing",
+            });
+          }
+        }
+        
+        for (const slideId of emptySlideIds) {
+          try {
+            // SAFETY: Double-check slide still exists and is still empty before deleting
+            const slideData = await topicsRepo.getSlideWithTopicAndStage(slideId);
+            if (!slideData) {
+              console.log(
+                `[bulk-save] [cleanup] Slide ${slideId} already deleted, skipping`
+              );
+              continue;
+            }
+
+            // Final safety check: Verify slide is still empty before deleting
+            // slideHasContent returns true if slide HAS content, false if empty
+            const hasContent = await slideHasContent(
+              slideData.slide,
+              supabase,
+              stageNumber,
+              topicNumber
+            );
+            
+            // Only delete if we're CERTAIN it's empty (hasContent === false)
+            if (!hasContent) {
+              // Delete file if it exists
+              if (
+                slideData.slide.imageUrl &&
+                stageNumber !== undefined &&
+                topicNumber !== undefined
+              ) {
+                try {
+                  let fileExtension = "jpg";
+                  const urlMatch = slideData.slide.imageUrl.match(
+                    /\.([a-zA-Z0-9]+)(?:\?|$)/
+                  );
+                  if (urlMatch) {
+                    fileExtension = urlMatch[1];
+                  }
+
+                  const fileName = `${slideId}.${fileExtension}`;
+                  const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+
+                  await supabase.storage.from("content").remove([filePath]);
+                  console.log(
+                    `[bulk-save] [cleanup] Deleted file for empty slide: ${filePath}`
+                  );
+                } catch (fileError: any) {
+                  // File deletion is best effort - log but don't fail
+                  console.warn(
+                    `[bulk-save] [cleanup] Failed to delete file for slide ${slideId}:`,
+                    fileError.message
+                  );
+                }
+              }
+
+              // Delete slide from database
+              await topicsRepo.deleteSlide(slideId);
+              console.log(
+                `[bulk-save] [cleanup] Successfully deleted empty slide: ${slideId}`
+              );
+            } else {
+              console.warn(
+                `[bulk-save] [cleanup] SAFETY: Slide ${slideId} now has content, skipping deletion`
+              );
+            }
+          } catch (deleteError: any) {
+            console.error(
+              `[bulk-save] [cleanup] ERROR: Failed to delete empty slide ${slideId}:`,
+              {
+                error: deleteError,
+                message: deleteError?.message,
+              }
+            );
+            // Continue with other deletions even if one fails
+          }
+        }
+
+        // Reorder remaining slides after cleanup
+        const remainingTopicData = await topicsRepo.getWithDetails(topicId);
+        if (remainingTopicData?.slides && remainingTopicData.slides.length > 0) {
+          const remainingSlideIds = remainingTopicData.slides
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .map((s) => s.id);
+          
+          if (remainingSlideIds.length > 0) {
+            await topicsRepo.reorderSlides(topicId, remainingSlideIds);
+            console.log(
+              `[bulk-save] [cleanup] Reordered ${remainingSlideIds.length} remaining slides`
+            );
+          }
+        }
+      } else {
+        console.log("[bulk-save] [cleanup] No empty slides found - all slides have content ✓");
+      }
+    }
+
+    // Step 7: Return updated topic with slides
+    console.log("[bulk-save] Step 7: Fetching final topic data...");
     console.log(
       `[bulk-save] Calling topicsRepo.getWithDetails with topicId: ${topicId}`
     );
     let finalTopicData;
     try {
       finalTopicData = await topicsRepo.getWithDetails(topicId);
+      const slidesCount = finalTopicData?.slides?.length || 0;
       console.log(
-        `[bulk-save] Successfully retrieved final topic data. Slides count: ${finalTopicData?.slides?.length || 0}`
+        `[bulk-save] Successfully retrieved final topic data. Slides count: ${slidesCount}`
       );
+      
+      // Final verification - check for any remaining empty slides
+      if (finalTopicData?.slides) {
+        const remainingEmptySlides = [];
+        for (const slide of finalTopicData.slides) {
+          const hasContent = await slideHasContent(
+            slide,
+            supabase,
+            stageNumber,
+            topicNumber
+          );
+          if (!hasContent) {
+            remainingEmptySlides.push(slide);
+          }
+        }
+        
+        if (remainingEmptySlides.length > 0) {
+          console.error(
+            `[bulk-save] WARNING: Found ${remainingEmptySlides.length} empty slide(s) still in database after cleanup:`,
+            remainingEmptySlides.map((s: any) => ({
+              id: s.id,
+              kind: s.kind,
+              orderIndex: s.orderIndex,
+            }))
+          );
+        } else {
+          console.log("[bulk-save] All slides in final data have content ✓");
+        }
+      }
     } catch (error: any) {
       console.error("[bulk-save] ERROR: Failed to get final topic data:", {
         error: error,

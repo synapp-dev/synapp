@@ -27,6 +27,7 @@ import { db } from "@/server/db/drizzle";
 import { userProfile } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { handleDatabaseError } from "@/utils/db-error-handler";
 
 type UpdateLogChange = {
   field: string;
@@ -230,18 +231,20 @@ export async function PATCH(
       };
     }
 
-    // Update user profile using Drizzle (bypasses RLS)
-    await db
+    // Update user profile using Drizzle (bypasses RLS) and return updated data
+    // Use .returning() to avoid an extra query
+    const [updatedUserProfile] = await db
       .update(userProfile)
       .set(updateData)
-      .where(eq(userProfile.id, targetUserId));
+      .where(eq(userProfile.id, targetUserId))
+      .returning();
 
     console.log("[USER UPDATE] User updated successfully:", {
       targetUserId,
       updatedFields: Object.keys(updateData),
     });
 
-    // Fetch updated user
+    // Fetch full user data with relations using service
     const updatedUser = await meService.getUserById({ userId }, { id: targetUserId });
 
     return NextResponse.json(updatedUser, { status: 200 });
@@ -261,17 +264,29 @@ export async function PATCH(
       );
     }
 
-    const status =
+    // Handle business logic errors (authorization, not found)
+    if (
       e.message?.includes("Unauthorized") ||
       e.message?.includes("Platform admin role required")
-        ? 403
-        : e.message?.includes("not found")
-          ? 404
-          : 500;
+    ) {
+      return NextResponse.json(
+        { error: e.message },
+        { status: 403 }
+      );
+    }
 
+    if (e.message?.includes("not found")) {
+      return NextResponse.json(
+        { error: e.message },
+        { status: 404 }
+      );
+    }
+
+    // Handle database errors
+    const dbError = handleDatabaseError(e, e.message ?? "Internal error");
     return NextResponse.json(
-      { error: e.message ?? "Internal error" },
-      { status }
+      { error: dbError.error },
+      { status: dbError.status }
     );
   }
 }

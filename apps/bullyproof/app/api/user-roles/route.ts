@@ -24,6 +24,7 @@ import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { db } from "@/server/db/drizzle";
 import { userProfile, roles, schools } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import { handleDatabaseError } from "@/utils/db-error-handler";
 
 type RoleLog = {
   action: "assigned" | "removed";
@@ -99,66 +100,63 @@ export async function POST(request: Request) {
 
     const body = await request.json();
 
-    // Get role and school info before assignment for logging
-    const [roleResult] = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.id, body.roleId))
-      .limit(1);
+    // Batch fetch role, school, and user info in parallel for better performance
+    const [roleResults, schoolResults, userResults] = await Promise.all([
+      db.select().from(roles).where(eq(roles.id, body.roleId)).limit(1),
+      body.schoolId
+        ? db.select().from(schools).where(eq(schools.id, body.schoolId)).limit(1)
+        : Promise.resolve([]),
+      db.select().from(userProfile).where(eq(userProfile.id, body.userId)).limit(1),
+    ]);
 
-    let schoolName: string | null = null;
-    if (body.schoolId) {
-      const [schoolResult] = await db
-        .select()
-        .from(schools)
-        .where(eq(schools.id, body.schoolId))
-        .limit(1);
-      schoolName = schoolResult?.name || null;
-    }
+    const [roleResult] = roleResults;
+    const [schoolResult] = schoolResults;
+    const [currentUser] = userResults;
+    const schoolName = schoolResult?.name || null;
 
-    const assignment = await rolesService.assignRole({ userId }, body);
+    // Use transaction to ensure atomicity: role assignment + metadata update
+    const assignment = await db.transaction(async (tx) => {
+      // Assign role within transaction
+      const assignmentResult = await rolesService.assignRole({ userId }, body, tx);
 
-    // Log role assignment in user metadata
-    const [currentUser] = await db
-      .select()
-      .from(userProfile)
-      .where(eq(userProfile.id, body.userId))
-      .limit(1);
+      // Log role assignment in user metadata within transaction
+      if (currentUser) {
+        const currentMetadata =
+          (currentUser.metadata as UserMetadata | null) || ({} as UserMetadata);
+        const roleLogs = Array.isArray(currentMetadata.roleLogs)
+          ? currentMetadata.roleLogs
+          : [];
 
-    if (currentUser) {
-      const currentMetadata =
-        (currentUser.metadata as UserMetadata | null) || ({} as UserMetadata);
-      const roleLogs = Array.isArray(currentMetadata.roleLogs)
-        ? currentMetadata.roleLogs
-        : [];
+        roleLogs.push({
+          action: "assigned",
+          roleId: body.roleId,
+          roleName: roleResult?.name || "Unknown Role",
+          roleKey: roleResult?.key || null,
+          schoolId: body.schoolId || null,
+          schoolName: schoolName,
+          updatedAt: new Date().toISOString(),
+          updatedBy: userId,
+        });
 
-      roleLogs.push({
-        action: "assigned",
-        roleId: body.roleId,
-        roleName: roleResult?.name || "Unknown Role",
-        roleKey: roleResult?.key || null,
-        schoolId: body.schoolId || null,
-        schoolName: schoolName,
-        updatedAt: new Date().toISOString(),
-        updatedBy: userId,
-      });
+        await tx
+          .update(userProfile)
+          .set({
+            metadata: {
+              ...currentMetadata,
+              roleLogs,
+            },
+          })
+          .where(eq(userProfile.id, body.userId));
+      }
 
-      await db
-        .update(userProfile)
-        .set({
-          metadata: {
-            ...currentMetadata,
-            roleLogs,
-          },
-        })
-        .where(eq(userProfile.id, body.userId));
-    }
+      return assignmentResult;
+    });
 
     return NextResponse.json(assignment, { status: 201 });
   } catch (e: any) {
     console.error("[POST /api/user-roles] Error:", e);
 
-    // Check for PLATFORM_ADMIN constraint errors
+    // Check for PLATFORM_ADMIN constraint errors (business logic errors)
     const errorMessage = e.message ?? "Internal error";
     if (
       errorMessage.includes("PLATFORM_ADMIN") ||
@@ -167,7 +165,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    // Handle database errors
+    const dbError = handleDatabaseError(e, errorMessage);
+    return NextResponse.json({ error: dbError.error }, { status: dbError.status });
   }
 }
 
@@ -189,67 +189,63 @@ export async function DELETE(request: Request) {
 
     const body = await request.json();
 
-    // Get role and school info before removal for logging
-    const [roleResult] = await db
-      .select()
-      .from(roles)
-      .where(eq(roles.id, body.roleId))
-      .limit(1);
+    // Batch fetch role, school, and user info in parallel for better performance
+    const [roleResults, schoolResults, userResults] = await Promise.all([
+      db.select().from(roles).where(eq(roles.id, body.roleId)).limit(1),
+      body.schoolId
+        ? db.select().from(schools).where(eq(schools.id, body.schoolId)).limit(1)
+        : Promise.resolve([]),
+      db.select().from(userProfile).where(eq(userProfile.id, body.userId)).limit(1),
+    ]);
 
-    let schoolName: string | null = null;
-    if (body.schoolId) {
-      const [schoolResult] = await db
-        .select()
-        .from(schools)
-        .where(eq(schools.id, body.schoolId))
-        .limit(1);
-      schoolName = schoolResult?.name || null;
-    }
+    const [roleResult] = roleResults;
+    const [schoolResult] = schoolResults;
+    const [currentUser] = userResults;
+    const schoolName = schoolResult?.name || null;
 
-    await rolesService.removeRole({ userId }, body);
+    // Use transaction to ensure atomicity: role removal + metadata update
+    await db.transaction(async (tx) => {
+      // Remove role within transaction
+      await rolesService.removeRole({ userId }, body, tx);
 
-    // Log role removal in user metadata
-    const [currentUser] = await db
-      .select()
-      .from(userProfile)
-      .where(eq(userProfile.id, body.userId))
-      .limit(1);
+      // Log role removal in user metadata within transaction
+      if (currentUser) {
+        const currentMetadata =
+          (currentUser.metadata as UserMetadata | null) || ({} as UserMetadata);
+        const roleLogs = Array.isArray(currentMetadata.roleLogs)
+          ? currentMetadata.roleLogs
+          : [];
 
-    if (currentUser) {
-      const currentMetadata =
-        (currentUser.metadata as UserMetadata | null) || ({} as UserMetadata);
-      const roleLogs = Array.isArray(currentMetadata.roleLogs)
-        ? currentMetadata.roleLogs
-        : [];
+        roleLogs.push({
+          action: "removed",
+          roleId: body.roleId,
+          roleName: roleResult?.name || "Unknown Role",
+          roleKey: roleResult?.key || null,
+          schoolId: body.schoolId || null,
+          schoolName: schoolName,
+          updatedAt: new Date().toISOString(),
+          updatedBy: userId,
+        });
 
-      roleLogs.push({
-        action: "removed",
-        roleId: body.roleId,
-        roleName: roleResult?.name || "Unknown Role",
-        roleKey: roleResult?.key || null,
-        schoolId: body.schoolId || null,
-        schoolName: schoolName,
-        updatedAt: new Date().toISOString(),
-        updatedBy: userId,
-      });
-
-      await db
-        .update(userProfile)
-        .set({
-          metadata: {
-            ...currentMetadata,
-            roleLogs,
-          },
-        })
-        .where(eq(userProfile.id, body.userId));
-    }
+        await tx
+          .update(userProfile)
+          .set({
+            metadata: {
+              ...currentMetadata,
+              roleLogs,
+            },
+          })
+          .where(eq(userProfile.id, body.userId));
+      }
+    });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {
-    console.error(e);
+    console.error("[DELETE /api/user-roles] Error:", e);
+    const dbError = handleDatabaseError(e, e.message ?? "Internal error");
     return NextResponse.json(
-      { error: e.message ?? "Internal error" },
-      { status: 500 }
+      { error: dbError.error },
+      { status: dbError.status }
     );
   }
 }
