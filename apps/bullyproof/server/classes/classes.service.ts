@@ -114,13 +114,20 @@ export const classesService = {
 
     await assertCanManageClasses(ctx, existingClass[0].schoolId);
 
-    const { yearIds, ...classData } = data;
+    const { yearIds, teacherIds, ...classData } = data;
     const updatedClass = await classesRepo.update(id, classData);
 
     if (yearIds !== undefined) {
       await classesRepo.removeYears(id);
       if (yearIds.length > 0) {
         await classesRepo.assignYears(id, yearIds);
+      }
+    }
+
+    if (teacherIds !== undefined) {
+      await classesRepo.removeTeachers(id);
+      if (teacherIds.length > 0) {
+        await classesRepo.assignTeachers(id, teacherIds);
       }
     }
 
@@ -137,5 +144,41 @@ export const classesService = {
 
     await classesRepo.delete(id);
     return { success: true };
+  },
+
+  async deleteClassesBatch(ctx: AuthContext, ids: string[]) {
+    if (ids.length === 0) {
+      return { success: true, deletedCount: 0 };
+    }
+
+    // Get all classes to verify permissions
+    const existingClasses = await Promise.all(
+      ids.map((id) => classesRepo.getById(id))
+    );
+
+    // Group by schoolId to check permissions efficiently
+    const schoolIds = new Set<string>();
+    for (const classResult of existingClasses) {
+      if (classResult[0]) {
+        schoolIds.add(classResult[0].schoolId);
+      }
+    }
+
+    // Check permissions for all schools
+    for (const schoolId of schoolIds) {
+      await assertCanManageClasses(ctx, schoolId);
+    }
+
+    // Verify all classes exist
+    const notFoundIds = ids.filter(
+      (id, index) => !existingClasses[index]?.[0]
+    );
+    if (notFoundIds.length > 0) {
+      throw new Error(`Classes not found: ${notFoundIds.join(", ")}`);
+    }
+
+    // Batch delete all classes and related records
+    await classesRepo.deleteBatch(ids);
+    return { success: true, deletedCount: ids.length };
   },
 };

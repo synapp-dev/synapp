@@ -4,6 +4,8 @@ import {
   classYears,
   schoolYears,
   schoolLevels,
+  teacherClasses,
+  userProfile,
 } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc, sql } from "drizzle-orm";
 
@@ -74,9 +76,21 @@ export const classesRepo = {
       .where(eq(classYears.classId, id))
       .orderBy(asc(schoolYears.sortIndex));
 
+    const teachers = await db
+      .select({
+        userId: teacherClasses.userId,
+        firstName: userProfile.firstName,
+        lastName: userProfile.lastName,
+        email: userProfile.email,
+      })
+      .from(teacherClasses)
+      .innerJoin(userProfile, eq(teacherClasses.userId, userProfile.id))
+      .where(eq(teacherClasses.classId, id));
+
     return {
       ...classData[0],
       years,
+      teachers,
     };
   },
 
@@ -116,6 +130,20 @@ export const classesRepo = {
 
   delete: (id: string) => db.delete(classes).where(eq(classes.id, id)),
 
+  deleteBatch: async (ids: string[]) => {
+    if (ids.length === 0) return;
+    
+    // Use transaction to ensure atomicity: all deletes succeed or all rollback
+    await db.transaction(async (tx) => {
+      // Delete related classYears records
+      await tx.delete(classYears).where(inArray(classYears.classId, ids));
+      // Delete related teacherClasses records
+      await tx.delete(teacherClasses).where(inArray(teacherClasses.classId, ids));
+      // Delete the classes themselves
+      await tx.delete(classes).where(inArray(classes.id, ids));
+    });
+  },
+
   assignYears: (classId: string, yearIds: string[]) =>
     db
       .insert(classYears)
@@ -123,4 +151,23 @@ export const classesRepo = {
 
   removeYears: (classId: string) =>
     db.delete(classYears).where(eq(classYears.classId, classId)),
+
+  assignTeachers: (classId: string, userIds: string[]) => {
+    if (userIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return db
+      .insert(teacherClasses)
+      .values(
+        userIds.map((userId) => ({
+          classId,
+          userId,
+        }))
+      )
+      .onConflictDoNothing()
+      .returning();
+  },
+
+  removeTeachers: (classId: string) =>
+    db.delete(teacherClasses).where(eq(teacherClasses.classId, classId)),
 };

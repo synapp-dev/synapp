@@ -24,6 +24,8 @@ export const updateClassSchema = z.object({
   studentCap: z.number().int().min(1).max(1000).optional(),
   active: z.boolean().optional(),
   yearIds: z.array(z.string().trim().min(1)).optional(),
+  teacherIds: z.array(z.string().trim().min(1)).optional(),
+  startYear: z.string().datetime().optional(),
 });
 
 export type UpdateClassParams = z.infer<typeof updateClassSchema>;
