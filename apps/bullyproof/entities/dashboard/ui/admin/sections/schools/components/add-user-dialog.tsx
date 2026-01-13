@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import * as XLSX from "xlsx";
 import {
@@ -60,9 +60,13 @@ import {
   UserCheck,
   UserX,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { usersApi } from "@/entities/users/api/endpoints";
 import { meApi } from "@/entities/me/api/endpoints";
+import { rolesApi } from "@/entities/roles/api/endpoints";
+import { useRoles } from "@/entities/users/model/store";
+import { apiFetch } from "@/lib/api/fetcher.client";
 import type { School as SchoolType } from "./schools-table-columns";
 
 interface AddUserDialogProps {
@@ -70,6 +74,8 @@ interface AddUserDialogProps {
   onOpenChange: (open: boolean) => void;
   school: SchoolType | null;
   onSuccess?: () => void;
+  skipToManual?: boolean; // Skip directly to manual form
+  initialUserType?: "admin" | "teacher"; // Pre-select user type
 }
 
 // Email validation helper
@@ -101,21 +107,23 @@ export function AddUserDialog({
   onOpenChange,
   school,
   onSuccess,
+  skipToManual = false,
+  initialUserType,
 }: AddUserDialogProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { roles } = useRoles();
 
-  // Dialog state
+  // Dialog state - start with method selection, will be updated by useEffect based on URL param
   const [addUserSuccess, setAddUserSuccess] = useState(false);
   const [addUserStep, setAddUserStep] = useState<
     "method" | "userType" | "manual" | "csv"
-  >("method");
+  >(skipToManual ? "manual" : "method");
   const [addUserMethod, setAddUserMethod] = useState<"manual" | "csv" | null>(
-    null
+    skipToManual ? "manual" : null
   );
-  const [addUserType, setAddUserType] = useState<"admin" | "teacher" | null>(
-    null
-  );
+  // Remove addUserType - we'll always add as SCHOOL_STAFF
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<
     Array<{
@@ -164,32 +172,23 @@ export function AddUserDialog({
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Form fields
-  const [adminEmail, setAdminEmail] = useState("");
-  const [adminFirstName, setAdminFirstName] = useState("");
-  const [adminLastName, setAdminLastName] = useState("");
-  const [teacherEmail, setTeacherEmail] = useState("");
-  const [teacherFirstName, setTeacherFirstName] = useState("");
-  const [teacherLastName, setTeacherLastName] = useState("");
+  // Form fields (simplified - no admin/teacher separation)
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
-  const hasValidAdminEmail = adminEmail ? isValidEmail(adminEmail) : false;
-  const hasValidTeacherEmail = teacherEmail
-    ? isValidEmail(teacherEmail)
-    : false;
+  const hasValidEmail = email ? isValidEmail(email) : false;
 
   // Reset state when dialog closes
   const handleClose = (open: boolean) => {
     if (!open) {
       setAddUserSuccess(false);
+      // Reset to method selection (default) when closing
       setAddUserStep("method");
       setAddUserMethod(null);
-      setAddUserType(null);
-      setAdminEmail("");
-      setAdminFirstName("");
-      setAdminLastName("");
-      setTeacherEmail("");
-      setTeacherFirstName("");
-      setTeacherLastName("");
+      setEmail("");
+      setFirstName("");
+      setLastName("");
       setCsvFile(null);
       setCsvData([]);
       setCsvError(null);
@@ -207,8 +206,8 @@ export function AddUserDialog({
       const params = new URLSearchParams(searchParams?.toString() || "");
       params.delete("dialog");
       const newUrl = params.toString()
-        ? `/admin/schools?${params.toString()}`
-        : "/admin/schools";
+        ? `${pathname}?${params.toString()}`
+        : pathname;
       router.replace(newUrl, { scroll: false });
     }
     onOpenChange(open);
@@ -541,9 +540,9 @@ export function AddUserDialog({
     }
   };
 
-  // Handle bulk user creation
+  // Handle bulk user creation - everyone gets SCHOOL_STAFF, TEACHER role added if apTeacher is "Y"
   const handleBulkCreateUsers = async () => {
-    if (!school || csvData.length === 0 || !addUserType) return;
+    if (!school || csvData.length === 0) return;
 
     const validData = csvData.filter(
       (row) => row.isValid && !row.isDuplicate && !row.isIncomplete
@@ -551,6 +550,15 @@ export function AddUserDialog({
 
     if (validData.length === 0) {
       setCsvError("No valid rows to submit. Please fix errors and try again.");
+      return;
+    }
+
+    // Get role IDs
+    const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
+    const teacherRole = roles.find((r) => r.key === "TEACHER");
+
+    if (!staffRole) {
+      setCsvError("SCHOOL_STAFF role not found. Please contact support.");
       return;
     }
 
@@ -564,38 +572,59 @@ export function AddUserDialog({
     for (let i = 0; i < validData.length; i++) {
       const user = validData[i];
       try {
-        const result =
-          addUserType === "admin"
-            ? await usersApi.post.new.schoolAdmin({
-                schoolId: school.id,
-                email: user.email,
-                firstName: user.firstName?.trim() || undefined,
-                lastName: user.lastName?.trim() || undefined,
-              })
-            : await usersApi.post.new.teacher({
-                schoolId: school.id,
-                email: user.email,
-                firstName: user.firstName?.trim() || undefined,
-                lastName: user.lastName?.trim() || undefined,
-              });
+        // Create user with SCHOOL_STAFF role using /users/new endpoint
+        const createResult = await apiFetch<{
+          userId: string;
+          email: string;
+          schoolId: string;
+        }>("/users/new", {
+          method: "POST",
+          body: JSON.stringify({
+            email: user.email,
+            roleScope: "school",
+            schoolId: school.id,
+            roleName: "SCHOOL_STAFF",
+            firstName: user.firstName?.trim() || undefined,
+            lastName: user.lastName?.trim() || undefined,
+          }),
+        });
 
-        if (result.error) {
+        if (createResult.error) {
           errorCount++;
           console.error(
-            `Failed to create ${addUserType} ${user.email}:`,
-            result.error
+            `Failed to create user ${user.email}:`,
+            createResult.error
           );
         } else {
+          // If apTeacher is "Y", also assign TEACHER role
+          const isApTeacher =
+            user.apTeacher &&
+            user.apTeacher.toString().toUpperCase().trim() === "Y";
+          if (isApTeacher && teacherRole && createResult.data) {
+            const assignResult = await rolesApi.post.assignRole({
+              userId: createResult.data.userId,
+              roleId: teacherRole.id,
+              schoolId: school.id,
+            });
+
+            if (assignResult.error) {
+              console.error(
+                `Failed to assign TEACHER role to ${user.email}:`,
+                assignResult.error
+              );
+              // Don't count this as a failure since user was created successfully
+            }
+          }
           successCount++;
         }
       } catch (error) {
         errorCount++;
-        console.error(`Failed to create ${addUserType} ${user.email}:`, error);
+        console.error(`Failed to create user ${user.email}:`, error);
       }
 
       setBulkProgress({
         completed: i + 1,
-        total: csvData.length,
+        total: validData.length,
         errors: errorCount,
       });
     }
@@ -604,7 +633,7 @@ export function AddUserDialog({
 
     if (errorCount > 0) {
       setCsvError(
-        `${successCount} ${addUserType}${successCount !== 1 ? "s" : ""} added successfully. ${errorCount} failed.`
+        `${successCount} user${successCount !== 1 ? "s" : ""} added successfully. ${errorCount} failed.`
       );
     } else {
       setAddUserSuccess(true);
@@ -616,43 +645,38 @@ export function AddUserDialog({
     setBulkSubmitting(false);
   };
 
-  // Handle manual user creation
+  // Handle manual user creation - creates user with SCHOOL_STAFF role
   const handleManualCreate = async () => {
-    const isValidEmail =
-      addUserType === "admin" ? hasValidAdminEmail : hasValidTeacherEmail;
-    if (!school || !isValidEmail || addUserSuccess) return;
+    if (!school || !hasValidEmail || addUserSuccess) return;
 
     setSubmitting(true);
     try {
-      const email = addUserType === "admin" ? adminEmail : teacherEmail;
-      const firstName =
-        addUserType === "admin" ? adminFirstName : teacherFirstName;
-      const lastName =
-        addUserType === "admin" ? adminLastName : teacherLastName;
+      // Get SCHOOL_STAFF role
+      const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
+      if (!staffRole) {
+        console.error("SCHOOL_STAFF role not found");
+        return;
+      }
 
-      const payload: {
-        schoolId: string;
+      // Create user with SCHOOL_STAFF role using /users/new endpoint
+      const createResult = await apiFetch<{
+        userId: string;
         email: string;
-        firstName?: string;
-        lastName?: string;
-      } = {
-        schoolId: school.id,
-        email,
-      };
-      if (firstName.trim()) {
-        payload.firstName = firstName.trim();
-      }
-      if (lastName.trim()) {
-        payload.lastName = lastName.trim();
-      }
+        schoolId: string;
+      }>("/users/new", {
+        method: "POST",
+        body: JSON.stringify({
+          email: email.trim(),
+          roleScope: "school",
+          schoolId: school.id,
+          roleName: "SCHOOL_STAFF",
+          firstName: firstName.trim() || undefined,
+          lastName: lastName.trim() || undefined,
+        }),
+      });
 
-      const result =
-        addUserType === "admin"
-          ? await usersApi.post.new.schoolAdmin(payload)
-          : await usersApi.post.new.teacher(payload);
-
-      if (result.error) {
-        console.error(`Failed to create ${addUserType}:`, result.error);
+      if (createResult.error) {
+        console.error("Failed to create user:", createResult.error);
       } else {
         setAddUserSuccess(true);
         onSuccess?.();
@@ -661,7 +685,7 @@ export function AddUserDialog({
         }, 2000);
       }
     } catch (error) {
-      console.error(`Failed to create ${addUserType}:`, error);
+      console.error("Failed to create user:", error);
     } finally {
       setSubmitting(false);
     }
@@ -1090,6 +1114,67 @@ export function AddUserDialog({
 
   if (!school) return null;
 
+  // Listen for file selection event from Import Data button
+  useEffect(() => {
+    if (!open) return;
+
+    const handleFileSelected = async (e: CustomEvent<{ file: File }>) => {
+      const dialogParam = searchParams?.get("dialog");
+      if (dialogParam === "import-users") {
+        const file = e.detail.file;
+        const isCsv = file.name.endsWith(".csv");
+        const isXlsx =
+          file.name.endsWith(".xlsx") || file.name.endsWith(".xls");
+
+        if (!isCsv && !isXlsx) {
+          setCsvError("Please select a CSV or Excel (.xlsx) file");
+          return;
+        }
+
+        setCsvFile(file);
+        setCsvError(null);
+
+        try {
+          const parsed = isCsv ? await parseCSV(file) : await parseXLSX(file);
+          setCsvData(parsed);
+          setAddUserStep("csv");
+        } catch (error: any) {
+          setCsvError(error.message);
+          setCsvFile(null);
+          setCsvData([]);
+        }
+      }
+    };
+
+    window.addEventListener(
+      "csv-file-selected",
+      handleFileSelected as EventListener
+    );
+    return () => {
+      window.removeEventListener(
+        "csv-file-selected",
+        handleFileSelected as EventListener
+      );
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, searchParams]);
+
+  // Check dialog param and set step accordingly when dialog opens
+  useEffect(() => {
+    if (open) {
+      const dialogParam = searchParams?.get("dialog");
+      if (dialogParam === "add-user") {
+        // Skip directly to manual form
+        setAddUserStep("manual");
+        setAddUserMethod("manual");
+      } else if (dialogParam === "import-users") {
+        // Skip directly to CSV step (file will be processed by file selection handler)
+        setAddUserStep("csv");
+        setAddUserMethod("csv");
+      }
+    }
+  }, [open, searchParams]);
+
   const isCsvStep = addUserStep === "csv";
 
   return (
@@ -1098,77 +1183,97 @@ export function AddUserDialog({
         className="!max-w-5xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden"
         showCloseButton={!isCsvStep}
       >
-        <DialogHeader className="px-6 pt-6 pb-4 flex-shrink-0">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <DialogTitle className="flex items-center gap-2">
-                {isCsvStep ? (
-                  <>
-                    <Upload className="h-5 w-5" />
-                    Import Teacher Data
-                  </>
-                ) : addUserStep === "method" ? (
-                  "Add User"
-                ) : addUserStep === "userType" ? (
-                  `Add ${addUserMethod === "manual" ? "User" : "Users"}`
-                ) : (
-                  `Add ${addUserType === "admin" ? "School Admin" : "Teacher"}`
-                )}
-              </DialogTitle>
-              {isCsvStep && (
-                <p className="text-sm text-muted-foreground">{school.name}</p>
+        <DialogHeader
+          className={`${isCsvStep ? "p-4 bg-muted" : "px-6 pt-6 pb-4"} flex-shrink-0`}
+        >
+          {isCsvStep ? (
+            <div className="flex items-center gap-4">
+              {/* Bullyproof Logo */}
+              <Image
+                src="/images/bullyproof-logo.svg"
+                alt="Bullyproof Logo"
+                width={120}
+                height={32}
+                className="h-8 w-auto"
+              />
+              {/* Vertical Separator */}
+              <div className="h-6 w-px bg-border" />
+              {/* Title */}
+              <div className="flex flex-col gap-1 flex-1">
+                <DialogTitle className="flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Import Teacher Data
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  Review and edit the imported data before adding users to the
+                  school.
+                </p>
+              </div>
+              {csvFile && csvData.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="group w-fit h-auto py-1.5 px-3"
+                  onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    input.accept = ".csv,.xlsx,.xls";
+                    input.onchange = (e) => {
+                      const file = (e.target as HTMLInputElement).files?.[0];
+                      if (file) {
+                        handleCsvFileSelect(file);
+                      }
+                    };
+                    input.click();
+                  }}
+                >
+                  <div className="flex flex-col items-start gap-1">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:hidden" />
+                      <RefreshCw className="h-4 w-4 text-muted-foreground flex-shrink-0 hidden group-hover:block" />
+                      <span className="text-sm font-medium whitespace-nowrap group-hover:hidden">
+                        {csvFile.name.replace(/\.[^/.]+$/, "")}
+                      </span>
+                      <span className="text-sm font-medium whitespace-nowrap hidden group-hover:inline">
+                        Replace data
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 pl-6">
+                      {csvFile.name.lastIndexOf(".") > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                          {csvFile.name.substring(
+                            csvFile.name.lastIndexOf(".")
+                          )}
+                        </Badge>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {csvData.length} row{csvData.length !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </div>
+                </Button>
               )}
             </div>
-            {isCsvStep && csvFile && csvData.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="group w-fit h-auto py-1.5 px-3"
-                onClick={() => {
-                  const input = document.createElement("input");
-                  input.type = "file";
-                  input.accept = ".csv,.xlsx,.xls";
-                  input.onchange = (e) => {
-                    const file = (e.target as HTMLInputElement).files?.[0];
-                    if (file) {
-                      handleCsvFileSelect(file);
-                    }
-                  };
-                  input.click();
-                }}
-              >
-                <div className="flex flex-col items-start gap-1">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0 group-hover:hidden" />
-                    <RefreshCw className="h-4 w-4 text-muted-foreground flex-shrink-0 hidden group-hover:block" />
-                    <span className="text-sm font-medium whitespace-nowrap group-hover:hidden">
-                      {csvFile.name.replace(/\.[^/.]+$/, "")}
-                    </span>
-                    <span className="text-sm font-medium whitespace-nowrap hidden group-hover:inline">
-                      Replace data
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 pl-6">
-                    {csvFile.name.lastIndexOf(".") > 0 && (
-                      <Badge variant="secondary" className="text-xs">
-                        {csvFile.name.substring(csvFile.name.lastIndexOf("."))}
-                      </Badge>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {csvData.length} row{csvData.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                </div>
-              </Button>
-            )}
-          </div>
+          ) : (
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <DialogTitle className="flex items-center gap-2">
+                  {addUserStep === "method"
+                    ? "Add User"
+                    : addUserStep === "userType"
+                      ? `Add ${addUserMethod === "manual" ? "User" : "Users"}`
+                      : "Add User"}
+                </DialogTitle>
+              </div>
+            </div>
+          )}
           {!isCsvStep && (
             <DialogDescription>
               {addUserStep === "method"
                 ? "Choose how you want to add users to this school."
                 : addUserStep === "userType"
                   ? `Select the type of user you want to ${addUserMethod === "manual" ? "add" : "upload"}.`
-                  : `Invite a user to become a ${addUserType === "admin" ? "school admin" : "teacher"} for this school.`}
+                  : "Add a new user to this school. Users will be added as SCHOOL_STAFF."}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -1181,7 +1286,7 @@ export function AddUserDialog({
                 className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
                 onClick={() => {
                   setAddUserMethod("manual");
-                  setAddUserStep("userType");
+                  setAddUserStep("manual");
                 }}
               >
                 <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
@@ -1196,7 +1301,16 @@ export function AddUserDialog({
                 className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
                 onClick={() => {
                   setAddUserMethod("csv");
-                  setAddUserStep("userType");
+                  const input = document.createElement("input");
+                  input.type = "file";
+                  input.accept = ".csv,.xlsx,.xls";
+                  input.onchange = (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0];
+                    if (file) {
+                      handleCsvFileSelect(file);
+                    }
+                  };
+                  input.click();
                 }}
               >
                 <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
@@ -1213,202 +1327,106 @@ export function AddUserDialog({
           </div>
         )}
 
-        {/* Step 2: User Type Selection */}
-        {addUserStep === "userType" && (
-          <>
-            <div className="space-y-4 py-4 px-6 overflow-y-auto flex-1 min-h-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card
-                  className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
-                  onClick={() => {
-                    setAddUserType("admin");
-                    if (addUserMethod === "manual") {
-                      setAddUserStep("manual");
-                    } else {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = ".csv,.xlsx,.xls";
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          handleCsvFileSelect(file);
-                        }
-                      };
-                      input.click();
-                    }
-                  }}
-                >
-                  <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
-                    <Shield className="h-12 w-12 text-purple-600 dark:text-purple-400" />
-                    <h3 className="font-semibold text-lg">School Admin</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Add school administrator
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card
-                  className="cursor-pointer hover:bg-muted/50 transition-colors border-2"
-                  onClick={() => {
-                    setAddUserType("teacher");
-                    if (addUserMethod === "manual") {
-                      setAddUserStep("manual");
-                    } else {
-                      const input = document.createElement("input");
-                      input.type = "file";
-                      input.accept = ".csv,.xlsx,.xls";
-                      input.onchange = (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0];
-                        if (file) {
-                          handleCsvFileSelect(file);
-                        }
-                      };
-                      input.click();
-                    }
-                  }}
-                >
-                  <CardContent className="flex flex-col items-center justify-center gap-3 p-6">
-                    <UserPlus className="h-12 w-12 text-green-600 dark:text-green-400" />
-                    <h3 className="font-semibold text-lg">Teacher</h3>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Add teacher
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-            <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAddUserStep("method");
-                  setAddUserMethod(null);
-                  setAddUserType(null);
-                }}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <Button variant="outline" onClick={() => handleClose(false)}>
-                Cancel
-              </Button>
-            </DialogFooter>
-          </>
-        )}
+        {/* Step 2: User Type Selection - Removed, no longer needed */}
 
         {/* Step 3: Manual Entry */}
         {addUserStep === "manual" && (
           <>
-            <div className="space-y-4 py-4 px-6 overflow-y-auto flex-1 min-h-0">
+            <div className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0">
+              {/* First Name and Last Name in same row */}
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="user-first-name">First Name (Optional)</Label>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="user-first-name"
+                    className="text-xs text-muted-foreground ml-2"
+                  >
+                    First Name
+                  </Label>
                   <Input
                     id="user-first-name"
                     type="text"
                     placeholder="Enter first name"
-                    value={
-                      addUserType === "admin"
-                        ? adminFirstName
-                        : teacherFirstName
-                    }
-                    onChange={(e) => {
-                      if (addUserType === "admin") {
-                        setAdminFirstName(e.target.value);
-                      } else {
-                        setTeacherFirstName(e.target.value);
-                      }
-                    }}
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="user-last-name">Last Name (Optional)</Label>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="user-last-name"
+                    className="text-xs text-muted-foreground ml-2"
+                  >
+                    Last Name
+                  </Label>
                   <Input
                     id="user-last-name"
                     type="text"
                     placeholder="Enter last name"
-                    value={
-                      addUserType === "admin" ? adminLastName : teacherLastName
-                    }
-                    onChange={(e) => {
-                      if (addUserType === "admin") {
-                        setAdminLastName(e.target.value);
-                      } else {
-                        setTeacherLastName(e.target.value);
-                      }
-                    }}
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="user-email">Email Address</Label>
+              {/* Email on its own row */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="user-email"
+                  className="text-xs text-muted-foreground ml-2"
+                >
+                  Email <span className="text-red-500">*</span>
+                </Label>
                 <Input
                   id="user-email"
                   type="email"
                   placeholder="Enter email address"
-                  value={addUserType === "admin" ? adminEmail : teacherEmail}
-                  onChange={(e) => {
-                    if (addUserType === "admin") {
-                      setAdminEmail(e.target.value);
-                    } else {
-                      setTeacherEmail(e.target.value);
-                    }
-                  }}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className={
-                    (addUserType === "admin" &&
-                      adminEmail &&
-                      !hasValidAdminEmail) ||
-                    (addUserType === "teacher" &&
-                      teacherEmail &&
-                      !hasValidTeacherEmail)
+                    email && !hasValidEmail
                       ? "border-red-500 focus-visible:ring-red-500"
                       : ""
                   }
                 />
-                {((addUserType === "admin" &&
-                  adminEmail &&
-                  !hasValidAdminEmail) ||
-                  (addUserType === "teacher" &&
-                    teacherEmail &&
-                    !hasValidTeacherEmail)) && (
-                  <p className="text-sm text-red-500">
+                {email && !hasValidEmail && (
+                  <p className="text-sm text-red-500 ml-2">
                     Please enter a valid email address (e.g., name@domain.com)
                   </p>
                 )}
               </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setAddUserStep("userType");
-                }}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
+              {!skipToManual && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setAddUserStep("method");
+                  }}
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
+              )}
               <Button variant="outline" onClick={() => handleClose(false)}>
                 Cancel
               </Button>
               <Button
                 onClick={handleManualCreate}
-                disabled={
-                  submitting ||
-                  (addUserType === "admin"
-                    ? !hasValidAdminEmail
-                    : !hasValidTeacherEmail) ||
-                  addUserSuccess
-                }
+                disabled={submitting || !hasValidEmail || addUserSuccess}
                 className={
                   addUserSuccess
                     ? "bg-green-600 hover:bg-green-700 text-white"
                     : ""
                 }
               >
-                {addUserSuccess
-                  ? "Add Successful"
-                  : submitting
-                    ? "Creating..."
-                    : `Add ${addUserType === "admin" ? "School Admin" : "Teacher"}`}
+                {addUserSuccess ? (
+                  "Add Successful"
+                ) : submitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create User"
+                )}
               </Button>
             </DialogFooter>
           </>
@@ -1936,10 +1954,7 @@ export function AddUserDialog({
                   {bulkSubmitting && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
-                        <span>
-                          Processing{" "}
-                          {addUserType === "admin" ? "admins" : "teachers"}...
-                        </span>
+                        <span>Processing users...</span>
                         <span>
                           {bulkProgress.completed} / {bulkProgress.total}
                         </span>
@@ -2006,20 +2021,7 @@ export function AddUserDialog({
             </div>
             <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t">
               <Button
-                variant="outline"
-                onClick={() => {
-                  setAddUserStep("userType");
-                  setCsvFile(null);
-                  setCsvData([]);
-                  setCsvError(null);
-                }}
-                disabled={bulkSubmitting}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-              <Button
-                variant="outline"
+                variant="ghost"
                 onClick={() => handleClose(false)}
                 disabled={bulkSubmitting}
               >
@@ -2046,7 +2048,7 @@ export function AddUserDialog({
                   ? "Upload Successful"
                   : bulkSubmitting
                     ? `Adding... (${bulkProgress.completed}/${bulkProgress.total})`
-                    : `Add ${csvData.filter((r) => r.isValid && !r.isDuplicate && !r.isIncomplete).length} ${addUserType === "admin" ? "Admin" : "Teacher"}${csvData.filter((r) => r.isValid && !r.isDuplicate && !r.isIncomplete).length !== 1 ? "s" : ""}`}
+                    : `Add ${csvData.filter((r) => r.isValid && !r.isDuplicate && !r.isIncomplete).length} User${csvData.filter((r) => r.isValid && !r.isDuplicate && !r.isIncomplete).length !== 1 ? "s" : ""}`}
               </Button>
             </DialogFooter>
           </>

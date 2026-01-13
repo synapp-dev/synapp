@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, Suspense, useMemo } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback } from "react";
+import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Sheet,
   SheetContent,
@@ -41,6 +43,12 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
+import { Checkbox } from "@workspace/ui/components/checkbox";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
 import {
   Table,
   TableBody,
@@ -53,7 +61,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnFiltersState,
@@ -62,7 +69,6 @@ import {
 } from "@tanstack/react-table";
 import {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
@@ -78,6 +84,15 @@ import { licencesApi } from "@/entities/licences/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { usersApi } from "@/entities/users/api/endpoints";
 import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
+import { statesApi } from "@/entities/states/api/endpoints";
+import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
+import { useStatesStore } from "@/entities/states/model/store";
+import { useSchoolSectorsStore } from "@/entities/school-sectors/model/store";
+import { useSchoolLevelsStore } from "@/entities/school-levels/model/store";
+import { useRoles, useUsers } from "@/entities/users/model/store";
+import { userKeys } from "@/entities/users/model/keys";
+import { UsersTable } from "@/entities/users/ui/users-table";
+import { ClassesTable } from "@/entities/classes/ui/classes-table";
 import type { schoolYears } from "@/server/db/schema";
 import {
   Popover,
@@ -92,6 +107,7 @@ import {
   CommandItem,
   CommandList,
 } from "@workspace/ui/components/command";
+import { cn } from "@workspace/ui/lib/utils";
 
 type Class = typeof classes.$inferSelect;
 type ClassWithYearCodes = Class & { yearCodes?: string[] };
@@ -109,7 +125,6 @@ import {
   Rocket,
   Eye,
   Activity,
-  Settings,
   CheckCircle2,
   Circle,
   Mail,
@@ -120,15 +135,33 @@ import {
   Check,
   X,
   ChevronDown,
+  ChevronsUpDown,
   Upload,
   FileText,
   ArrowLeft,
   MoreHorizontal,
   ChevronsRight,
+  Pencil,
+  Save,
+  AlertCircle,
+  Search,
+  CircleX,
+  FileSpreadsheet,
+  Trash2,
 } from "lucide-react";
 import { type School as SchoolType } from "./schools-table-columns";
-import { createSchoolUsersColumns } from "./school-users-table-columns";
-import { AddUserDialog } from "./add-user-dialog";
+import { AddManualUserDialog } from "./add-manual-user-dialog";
+import { SchoolDetailHeader } from "./school-detail-header";
+import { SchoolDetailSidebar } from "./school-detail-sidebar";
+import { ImportUsersDialog } from "./import-users-dialog";
+import { ImportClassesDialog } from "./import-classes-dialog";
+import { apiFetch } from "@/lib/api/fetcher.client";
+import { ScrollArea } from "@workspace/ui/components/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 
 type TabId =
   | "onboarding"
@@ -153,9 +186,9 @@ const navItems = [
   { id: "overview", name: "Overview", icon: Eye },
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },
-  { id: "activity", name: "Activity", icon: Activity },
-  { id: "culture", name: "Culture", icon: Star },
-  { id: "settings", name: "Settings", icon: Settings },
+  { id: "activity", name: "Activity", icon: Activity, disabled: true },
+  { id: "culture", name: "Culture", icon: Star, disabled: true },
+  { id: "settings", name: "License", icon: Key },
 ];
 
 // Helper function to format school levels
@@ -198,6 +231,618 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
     : "—";
 }
 
+interface SchoolDetailsCardProps {
+  school: SchoolType | null;
+  onSchoolUpdate?: () => void;
+}
+
+function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [address, setAddress] = useState("");
+  const [emailDomain, setEmailDomain] = useState("");
+  const [bannerUrl, setBannerUrl] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [stateId, setStateId] = useState<string>("");
+  const [sectorId, setSectorId] = useState<string>("");
+  const [levelIds, setLevelIds] = useState<string[]>([]);
+  const [stateComboboxOpen, setStateComboboxOpen] = useState(false);
+  const [sectorComboboxOpen, setSectorComboboxOpen] = useState(false);
+  const [levelsComboboxOpen, setLevelsComboboxOpen] = useState(false);
+
+  // React Query hooks with Zustand caching
+  const { states, setStates } = useStatesStore();
+  const { schoolSectors, setSchoolSectors } = useSchoolSectorsStore();
+  const { schoolLevels, setSchoolLevels } = useSchoolLevelsStore();
+
+  const { data: statesData = [], isLoading: loadingStates } = useQuery({
+    queryKey: ["states"],
+    queryFn: async () => {
+      const result = await statesApi.get.list();
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch states");
+      }
+      if (result.data) {
+        const sorted = [...result.data].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+        setStates(sorted);
+        return sorted;
+      }
+      return [];
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    initialData: () => (states.length > 0 ? states : undefined),
+  });
+
+  const { data: sectorsData = [], isLoading: loadingSectors } = useQuery({
+    queryKey: ["school-sectors"],
+    queryFn: async () => {
+      const result = await schoolSectorsApi.get.list();
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch sectors");
+      }
+      if (result.data) {
+        const sorted = [...result.data].sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+        setSchoolSectors(sorted);
+        return sorted;
+      }
+      return [];
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    initialData: () => (schoolSectors.length > 0 ? schoolSectors : undefined),
+  });
+
+  const { data: levelsData = [], isLoading: loadingLevels } = useQuery({
+    queryKey: ["school-levels"],
+    queryFn: async () => {
+      const result = await schoolLevelsApi.get.list();
+      if (result.error) {
+        throw new Error(
+          result.error.message || "Failed to fetch school levels"
+        );
+      }
+      if (result.data) {
+        const sorted = [...result.data].sort((a, b) =>
+          a.key.localeCompare(b.key)
+        );
+        setSchoolLevels(sorted);
+        return sorted;
+      }
+      return [];
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    initialData: () => (schoolLevels.length > 0 ? schoolLevels : undefined),
+  });
+
+  // Map school data to IDs
+  useEffect(() => {
+    if (
+      school &&
+      statesData.length > 0 &&
+      sectorsData.length > 0 &&
+      levelsData.length > 0
+    ) {
+      setName(school.name || "");
+      setAddress((school as any).address || "");
+      setEmailDomain((school as any).emailDomain || "");
+      setBannerUrl((school as any).bannerUrl || "");
+      setAvatarUrl((school as any).avatarUrl || "");
+
+      // Map state code to state ID
+      if (school.state) {
+        const state = statesData.find(
+          (s) => s.code?.toLowerCase() === school.state?.toLowerCase()
+        );
+        setStateId(state?.id || "");
+      } else {
+        setStateId("");
+      }
+
+      // Map sector key to sector ID
+      if (school.sector) {
+        const sector = sectorsData.find((s) => s.key === school.sector);
+        setSectorId(sector?.id || "");
+      } else {
+        setSectorId("");
+      }
+
+      // Map level names to level IDs
+      if (school.levels && school.levels.length > 0) {
+        const mappedLevelIds = school.levels
+          .map((levelName) => {
+            const level = levelsData.find(
+              (l) => l.name?.toLowerCase() === levelName.toLowerCase()
+            );
+            return level?.id;
+          })
+          .filter((id): id is string => !!id);
+        setLevelIds(mappedLevelIds);
+      } else {
+        setLevelIds([]);
+      }
+    }
+  }, [school?.id, statesData, sectorsData, levelsData]);
+
+  // Check if there are changes
+  const hasChanges =
+    school &&
+    (name !== (school.name || "") ||
+      address !== ((school as any).address || "") ||
+      emailDomain !== ((school as any).emailDomain || "") ||
+      bannerUrl !== ((school as any).bannerUrl || "") ||
+      avatarUrl !== ((school as any).avatarUrl || "") ||
+      stateId !==
+        (statesData.find(
+          (s) => s.code?.toLowerCase() === school.state?.toLowerCase()
+        )?.id || "") ||
+      sectorId !==
+        (sectorsData.find((s) => s.key === school.sector)?.id || "") ||
+      JSON.stringify(levelIds) !==
+        JSON.stringify(
+          (school.levels || [])
+            .map((levelName) => {
+              const level = levelsData.find(
+                (l) => l.name?.toLowerCase() === levelName.toLowerCase()
+              );
+              return level?.id;
+            })
+            .filter((id): id is string => !!id)
+        ));
+
+  const handleSave = async () => {
+    if (!school) return;
+
+    try {
+      setSaving(true);
+      setSaveError(null);
+
+      // TODO: Add API endpoint for updating school
+      // For now, just show an error that the endpoint doesn't exist
+      throw new Error("School update API endpoint not yet implemented");
+
+      // Uncomment when API is ready:
+      // const result = await schoolApi.patch.update(school.id, {
+      //   name: name || undefined,
+      //   address: address || undefined,
+      //   emailDomain: emailDomain || undefined,
+      //   bannerUrl: bannerUrl || undefined,
+      //   avatarUrl: avatarUrl || undefined,
+      //   stateId: stateId || undefined,
+      //   sectorId: sectorId || undefined,
+      //   levelIds: levelIds.length > 0 ? levelIds : undefined,
+      // });
+
+      // if (result.error) {
+      //   const errorMessage =
+      //     result.error.message || "Failed to update school";
+      //   throw new Error(errorMessage);
+      // }
+
+      // setEditing(false);
+      // onSchoolUpdate?.();
+    } catch (err: any) {
+      console.error("Failed to update school:", err);
+      setSaveError(err.message || "Failed to update school");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditing(false);
+    setSaveError(null);
+    if (
+      school &&
+      statesData.length > 0 &&
+      sectorsData.length > 0 &&
+      levelsData.length > 0
+    ) {
+      setName(school.name || "");
+      setAddress((school as any).address || "");
+      setEmailDomain((school as any).emailDomain || "");
+      setBannerUrl((school as any).bannerUrl || "");
+      setAvatarUrl((school as any).avatarUrl || "");
+
+      // Reset state, sector, and levels
+      const state = statesData.find(
+        (s) => s.code?.toLowerCase() === school.state?.toLowerCase()
+      );
+      setStateId(state?.id || "");
+
+      const sector = sectorsData.find((s) => s.key === school.sector);
+      setSectorId(sector?.id || "");
+
+      const mappedLevelIds = (school.levels || [])
+        .map((levelName) => {
+          const level = levelsData.find(
+            (l) => l.name?.toLowerCase() === levelName.toLowerCase()
+          );
+          return level?.id;
+        })
+        .filter((id): id is string => !!id);
+      setLevelIds(mappedLevelIds);
+    }
+  };
+
+  if (!school) return null;
+
+  const selectedState = statesData.find((s) => s.id === stateId);
+  const selectedSector = sectorsData.find((s) => s.id === sectorId);
+  const selectedLevels = levelsData.filter((l) => levelIds.includes(l.id));
+
+  // Format levels display
+  const formatLevelsDisplay = (levels: typeof selectedLevels): string => {
+    if (levels.length === 0) return "—";
+    if (levels.length === 2) {
+      const hasPrimary = levels.some((l) => l.key === "primary");
+      const hasSecondary = levels.some((l) => l.key === "secondary");
+      if (hasPrimary && hasSecondary) return "P-12";
+    }
+    return levels.map((l) => l.name).join(", ");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          {(school as any).createdAt && (
+            <p className="text-xs bg-muted text-muted-foreground px-2 py-1 rounded">
+              Created {new Date((school as any).createdAt).toLocaleDateString()}
+            </p>
+          )}
+          <div className="ml-auto">
+            {editing ? (
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={handleCancel}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={!hasChanges || saving}
+                  className={
+                    hasChanges && !saving
+                      ? "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
+                      : ""
+                  }
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEditing(true);
+                  setSaveError(null);
+                }}
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* State (1/4) and School Name (3/4) row */}
+        <div className="grid grid-cols-4 gap-4">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="school-state"
+              className="text-xs text-muted-foreground ml-2"
+            >
+              State
+            </Label>
+            <Popover
+              open={stateComboboxOpen}
+              onOpenChange={setStateComboboxOpen}
+              modal
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={stateComboboxOpen}
+                  className="w-full justify-between"
+                  disabled={!editing || loadingStates}
+                >
+                  {selectedState ? selectedState.name : "Select state..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+              >
+                <Command>
+                  <CommandInput placeholder="Search state..." />
+                  <CommandList>
+                    <CommandEmpty>No state found.</CommandEmpty>
+                    <CommandGroup>
+                      {statesData.map((state) => (
+                        <CommandItem
+                          key={state.id}
+                          value={`${state.id} ${state.name}`}
+                          onSelect={() => {
+                            setStateId(state.id === stateId ? "" : state.id);
+                            setStateComboboxOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              stateId === state.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {state.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="col-span-3 space-y-1.5">
+            <Label
+              htmlFor="school-name"
+              className="text-xs text-muted-foreground ml-2"
+            >
+              School Name
+            </Label>
+            <Input
+              id="school-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={!editing}
+              className={!editing ? "bg-muted" : ""}
+            />
+          </div>
+        </div>
+
+        {/* Sector (1/2) and Type/Levels (1/2) row */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="school-sector"
+              className="text-xs text-muted-foreground ml-2"
+            >
+              Sector
+            </Label>
+            <Popover
+              open={sectorComboboxOpen}
+              onOpenChange={setSectorComboboxOpen}
+              modal
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={sectorComboboxOpen}
+                  className="w-full justify-between"
+                  disabled={!editing || loadingSectors}
+                >
+                  {selectedSector ? selectedSector.name : "Select sector..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+              >
+                <Command>
+                  <CommandInput placeholder="Search sector..." />
+                  <CommandList>
+                    <CommandEmpty>No sector found.</CommandEmpty>
+                    <CommandGroup>
+                      {sectorsData.map((sector) => (
+                        <CommandItem
+                          key={sector.id}
+                          value={`${sector.id} ${sector.name}`}
+                          onSelect={() => {
+                            setSectorId(
+                              sector.id === sectorId ? "" : sector.id
+                            );
+                            setSectorComboboxOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              sectorId === sector.id
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          {sector.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="school-levels"
+              className="text-xs text-muted-foreground ml-2"
+            >
+              Type
+            </Label>
+            <Popover
+              open={levelsComboboxOpen}
+              onOpenChange={setLevelsComboboxOpen}
+              modal
+            >
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={levelsComboboxOpen}
+                  className="w-full justify-between"
+                  disabled={!editing || loadingLevels}
+                >
+                  {selectedLevels.length > 0
+                    ? formatLevelsDisplay(selectedLevels)
+                    : "Select type..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
+              >
+                <Command>
+                  <CommandInput placeholder="Search type..." />
+                  <CommandList>
+                    <CommandEmpty>No type found.</CommandEmpty>
+                    <CommandGroup>
+                      {levelsData.map((level) => {
+                        const isSelected = levelIds.includes(level.id);
+                        return (
+                          <CommandItem
+                            key={level.id}
+                            value={`${level.id} ${level.name}`}
+                            onSelect={() => {
+                              if (isSelected) {
+                                setLevelIds(
+                                  levelIds.filter((id) => id !== level.id)
+                                );
+                              } else {
+                                // If selecting primary or secondary, allow multiple
+                                // Otherwise replace with single selection
+                                if (
+                                  level.key === "primary" ||
+                                  level.key === "secondary"
+                                ) {
+                                  setLevelIds([...levelIds, level.id]);
+                                } else {
+                                  setLevelIds([level.id]);
+                                }
+                              }
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {level.name}
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="school-address"
+            className="text-xs text-muted-foreground ml-2"
+          >
+            Address
+          </Label>
+          <Input
+            id="school-address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            disabled={!editing}
+            className={!editing ? "bg-muted" : ""}
+            placeholder="Enter school address"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="school-email-domain"
+            className="text-xs text-muted-foreground ml-2"
+          >
+            Email Domain
+          </Label>
+          <Input
+            id="school-email-domain"
+            value={emailDomain}
+            onChange={(e) => setEmailDomain(e.target.value)}
+            disabled={!editing}
+            className={!editing ? "bg-muted" : ""}
+            placeholder="example.com"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="school-banner-url"
+            className="text-xs text-muted-foreground ml-2"
+          >
+            Banner URL
+          </Label>
+          <Input
+            id="school-banner-url"
+            type="url"
+            value={bannerUrl}
+            onChange={(e) => setBannerUrl(e.target.value)}
+            disabled={!editing}
+            className={!editing ? "bg-muted" : ""}
+            placeholder="https://example.com/banner.jpg"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="school-avatar-url"
+            className="text-xs text-muted-foreground ml-2"
+          >
+            Avatar URL
+          </Label>
+          <Input
+            id="school-avatar-url"
+            type="url"
+            value={avatarUrl}
+            onChange={(e) => setAvatarUrl(e.target.value)}
+            disabled={!editing}
+            className={!editing ? "bg-muted" : ""}
+            placeholder="https://example.com/avatar.jpg"
+          />
+        </div>
+
+        {saveError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{saveError}</AlertDescription>
+          </Alert>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function SchoolDetailDrawerContent({
   school,
   open,
@@ -208,6 +853,7 @@ function SchoolDetailDrawerContent({
 }: SchoolDetailDrawerProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [activeSection, setActiveSection] = useState<TabId>(initialTab);
 
   // Reset to initialTab when drawer opens or initialTab changes
@@ -222,21 +868,73 @@ function SchoolDetailDrawerContent({
     setActiveSection(tab);
     onTabChange?.(tab);
   };
-  const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [classes, setClasses] = useState<ClassWithYearCodes[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
-  // Table state for users
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
+  // Search and filter state for users
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("");
+
+  // Search and filter state for classes
+  const [classesSearchQuery, setClassesSearchQuery] = useState("");
+  const [debouncedClassesSearchQuery, setDebouncedClassesSearchQuery] = useState("");
+  const [yearLevelFilter, setYearLevelFilter] = useState<string>("");
+  const [classesRowSelection, setClassesRowSelection] = useState({});
+  
+  // Edit class dialog state
+  const [editClassDialogOpen, setEditClassDialogOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassWithYearCodes | null>(null);
+  const [editClassName, setEditClassName] = useState("");
+  const [editClassCode, setEditClassCode] = useState("");
+  const [editClassStudentCap, setEditClassStudentCap] = useState<string>("");
+  const [editClassActive, setEditClassActive] = useState(true);
+  const [editClassRunningYear, setEditClassRunningYear] = useState<string>("");
+  const [editSelectedYearIds, setEditSelectedYearIds] = useState<string[]>([]);
+  const [editLoadingYears, setEditLoadingYears] = useState(false);
+  const [editAvailableYears, setEditAvailableYears] = useState<
+    Array<typeof schoolYears.$inferSelect>
+  >([]);
+  const [editYearComboboxOpen, setEditYearComboboxOpen] = useState(false);
+  const [editSelectedTeacherIds, setEditSelectedTeacherIds] = useState<string[]>([]);
+  const [editTeacherComboboxOpen, setEditTeacherComboboxOpen] = useState(false);
+
+  // Roles for filtering
+  const { roles, isLoading: isLoadingRoles } = useRoles();
+
+  // Use React Query hook for users with locked schoolId filter
+  const {
+    users,
+    isLoading: loadingUsers,
+    error: usersError,
+    refetch: refetchUsers,
+  } = useUsers({
+    search: debouncedSearchQuery || undefined,
+    role: roleFilter && roleFilter !== "all" ? roleFilter : undefined,
+    schoolId: school?.id, // Lock to this school
+  });
+
+  // Row selection state (if needed for future bulk actions)
   const [rowSelection, setRowSelection] = useState({});
 
   // Dialog states
   const [addLicenceDialogOpen, setAddLicenceDialogOpen] = useState(false);
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
+  const [importUsersDialogOpen, setImportUsersDialogOpen] = useState(false);
+  const [importClassesDialogOpen, setImportClassesDialogOpen] = useState(false);
   const [addClassDialogOpen, setAddClassDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] =
+    useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  
+  // Class deletion state
+  const [isDeleteClassesDialogOpen, setIsDeleteClassesDialogOpen] = useState(false);
+  const [isConfirmDeleteClassesDialogOpen, setIsConfirmDeleteClassesDialogOpen] =
+    useState(false);
+  const [isDeletingClasses, setIsDeletingClasses] = useState(false);
+  const [deleteClassesError, setDeleteClassesError] = useState<string | null>(null);
 
   // Legacy states for backward compatibility (will be removed)
   const [addAdminDialogOpen, setAddAdminDialogOpen] = useState(false);
@@ -293,28 +991,28 @@ function SchoolDetailDrawerContent({
       ? isValidEmail(schoolLicenceEmail)
       : false;
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Debounce classes search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedClassesSearchQuery(classesSearchQuery);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [classesSearchQuery]);
+
+  // Refetch users when section becomes active
   useEffect(() => {
     if (activeSection === "users" && school) {
-      setLoadingUsers(true);
-      meApi.get
-        .listAllUsers()
-        .then((result) => {
-          if (!result.error && result.data) {
-            // Filter users who have ANY role for this school
-            const schoolUsers = result.data.filter((user) =>
-              user.schoolRoles.some((role) => role.schoolId === school.id)
-            );
-            setUsers(schoolUsers);
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to fetch users:", error);
-        })
-        .finally(() => {
-          setLoadingUsers(false);
-        });
+      refetchUsers();
     }
-  }, [activeSection, school]);
+  }, [activeSection, school, refetchUsers]);
 
   useEffect(() => {
     if (activeSection === "classes" && school) {
@@ -334,6 +1032,102 @@ function SchoolDetailDrawerContent({
         });
     }
   }, [activeSection, school]);
+
+  // Filter classes based on search and year level
+  const filteredClasses = useMemo(() => {
+    let filtered = classes;
+
+    // Filter by search query
+    if (debouncedClassesSearchQuery.trim()) {
+      const searchLower = debouncedClassesSearchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (classItem) =>
+          classItem.name.toLowerCase().includes(searchLower) ||
+          classItem.code?.toLowerCase().includes(searchLower) ||
+          classItem.yearCodes?.some((code) =>
+            code.toLowerCase().includes(searchLower)
+          )
+      );
+    }
+
+    // Filter by year level
+    if (yearLevelFilter && yearLevelFilter !== "all") {
+      filtered = filtered.filter((classItem) =>
+        classItem.yearCodes?.includes(yearLevelFilter)
+      );
+    }
+
+    return filtered;
+  }, [classes, debouncedClassesSearchQuery, yearLevelFilter]);
+
+  // Memoize year codes for filter dropdown
+  const yearLevelOptions = useMemo(() => {
+    const allYearCodes = new Set<string>();
+    classes.forEach((classItem) => {
+      classItem.yearCodes?.forEach((code) => {
+        allYearCodes.add(code);
+      });
+    });
+    return Array.from(allYearCodes)
+      .sort()
+      .map((yearCode) => {
+        const count = classes.filter((classItem) =>
+          classItem.yearCodes?.includes(yearCode)
+        ).length;
+        return { yearCode, count };
+      });
+  }, [classes]);
+
+  // Stable callback for row selection
+  const handleClassesRowSelectionChange = useCallback((selection: Record<string, boolean>) => {
+    setClassesRowSelection(selection);
+  }, []);
+
+  // Ref to track if edit dialog is open (to prevent infinite loops)
+  const editDialogOpenRef = useRef(false);
+  
+  useEffect(() => {
+    editDialogOpenRef.current = editClassDialogOpen;
+  }, [editClassDialogOpen]);
+
+  // Stable callback for class click
+  const handleClassClick = useCallback(async (classItem: ClassWithYearCodes) => {
+    // Prevent multiple clicks or if dialog is already open
+    if (editDialogOpenRef.current) return;
+    
+    // Load full class data with years
+    try {
+      const result = await classesApi.get.byId(classItem.id);
+      if (result.data && !editDialogOpenRef.current) {
+        setEditingClass(result.data);
+        setEditClassName(result.data.name);
+        setEditClassCode(result.data.code || "");
+        setEditClassStudentCap(
+          result.data.studentCap?.toString() || ""
+        );
+        setEditClassActive(result.data.active ?? true);
+        
+        // Extract running year from startYear
+        const runningYear = result.data.startYear
+          ? new Date(result.data.startYear).getFullYear().toString()
+          : new Date().getFullYear().toString();
+        setEditClassRunningYear(runningYear);
+        
+        // Get year IDs from the years array
+        const yearIds = result.data.years?.map((y: any) => y.yearId) || [];
+        setEditSelectedYearIds(yearIds);
+        
+        // Get teacher IDs from the teachers array
+        const classData = result.data as any;
+        const teacherIds = classData?.teachers?.map((t: any) => t.userId) || [];
+        setEditSelectedTeacherIds(teacherIds);
+        
+        setEditClassDialogOpen(true);
+      }
+    } catch (error) {
+      console.error("Failed to load class:", error);
+    }
+  }, []);
 
   // Fetch school levels on mount to create mapping
   useEffect(() => {
@@ -358,6 +1152,65 @@ function SchoolDetailDrawerContent({
         console.error("Failed to fetch school levels:", error);
       });
   }, []);
+
+  // Filter teachers from the school (users with TEACHER role)
+  const editAvailableTeachers = useMemo(() => {
+    if (!school?.id || !users || users.length === 0) return [];
+    
+    return users.filter((user) => {
+      // Check if user has TEACHER role for this school
+      const schoolRoles = user.schoolRoles.filter(
+        (role) => role.schoolId === school.id
+      );
+      
+      // User must have TEACHER role for this school
+      return schoolRoles.some((role) => role.roleKey === "TEACHER");
+    });
+  }, [users, school?.id]);
+
+  // Fetch school years for edit dialog
+  useEffect(() => {
+    if (editClassDialogOpen && school && schoolLevelsMap.size > 0) {
+      setEditLoadingYears(true);
+
+      // Extract level IDs from school's levels array
+      const levelIds = school.levels
+        ?.map((levelName: string) => {
+          const normalizedName = levelName.toLowerCase().trim();
+          return schoolLevelsMap.get(normalizedName);
+        })
+        .filter((id): id is string => typeof id === "string" && id.length > 0);
+
+      // Fetch years filtered by school's level IDs
+      curriculumApi.years
+        .list(levelIds && levelIds.length > 0 ? { levelIds } : undefined)
+        .then((result) => {
+          if (!result.error && result.data) {
+            const years = result.data
+              .map((item: any) => item.year)
+              .filter((year: any) => year != null);
+
+            const sortedYears = [...years].sort((a, b) => {
+              if (a.sortIndex != null && b.sortIndex != null) {
+                return a.sortIndex - b.sortIndex;
+              }
+              const aCode = a.code || "";
+              const bCode = b.code || "";
+              return aCode.localeCompare(bCode);
+            });
+
+            setEditAvailableYears(sortedYears);
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to fetch school years:", error);
+          setEditAvailableYears([]);
+        })
+        .finally(() => {
+          setEditLoadingYears(false);
+        });
+    }
+  }, [editClassDialogOpen, school, schoolLevelsMap]);
 
   // Fetch school years when dialog opens
   useEffect(() => {
@@ -492,11 +1345,30 @@ function SchoolDetailDrawerContent({
 
     if (open && school && activeSection === "users") {
       const dialogParam = searchParams?.get("dialog");
-      if (dialogParam === "add-user" && !addUserDialogOpen) {
-        setAddUserDialogOpen(true);
-      } else if (dialogParam !== "add-user" && addUserDialogOpen) {
-        // Close dialog when param is removed
-        setAddUserDialogOpen(false);
+      if (dialogParam === "add-user") {
+        if (!addUserDialogOpen) {
+          setAddUserDialogOpen(true);
+        }
+        // Close import dialog if it's open
+        if (importUsersDialogOpen) {
+          setImportUsersDialogOpen(false);
+        }
+      } else if (dialogParam === "import-users") {
+        if (!importUsersDialogOpen) {
+          setImportUsersDialogOpen(true);
+        }
+        // Close add user dialog if it's open
+        if (addUserDialogOpen) {
+          setAddUserDialogOpen(false);
+        }
+      } else {
+        // Close both dialogs when param is removed
+        if (addUserDialogOpen) {
+          setAddUserDialogOpen(false);
+        }
+        if (importUsersDialogOpen) {
+          setImportUsersDialogOpen(false);
+        }
       }
     }
 
@@ -504,13 +1376,30 @@ function SchoolDetailDrawerContent({
       const dialogParam = searchParams?.get("dialog");
       if (dialogParam === "add-class" && !addClassDialogOpen) {
         setAddClassDialogOpen(true);
-      } else if (dialogParam !== "add-class" && addClassDialogOpen) {
-        // Close dialog when param is removed
-        setAddClassDialogOpen(false);
-        setClassName("");
-        setClassCode("");
-        setClassRunningYear(new Date().getFullYear().toString());
-        setSelectedYearIds([]);
+        // Close import dialog if it's open
+        if (importClassesDialogOpen) {
+          setImportClassesDialogOpen(false);
+        }
+      } else if (dialogParam === "import-classes") {
+        if (!importClassesDialogOpen) {
+          setImportClassesDialogOpen(true);
+        }
+        // Close add class dialog if it's open
+        if (addClassDialogOpen) {
+          setAddClassDialogOpen(false);
+        }
+      } else {
+        // Close both dialogs when param is removed
+        if (addClassDialogOpen) {
+          setAddClassDialogOpen(false);
+          setClassName("");
+          setClassCode("");
+          setClassRunningYear(new Date().getFullYear().toString());
+          setSelectedYearIds([]);
+        }
+        if (importClassesDialogOpen) {
+          setImportClassesDialogOpen(false);
+        }
       }
     }
   }, [
@@ -520,6 +1409,8 @@ function SchoolDetailDrawerContent({
     searchParams,
     addLicenceDialogOpen,
     addUserDialogOpen,
+    importUsersDialogOpen,
+    importClassesDialogOpen,
     addClassDialogOpen,
   ]);
 
@@ -558,33 +1449,7 @@ function SchoolDetailDrawerContent({
     }
   }, [addLicenceDialogOpen, school]);
 
-  // Set up columns for users table (memoized to avoid recreation on every render)
-  const usersColumns = useMemo(
-    () => (school ? createSchoolUsersColumns(school.id) : []),
-    [school?.id]
-  );
-
-  // Set up users table
-  const usersTable = useReactTable({
-    data: users,
-    columns: usersColumns,
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onColumnVisibilityChange: setColumnVisibility,
-    onRowSelectionChange: setRowSelection,
-    state: {
-      sorting,
-      columnFilters,
-      columnVisibility,
-      rowSelection,
-    },
-  });
-
-  // Handler for opening add user dialog
+  // Handler for opening add user dialog (goes directly to manual form)
   const handleAddUserClick = () => {
     setAddUserDialogOpen(true);
     // Add dialog query parameter to URL
@@ -593,6 +1458,21 @@ function SchoolDetailDrawerContent({
       params.set("school", school.slug);
       params.set("tab", "users");
       params.set("dialog", "add-user");
+      router.push(`/admin/schools?${params.toString()}`, {
+        scroll: false,
+      });
+    }
+  };
+
+  // Handler for opening import data dialog (triggers file picker immediately)
+  const handleImportDataClick = () => {
+    // Open import dialog
+    setImportUsersDialogOpen(true);
+    if (school?.slug) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("school", school.slug);
+      params.set("tab", "users");
+      params.set("dialog", "import-users");
       router.push(`/admin/schools?${params.toString()}`, {
         scroll: false,
       });
@@ -615,81 +1495,27 @@ function SchoolDetailDrawerContent({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="h-[95vh] w-full max-w-6xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 overflow-hidden flex flex-col"
+        className="h-[95vh] w-full max-w-7xl mx-auto rounded-t-2xl border-t-2 border-l-2 border-r-2 border-border/50 shadow-2xl p-0 gap-2 overflow-hidden flex flex-col"
       >
         <SheetTitle className="sr-only">
           {school.name} - School Details
         </SheetTitle>
-        <div className="flex flex-1 overflow-hidden min-h-0">
+
+        {/* Full-width Header */}
+        <SchoolDetailHeader school={school} />
+
+        {/* Sidebar and Content Area */}
+        <div className="flex flex-1 overflow-hidden min-h-0 gap-0">
           {/* Left Sidebar */}
-          <div className="hidden md:flex flex-col w-48 border-r shrink-0">
-            {/* School Info Header */}
-            <div className="p-4 border-b shrink-0">
-              <div className="flex items-center gap-2 mb-2">
-                {/* <School className="h-5 w-5 text-muted-foreground" /> */}
-                <h2 className="font-semibold text-xl">{school.name}</h2>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {school.state && (
-                  <Badge variant="secondary" className="w-fit">
-                    {school.state.toUpperCase()}
-                  </Badge>
-                )}
-                {sectorDisplay !== "—" && (
-                  <Badge variant="secondary" className="w-fit">
-                    {sectorDisplay}
-                  </Badge>
-                )}
-                {levelDisplay !== "—" && (
-                  <Badge variant="secondary" className="w-fit">
-                    {levelDisplay}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            {/* Navigation Menu */}
-            <div className="h-fit">
-              <SidebarProvider className="items-start">
-                <Sidebar collapsible="none" className="border-0">
-                  <SidebarContent>
-                    <SidebarGroup>
-                      <SidebarGroupContent>
-                        <SidebarMenu>
-                          {navItems.map((item) => {
-                            const Icon = item.icon;
-                            const isOnboarding = item.id === "onboarding";
-                            return (
-                              <SidebarMenuItem key={item.id}>
-                                <SidebarMenuButton
-                                  onClick={() =>
-                                    handleTabChange(item.id as TabId)
-                                  }
-                                  isActive={activeSection === item.id}
-                                  className={
-                                    isOnboarding
-                                      ? "animate-pulse text-orange-600 data-[active=true]:text-orange-600"
-                                      : ""
-                                  }
-                                >
-                                  <Icon className="h-4 w-4" />
-                                  <span>{item.name}</span>
-                                </SidebarMenuButton>
-                              </SidebarMenuItem>
-                            );
-                          })}
-                        </SidebarMenu>
-                      </SidebarGroupContent>
-                    </SidebarGroup>
-                  </SidebarContent>
-                </Sidebar>
-              </SidebarProvider>
-            </div>
-          </div>
+          <SchoolDetailSidebar
+            activeTab={activeSection}
+            onTabChange={handleTabChange}
+          />
 
           {/* Right Content Area */}
-          <main className="flex flex-1 flex-col overflow-hidden min-h-0">
+          <main className="flex flex-1 flex-col overflow-hidden min-h-0 pt-2 pr-6 pl-4">
             {/* Mobile Header */}
-            <div className="md:hidden p-4 border-b shrink-0">
+            <div className="md:hidden p-4 border-b shrink-0 mb-2">
               <div className="flex items-center gap-2 mb-2">
                 <School className="h-5 w-5 text-muted-foreground" />
                 <h2 className="font-semibold text-lg">{school.name}</h2>
@@ -720,212 +1546,198 @@ function SchoolDetailDrawerContent({
                 </SelectTrigger>
                 <SelectContent>
                   {navItems.map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
+                    <SelectItem
+                      key={item.id}
+                      value={item.id}
+                      disabled={item.disabled}
+                    >
                       {item.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            {/* Scrollable Content */}
-            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
               {/* Onboarding Section */}
               {activeSection === "onboarding" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Rocket className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold">Onboarding</h3>
-                  </div>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Essential Section */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-semibold text-muted-foreground">
-                        Essential
-                      </h4>
-                      {(() => {
-                        const steps = [
-                          {
-                            id: "add-school",
-                            title: "Add School",
-                            description: "School has been created",
-                            icon: School,
-                            completed: true,
-                          },
-                          {
-                            id: "add-licence",
-                            title: "Add School Licence",
-                            description: school.activeLicence
-                              ? "Active school licence exists"
-                              : "No active school licence has been added yet",
-                            icon: Key,
-                            completed: school.activeLicence,
-                          },
-                          {
-                            id: "add-admin",
-                            title: "Add School Admin",
-                            description:
-                              school.schoolAdminCount > 0
-                                ? "School admin has been added"
-                                : "No school admin has been added yet",
-                            icon: Shield,
-                            completed: school.schoolAdminCount > 0,
-                          },
-                          {
-                            id: "add-classes",
-                            title: "Add Classes",
-                            description:
-                              school.classCount > 0
-                                ? "Classes have been added"
-                                : "No classes have been added yet",
-                            icon: GraduationCap,
-                            completed: school.classCount > 0,
-                          },
-                          {
-                            id: "add-teachers",
-                            title: "Add Teachers",
-                            description:
-                              school.teacherCount > 0
-                                ? "Teachers have been added"
-                                : "No users have been added yet",
-                            icon: UserPlus,
-                            completed: school.teacherCount > 0,
-                          },
-                        ];
+                  {/* Essential Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-muted-foreground">
+                      Essential
+                    </h4>
+                    {(() => {
+                      const steps = [
+                        {
+                          id: "add-licence",
+                          title: "Add School Licence",
+                          description: school.activeLicence
+                            ? "Active school licence exists"
+                            : "No active school licence has been added yet",
+                          icon: Key,
+                          completed: school.activeLicence,
+                        },
+                        {
+                          id: "add-admin",
+                          title: "Add School Admin",
+                          description:
+                            school.schoolAdminCount > 0
+                              ? "School admin has been added"
+                              : "No school admin has been added yet",
+                          icon: Shield,
+                          completed: school.schoolAdminCount > 0,
+                        },
+                        {
+                          id: "add-teachers",
+                          title: "Add Staff and AP Teachers",
+                          description:
+                            school.teacherCount > 0
+                              ? "Staff and AP teachers have been added"
+                              : "No staff or AP teachers have been added yet",
+                          icon: UserPlus,
+                          completed: school.teacherCount > 0,
+                        },
+                        {
+                          id: "add-classes",
+                          title: "Add Classes",
+                          description:
+                            school.classCount > 0
+                              ? "Classes have been added"
+                              : "No classes have been added yet",
+                          icon: GraduationCap,
+                          completed: school.classCount > 0,
+                        },
+                      ];
 
-                        let previousCompleted = true;
+                      let previousCompleted = true;
 
-                        return steps.map((item, index) => {
-                          const Icon = item.icon;
-                          const isCompleted = item.completed;
-                          const isAvailable = previousCompleted;
-                          const isDisabled = index === 0 || !isAvailable;
+                      return (
+                        <div className="grid grid-cols-4 gap-4">
+                          {steps.map((item, index) => {
+                            const Icon = item.icon;
+                            const isCompleted = item.completed;
+                            const isAvailable = previousCompleted;
+                            const isDisabled = !isAvailable;
 
-                          // Update previousCompleted for next iteration
-                          if (isCompleted) {
-                            previousCompleted = true;
-                          } else {
-                            previousCompleted = false;
-                          }
+                            // Update previousCompleted for next iteration
+                            if (isCompleted) {
+                              previousCompleted = true;
+                            } else {
+                              previousCompleted = false;
+                            }
 
-                          return (
-                            <Card
-                              key={item.id}
-                              className={`transition-all py-1 p-0 ${
-                                isCompleted
-                                  ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
-                                  : isAvailable
-                                    ? "hover:bg-muted/30 border-border"
-                                    : "bg-muted/30 opacity-60 border-muted"
-                              } ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
-                              onClick={() => {
-                                if (isDisabled || isCompleted) return;
+                            return (
+                              <Card
+                                key={item.id}
+                                className={`transition-all relative h-full ${
+                                  isCompleted
+                                    ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
+                                    : isAvailable
+                                      ? "hover:bg-muted/30 border-border"
+                                      : "bg-muted/30 opacity-60 border-muted"
+                                } ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
+                                onClick={() => {
+                                  if (isDisabled || isCompleted) return;
 
-                                // If this is the "Add School Licence" step, navigate to settings tab with dialog
-                                if (item.id === "add-licence") {
-                                  handleTabChange("settings");
-                                  if (school?.slug) {
-                                    const params = new URLSearchParams(
-                                      searchParams?.toString() || ""
-                                    );
-                                    params.set("school", school.slug);
-                                    params.set("tab", "settings");
-                                    params.set("dialog", "ADD-school-licence");
-                                    router.push(
-                                      `/admin/schools?${params.toString()}`,
-                                      {
-                                        scroll: false,
-                                      }
-                                    );
+                                  // If this is the "Add School Licence" step, navigate to settings tab with dialog
+                                  if (item.id === "add-licence") {
+                                    handleTabChange("settings");
+                                    if (school?.slug) {
+                                      const params = new URLSearchParams(
+                                        searchParams?.toString() || ""
+                                      );
+                                      params.set("school", school.slug);
+                                      params.set("tab", "settings");
+                                      params.set(
+                                        "dialog",
+                                        "ADD-school-licence"
+                                      );
+                                      router.push(
+                                        `/admin/schools?${params.toString()}`,
+                                        {
+                                          scroll: false,
+                                        }
+                                      );
+                                    }
                                   }
-                                }
 
-                                // If this is the "Add School Admin" step, navigate to users tab with dialog
-                                if (item.id === "add-admin") {
-                                  handleTabChange("users");
-                                  if (school?.slug) {
-                                    const params = new URLSearchParams(
-                                      searchParams?.toString() || ""
-                                    );
-                                    params.set("school", school.slug);
-                                    params.set("tab", "users");
-                                    params.set("dialog", "add-school-admin");
-                                    router.push(
-                                      `/admin/schools?${params.toString()}`,
-                                      {
-                                        scroll: false,
-                                      }
-                                    );
+                                  // If this is the "Add School Admin" step, navigate to users tab with dialog
+                                  if (item.id === "add-admin") {
+                                    handleTabChange("users");
+                                    if (school?.slug) {
+                                      const params = new URLSearchParams(
+                                        searchParams?.toString() || ""
+                                      );
+                                      params.set("school", school.slug);
+                                      params.set("tab", "users");
+                                      params.set("dialog", "add-school-admin");
+                                      router.push(
+                                        `/admin/schools?${params.toString()}`,
+                                        {
+                                          scroll: false,
+                                        }
+                                      );
+                                    }
                                   }
-                                }
 
-                                // If this is the "Add Teachers" step, navigate to users tab with dialog
-                                if (item.id === "add-teachers") {
-                                  handleTabChange("users");
-                                  if (school?.slug) {
-                                    const params = new URLSearchParams(
-                                      searchParams?.toString() || ""
-                                    );
-                                    params.set("school", school.slug);
-                                    params.set("tab", "users");
-                                    params.set("dialog", "add-teacher");
-                                    router.push(
-                                      `/admin/schools?${params.toString()}`,
-                                      {
-                                        scroll: false,
-                                      }
-                                    );
+                                  // If this is the "Add Teachers" step, navigate to users tab with dialog
+                                  if (item.id === "add-teachers") {
+                                    handleTabChange("users");
+                                    if (school?.slug) {
+                                      const params = new URLSearchParams(
+                                        searchParams?.toString() || ""
+                                      );
+                                      params.set("school", school.slug);
+                                      params.set("tab", "users");
+                                      params.set("dialog", "add-teacher");
+                                      router.push(
+                                        `/admin/schools?${params.toString()}`,
+                                        {
+                                          scroll: false,
+                                        }
+                                      );
+                                    }
                                   }
-                                }
 
-                                // If this is the "Add Classes" step, navigate to classes tab with dialog
-                                if (item.id === "add-classes") {
-                                  handleTabChange("classes");
-                                  if (school?.slug) {
-                                    const params = new URLSearchParams(
-                                      searchParams?.toString() || ""
-                                    );
-                                    params.set("school", school.slug);
-                                    params.set("tab", "classes");
-                                    params.set("dialog", "add-class");
-                                    router.push(
-                                      `/admin/schools?${params.toString()}`,
-                                      {
-                                        scroll: false,
-                                      }
-                                    );
+                                  // If this is the "Add Classes" step, navigate to classes tab with dialog
+                                  if (item.id === "add-classes") {
+                                    handleTabChange("classes");
+                                    if (school?.slug) {
+                                      const params = new URLSearchParams(
+                                        searchParams?.toString() || ""
+                                      );
+                                      params.set("school", school.slug);
+                                      params.set("tab", "classes");
+                                      params.set("dialog", "add-class");
+                                      router.push(
+                                        `/admin/schools?${params.toString()}`,
+                                        {
+                                          scroll: false,
+                                        }
+                                      );
+                                    }
                                   }
-                                }
-                              }}
-                            >
-                              <CardContent className="py-2">
-                                <div className="flex items-center gap-3">
-                                  <div className="shrink-0 flex items-center gap-2">
-                                    <span className="text-sm font-semibold text-muted-foreground w-4">
+                                }}
+                              >
+                                <CardContent className="p-4 flex flex-col items-center h-full">
+                                  {/* Step number in top left */}
+                                  <div className="absolute top-2 left-2">
+                                    <span className="text-xs font-semibold text-muted-foreground">
                                       {index + 1}
                                     </span>
-                                    {isCompleted ? (
-                                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                    ) : (
-                                      <Circle
-                                        className={`h-5 w-5 ${
-                                          isAvailable
-                                            ? "text-muted-foreground"
-                                            : "text-muted-foreground/50"
-                                        }`}
-                                      />
-                                    )}
                                   </div>
-                                  <div
-                                    className={`text-sm font-bold flex items-center gap-2 flex-1 ${
-                                      isCompleted
-                                        ? "text-green-700 dark:text-green-400 line-through"
-                                        : isAvailable
-                                          ? ""
-                                          : "text-muted-foreground"
-                                    }`}
-                                  >
+                                  {/* Check icon in top right */}
+                                  {isCompleted && (
+                                    <div className="absolute top-2 right-2">
+                                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    </div>
+                                  )}
+                                  {/* Icon in the middle */}
+                                  <div className="flex-1 flex items-center justify-center my-4">
                                     <Icon
-                                      className={`h-4 w-4 shrink-0 ${
+                                      className={`h-8 w-8 ${
                                         isCompleted
                                           ? "text-green-600"
                                           : isAvailable
@@ -933,21 +1745,41 @@ function SchoolDetailDrawerContent({
                                             : "text-muted-foreground/50"
                                       }`}
                                     />
-                                    {item.title}
                                   </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          );
-                        });
-                      })()}
-                    </div>
+                                  {/* Title and description in flex column */}
+                                  <div className="flex flex-col items-center gap-1 w-full">
+                                    <h3
+                                      className={`text-sm font-semibold text-center ${
+                                        isCompleted
+                                          ? "text-green-700 dark:text-green-400"
+                                          : isAvailable
+                                            ? ""
+                                            : "text-muted-foreground"
+                                      }`}
+                                    >
+                                      {item.title}
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground text-center line-clamp-2">
+                                      {item.description}
+                                    </p>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
 
-                    {/* Optional Section */}
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-semibold text-muted-foreground">
-                        (Optional)
-                      </h4>
+                  <Separator />
+
+                  {/* Optional Section */}
+                  <div className="space-y-4">
+                    <h4 className="text-sm font-semibold text-muted-foreground">
+                      (Optional)
+                    </h4>
+                    <div className="grid grid-cols-4 gap-4">
                       {[
                         {
                           id: "add-email-domain",
@@ -985,44 +1817,56 @@ function SchoolDetailDrawerContent({
                           icon: UserCircle,
                           completed: !!(school as any).avatarUrl,
                         },
-                      ].map((item) => {
+                      ].map((item, index) => {
                         const Icon = item.icon;
                         const isCompleted = item.completed;
 
                         return (
                           <Card
                             key={item.id}
-                            className={`transition-all ${
+                            className={`transition-all relative h-full ${
                               isCompleted
                                 ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
                                 : "hover:bg-muted/30 border-border"
                             } cursor-pointer`}
                           >
-                            <CardContent className="py-2">
-                              <div className="flex items-center gap-3">
-                                <div className="shrink-0">
-                                  {isCompleted ? (
-                                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                  ) : (
-                                    <Circle className="h-5 w-5 text-muted-foreground" />
-                                  )}
+                            <CardContent className="p-4 flex flex-col items-center h-full">
+                              {/* Step number in top left */}
+                              <div className="absolute top-2 left-2">
+                                <span className="text-xs font-semibold text-muted-foreground">
+                                  {index + 1}
+                                </span>
+                              </div>
+                              {/* Check icon in top right */}
+                              {isCompleted && (
+                                <div className="absolute top-2 right-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
                                 </div>
-                                <div
-                                  className={`text-sm font-bold flex items-center gap-2 flex-1 ${
+                              )}
+                              {/* Icon in the middle */}
+                              <div className="flex-1 flex items-center justify-center my-4">
+                                <Icon
+                                  className={`h-8 w-8 ${
+                                    isCompleted
+                                      ? "text-green-600"
+                                      : "text-muted-foreground"
+                                  }`}
+                                />
+                              </div>
+                              {/* Title and description in flex column */}
+                              <div className="flex flex-col items-center gap-1 w-full">
+                                <h3
+                                  className={`text-sm font-semibold text-center ${
                                     isCompleted
                                       ? "text-green-700 dark:text-green-400"
                                       : ""
                                   }`}
                                 >
-                                  <Icon
-                                    className={`h-4 w-4 shrink-0 ${
-                                      isCompleted
-                                        ? "text-green-600"
-                                        : "text-muted-foreground"
-                                    }`}
-                                  />
                                   {item.title}
-                                </div>
+                                </h3>
+                                <p className="text-xs text-muted-foreground text-center line-clamp-2">
+                                  {item.description}
+                                </p>
                               </div>
                             </CardContent>
                           </Card>
@@ -1033,328 +1877,208 @@ function SchoolDetailDrawerContent({
                 </div>
               )}
 
-              {/* Overview Section */}
+              {/* Details Section */}
               {activeSection === "overview" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Eye className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold">Overview</h3>
-                  </div>
-                  {/* Quick Stats Cards */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Teachers
-                        </CardTitle>
-                        <Users className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">
-                          {school.teacherCount}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          total teachers
-                        </p>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          State
-                        </CardTitle>
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                      </CardHeader>
-                      <CardContent>
-                        <div className="text-2xl font-bold">
-                          {school.state || "—"}
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          location
-                        </p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  {/* School Details */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>School Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            State: {school.state || "—"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <School className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">
-                            Sector:{" "}
-                            {school.sector === "government"
-                              ? "Government"
-                              : school.sector === "catholic"
-                                ? "Catholic"
-                                : school.sector === "independent"
-                                  ? "Independent"
-                                  : "—"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">School ID</span>
-                        <span className="text-sm text-muted-foreground font-mono">
-                          {school.id}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium">Teachers</span>
-                        <span className="text-sm text-muted-foreground">
-                          {school.teacherCount} teachers
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  {/* Recent Feedback */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Feedback</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                            <Users className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">
-                              Teacher Training Completed
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              "Great session! The new curriculum materials are
-                              very helpful."
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              2 days ago
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-start gap-3">
-                          <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                            <BookOpen className="h-4 w-4 text-green-600" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">
-                              Lesson Delivered Successfully
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              "Students were very engaged with the anti-bullying
-                              content."
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              5 days ago
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <SchoolDetailsCard
+                    school={school}
+                    onSchoolUpdate={onSchoolUpdate}
+                  />
                 </div>
               )}
 
               {/* Users Section */}
               {activeSection === "users" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Users className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold">Users</h3>
-                  </div>
+                  {/* Action Buttons and Search/Filters */}
+                  <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+                    {/* Add User and Import Data Buttons - Left */}
+                    <div className="flex items-center gap-2 h-8">
+                      {Object.keys(rowSelection).filter(
+                        (key) => rowSelection[key]
+                      ).length > 0 ? (
+                        <div
+                          className="flex items-center gap-2 opacity-0 animate-slide-up-fade-in"
+                          style={{ animationFillMode: "forwards" }}
+                        >
+                          <div className="flex items-center gap-0.5 text-sm text-muted-foreground">
+                            <span className="pl-4">
+                              {
+                                Object.keys(rowSelection).filter(
+                                  (key) => rowSelection[key]
+                                ).length
+                              }
+                            </span>
+                            <Check className="h-4 w-4" />
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => setIsDeleteDialogOpen(true)}
+                                className="group h-8 w-8 bg-destructive/5 hover:bg-destructive/10 border border-transparent hover:border-destructive transition-all duration-200 ease-in-out"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive opacity-100 group-hover:animate-shake-twice" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      ) : (
+                        <>
+                          <Button
+                            onClick={handleAddUserClick}
+                            disabled={loadingUsers && users.length === 0}
+                            className="bg-transparent hover:bg-[var(--brand-bullyproof-primary)] text-[var(--brand-bullyproof-primary)] hover:text-white h-10 opacity-0 animate-slide-left-fade-in transition-colors"
+                            style={{ animationFillMode: "forwards" }}
+                          >
+                            <UserPlus className="h-4 w-4" />
+                            Add User
+                          </Button>
+                          <Button
+                            onClick={handleImportDataClick}
+                            variant="outline"
+                            disabled={loadingUsers && users.length === 0}
+                            className="h-10 opacity-0 animate-slide-left-fade-in transition-colors"
+                            style={{ animationFillMode: "forwards" }}
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Import Data
+                          </Button>
+                        </>
+                      )}
+                    </div>
 
-                  {/* Action Cards */}
-                  <div className="flex items-center justify-end gap-4">
-                    <Card
-                      className="cursor-pointer py-2 hover:bg-muted/50 transition-colors"
-                      onClick={handleAddUserClick}
-                    >
-                      <CardContent className="flex items-center gap-1.5">
-                        <UserPlus className="h-5 w-5 text-primary" />
-                        <h4 className="font-semibold text-sm">Add User</h4>
-                      </CardContent>
-                    </Card>
+                    {/* Vertical Separator */}
+                    <div className="h-6 w-px bg-border" />
+
+                    {/* Search and Filters - Right */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="relative flex-1 min-w-0 transition-all duration-200 ease-in-out">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                          placeholder="Search by name or email..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className={cn(
+                            "pl-10 pr-10 transition-all duration-200 ease-in-out",
+                            debouncedSearchQuery.trim() &&
+                              "border-orange-500 bg-orange-500/10"
+                          )}
+                          disabled={loadingUsers && users.length === 0}
+                        />
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          {searchQuery !== debouncedSearchQuery ||
+                          loadingUsers ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : searchQuery ? (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery("")}
+                              className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Clear search"
+                            >
+                              <CircleX className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Select
+                          value={roleFilter || "all"}
+                          onValueChange={setRoleFilter}
+                          disabled={loadingUsers && users.length === 0}
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              "w-[180px]",
+                              roleFilter &&
+                                roleFilter !== "all" &&
+                                "border-orange-500 bg-orange-500/10"
+                            )}
+                            disabled={loadingUsers && users.length === 0}
+                          >
+                            <SelectValue placeholder="Role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Roles</SelectItem>
+                            {roles
+                              .filter((role) => role.key)
+                              .sort((a, b) =>
+                                (a.name || "").localeCompare(b.name || "")
+                              )
+                              .map((role) => {
+                                const roleKey = role.key || "";
+                                const count = users.filter((user) => {
+                                  const schoolRoles = user.schoolRoles.filter(
+                                    (sr) =>
+                                      sr.schoolId === school.id &&
+                                      sr.roleKey === roleKey
+                                  );
+                                  return schoolRoles.length > 0;
+                                }).length;
+                                return (
+                                  <SelectItem key={role.id} value={roleKey}>
+                                    <div className="flex items-center justify-between w-full">
+                                      <span>{role.name}</span>
+                                      {count > 0 && (
+                                        <span className="ml-2 text-xs text-muted-foreground">
+                                          {count}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Vertical Separator */}
+                    {(searchQuery.trim() ||
+                      (roleFilter && roleFilter !== "all")) && (
+                      <>
+                        <div className="h-6 w-px bg-border" />
+                        {/* Clear Filters Button */}
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSearchQuery("");
+                            setRoleFilter("");
+                          }}
+                          className={cn(
+                            "flex items-center gap-1",
+                            "text-orange-500 border-orange-500/10 hover:text-orange-500 hover:bg-orange-500/10"
+                          )}
+                          disabled={loadingUsers && users.length === 0}
+                        >
+                          <CircleX className="h-4 w-4" />
+                          Clear Filters
+                        </Button>
+                      </>
+                    )}
                   </div>
 
                   <div className="w-full space-y-4">
-                    <div className="flex items-center py-4 gap-4">
-                      <Input
-                        placeholder="Filter emails..."
-                        value={
-                          (usersTable
-                            .getColumn("email")
-                            ?.getFilterValue() as string) ?? ""
-                        }
-                        onChange={(event) =>
-                          usersTable
-                            .getColumn("email")
-                            ?.setFilterValue(event.target.value)
-                        }
-                        className="max-w-sm"
-                      />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="ml-auto">
-                            Columns <ChevronDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {usersTable
-                            .getAllColumns()
-                            .filter((column) => column.getCanHide())
-                            .map((column) => {
-                              return (
-                                <DropdownMenuCheckboxItem
-                                  key={column.id}
-                                  className="capitalize"
-                                  checked={column.getIsVisible()}
-                                  onCheckedChange={(value) =>
-                                    column.toggleVisibility(!!value)
-                                  }
-                                >
-                                  {column.id}
-                                </DropdownMenuCheckboxItem>
-                              );
-                            })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="overflow-hidden rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          {usersTable.getHeaderGroups().map((headerGroup) => (
-                            <TableRow key={headerGroup.id}>
-                              {headerGroup.headers.map((header) => {
-                                return (
-                                  <TableHead key={header.id}>
-                                    {header.isPlaceholder
-                                      ? null
-                                      : flexRender(
-                                          header.column.columnDef.header,
-                                          header.getContext()
-                                        )}
-                                  </TableHead>
-                                );
-                              })}
-                            </TableRow>
-                          ))}
-                        </TableHeader>
-                        <TableBody>
-                          {/* Add User Row */}
-                          <TableRow
-                            className="cursor-pointer hover:bg-muted/50 transition-colors border-dashed"
-                            onClick={handleAddUserClick}
-                          >
-                            <TableCell
-                              colSpan={usersColumns.length}
-                              className="h-auto py-3"
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-2 text-muted-foreground hover:text-foreground pl-0.5">
-                                  <UserPlus className="h-4 w-4" />
-                                  <span className="font-medium pl-2">
-                                    Add New User
-                                  </span>
-                                </div>
-                                <div>
-                                  <ChevronsRight className="h-3 w-3 text-muted-foreground mt-0.5" />
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-0.5 pl-2">
-                                  Add a member to {school.name}
-                                </p>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {loadingUsers ? (
-                            <TableRow>
-                              <TableCell
-                                colSpan={usersColumns.length}
-                                className="h-24 text-center"
-                              >
-                                <div className="flex items-center justify-center">
-                                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ) : usersTable.getRowModel().rows?.length ? (
-                            usersTable.getRowModel().rows.map((row) => (
-                              <TableRow
-                                key={row.id}
-                                data-state={row.getIsSelected() && "selected"}
-                              >
-                                {row.getVisibleCells().map((cell) => (
-                                  <TableCell key={cell.id}>
-                                    {flexRender(
-                                      cell.column.columnDef.cell,
-                                      cell.getContext()
-                                    )}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            ))
-                          ) : (
-                            <TableRow>
-                              <TableCell
-                                colSpan={usersColumns.length}
-                                className="h-24 text-center"
-                              >
-                                <div className="flex flex-col items-center justify-center">
-                                  <Users className="h-12 w-12 text-muted-foreground mb-4" />
-                                  <h3 className="text-lg font-medium mb-2">
-                                    No Users Found
-                                  </h3>
-                                  <p className="text-muted-foreground">
-                                    No users have been assigned to this school
-                                    yet.
-                                  </p>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    <div className="flex items-center justify-end space-x-2 py-4">
-                      <div className="text-muted-foreground flex-1 text-sm">
-                        {usersTable.getFilteredSelectedRowModel().rows.length}{" "}
-                        of {usersTable.getFilteredRowModel().rows.length} row(s)
-                        selected.
+                    <UsersTable
+                      users={users}
+                      roles={roles}
+                      isLoading={loadingUsers}
+                      error={usersError?.message || null}
+                      schoolId={school?.id}
+                      showSelection={true}
+                      onRowSelectionChange={setRowSelection}
+                    />
+                    {Object.keys(rowSelection).length > 0 && (
+                      <div className="flex items-center justify-end space-x-2 py-4">
+                        <div className="text-muted-foreground flex-1 text-sm">
+                          {Object.keys(rowSelection).length} of {users.length}{" "}
+                          row(s) selected.
+                        </div>
                       </div>
-                      <div className="space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => usersTable.previousPage()}
-                          disabled={!usersTable.getCanPreviousPage()}
-                        >
-                          Previous
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => usersTable.nextPage()}
-                          disabled={!usersTable.getCanNextPage()}
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1362,126 +2086,235 @@ function SchoolDetailDrawerContent({
               {/* Classes Section */}
               {activeSection === "classes" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <GraduationCap className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold">Classes</h3>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={() => {
-                        setAddClassDialogOpen(true);
-                        // Add dialog query parameter to URL
-                        if (school?.slug) {
-                          const params = new URLSearchParams(
-                            searchParams?.toString() || ""
-                          );
-                          params.set("school", school.slug);
-                          params.set("tab", "classes");
-                          params.set("dialog", "add-class");
-                          router.push(`/admin/schools?${params.toString()}`, {
-                            scroll: false,
-                          });
-                        }
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Class
-                    </Button>
-                  </div>
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="sr-only">Classes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {loadingClasses ? (
-                        <div className="flex items-center justify-center py-8">
-                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : classes.length === 0 ? (
-                        <div className="text-center py-8">
-                          <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                          <h3 className="text-lg font-medium mb-2">
-                            No Classes Found
-                          </h3>
-                          <p className="text-muted-foreground">
-                            No classes have been created for this school yet.
-                          </p>
+                  {/* Action Buttons and Search/Filters */}
+                  <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+                    {/* Add Class and Import Classes Buttons - Left */}
+                    <div className="flex items-center gap-2 h-8">
+                      {Object.keys(classesRowSelection).filter(
+                        (key) => classesRowSelection[key]
+                      ).length > 0 ? (
+                        <div
+                          className="flex items-center gap-2 opacity-0 animate-slide-up-fade-in"
+                          style={{ animationFillMode: "forwards" }}
+                        >
+                          <div className="flex items-center gap-0.5 text-sm text-muted-foreground">
+                            <span className="pl-4">
+                              {
+                                Object.keys(classesRowSelection).filter(
+                                  (key) => classesRowSelection[key]
+                                ).length
+                              }
+                            </span>
+                            <Check className="h-4 w-4" />
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setIsDeleteClassesDialogOpen(true);
+                                }}
+                                className="group h-8 w-8 bg-destructive/5 hover:bg-destructive/10 border border-transparent hover:border-destructive transition-all duration-200 ease-in-out"
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive opacity-100 group-hover:animate-shake-twice" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete</TooltipContent>
+                          </Tooltip>
                         </div>
                       ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Class Name</TableHead>
-                              <TableHead>Code</TableHead>
-                              <TableHead>Year Level Codes</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead>Created</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {classes.map((classItem) => (
-                              <TableRow key={classItem.id}>
-                                <TableCell>
-                                  <div className="font-medium">
-                                    {classItem.name}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-muted-foreground">
-                                    {classItem.code || "—"}
-                                  </span>
-                                </TableCell>
-                                <TableCell>
-                                  {classItem.yearCodes &&
-                                  classItem.yearCodes.length > 0 ? (
-                                    <div className="flex flex-wrap gap-1">
-                                      {classItem.yearCodes.map(
-                                        (yearCode, index) => (
-                                          <Badge
-                                            key={index}
-                                            variant="outline"
-                                            className="text-xs"
-                                          >
-                                            {yearCode}
-                                          </Badge>
-                                        )
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={
-                                      classItem.active ? "default" : "secondary"
-                                    }
-                                  >
-                                    {classItem.active ? "Active" : "Inactive"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  {classItem.createdAt ? (
-                                    <span className="text-sm text-muted-foreground">
-                                      {new Date(
-                                        classItem.createdAt
-                                      ).toLocaleDateString()}
-                                    </span>
-                                  ) : (
-                                    <span className="text-sm text-muted-foreground">
-                                      —
-                                    </span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                        <>
+                          <Button
+                            onClick={() => {
+                              setAddClassDialogOpen(true);
+                              if (school?.slug) {
+                                const params = new URLSearchParams(
+                                  searchParams?.toString() || ""
+                                );
+                                params.set("school", school.slug);
+                                params.set("tab", "classes");
+                                params.set("dialog", "add-class");
+                                router.push(`/admin/schools?${params.toString()}`, {
+                                  scroll: false,
+                                });
+                              }
+                            }}
+                            disabled={loadingClasses && classes.length === 0}
+                            className="bg-transparent hover:bg-[var(--brand-bullyproof-primary)] text-[var(--brand-bullyproof-primary)] hover:text-white h-10 opacity-0 animate-slide-left-fade-in transition-colors"
+                            style={{ animationFillMode: "forwards" }}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add Class
+                          </Button>
+                          <Button
+                            onClick={() => {
+                              setImportClassesDialogOpen(true);
+                              if (school?.slug) {
+                                const params = new URLSearchParams(
+                                  searchParams?.toString() || ""
+                                );
+                                params.set("school", school.slug);
+                                params.set("tab", "classes");
+                                params.set("dialog", "import-classes");
+                                router.push(`/admin/schools?${params.toString()}`, {
+                                  scroll: false,
+                                });
+                              }
+                            }}
+                            variant="outline"
+                            disabled={loadingClasses && classes.length === 0}
+                            className="h-10 opacity-0 animate-slide-left-fade-in transition-colors"
+                            style={{ animationFillMode: "forwards" }}
+                          >
+                            <FileSpreadsheet className="h-4 w-4" />
+                            Import Data
+                          </Button>
+                        </>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+
+                    {/* Vertical Separator */}
+                    <div className="h-6 w-px bg-border" />
+
+                    {/* Search and Filters - Right */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className="relative flex-1 min-w-0 transition-all duration-200 ease-in-out">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                        <Input
+                          placeholder="Search by class name or code..."
+                          value={classesSearchQuery}
+                          onChange={(e) => setClassesSearchQuery(e.target.value)}
+                          className={cn(
+                            "pl-10 pr-10 transition-all duration-200 ease-in-out",
+                            debouncedClassesSearchQuery.trim() &&
+                              "border-orange-500 bg-orange-500/10"
+                          )}
+                          disabled={loadingClasses && classes.length === 0}
+                        />
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          {classesSearchQuery !== debouncedClassesSearchQuery ||
+                          loadingClasses ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          ) : classesSearchQuery ? (
+                            <button
+                              type="button"
+                              onClick={() => setClassesSearchQuery("")}
+                              className="flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Clear search"
+                            >
+                              <CircleX className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Select
+                          value={yearLevelFilter || "all"}
+                          onValueChange={setYearLevelFilter}
+                          disabled={loadingClasses && classes.length === 0}
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              "w-[180px]",
+                              yearLevelFilter &&
+                                yearLevelFilter !== "all" &&
+                                "border-orange-500 bg-orange-500/10"
+                            )}
+                            disabled={loadingClasses && classes.length === 0}
+                          >
+                            <SelectValue placeholder="Year Level" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Year Levels</SelectItem>
+                            {yearLevelOptions.map(({ yearCode, count }) => (
+                              <SelectItem key={yearCode} value={yearCode}>
+                                <div className="flex items-center justify-between w-full">
+                                  <span>{yearCode}</span>
+                                  {count > 0 && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      {count}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Vertical Separator */}
+                    {(classesSearchQuery.trim() ||
+                      (yearLevelFilter && yearLevelFilter !== "all")) && (
+                      <>
+                        <div className="h-6 w-px bg-border" />
+                        {/* Clear Filters Button */}
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setClassesSearchQuery("");
+                            setYearLevelFilter("");
+                          }}
+                          className={cn(
+                            "flex items-center gap-1",
+                            "text-orange-500 border-orange-500/10 hover:text-orange-500 hover:bg-orange-500/10"
+                          )}
+                          disabled={loadingClasses && classes.length === 0}
+                        >
+                          <CircleX className="h-4 w-4" />
+                          Clear Filters
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="w-full space-y-4">
+                    {loadingClasses ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : classes.length === 0 ? (
+                      <div className="text-center py-8">
+                        <GraduationCap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-medium mb-2">
+                          No Classes Found
+                        </h3>
+                        <p className="text-muted-foreground">
+                          No classes have been created for this school yet.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <ClassesTable
+                          classes={filteredClasses}
+                          isLoading={false}
+                          error={null}
+                          showSelection={true}
+                          onRowSelectionChange={handleClassesRowSelectionChange}
+                          onClassClick={handleClassClick}
+                        />
+                        {Object.keys(classesRowSelection).length > 0 && (
+                          <div className="flex items-center justify-between space-x-2 py-4">
+                            <div className="text-muted-foreground flex-1 text-sm">
+                              {Object.keys(classesRowSelection).length} of{" "}
+                              {filteredClasses.length} row(s) selected.
+                            </div>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => {
+                                setIsDeleteClassesDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Selected
+                            </Button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -1520,10 +2353,6 @@ function SchoolDetailDrawerContent({
               {/* Culture Section */}
               {activeSection === "culture" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Star className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold">Culture</h3>
-                  </div>
                   <Card>
                     <CardHeader>
                       <CardTitle className="sr-only">
@@ -1549,14 +2378,9 @@ function SchoolDetailDrawerContent({
                 </div>
               )}
 
-              {/* Settings Section */}
+              {/* License Section */}
               {activeSection === "settings" && (
                 <div className="space-y-6">
-                  <div className="flex items-center gap-2 pb-2 border-b">
-                    <Settings className="h-5 w-5 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold">Settings</h3>
-                  </div>
-
                   {/* School Licence Card */}
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                     {loadingLicence ? (
@@ -1663,27 +2487,6 @@ function SchoolDetailDrawerContent({
                       </Card>
                     )}
                   </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="sr-only">School Settings</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8">
-                        <School className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          Settings & Management
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          School settings and management tools coming soon.
-                        </p>
-                        <div className="text-sm text-muted-foreground">
-                          This will include school details, license management,
-                          and user invitations.
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
                 </div>
               )}
             </div>
@@ -1979,8 +2782,8 @@ function SchoolDetailDrawerContent({
         </DialogContent>
       </Dialog>
 
-      {/* Add User Wizard Dialog */}
-      <AddUserDialog
+      {/* Add Manual User Dialog */}
+      <AddManualUserDialog
         open={addUserDialogOpen}
         onOpenChange={(open) => {
           if (!open) {
@@ -2008,18 +2811,107 @@ function SchoolDetailDrawerContent({
         }}
         school={school}
         onSuccess={async () => {
-          // Refresh users list
-          if (activeSection === "users") {
-            const usersResult = await meApi.get.listAllUsers();
-            if (!usersResult.error && usersResult.data) {
-              const schoolUsers = usersResult.data.filter((user) =>
-                user.schoolRoles.some((role) => role.schoolId === school.id)
-              );
-              setUsers(schoolUsers);
+          // Wait a bit to ensure database transactions are committed
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Invalidate React Query cache for users - React Query will automatically refetch
+          await queryClient.invalidateQueries({ queryKey: userKeys.all });
+          
+          // Refresh school data to update counts (including schoolAdminCount)
+          onSchoolUpdate?.();
+        }}
+      />
+
+      {/* Import Classes Dialog */}
+      <ImportClassesDialog
+        open={importClassesDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Set flag to prevent effect from interfering
+            isClosingDialogRef.current = true;
+
+            // Close dialog immediately
+            setImportClassesDialogOpen(false);
+
+            // Remove dialog query parameter from URL
+            const params = new URLSearchParams(searchParams?.toString() || "");
+            params.delete("dialog");
+            const newUrl = params.toString()
+              ? `/admin/schools?${params.toString()}`
+              : "/admin/schools";
+            router.replace(newUrl, { scroll: false });
+
+            // Reset flag after a brief delay to allow URL update to complete
+            setTimeout(() => {
+              isClosingDialogRef.current = false;
+            }, 100);
+          } else {
+            setImportClassesDialogOpen(open);
+          }
+        }}
+        school={school}
+        onSuccess={async () => {
+          // Wait a bit to ensure database transactions are committed
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Refresh classes list
+          if (school?.id) {
+            setLoadingClasses(true);
+            try {
+              const result = await classesApi.get.list({
+                schoolId: school.id,
+              });
+              if (result.data) {
+                setClasses(result.data);
+              }
+            } catch (error) {
+              console.error("Failed to refresh classes:", error);
+            } finally {
+              setLoadingClasses(false);
             }
           }
-
+          
           // Refresh school data to update counts
+          onSchoolUpdate?.();
+        }}
+      />
+
+      {/* Import Users Dialog */}
+      <ImportUsersDialog
+        open={importUsersDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            // Set flag to prevent effect from interfering
+            isClosingDialogRef.current = true;
+
+            // Close dialog immediately
+            setImportUsersDialogOpen(false);
+
+            // Remove dialog query parameter from URL
+            const params = new URLSearchParams(searchParams?.toString() || "");
+            params.delete("dialog");
+            const newUrl = params.toString()
+              ? `/admin/schools?${params.toString()}`
+              : "/admin/schools";
+            router.replace(newUrl, { scroll: false });
+
+            // Reset flag after a brief delay to allow URL update to complete
+            setTimeout(() => {
+              isClosingDialogRef.current = false;
+            }, 100);
+          } else {
+            setImportUsersDialogOpen(open);
+          }
+        }}
+        school={school}
+        onSuccess={async () => {
+          // Wait a bit to ensure database transactions are committed
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Invalidate React Query cache for users - React Query will automatically refetch
+          await queryClient.invalidateQueries({ queryKey: userKeys.all });
+          
+          // Refresh school data to update counts (including schoolAdminCount)
           onSchoolUpdate?.();
         }}
       />
@@ -2386,6 +3278,857 @@ function SchoolDetailDrawerContent({
               }
             >
               {submitting ? "Creating..." : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Class Dialog */}
+      {editingClass && (
+      <Dialog
+        open={editClassDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditClassDialogOpen(false);
+            setEditingClass(null);
+            setEditClassName("");
+            setEditClassCode("");
+            setEditClassStudentCap("");
+            setEditClassActive(true);
+            setEditClassRunningYear("");
+            setEditSelectedYearIds([]);
+            setEditSelectedTeacherIds([]);
+          } else {
+            setEditClassDialogOpen(open);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Class</DialogTitle>
+            <DialogDescription>
+              Update class information for {school?.name || "this school"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {editingClass && (
+              <>
+                {/* Class Name and Class Code in same row */}
+              <div className="grid grid-cols-5 gap-4">
+                {/* Class Name - 3/5 width */}
+                <div className="col-span-3 space-y-1.5">
+                  <Label
+                    htmlFor="edit-class-name"
+                    className="text-xs text-muted-foreground ml-2"
+                  >
+                    Class Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="edit-class-name"
+                    placeholder="Enter class name"
+                    value={editClassName}
+                    onChange={(e) => setEditClassName(e.target.value)}
+                  />
+                </div>
+                {/* Class Code - 2/5 width */}
+                <div className="col-span-2 space-y-1.5">
+                  <Label
+                    htmlFor="edit-class-code"
+                    className="text-xs text-muted-foreground ml-2"
+                  >
+                    Class Code
+                  </Label>
+                  <Input
+                    id="edit-class-code"
+                    placeholder="Code (optional)"
+                    value={editClassCode}
+                    onChange={(e) => setEditClassCode(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Student Cap and Active Status */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="edit-student-cap"
+                    className="text-xs text-muted-foreground ml-2"
+                  >
+                    Student Capacity
+                  </Label>
+                  <Input
+                    id="edit-student-cap"
+                    type="number"
+                    placeholder="Number of students"
+                    value={editClassStudentCap}
+                    onChange={(e) => setEditClassStudentCap(e.target.value)}
+                    min="1"
+                    max="1000"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground ml-2">
+                    Status
+                  </Label>
+                  <div className="flex items-center gap-2 pt-2">
+                    <Checkbox
+                      id="edit-class-active"
+                      checked={editClassActive}
+                      onCheckedChange={(checked) =>
+                        setEditClassActive(checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor="edit-class-active"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Active
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Running Year */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="edit-running-year"
+                  className="text-xs text-muted-foreground ml-2"
+                >
+                  Running Year
+                </Label>
+                <Select
+                  value={editClassRunningYear}
+                  onValueChange={setEditClassRunningYear}
+                >
+                  <SelectTrigger id="edit-running-year" className="w-full">
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                    {getClassRunningYearOptions().map((year) => (
+                      <SelectItem key={year.value} value={year.value}>
+                        {year.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* School Years Multi-Select */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground ml-2">
+                  School Years <span className="text-red-500">*</span>
+                </Label>
+                <Popover
+                  modal
+                  open={editYearComboboxOpen}
+                  onOpenChange={setEditYearComboboxOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={editYearComboboxOpen}
+                      className="w-full justify-between"
+                    >
+                      {editSelectedYearIds.length === 0
+                        ? "Select years..."
+                        : `${editSelectedYearIds.length} year${
+                            editSelectedYearIds.length > 1 ? "s" : ""
+                          } selected`}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Search years..." />
+                      <CommandList className="[&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80">
+                        <CommandEmpty>
+                          {editLoadingYears
+                            ? "Loading..."
+                            : "No years found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {editAvailableYears.map((year) => {
+                            const isSelected = editSelectedYearIds.includes(
+                              year.id
+                            );
+                            return (
+                              <CommandItem
+                                key={year.id}
+                                value={`${year.displayName} ${year.code || ""}`}
+                                onSelect={() => {
+                                  if (isSelected) {
+                                    setEditSelectedYearIds(
+                                      editSelectedYearIds.filter(
+                                        (id) => id !== year.id
+                                      )
+                                    );
+                                  } else {
+                                    setEditSelectedYearIds([
+                                      ...editSelectedYearIds,
+                                      year.id,
+                                    ]);
+                                  }
+                                }}
+                                className={
+                                  isSelected
+                                    ? "bg-[var(--brand-bullyproof-primary)]/10"
+                                    : ""
+                                }
+                              >
+                                <span className="flex-1">
+                                  {year.displayName}
+                                </span>
+                                <Check
+                                  className={`ml-2 h-4 w-4 ${
+                                    isSelected ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Teachers Multi-Select */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground ml-2">
+                  Teachers
+                </Label>
+                <Popover
+                  modal
+                  open={editTeacherComboboxOpen}
+                  onOpenChange={setEditTeacherComboboxOpen}
+                >
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={editTeacherComboboxOpen}
+                      className="w-full justify-between"
+                    >
+                      {editSelectedTeacherIds.length === 0
+                        ? "Select teachers..."
+                        : `${editSelectedTeacherIds.length} teacher${
+                            editSelectedTeacherIds.length > 1 ? "s" : ""
+                          } selected`}
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
+                    align="start"
+                  >
+                    <Command>
+                      <CommandInput placeholder="Search teachers..." />
+                      <CommandList className="[&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80">
+                        <CommandEmpty>
+                          {loadingUsers ? "Loading..." : "No teachers found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {editAvailableTeachers.map((teacher) => {
+                            const isSelected = editSelectedTeacherIds.includes(
+                              teacher.id
+                            );
+                            const fullName = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim() || teacher.email;
+                            return (
+                              <CommandItem
+                                key={teacher.id}
+                                value={`${fullName} ${teacher.email || ""}`}
+                                onSelect={() => {
+                                  if (isSelected) {
+                                    setEditSelectedTeacherIds(
+                                      editSelectedTeacherIds.filter(
+                                        (id) => id !== teacher.id
+                                      )
+                                    );
+                                  } else {
+                                    setEditSelectedTeacherIds([
+                                      ...editSelectedTeacherIds,
+                                      teacher.id,
+                                    ]);
+                                  }
+                                }}
+                                className={
+                                  isSelected
+                                    ? "bg-[var(--brand-bullyproof-primary)]/10"
+                                    : ""
+                                }
+                              >
+                                <span className="flex-1">
+                                  {fullName}
+                                </span>
+                                <Check
+                                  className={`ml-2 h-4 w-4 ${
+                                    isSelected ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <Separator className="mt-6 mb-6" />
+
+              {/* Class Preview Card */}
+              {(editClassName ||
+                editClassCode ||
+                editSelectedYearIds.length > 0) && (
+                <Card className="border-2 border-dashed bg-muted/30 py-4">
+                  <CardContent className="px-4">
+                    <div className="space-y-1.5">
+                      {/* Header: School name */}
+                      {school?.name && (
+                        <div className="text-sm text-muted-foreground">
+                          {school.name}
+                        </div>
+                      )}
+
+                      {/* Class name with icon */}
+                      <div className="flex items-center gap-2">
+                        <GraduationCap className="h-6 w-6 text-muted-foreground" />
+                        {editClassName ? (
+                          <span className="text-xl font-bold">
+                            {editClassName}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground/50 italic">
+                            N/A
+                          </span>
+                        )}
+                        {editClassCode && (
+                          <p className="text-xs text-muted-foreground">
+                            {editClassCode}
+                          </p>
+                        )}
+                      </div>
+                      {/* Year level badges */}
+                      {editSelectedYearIds.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {editSelectedYearIds.map((yearId) => {
+                            const year = editAvailableYears.find(
+                              (y) => y.id === yearId
+                            );
+                            if (!year) return null;
+                            return (
+                              <Badge
+                                key={yearId}
+                                variant="secondary"
+                                className="text-xs"
+                              >
+                                {year.displayName}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {/* Student cap */}
+                      {editClassStudentCap && (
+                        <div className="text-sm text-muted-foreground">
+                          Capacity: {editClassStudentCap} students
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditClassDialogOpen(false);
+                setEditingClass(null);
+                setEditClassName("");
+                setEditClassCode("");
+                setEditClassStudentCap("");
+                setEditClassActive(true);
+                setEditClassRunningYear("");
+                setEditSelectedYearIds([]);
+                setEditSelectedTeacherIds([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (
+                  !editingClass ||
+                  !school ||
+                  !editClassName ||
+                  editSelectedYearIds.length === 0
+                )
+                  return;
+                setSubmitting(true);
+                try {
+                  const studentCap = editClassStudentCap.trim()
+                    ? parseInt(editClassStudentCap.trim(), 10)
+                    : undefined;
+
+                  // Convert running year to datetime string (January 1st of that year)
+                  const startYearDate = editClassRunningYear
+                    ? new Date(
+                        `${editClassRunningYear}-01-01T00:00:00.000Z`
+                      ).toISOString()
+                    : undefined;
+
+                  const result = await classesApi.put.update(
+                    editingClass.id,
+                    {
+                      name: editClassName,
+                      code: editClassCode.trim() || undefined,
+                      studentCap,
+                      active: editClassActive,
+                      yearIds: editSelectedYearIds,
+                      teacherIds: editSelectedTeacherIds,
+                      startYear: startYearDate,
+                    }
+                  );
+                  if (result.error) {
+                    console.error("Failed to update class:", result.error);
+                  } else {
+                    // Close dialog
+                    setEditClassDialogOpen(false);
+                    setEditingClass(null);
+                    setEditClassName("");
+                    setEditClassCode("");
+                    setEditClassStudentCap("");
+                    setEditClassActive(true);
+                    setEditClassRunningYear("");
+                    setEditSelectedYearIds([]);
+                    setEditSelectedTeacherIds([]);
+
+                    // Refresh classes list
+                    if (activeSection === "classes") {
+                      setLoadingClasses(true);
+                      classesApi.get
+                        .list({ schoolId: school.id })
+                        .then((refreshResult) => {
+                          if (!refreshResult.error && refreshResult.data) {
+                            setClasses(refreshResult.data);
+                          }
+                        })
+                        .catch((error) => {
+                          console.error("Failed to refresh classes:", error);
+                        })
+                        .finally(() => {
+                          setLoadingClasses(false);
+                        });
+                    }
+                    onSchoolUpdate?.();
+                  }
+                } catch (error) {
+                  console.error("Failed to update class:", error);
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              disabled={
+                submitting ||
+                !editClassName ||
+                editSelectedYearIds.length === 0
+              }
+            >
+              {submitting ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      )}
+
+      {/* Delete Users Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Users</DialogTitle>
+            <DialogDescription>
+              You're about to delete these users:
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            <div className="space-y-2 py-4">
+              {Object.keys(rowSelection)
+                .filter((key) => rowSelection[key])
+                .map((rowIndex) => {
+                  const user = users[parseInt(rowIndex)];
+                  if (!user) return null;
+                  const fullName = [user.firstName, user.lastName]
+                    .filter(Boolean)
+                    .join(" ");
+                  return (
+                    <div
+                      key={user.id}
+                      className="flex items-center justify-between p-2 border rounded"
+                    >
+                      <div>
+                        <div className="font-medium">
+                          {fullName || user.email}
+                        </div>
+                        {fullName && (
+                          <div className="text-sm text-muted-foreground">
+                            {user.email}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+                .filter(Boolean)}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setIsConfirmDeleteDialogOpen(true);
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Dialog */}
+      <Dialog
+        open={isConfirmDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setIsConfirmDeleteDialogOpen(open);
+          if (!open) {
+            setDeleteError(null);
+            setIsDeleting(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Are you absolutely sure?</DialogTitle>
+            <DialogDescription>
+              This action is irreversible. Are you absolutely sure you want to
+              delete these users?
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{deleteError}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsConfirmDeleteDialogOpen(false);
+                setRowSelection({});
+                setDeleteError(null);
+                setIsDeleting(false);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const selectedUserIds = Object.keys(rowSelection)
+                  .filter((key) => rowSelection[key])
+                  .map((rowIndex) => {
+                    const user = users[parseInt(rowIndex)];
+                    return user?.id;
+                  })
+                  .filter(Boolean) as string[];
+
+                if (selectedUserIds.length === 0) {
+                  setIsConfirmDeleteDialogOpen(false);
+                  setRowSelection({});
+                  return;
+                }
+
+                setIsDeleting(true);
+                setDeleteError(null);
+
+                try {
+                  const result = await apiFetch<{
+                    success: boolean;
+                    deleted: number;
+                    failed: number;
+                    results: {
+                      successful: string[];
+                      failed: Array<{ userId: string; error: string }>;
+                    };
+                  }>("/users/delete", {
+                    method: "DELETE",
+                    body: JSON.stringify({ userIds: selectedUserIds }),
+                  });
+
+                  if (result.error) {
+                    setDeleteError(
+                      result.error.message || "Failed to delete users"
+                    );
+                    setIsDeleting(false);
+                    return;
+                  }
+
+                  if (result.data) {
+                    const { deleted, failed, results } = result.data;
+
+                    // Invalidate React Query cache for users - React Query will automatically refetch
+                    await queryClient.invalidateQueries({ queryKey: userKeys.all });
+
+                    if (failed > 0) {
+                      // Partial success - show error but keep dialog open
+                      const failedMessages = results.failed
+                        .map((f) => {
+                          const failedUser = users.find(
+                            (u) => u.id === f.userId
+                          );
+                          const userName = failedUser
+                            ? [failedUser.firstName, failedUser.lastName]
+                                .filter(Boolean)
+                                .join(" ") || failedUser.email
+                            : f.userId;
+                          return `${userName}: ${f.error}`;
+                        })
+                        .join(", ");
+                      setDeleteError(
+                        `Successfully deleted ${deleted} user(s), but failed to delete ${failed} user(s): ${failedMessages}`
+                      );
+                      // Clear selection for successfully deleted users
+                      const newSelection: Record<string, boolean> = {};
+                      Object.keys(rowSelection).forEach((key) => {
+                        const user = users[parseInt(key)];
+                        if (user && !results.successful.includes(user.id)) {
+                          newSelection[key] = true;
+                        }
+                      });
+                      setRowSelection(newSelection);
+                    } else {
+                      // Complete success - close dialogs and clear selection
+                      setIsConfirmDeleteDialogOpen(false);
+                      setRowSelection({});
+                    }
+                  }
+                } catch (error: any) {
+                  console.error("[USER DELETE] Error:", error);
+                  setDeleteError(
+                    error.message || "An unexpected error occurred"
+                  );
+                } finally {
+                  setIsDeleting(false);
+                }
+              }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Classes Dialog */}
+      <Dialog
+        open={isDeleteClassesDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteClassesDialogOpen(open);
+          if (!open) {
+            setDeleteClassesError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Classes</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the selected classes? This action
+              cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[400px]">
+            <div className="space-y-2 py-2">
+              {Object.keys(classesRowSelection)
+                .filter((key) => classesRowSelection[key])
+                .map((rowIndex) => {
+                  const classItem = filteredClasses[parseInt(rowIndex)];
+                  if (!classItem) return null;
+                  return (
+                    <div
+                      key={classItem.id}
+                      className="flex items-center justify-between p-2 border rounded"
+                    >
+                      <div>
+                        <div className="font-medium">{classItem.name}</div>
+                        {classItem.code && (
+                          <div className="text-sm text-muted-foreground">
+                            {classItem.code}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+                .filter(Boolean)}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteClassesDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setIsDeleteClassesDialogOpen(false);
+                setIsConfirmDeleteClassesDialogOpen(true);
+              }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Classes Dialog */}
+      <Dialog
+        open={isConfirmDeleteClassesDialogOpen}
+        onOpenChange={(open) => {
+          setIsConfirmDeleteClassesDialogOpen(open);
+          if (!open) {
+            setDeleteClassesError(null);
+            setIsDeletingClasses(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Are you absolutely sure?</DialogTitle>
+            <DialogDescription>
+              This action is irreversible. Are you absolutely sure you want to
+              delete these classes?
+            </DialogDescription>
+          </DialogHeader>
+          {deleteClassesError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{deleteClassesError}</AlertDescription>
+            </Alert>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsConfirmDeleteClassesDialogOpen(false);
+                setClassesRowSelection({});
+                setDeleteClassesError(null);
+                setIsDeletingClasses(false);
+              }}
+              disabled={isDeletingClasses}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                const selectedClassIds = Object.keys(classesRowSelection)
+                  .filter((key) => classesRowSelection[key])
+                  .map((rowIndex) => {
+                    const classItem = filteredClasses[parseInt(rowIndex)];
+                    return classItem?.id;
+                  })
+                  .filter(Boolean) as string[];
+
+                if (selectedClassIds.length === 0) {
+                  setIsConfirmDeleteClassesDialogOpen(false);
+                  setClassesRowSelection({});
+                  return;
+                }
+
+                setIsDeletingClasses(true);
+                setDeleteClassesError(null);
+
+                try {
+                  // Delete classes in batch using Drizzle batch operations
+                  const result = await classesApi.delete.deleteBatch({
+                    classIds: selectedClassIds,
+                  });
+
+                  if (result.error) {
+                    setDeleteClassesError(
+                      result.error.message || "Failed to delete classes"
+                    );
+                  } else {
+                    // Complete success - close dialogs and refresh
+                    setIsConfirmDeleteClassesDialogOpen(false);
+                    setClassesRowSelection({});
+                    // Refresh classes list
+                    if (activeSection === "classes") {
+                      setLoadingClasses(true);
+                      classesApi.get
+                        .list({ schoolId: school?.id })
+                        .then((refreshResult) => {
+                          if (!refreshResult.error && refreshResult.data) {
+                            setClasses(refreshResult.data);
+                          }
+                        })
+                        .catch((error) => {
+                          console.error("Failed to refresh classes:", error);
+                        })
+                        .finally(() => {
+                          setLoadingClasses(false);
+                        });
+                    }
+                    onSchoolUpdate?.();
+                  }
+                } catch (error: any) {
+                  console.error("[CLASS DELETE] Error:", error);
+                  setDeleteClassesError(
+                    error.message || "An unexpected error occurred"
+                  );
+                } finally {
+                  setIsDeletingClasses(false);
+                }
+              }}
+              disabled={isDeletingClasses}
+            >
+              {isDeletingClasses ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

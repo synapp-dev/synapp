@@ -1,15 +1,7 @@
 import { ColumnDef } from "@tanstack/react-table";
-import { ArrowUpDown, MoreHorizontal } from "lucide-react";
+import { ArrowUpDown } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu";
 export type School = {
   id: string;
   name: string;
@@ -19,6 +11,7 @@ export type School = {
   classCount: number;
   schoolAdminCount: number;
   schoolLicenceCount: number;
+  staffCount?: number; // Number of users with SCHOOL_STAFF role
   activeLicence: boolean;
   status: "onboarding" | "active";
   slug: string | null;
@@ -66,9 +59,12 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
 export const columns: ColumnDef<School>[] = [
   {
     accessorKey: "status",
+    meta: {
+      align: "right",
+    },
     header: ({ column }) => {
       return (
-        <div className="text-left">
+        <div className="text-right pl-1">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -83,7 +79,7 @@ export const columns: ColumnDef<School>[] = [
     cell: ({ row }) => {
       const status = row.getValue("status") as "onboarding" | "active";
       return (
-        <div className="text-left">
+        <div className="text-right flex items-center justify-end pl-1">
           <Badge
             variant="default"
             className={
@@ -102,7 +98,7 @@ export const columns: ColumnDef<School>[] = [
     accessorKey: "name",
     header: ({ column }) => {
       return (
-        <div className="text-left">
+        <div className="text-left pl-2">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -117,7 +113,7 @@ export const columns: ColumnDef<School>[] = [
     cell: ({ row }) => {
       const school = row.original;
       return (
-        <div className="text-left font-medium text-blue-600 hover:text-blue-800 cursor-pointer pl-4">
+        <div className="text-left font-medium text-blue-600 hover:text-blue-800 cursor-pointer">
           {school.name}
         </div>
       );
@@ -127,7 +123,7 @@ export const columns: ColumnDef<School>[] = [
     accessorKey: "levels",
     header: ({ column }) => {
       return (
-        <div className="text-left">
+        <div className="text-left pl-2">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -151,7 +147,7 @@ export const columns: ColumnDef<School>[] = [
     accessorKey: "state",
     header: ({ column }) => {
       return (
-        <div className="text-left">
+        <div className="text-left pl-2">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -176,7 +172,7 @@ export const columns: ColumnDef<School>[] = [
     accessorKey: "sector",
     header: ({ column }) => {
       return (
-        <div className="text-left">
+        <div className="text-left pl-2">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -196,13 +192,7 @@ export const columns: ColumnDef<School>[] = [
       return (
         <div className="text-left">
           <Badge
-            variant={
-              school.sector === "government"
-                ? "default"
-                : school.sector === "catholic"
-                  ? "secondary"
-                  : "outline"
-            }
+            variant="outline"
             className="text-xs"
           >
             {school.sector === "government"
@@ -216,13 +206,41 @@ export const columns: ColumnDef<School>[] = [
     },
   },
   {
+    accessorKey: "staffCount",
+    meta: {
+      align: "right",
+    },
+    header: ({ column }) => {
+      return (
+        <div className="w-full flex justify-end pr-2">
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 px-2 lg:px-3"
+          >
+            Staff
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      );
+    },
+    cell: ({ row }) => {
+      const staffCount = (row.getValue("staffCount") as number) ?? 0;
+      return (
+        <div className="w-full text-right text-sm font-medium text-purple-600">
+          {staffCount}
+        </div>
+      );
+    },
+  },
+  {
     accessorKey: "teacherCount",
     meta: {
       align: "right",
     },
     header: ({ column }) => {
       return (
-        <div className="w-full flex justify-end">
+        <div className="w-full flex justify-end pr-2">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -250,7 +268,7 @@ export const columns: ColumnDef<School>[] = [
     },
     header: ({ column }) => {
       return (
-        <div className="w-full flex justify-end">
+        <div className="w-full flex justify-end pr-2">
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
@@ -267,41 +285,6 @@ export const columns: ColumnDef<School>[] = [
       return (
         <div className="w-full text-right text-sm font-medium text-blue-600">
           {classCount}
-        </div>
-      );
-    },
-  },
-  {
-    id: "actions",
-    enableHiding: false,
-    header: () => {
-      return <div className="text-center">Actions</div>;
-    },
-    cell: ({ row }) => {
-      const school = row.original;
-
-      return (
-        <div className="text-center">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(school.id)}
-              >
-                Copy school ID
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem>View details</DropdownMenuItem>
-              <DropdownMenuItem>Edit school</DropdownMenuItem>
-              <DropdownMenuItem>Deactivate</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       );
     },
