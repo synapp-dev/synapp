@@ -1,8 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useSchoolStore } from "@/stores/school-store";
-import { LibraryBig } from "lucide-react";
+import { LibraryBig, BookOpen, FileText, Video, Lock } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import { Badge } from "@workspace/ui/components/badge";
 
 export default function ResourcesPage({
   params,
@@ -10,11 +19,16 @@ export default function ResourcesPage({
   params: Promise<{ school_id: string }>;
 }) {
   const [schoolSlug, setSchoolSlug] = React.useState<string>("");
+  const router = useRouter();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
 
   React.useEffect(() => {
     params.then(({ school_id }) => setSchoolSlug(school_id));
   }, [params]);
+
+  const handleContentClick = () => {
+    router.push(`/schools/${schoolSlug}/resources/content`);
+  };
 
   return (
     <div className="space-y-6">
@@ -28,15 +42,87 @@ export default function ResourcesPage({
         </p>
       </div>
 
-      <div className="bg-card rounded-lg p-8 border border-border">
-        <div className="text-center py-12">
-          <LibraryBig className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-xl font-semibold mb-2">Resources Coming Soon</h2>
-          <p className="text-muted-foreground">
-            This section will contain educational resources, materials, and
-            tools for your school.
-          </p>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Content Folder */}
+        <Card
+          className="hover:shadow-md transition-shadow cursor-pointer h-full"
+          onClick={handleContentClick}
+        >
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                <BookOpen className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <CardTitle>Content</CardTitle>
+                <CardDescription>
+                  View curriculum stages, topics, and lessons
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Browse through curriculum content organized by stages and topics.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Info Packs Folder - Disabled */}
+        <Card className="opacity-50 cursor-not-allowed h-full">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <CardTitle>Info Packs</CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Coming Soon
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Educational information packs and resources
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              This section will be available soon.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Videos Folder - Disabled */}
+        <Card className="opacity-50 cursor-not-allowed h-full">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-red-100 text-red-600 rounded-lg">
+                <Video className="h-6 w-6" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <CardTitle>Videos</CardTitle>
+                  <Badge variant="secondary" className="text-xs">
+                    <Lock className="h-3 w-3 mr-1" />
+                    Coming Soon
+                  </Badge>
+                </div>
+                <CardDescription>
+                  Video resources and educational content
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              This section will be available soon.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
