@@ -12,11 +12,12 @@ import {
   DrawerClose,
 } from "@workspace/ui/components/drawer";
 import { Button } from "@workspace/ui/components/button";
+import { Card, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { LessonWizardClasses } from "./lesson-wizard-classes";
 import { LessonWizardTopic } from "./lesson-wizard-topic";
 import { LessonWizardConfirm } from "./lesson-wizard-confirm";
 import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
-import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, BookOpen, Play } from "lucide-react";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
@@ -53,7 +54,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
   }, [schoolId]);
 
   const [state, setState] = useState({
-    step: 1,
+    step: 0,
     selectedClasses: [] as ClassOption[],
     selectedTopic: null as TopicOption | null,
   });
@@ -62,7 +63,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
   useEffect(() => {
     if (!open) {
       setState({
-        step: 1,
+        step: 0,
         selectedClasses: [],
         selectedTopic: null,
       });
@@ -71,10 +72,10 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
     }
   }, [open]);
 
-  const totalSteps = 3;
+  const totalSteps = 4;
 
   const goToStep = (step: number) => {
-    setState((prev) => ({ ...prev, step: Math.max(1, Math.min(totalSteps, step)) }));
+    setState((prev) => ({ ...prev, step: Math.max(0, Math.min(totalSteps - 1, step)) }));
     setError(null);
   };
 
@@ -90,6 +91,8 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
 
   const canProceed = () => {
     switch (state.step) {
+      case 0:
+        return true; // Initial step - user selects an option
       case 1:
         return state.selectedClasses.length > 0;
       case 2:
@@ -98,6 +101,17 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
         return true;
       default:
         return false;
+    }
+  };
+
+  const handleOptionSelect = (option: 'teach' | 'view') => {
+    if (option === 'view') {
+      // Redirect to content page
+      router.push(`/schools/${schoolId}/resources/content`);
+      onOpenChange(false);
+    } else {
+      // Continue to next step (select classes)
+      goToStep(1);
     }
   };
 
@@ -159,6 +173,8 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
 
   const getStepTitle = () => {
     switch (state.step) {
+      case 0:
+        return 'What would you like to do?';
       case 1:
         return 'Select Classes';
       case 2:
@@ -172,6 +188,8 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
 
   const getStepDescription = () => {
     switch (state.step) {
+      case 0:
+        return 'Choose how you want to proceed';
       case 1:
         return 'Choose which classes will participate in this lesson';
       case 2:
@@ -185,39 +203,77 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction="top">
-      <DrawerContent className="h-[90vh] max-w-4xl mx-auto">
+      <DrawerContent className="h-[90vh] max-w-3xl mx-auto">
         <DrawerHeader>
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="flex-1">
               <DrawerTitle>{getStepTitle()}</DrawerTitle>
               <DrawerDescription>{getStepDescription()}</DrawerDescription>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <span className="text-xs text-muted-foreground">Step {state.step} of {totalSteps}</span>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: totalSteps }, (_, i) => i + 1).map((step) => (
-                  <span
-                    key={step}
-                    className={`
-                      inline-block h-1.5 w-4 rounded-full transition-colors
-                      ${step === state.step
-                        ? 'bg-primary'
-                        : step < state.step
-                        ? 'bg-primary/40'
-                        : 'bg-border'
-                      }
-                    `}
-                  />
-                ))}
+              <div className="flex items-center gap-2 mt-3">
+                <span className="text-xs text-muted-foreground">Step {state.step + 1} of {totalSteps}</span>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalSteps }, (_, i) => i).map((step) => (
+                    <span
+                      key={step}
+                      className={`
+                        inline-block h-1.5 w-4 rounded-full transition-colors
+                        ${step === state.step
+                          ? 'bg-primary'
+                          : step < state.step
+                          ? 'bg-primary/40'
+                          : 'bg-border'
+                        }
+                      `}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
         </DrawerHeader>
 
         <div className="flex-1 overflow-auto p-6">
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             {/* Always render all step components to maintain consistent hook order */}
             {/* Hide inactive steps using CSS to prevent hook order issues */}
+            
+            {/* Step 0: Initial option selection */}
+            <div className={state.step === 0 ? 'block' : 'hidden'}>
+              <div className="grid gap-4 md:grid-cols-2 max-w-2xl mx-auto">
+                <Card
+                  className="hover:shadow-md transition-shadow cursor-pointer h-full"
+                  onClick={() => handleOptionSelect('teach')}
+                >
+                  <CardHeader className="flex-1 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <div className="rounded-full bg-primary/10 p-4">
+                        <Play className="h-8 w-8 text-primary" />
+                      </div>
+                      <CardTitle className="text-xl text-center">
+                        I'm going to teach a class right now
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                </Card>
+
+                <Card
+                  className="hover:shadow-md transition-shadow cursor-pointer h-full"
+                  onClick={() => handleOptionSelect('view')}
+                >
+                  <CardHeader className="flex-1 flex items-center justify-center">
+                    <div className="flex flex-col items-center gap-3 py-4">
+                      <div className="rounded-full bg-secondary/10 p-4">
+                        <BookOpen className="h-8 w-8 text-secondary-foreground" />
+                      </div>
+                      <CardTitle className="text-xl text-center">
+                        I just want to look at the content
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                </Card>
+              </div>
+            </div>
+
             <div className={state.step === 1 ? 'block' : 'hidden'}>
               <LessonWizardClasses
                 schoolId={schoolUuid}
@@ -253,23 +309,27 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
           </div>
         </div>
 
-        <DrawerFooter className="border-t">
-          <div className="flex items-center justify-between max-w-4xl mx-auto w-full">
+        <DrawerFooter className="border-t bg-[var(--brand-bullyproof-primary)]">
+          <div className="flex items-center justify-between max-w-3xl mx-auto w-full">
             <Button
               variant="outline"
-              onClick={state.step === 1 ? () => onOpenChange(false) : goBack}
+              onClick={state.step === 0 ? () => onOpenChange(false) : goBack}
               disabled={loading}
+              className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white"
             >
               <ChevronLeft className="h-4 w-4 mr-2" />
-              {state.step === 1 ? 'Cancel' : 'Back'}
+              {state.step === 0 ? 'Cancel' : 'Back'}
             </Button>
 
-            <div className="text-sm text-muted-foreground">
-              Step {state.step} of {totalSteps}
-            </div>
-
-            {state.step < totalSteps ? (
-              <Button onClick={goNext} disabled={!canProceed() || loading}>
+            {state.step === 0 ? (
+              // Step 0 doesn't show continue button - user clicks cards instead
+              <div className="w-[100px]" />
+            ) : state.step < totalSteps - 1 ? (
+              <Button 
+                onClick={goNext} 
+                disabled={!canProceed() || loading}
+                className="bg-white text-[var(--brand-bullyproof-primary)] hover:bg-white/90"
+              >
                 Continue
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
@@ -277,6 +337,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
               <Button
                 onClick={handleCreateLesson}
                 disabled={loading || !canProceed()}
+                className="bg-white text-[var(--brand-bullyproof-primary)] hover:bg-white/90"
               >
                 {loading ? (
                   <>

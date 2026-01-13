@@ -44,7 +44,13 @@ type ChangeItem =
       slide: SlideData;
       oldSlide: SlideData;
     }
-  | { type: "reorder"; message: string };
+  | {
+      type: "reorder";
+      message: string;
+      slide: SlideData;
+      oldPosition: number;
+      newPosition: number;
+    };
 
 interface CategoryTitleProps {
   symbol: string;
@@ -210,6 +216,57 @@ function ChangeCard({
   );
 }
 
+function ReorderCard({
+  slide,
+  oldPosition,
+  newPosition,
+  borderColor,
+  bgColor,
+  textColor,
+  isCertification = false,
+}: {
+  slide: SlideData;
+  oldPosition: number;
+  newPosition: number;
+  borderColor: string;
+  bgColor: string;
+  textColor: string;
+  isCertification?: boolean;
+}) {
+  return (
+    <HoverCard>
+      <HoverCardTrigger asChild>
+        <Card
+          className={`group relative cursor-pointer transition-all hover:shadow-md p-0 overflow-hidden gap-0 flex flex-col ${borderColor}`}
+        >
+          <div className="relative w-full aspect-video overflow-hidden bg-muted">
+            <SlideRenderer
+              slide={slide}
+              thumbnailOnly={true}
+              isCertification={isCertification}
+            />
+          </div>
+          <div
+            className={`w-full text-xs font-medium px-4 py-2 flex items-center justify-between flex-shrink-0 ${bgColor} text-secondary`}
+          >
+            <div className="flex items-center gap-1">
+              <span className={`text-sm font-medium ${textColor}`}>↔</span>
+            </div>
+            <span className={`text-xs font-medium ${textColor}`}>
+              Slide {oldPosition} → {newPosition}
+            </span>
+          </div>
+        </Card>
+      </HoverCardTrigger>
+      <HoverCardContent className="w-[640px] p-0" side="right">
+        <div className="relative w-full aspect-video rounded overflow-hidden bg-muted">
+          <SlideRenderer slide={slide} isCertification={isCertification} />
+        </div>
+      </HoverCardContent>
+    </HoverCard>
+  );
+}
+
 interface ConfirmChangesDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -232,8 +289,13 @@ export function ConfirmChangesDialog({
   const replacements = changes.filter((c) => c.type === "replace");
   const additions = changes.filter((c) => c.type === "new");
   const removals = changes.filter((c) => c.type === "delete");
+  const reorders = changes.filter((c) => c.type === "reorder");
   const otherChanges = changes.filter(
-    (c) => c.type !== "new" && c.type !== "delete" && c.type !== "replace"
+    (c) =>
+      c.type !== "new" &&
+      c.type !== "delete" &&
+      c.type !== "replace" &&
+      c.type !== "reorder"
   );
 
   const handleDialogOpenChange = (open: boolean) => {
@@ -360,7 +422,44 @@ export function ConfirmChangesDialog({
                     </div>
                   )}
 
-                  {/* Other changes (reorder, etc.) */}
+                  {/* Separator */}
+                  {removals.length > 0 && reorders.length > 0 && <Separator />}
+
+                  {/* Reorders */}
+                  {reorders.length > 0 && (
+                    <div className="space-y-4">
+                      <CategoryTitle
+                        symbol="↔"
+                        count={reorders.length}
+                        singularLabel="Reordered Slide"
+                        pluralLabel="Reordered Slides"
+                        textColor="text-blue-700 dark:text-blue-400"
+                        bgColor="bg-blue-50 dark:bg-blue-950/20"
+                        borderColor="border-blue-500 dark:border-blue-600"
+                      />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                        {reorders.map((change, index) => (
+                          <ReorderCard
+                            key={index}
+                            slide={change.slide}
+                            oldPosition={change.oldPosition}
+                            newPosition={change.newPosition}
+                            borderColor="border-blue-500 dark:border-blue-600"
+                            bgColor="bg-blue-50/50 dark:bg-blue-950/20"
+                            textColor="text-blue-700 dark:text-blue-400"
+                            isCertification={isCertification}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Separator */}
+                  {reorders.length > 0 && otherChanges.length > 0 && (
+                    <Separator />
+                  )}
+
+                  {/* Other changes */}
                   {otherChanges.length > 0 && (
                     <div className="space-y-4">
                       <h4 className="text-sm font-medium">Other Changes</h4>

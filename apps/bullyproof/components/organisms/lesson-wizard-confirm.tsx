@@ -17,13 +17,6 @@ export function LessonWizardConfirm({
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Confirm Your Selections</h3>
-        <p className="text-sm text-muted-foreground">
-          Review your lesson details before creating
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Lesson Summary</CardTitle>
