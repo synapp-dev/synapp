@@ -23,6 +23,9 @@ interface LessonWizardTopicProps {
 }
 
 type TopicWithSlides = TopicOption & {
+  stageId?: string;
+  stageOrder?: number | null;
+  stageSortIndex?: number;
   slides?: Array<{
     id: string;
     kind: string;

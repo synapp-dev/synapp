@@ -296,7 +296,7 @@ export function ConfirmChangesDialog({
       c.type !== "delete" &&
       c.type !== "replace" &&
       c.type !== "reorder"
-  );
+  ) as ChangeItem[];
 
   const handleDialogOpenChange = (open: boolean) => {
     // Prevent closing dialog while saving
