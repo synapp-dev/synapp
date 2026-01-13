@@ -87,15 +87,11 @@ export function StageView({
         </CardHeader>
         <CardContent className="space-y-4">
           {stage.years && stage.years.length > 0 && (
-            <div>
-              <h3 className="text-sm font-medium mb-2">Year Levels</h3>
-              <div className="flex flex-wrap gap-2">
-                {stage.years.map((year) => (
-                  <Badge key={year.id} variant="outline" className="text-xs">
-                    {year.displayName}
-                  </Badge>
-                ))}
-              </div>
+            <div className="flex items-center gap-x-2 text-xs text-muted-foreground">
+              {stage.years.flatMap((year, index) => [
+                index > 0 && <span key={`dot-${year.id}`} className="opacity-50">•</span>,
+                <span key={year.id}>{year.displayName}</span>,
+              ]).filter(Boolean)}
             </div>
           )}
 

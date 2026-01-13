@@ -9,8 +9,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
-import { Button } from "@workspace/ui/components/button";
 import {
   Tooltip,
   TooltipContent,
@@ -19,9 +17,12 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { BookOpen, Plus, Loader2 } from "lucide-react";
+import { BookOpen } from "lucide-react";
 import type { curriculumStages, topics } from "@/server/db/schema";
-import { useTopicsByStage, useTopicsStore } from "@/entities/topics/model/store-enhanced";
+import {
+  useTopicsByStage,
+  useTopicsStore,
+} from "@/entities/topics/model/store-enhanced";
 
 type Stage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
@@ -118,7 +119,7 @@ function TopicImageThumbnail({
     const initialTimeout = setTimeout(() => {
       startAnimation();
       // Then continue with regular interval
-      interval = setInterval(startAnimation, 1500); // Change every 1.5 seconds
+      interval = setInterval(startAnimation, 5000); // Change every 5 seconds
     }, initialDelay);
 
     return () => {
@@ -137,7 +138,7 @@ function TopicImageThumbnail({
     <Tooltip>
       <TooltipTrigger asChild>
         <div
-          className="relative aspect-video rounded-md overflow-hidden border border-border cursor-pointer hover:opacity-80 transition-opacity bg-muted"
+          className="relative aspect-video overflow-hidden cursor-pointer hover:opacity-80 transition-opacity bg-muted"
           onClick={(e) => onTopicClick(topic, e)}
         >
           {slideUrls.length > 0 ? (
@@ -209,7 +210,7 @@ interface StageCardProps {
 
 function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
   const router = useRouter();
-  
+
   // Use new store hook to fetch topics with slides and URLs
   const { topics, isLoading: isLoadingTopics } = useTopicsByStage(stage.id, {
     includeSlides: true,
@@ -234,88 +235,64 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
   return (
     <StaggeredAnimation key={stage.id} index={index}>
       <Card
-        className={`relative transition-shadow ${
+        className={`relative transition-shadow pb-0 overflow-hidden ${
           onStageClick ? "cursor-pointer hover:shadow-md" : ""
         }`}
         onClick={() => onStageClick?.(stage)}
       >
-        <CardHeader>
-          <div className="space-y-2">
-            <CardTitle className="flex items-center gap-2 text-xl">
-              <BookOpen className="h-5 w-5 text-primary flex-shrink-0" />
-              <span>{stage.name}</span>
-            </CardTitle>
+        <CardHeader className="py-0">
+          <div className="space-y-0">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-xl">
+                <BookOpen className="h-5 w-5 text-primary flex-shrink-0" />
+                <span>{stage.name}</span>
+              </CardTitle>
+              {!isLoadingTopics && (
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {topics.length} {topics.length === 1 ? "topic" : "topics"}
+                </span>
+              )}
+            </div>
             {stage.years && stage.years.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {stage.years.map((year) => (
-                  <Badge key={year.id} variant="outline" className="text-xs text-muted-foreground bg-muted/50">
-                    {year.displayName}
-                  </Badge>
-                ))}
+              <div className="flex items-center gap-x-2 text-xs text-muted-foreground">
+                {stage.years
+                  .flatMap((year, index) => [
+                    index > 0 && (
+                      <span key={`dot-${year.id}`} className="opacity-50">
+                        •
+                      </span>
+                    ),
+                    <span key={year.id}>{year.displayName}</span>,
+                  ])
+                  .filter(Boolean)}
               </div>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="p-0">
           {isLoadingTopics ? (
-            <>
-              <div className="grid grid-cols-2 gap-2">
-                {[...Array(4)].map((_, i) => (
-                  <Skeleton key={i} className="aspect-video rounded-md" />
+            <div className="grid grid-cols-2">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="aspect-video" />
+              ))}
+            </div>
+          ) : displayedTopics.length > 0 ? (
+            <TooltipProvider>
+              <div className="grid grid-cols-2">
+                {displayedTopics.map((topic, topicIndex) => (
+                  <TopicImageThumbnail
+                    key={topic.id}
+                    topic={topic}
+                    onTopicClick={handleTopicClick}
+                    index={topicIndex}
+                  />
                 ))}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                disabled
-              >
-                Show all topics
-              </Button>
-            </>
-          ) : displayedTopics.length > 0 ? (
-            <>
-              <TooltipProvider>
-                <div className="grid grid-cols-2 gap-2">
-                  {displayedTopics.map((topic, topicIndex) => (
-                    <TopicImageThumbnail
-                      key={topic.id}
-                      topic={topic}
-                      onTopicClick={handleTopicClick}
-                      index={topicIndex}
-                    />
-                  ))}
-                </div>
-              </TooltipProvider>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // Navigate to stage detail page (same as clicking the card)
-                  if (onStageClick) {
-                    onStageClick(stage);
-                  }
-                }}
-              >
-                Show all {topics.length} topics
-              </Button>
-            </>
+            </TooltipProvider>
           ) : (
-            <>
-              <div className="text-sm text-muted-foreground">
-                No topics available
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="w-full"
-                disabled
-              >
-                Show all topics
-              </Button>
-            </>
+            <div className="p-6 text-sm text-muted-foreground">
+              No topics available
+            </div>
           )}
         </CardContent>
       </Card>
