@@ -54,7 +54,7 @@ const deletePositionSchema = z.object({
  */
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserIdFromRequest(request);
@@ -74,7 +74,8 @@ export async function GET(
       );
     }
 
-    const targetUserId = params.id;
+    const { id } = await params;
+    const targetUserId = id;
 
     // Get all positions for this user with school information
     const positions = await db
@@ -116,7 +117,7 @@ export async function GET(
  */
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserIdFromRequest(request);
@@ -136,7 +137,8 @@ export async function POST(
       );
     }
 
-    const targetUserId = params.id;
+    const { id } = await params;
+    const targetUserId = id;
     const body = await request.json();
     const data = createPositionSchema.parse(body);
 
@@ -195,7 +197,7 @@ export async function POST(
 
     if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: e.errors },
+        { error: "Validation error", details: e.issues },
         { status: 400 }
       );
     }
@@ -230,7 +232,7 @@ export async function POST(
  */
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserIdFromRequest(request);
@@ -250,7 +252,8 @@ export async function PUT(
       );
     }
 
-    const targetUserId = params.id;
+    const { id } = await params;
+    const targetUserId = id;
     const body = await request.json();
     const data = updatePositionSchema.parse(body);
 
@@ -329,7 +332,7 @@ export async function PUT(
 
     if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: e.errors },
+        { error: "Validation error", details: e.issues },
         { status: 400 }
       );
     }
@@ -353,7 +356,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const userId = await getUserIdFromRequest(request);
@@ -373,7 +376,8 @@ export async function DELETE(
       );
     }
 
-    const targetUserId = params.id;
+    const { id } = await params;
+    const targetUserId = id;
     const body = await request.json();
     const data = deletePositionSchema.parse(body);
 
@@ -407,7 +411,7 @@ export async function DELETE(
 
     if (e instanceof z.ZodError) {
       return NextResponse.json(
-        { error: "Validation error", details: e.errors },
+        { error: "Validation error", details: e.issues },
         { status: 400 }
       );
     }

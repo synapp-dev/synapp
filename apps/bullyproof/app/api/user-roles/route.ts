@@ -117,7 +117,7 @@ export async function POST(request: Request) {
     // Use transaction to ensure atomicity: role assignment + metadata update
     const assignment = await db.transaction(async (tx) => {
       // Assign role within transaction
-      const assignmentResult = await rolesService.assignRole({ userId }, body, tx);
+      const assignmentResult = await rolesService.assignRole({ userId }, body, tx as any);
 
       // Log role assignment in user metadata within transaction
       if (currentUser) {
@@ -206,7 +206,7 @@ export async function DELETE(request: Request) {
     // Use transaction to ensure atomicity: role removal + metadata update
     await db.transaction(async (tx) => {
       // Remove role within transaction
-      await rolesService.removeRole({ userId }, body, tx);
+      await rolesService.removeRole({ userId }, body, tx as any);
 
       // Log role removal in user metadata within transaction
       if (currentUser) {

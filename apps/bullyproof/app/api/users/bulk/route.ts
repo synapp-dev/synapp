@@ -1711,11 +1711,11 @@ export async function POST(request: Request) {
 
     // Handle Zod validation errors
     if (e.name === "ZodError") {
-      console.error("[BULK USER CREATE] Zod validation error:", e.errors);
+      console.error("[BULK USER CREATE] Zod validation error:", (e as z.ZodError).issues);
       return NextResponse.json(
         {
           error: "Invalid request data",
-          details: e.errors,
+          details: (e as z.ZodError).issues,
         },
         { status: 400 }
       );

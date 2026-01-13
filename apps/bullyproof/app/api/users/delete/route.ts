@@ -180,7 +180,7 @@ export async function DELETE(request: Request) {
         // Log but don't fail - cascade should have handled these
         console.warn(
           `[BULK USER DELETE] Warning: Error batch deleting related records:`,
-          dbError.message
+          dbError.message || dbError.error || "Unknown error"
         );
         // Fallback to individual deletions if batch fails
         for (const userId of successfullyDeletedUserIds) {

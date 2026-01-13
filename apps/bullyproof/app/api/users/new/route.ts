@@ -462,7 +462,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: "Invalid request data",
-          details: e.errors,
+          details: (e as z.ZodError).issues,
         },
         { status: 400 }
       );
