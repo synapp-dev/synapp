@@ -63,7 +63,7 @@ export async function DELETE(request: Request) {
     
     if (e.name === "ZodError") {
       return NextResponse.json(
-        { error: "Invalid request data", details: e.errors },
+        { error: "Invalid request data", details: (e as z.ZodError).issues },
         { status: 400 }
       );
     }

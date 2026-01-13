@@ -183,7 +183,7 @@ export async function POST(request: Request) {
         results.push({
           name: classData.name,
           status: "error",
-          error: dbError.message || error.message || "Unknown error",
+          error: dbError.error || error.message || "Unknown error",
         });
         errorCount++;
       }
@@ -222,7 +222,7 @@ export async function POST(request: Request) {
 
     const dbError = handleDatabaseError(error);
     return NextResponse.json(
-      { error: dbError.message || "Internal server error" },
+      { error: dbError.error || "Internal server error" },
       { status: 500 }
     );
   }
