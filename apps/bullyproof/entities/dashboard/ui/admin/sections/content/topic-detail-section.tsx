@@ -5,6 +5,25 @@ import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
 import CountUp from "react-countup";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { certificationApi } from "@/entities/certification/api/endpoints";
@@ -40,6 +59,7 @@ import {
   Trash2,
   Check,
   Save,
+  GripHorizontal,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import {
@@ -108,6 +128,223 @@ type CertificationTopic = typeof certificationTopics.$inferSelect & {
 
 type TopicContext = "curriculum" | "certification";
 
+// Helper function to check if a slide has content
+function slideHasContent(
+  slide: SlideData | { id: string; kind: string; imageUrl?: string | null; videoUrl?: string | null; textHtml?: string | null; quizData?: any; signedUrl?: string | null },
+  isCertification: boolean,
+  pendingFileUploads?: Map<string, File>
+): boolean {
+  // Check if imageUrl exists and is not just a placeholder/invalid URL
+  // Blob URLs are temporary and valid (from file uploads)
+  const imageUrl = slide.imageUrl;
+  const signedUrl = (slide as any).signedUrl; // Signed URL from API - null if file doesn't exist
+  
+  // For image slides:
+  // - If it's a blob URL, it's valid (temporary preview from upload)
+  // - If signedUrl exists, the file exists in storage
+  // - If signedUrl is null but imageUrl exists, the file doesn't exist (invalid)
+  const isBlobUrl = imageUrl?.startsWith("blob:");
+  const hasValidImageUrl = isBlobUrl || (!!signedUrl && signedUrl.trim() !== "");
+  
+  const hasVideoUrl = !!slide.videoUrl && slide.videoUrl.trim() !== "";
+  const hasQuizData =
+    isCertification &&
+    slide.kind === "quiz" &&
+    (slide as any).quizData &&
+    (slide as any).quizData.question &&
+    (slide as any).quizData.answers?.length >= 2;
+  const hasTextHtml =
+    !isCertification && slide.kind === "text" && !!slide.textHtml?.trim();
+  const hasPendingUpload = pendingFileUploads?.has(slide.id) || false;
+
+  const hasContent = hasValidImageUrl || hasVideoUrl || hasQuizData || hasTextHtml || hasPendingUpload;
+  
+  // Log detailed info for debugging empty slides
+  if (slide.kind === "image" && !hasContent) {
+    console.warn("[slideHasContent] Empty image slide detected:", {
+      id: slide.id,
+      kind: slide.kind,
+      imageUrl: imageUrl?.substring(0, 100),
+      signedUrl: signedUrl?.substring(0, 100) || "null",
+      isBlobUrl,
+      hasValidImageUrl,
+      hasVideoUrl,
+      hasQuizData,
+      hasTextHtml,
+      hasPendingUpload,
+      orderIndex: (slide as any).orderIndex,
+    });
+  }
+
+  return hasContent;
+}
+
+// Sortable slide item component
+function SortableSlideItem({
+  slide,
+  index,
+  isActive,
+  currentSlideIndex,
+  slideRefreshKey,
+  isReordering,
+  hoveredSlideIndex,
+  showAddButton,
+  isCertification,
+  onSlideClick,
+  onMouseEnter,
+  onMouseLeave,
+  onCreateSlide,
+  hoverTimeoutRef,
+  hideButtonTimeoutRef,
+}: {
+  slide: SlideData;
+  index: number;
+  isActive: boolean;
+  currentSlideIndex: number;
+  slideRefreshKey: number;
+  isReordering: boolean;
+  hoveredSlideIndex: number | null;
+  showAddButton: number | null;
+  isCertification: boolean;
+  onSlideClick: () => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onCreateSlide: () => void;
+  hoverTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+  hideButtonTimeoutRef: React.MutableRefObject<NodeJS.Timeout | null>;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: slide.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  // Show add button if this slide index matches showAddButton
+  const showAddButtonForSlide =
+    showAddButton === index &&
+    !isDragging &&
+    !isReordering;
+
+  return (
+    <div className="flex items-center relative" ref={setNodeRef} style={style}>
+      {/* Slide button */}
+      <button
+        {...attributes}
+        {...listeners}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!isReordering) {
+            onSlideClick();
+          }
+        }}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        className={`
+          flex-shrink-0 relative group transition-all rounded-lg overflow-hidden shadow-lg bg-background
+          ${
+            isReordering
+              ? "cursor-wait opacity-50"
+              : "cursor-grab active:cursor-grabbing"
+          }
+          ${
+            index === currentSlideIndex
+              ? "ring-2 ring-primary ring-offset-2 scale-105"
+              : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
+          }
+          ${isDragging ? "opacity-30 scale-90" : ""}
+        `}
+        style={{
+          width: "180px",
+          aspectRatio: "16 / 9",
+        }}
+      >
+        {/* Drag handle indicator */}
+        {!isDragging && (
+          <div className="absolute top-2 right-2 z-10 bg-background/80 rounded-md p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripHorizontal className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
+        <div className="w-full h-full relative">
+          {slide.kind === "quiz" ? (
+            <div className="w-full h-full flex items-center justify-center bg-muted pb-4">
+              <div className="flex items-center gap-2">
+                <MessageCircleQuestion className="h-6 w-6 text-muted-foreground" />
+                <span className="text-base font-medium text-muted-foreground">
+                  Quiz
+                </span>
+              </div>
+            </div>
+          ) : (
+            <SlideRenderer
+              key={`${slide.id}-${slideRefreshKey}`}
+              slide={slide}
+              className="w-full h-full"
+              thumbnailOnly={true}
+              isCertification={isCertification}
+            />
+          )}
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
+          Slide {slide.orderIndex + 1}
+        </div>
+      </button>
+
+      {/* Add slide button */}
+      <div
+        className="flex-shrink-0 flex items-center justify-center transition-all duration-200"
+        style={{
+          width: showAddButtonForSlide ? "48px" : "0px",
+          opacity: showAddButtonForSlide ? 1 : 0,
+        }}
+        onMouseEnter={() => {
+          if (hideButtonTimeoutRef.current) {
+            clearTimeout(hideButtonTimeoutRef.current);
+            hideButtonTimeoutRef.current = null;
+          }
+        }}
+        onMouseLeave={() => {
+          if (hideButtonTimeoutRef.current) {
+            clearTimeout(hideButtonTimeoutRef.current);
+          }
+          hideButtonTimeoutRef.current = setTimeout(() => {
+            // This will be handled by parent
+          }, 200);
+        }}
+      >
+        {showAddButtonForSlide && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCreateSlide();
+                }}
+                className="h-10 w-12 rounded-lg bg-background/50 border-2 border-dashed border-muted-foreground/40 shadow-sm flex items-center justify-center hover:bg-background/80 hover:border-muted-foreground/60 transition-all cursor-pointer ml-4"
+              >
+                <Plus className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Add slide</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface TopicDetailSectionProps {
   context?: TopicContext; // Default to curriculum for backward compatibility
   // For curriculum
@@ -150,10 +387,9 @@ export function TopicDetailSection({
   const [isDragging, setIsDragging] = useState(false);
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
   const [slideRefreshKey, setSlideRefreshKey] = useState(0);
-  const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null);
-  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  // @dnd-kit drag state
+  const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
-  const [insertAfterIndex, setInsertAfterIndex] = useState<number | null>(null);
   const [hoveredSlideIndex, setHoveredSlideIndex] = useState<number | null>(
     null
   );
@@ -204,6 +440,18 @@ export function TopicDetailSection({
   >(null);
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState<string>("");
+
+  // @dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   // Cleanup timeouts on unmount
   useEffect(() => {
@@ -408,7 +656,7 @@ export function TopicDetailSection({
           const slidesResult =
             await certificationApi.topics.slides.list(topicId);
           if (slidesResult.data) {
-            const initialSlides: ExtendedSlideData[] = slidesResult.data
+            const allSlides: ExtendedSlideData[] = slidesResult.data
               .sort((a, b) => a.orderIndex - b.orderIndex)
               .map((slide) => ({
                 id: slide.id,
@@ -422,10 +670,50 @@ export function TopicDetailSection({
                 quizData: (slide as any).quizData as QuizData | null,
                 effectiveNotes: (slide as any).officialNotes ?? null,
               }));
+            
+            // Filter out empty slides (slides without any content)
+            console.log("[topic-detail] [CERTIFICATION] Loading slides - total slides from DB:", allSlides.length);
+            const validSlides = allSlides.filter((slide) => {
+              const hasContent = slideHasContent(slide, isCertification);
+              if (!hasContent) {
+                console.warn("[topic-detail] [CERTIFICATION] Found empty slide:", {
+                  id: slide.id,
+                  kind: slide.kind,
+                  imageUrl: slide.imageUrl,
+                  videoUrl: slide.videoUrl,
+                  textHtml: slide.textHtml?.substring(0, 50),
+                  quizData: (slide as any).quizData ? "exists" : "null",
+                });
+              }
+              return hasContent;
+            });
+            
+            console.log("[topic-detail] [CERTIFICATION] After filtering empty slides:", {
+              total: allSlides.length,
+              valid: validSlides.length,
+              empty: allSlides.length - validSlides.length,
+            });
+            
+            // Reorder slides to have sequential orderIndex after filtering
+            const initialSlides = validSlides.map((slide, index) => ({
+              ...slide,
+              orderIndex: index,
+            }));
+            
+            // If we filtered out any slides, mark them for deletion
+            const emptySlideIds = allSlides
+              .filter((slide) => !slideHasContent(slide, isCertification))
+              .map((slide) => slide.id);
+            
+            if (emptySlideIds.length > 0) {
+              console.log("[topic-detail] [CERTIFICATION] Marking empty slides for deletion:", emptySlideIds);
+            }
+            
+            console.log("[topic-detail] [CERTIFICATION] Setting local slides:", initialSlides.length, "slides");
             setLocalSlides(initialSlides);
             setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
-            setHasUnsavedChanges(false);
-            setDeletedSlideIds(new Set());
+            setHasUnsavedChanges(emptySlideIds.length > 0);
+            setDeletedSlideIds(new Set(emptySlideIds));
             setPendingFileUploads(new Map());
 
             // Invalidate all slide caches to force refresh
@@ -535,7 +823,7 @@ export function TopicDetailSection({
 
     // Topic already has slides and URLs from the cached data
     setTopic(foundTopic as Topic);
-    const initialSlides =
+    const allSlides =
       foundTopic.slides
         ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
         .map((slide: any) => ({
@@ -550,6 +838,61 @@ export function TopicDetailSection({
           effectiveNotes: slide.officialNotes ?? null,
           signedUrl: slide.signedUrl ?? null,
         })) ?? [];
+    
+    // Filter out empty slides (slides without any content)
+    console.log("[topic-detail] Loading slides - total slides from DB:", allSlides.length);
+    const validSlides = allSlides.filter((slide) => {
+      const hasContent = slideHasContent(slide, isCertification);
+      if (!hasContent) {
+        console.warn("[topic-detail] Found empty slide:", {
+          id: slide.id,
+          kind: slide.kind,
+          imageUrl: slide.imageUrl?.substring(0, 100),
+          videoUrl: slide.videoUrl,
+          textHtml: slide.textHtml?.substring(0, 50),
+          orderIndex: slide.orderIndex,
+        });
+      } else {
+        // Log details for the last slide to debug why it might appear empty
+        if (slide.orderIndex === allSlides.length - 1) {
+          console.log("[topic-detail] Last slide content check:", {
+            id: slide.id,
+            kind: slide.kind,
+            imageUrl: slide.imageUrl?.substring(0, 100),
+            hasImageUrl: !!slide.imageUrl,
+            videoUrl: slide.videoUrl,
+            textHtml: slide.textHtml?.substring(0, 50),
+            orderIndex: slide.orderIndex,
+            hasContent,
+          });
+        }
+      }
+      return hasContent;
+    });
+    
+    console.log("[topic-detail] After filtering empty slides:", {
+      total: allSlides.length,
+      valid: validSlides.length,
+      empty: allSlides.length - validSlides.length,
+    });
+    
+    // Reorder slides to have sequential orderIndex after filtering
+    const initialSlides = validSlides.map((slide, index) => ({
+      ...slide,
+      orderIndex: index,
+    }));
+    
+    // If we filtered out any slides, mark them for deletion
+    if (allSlides.length !== validSlides.length) {
+      const emptySlideIds = allSlides
+        .filter((slide) => !slideHasContent(slide, isCertification))
+        .map((slide) => slide.id);
+      console.log("[topic-detail] Marking empty slides for deletion:", emptySlideIds);
+      setDeletedSlideIds(new Set(emptySlideIds));
+      setHasUnsavedChanges(true);
+    }
+    
+    console.log("[topic-detail] Setting local slides:", initialSlides.length, "slides");
     setLocalSlides(initialSlides);
     setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
     // Only reset hasUnsavedChanges if this is a new topic (user navigated to different topic)
@@ -988,168 +1331,38 @@ export function TopicDetailSection({
     };
   }, [isSaving]);
 
-  // Handle slide reordering via drag and drop
-  const handleSlideDragStart = (slideId: string, index: number) => {
-    setDraggedSlideId(slideId);
-    setDragOverIndex(null);
-    setInsertAfterIndex(null);
+  // Handle slide reordering via @dnd-kit
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveSlideId(event.active.id as string);
   };
 
-  const handleSlideDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedSlideId === null) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
 
-    const draggedIndex = slides.findIndex((s) => s.id === draggedSlideId);
-    if (draggedIndex === index) {
-      setDragOverIndex(null);
-      setInsertAfterIndex(null);
+    if (!over || active.id === over.id || !topic) {
+      setActiveSlideId(null);
       return;
     }
 
-    // Determine if we're closer to the left or right edge of the slide
-    const rect = e.currentTarget.getBoundingClientRect();
-    const mouseX = e.clientX;
-    const slideWidth = rect.width;
-    const slideLeft = rect.left;
-    const slideRight = rect.right;
+    const activeIndex = slides.findIndex((s) => s.id === active.id);
+    const overIndex = slides.findIndex((s) => s.id === over.id);
 
-    // Use a threshold (e.g., 30% of slide width) to determine insertion point
-    const threshold = slideWidth * 0.3;
-    const distanceFromLeft = mouseX - slideLeft;
-    const distanceFromRight = slideRight - mouseX;
-
-    if (distanceFromLeft < threshold) {
-      // Closer to left edge: insert before this slide (after the previous slide)
-      const targetAfterIndex = index - 1;
-      // Don't show if dragging to the same position
-      if (
-        draggedIndex !== targetAfterIndex &&
-        draggedIndex !== targetAfterIndex + 1
-      ) {
-        setInsertAfterIndex(targetAfterIndex);
-        setDragOverIndex(null);
-      }
-    } else if (distanceFromRight < threshold) {
-      // Closer to right edge: insert after this slide
-      const targetAfterIndex = index;
-      // Don't show if dragging to the same position
-      if (
-        draggedIndex !== targetAfterIndex &&
-        draggedIndex !== targetAfterIndex + 1
-      ) {
-        setInsertAfterIndex(targetAfterIndex);
-        setDragOverIndex(null);
-      }
-    } else {
-      // In the middle: don't show insert indicator, just highlight the slide
-      setDragOverIndex(index);
-      setInsertAfterIndex(null);
-    }
-  };
-
-  const handleDropZoneDragOver = (e: React.DragEvent, afterIndex: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedSlideId === null) return;
-
-    const draggedIndex = slides.findIndex((s) => s.id === draggedSlideId);
-    // Don't show insert indicator if dragging to the same position
-    if (draggedIndex === afterIndex || draggedIndex === afterIndex + 1) {
-      setInsertAfterIndex(null);
+    if (activeIndex === -1 || overIndex === -1) {
+      setActiveSlideId(null);
       return;
-    }
-
-    setInsertAfterIndex(afterIndex);
-    setDragOverIndex(null);
-  };
-
-  const handleSlideDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    // Only clear if we're actually leaving the gallery area
-    const relatedTarget = e.relatedTarget as Node | null;
-    if (
-      !slideGalleryRef.current?.contains(relatedTarget) &&
-      !(
-        relatedTarget instanceof Element &&
-        relatedTarget.closest("[data-drop-zone]")
-      )
-    ) {
-      setDragOverIndex(null);
-      setInsertAfterIndex(null);
-    }
-  };
-
-  const handleSlideDrop = async (e: React.DragEvent, dropIndex?: number) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (!draggedSlideId || !topic) return;
-
-    const draggedIndex = slides.findIndex((s) => s.id === draggedSlideId);
-    if (draggedIndex === -1) {
-      setDraggedSlideId(null);
-      setDragOverIndex(null);
-      setInsertAfterIndex(null);
-      return;
-    }
-
-    // Determine the target index based on insertAfterIndex or dropIndex
-    let targetIndex: number;
-    if (insertAfterIndex !== null) {
-      // insertAfterIndex represents the index of the slide we want to insert after
-      // Special case: insertAfterIndex = -1 means insert before first slide (at position 0)
-      if (insertAfterIndex === -1) {
-        targetIndex = 0;
-      } else {
-        // We want to insert at position insertAfterIndex + 1
-        targetIndex = insertAfterIndex + 1;
-
-        // However, if we're dragging forward (draggedIndex < insertAfterIndex),
-        // we need to account for the fact that removing the dragged slide first
-        // will shift all subsequent slides left by 1
-        if (draggedIndex < insertAfterIndex) {
-          // After removing draggedIndex, the slide at insertAfterIndex becomes insertAfterIndex - 1
-          // So we want to insert at insertAfterIndex (which is insertAfterIndex - 1 + 1)
-          targetIndex = insertAfterIndex;
-        }
-      }
-    } else if (dropIndex !== undefined) {
-      targetIndex = dropIndex;
-    } else {
-      // Fallback: no valid drop target
-      setDraggedSlideId(null);
-      setDragOverIndex(null);
-      setInsertAfterIndex(null);
-      return;
-    }
-
-    // Ensure targetIndex is valid (non-negative and within bounds)
-    if (targetIndex < 0) {
-      targetIndex = 0;
-    }
-    if (targetIndex > slides.length) {
-      targetIndex = slides.length;
     }
 
     // Don't do anything if we're dropping at the same position
-    if (draggedIndex === targetIndex) {
-      setDraggedSlideId(null);
-      setDragOverIndex(null);
-      setInsertAfterIndex(null);
+    if (activeIndex === overIndex) {
+      setActiveSlideId(null);
       return;
     }
 
     setIsReordering(true);
-    setDragOverIndex(null);
-    setInsertAfterIndex(null);
 
     try {
-      // Create a new array with the reordered slides (local state only)
-      const newSlides = [...slides];
-      const [draggedSlide] = newSlides.splice(draggedIndex, 1);
-      newSlides.splice(targetIndex, 0, draggedSlide);
+      // Reorder slides using arrayMove
+      const newSlides = arrayMove(slides, activeIndex, overIndex);
 
       // Update orderIndex for all slides
       const reorderedSlides = newSlides.map((slide, index) => ({
@@ -1162,7 +1375,7 @@ export function TopicDetailSection({
 
       // Update current slide index to track the dragged slide
       const newDraggedIndex = reorderedSlides.findIndex(
-        (s) => s.id === draggedSlideId
+        (s) => s.id === active.id
       );
 
       if (newDraggedIndex !== -1) {
@@ -1175,15 +1388,12 @@ export function TopicDetailSection({
       );
     } finally {
       setIsReordering(false);
-      setDraggedSlideId(null);
-      setDragOverIndex(null);
+      setActiveSlideId(null);
     }
   };
 
-  const handleSlideDragEnd = () => {
-    setDraggedSlideId(null);
-    setDragOverIndex(null);
-    setInsertAfterIndex(null);
+  const handleDragCancel = () => {
+    setActiveSlideId(null);
   };
 
   // Handle creating a new slide at a specific position (local state only)
@@ -1200,7 +1410,16 @@ export function TopicDetailSection({
     images: Array<{ imageData: Blob; blobUrl: string }>,
     insertAfterIndex: number
   ) => {
-    if (!topic || images.length === 0) return;
+    console.log("[topic-detail] handleInsertMultipleSlides called:", {
+      imagesCount: images.length,
+      insertAfterIndex,
+      currentSlidesCount: localSlides.length,
+    });
+    
+    if (!topic || images.length === 0) {
+      console.warn("[topic-detail] handleInsertMultipleSlides: No topic or images, returning early");
+      return;
+    }
 
     // Create new slides for each image and collect files
     const newPendingUploads = new Map(pendingFileUploads);
@@ -1219,7 +1438,7 @@ export function TopicDetailSection({
       // Store file for bulk upload (add to the same Map)
       newPendingUploads.set(tempId, file);
 
-      return {
+      const slide = {
         id: tempId,
         kind: "image" as const,
         orderIndex: insertAfterIndex + 1 + index, // Will be reordered below
@@ -1231,7 +1450,18 @@ export function TopicDetailSection({
         effectiveNotes: null,
         quizData: null,
       };
+      
+      console.log("[topic-detail] Creating new slide:", {
+        id: slide.id,
+        kind: slide.kind,
+        hasImageUrl: !!slide.imageUrl,
+        hasPendingUpload: true,
+      });
+      
+      return slide;
     });
+    
+    console.log("[topic-detail] Created", newSlides.length, "new slides with content");
 
     // Update pending uploads once with all files
     setPendingFileUploads(newPendingUploads);
@@ -1404,7 +1634,13 @@ export function TopicDetailSection({
         slide: ExtendedSlideData;
         oldSlide: ExtendedSlideData;
       }
-    | { type: "reorder"; message: string };
+    | {
+        type: "reorder";
+        message: string;
+        slide: ExtendedSlideData;
+        oldPosition: number;
+        newPosition: number;
+      };
 
   // Calculate differences between original and current slides
   const calculateChanges = (): ChangeItem[] => {
@@ -1501,7 +1737,25 @@ export function TopicDetailSection({
         originalExistingIds.some((id, idx) => currentExistingIds[idx] !== id);
 
       if (orderChanged) {
-        changes.push({ type: "reorder", message: "Slides reordered" });
+        // Find all slides that moved to a different position
+        for (let i = 0; i < originalExistingIds.length; i++) {
+          const slideId = originalExistingIds[i];
+          const newIndex = currentExistingIds.findIndex((id) => id === slideId);
+
+          // If the slide moved to a different position
+          if (newIndex !== -1 && newIndex !== i) {
+            const slide = currentSorted.find((s) => s.id === slideId);
+            if (slide) {
+              changes.push({
+                type: "reorder",
+                message: `Slide ${i + 1} moved to position ${newIndex + 1}`,
+                slide: slide as ExtendedSlideData,
+                oldPosition: i + 1, // 1-indexed
+                newPosition: newIndex + 1, // 1-indexed
+              });
+            }
+          }
+        }
       }
     }
 
@@ -1516,7 +1770,47 @@ export function TopicDetailSection({
     setIsSaving(true);
     setUploadError(null);
     setSaveProgress(0);
-    setSaveStatus("Uploading new slides");
+
+    // Analyze what operations will be performed
+    const hasFileUploads = pendingFileUploads.size > 0;
+    const hasCreates = localSlides.some((s) => s.id.startsWith("temp_"));
+    const hasUpdates = localSlides.some(
+      (s) =>
+        !s.id.startsWith("temp_") &&
+        !deletedSlideIds.has(s.id) &&
+        pendingFileUploads.has(s.id)
+    );
+    const hasDeletes = deletedSlideIds.size > 0;
+    const hasReorder = (() => {
+      const originalSorted = [...originalSlides]
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((s) => s.id)
+        .filter((id) => !id.startsWith("temp_"));
+      const currentSorted = localSlides
+        .filter((s) => !deletedSlideIds.has(s.id))
+        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .map((s) => s.id)
+        .filter((id) => !id.startsWith("temp_"));
+      return (
+        originalSorted.length === currentSorted.length &&
+        originalSorted.some((id, idx) => currentSorted[idx] !== id)
+      );
+    })();
+
+    // Set initial status based on operations
+    if (hasFileUploads) {
+      setSaveStatus("Uploading files...");
+    } else if (hasCreates) {
+      setSaveStatus("Creating slides...");
+    } else if (hasDeletes) {
+      setSaveStatus("Deleting slides...");
+    } else if (hasReorder) {
+      setSaveStatus("Reordering slides...");
+    } else if (hasUpdates) {
+      setSaveStatus("Updating slides...");
+    } else {
+      setSaveStatus("Saving changes...");
+    }
 
     try {
       // Extract stage code/number for file paths
@@ -1548,6 +1842,11 @@ export function TopicDetailSection({
 
       // Filter out empty slides (slides without images, videos, quiz data, or text)
       // Also automatically mark empty existing slides for deletion
+      console.log("[topic-detail] performSave: Filtering slides before save:", {
+        totalActiveSlides: activeSlides.length,
+        pendingFileUploads: pendingFileUploads.size,
+      });
+      
       const validSlides: typeof activeSlides = [];
       const newDeletedIds = new Set(deletedSlideIds);
 
@@ -1563,6 +1862,17 @@ export function TopicDetailSection({
           !isCertification && slide.kind === "text" && slide.textHtml;
         const hasPendingUpload = pendingFileUploads.has(slide.id);
 
+        const slideContent = {
+          id: slide.id,
+          kind: slide.kind,
+          hasImageUrl,
+          hasVideoUrl,
+          hasQuizData: !!hasQuizData,
+          hasTextHtml: !!hasTextHtml,
+          hasPendingUpload,
+          isTemp: slide.id.startsWith("temp_"),
+        };
+
         // Keep slide if it has any content or a pending upload
         if (
           hasImageUrl ||
@@ -1572,14 +1882,25 @@ export function TopicDetailSection({
           hasPendingUpload
         ) {
           validSlides.push(slide);
+          console.log("[topic-detail] performSave: Keeping slide with content:", slideContent);
         } else {
           // Empty slide - mark for deletion if it's an existing slide (not a temp slide)
+          console.warn("[topic-detail] performSave: Found empty slide:", slideContent);
           if (!slide.id.startsWith("temp_")) {
+            console.log("[topic-detail] performSave: Marking existing empty slide for deletion:", slide.id);
             newDeletedIds.add(slide.id);
+          } else {
+            console.log("[topic-detail] performSave: Skipping temp slide without content (won't be created):", slide.id);
           }
           // Temp slides without content are simply not included (they won't be created)
         }
       }
+      
+      console.log("[topic-detail] performSave: After filtering:", {
+        validSlides: validSlides.length,
+        emptySlidesMarkedForDeletion: newDeletedIds.size - deletedSlideIds.size,
+        totalToDelete: newDeletedIds.size,
+      });
 
       const sortedSlides = [...validSlides].sort(
         (a, b) => a.orderIndex - b.orderIndex
@@ -1670,28 +1991,26 @@ export function TopicDetailSection({
       }
 
       // Update progress: files prepared
-      setSaveProgress(30);
+      setSaveProgress(hasFileUploads ? 20 : 40);
 
       // Step 3: Call bulk save API with FormData
+      if (hasFileUploads) {
+        setSaveStatus("Uploading files...");
+      } else {
+        setSaveStatus("Processing changes...");
+      }
+
       const result = isCertification
         ? await certificationApi.topics.slides.bulkSave(topic.id, formData)
         : await topicsApi.slides.bulkSave(formData);
-
-      // Update progress: upload complete, encrypting URLs
-      setSaveProgress(60);
-      setSaveStatus("Encrypting URLs");
-
-      // Small delay to show the status change
-      await new Promise((resolve) => setTimeout(resolve, 300));
 
       if (result.error) {
         throw new Error(result.error.message || "Failed to save changes");
       }
 
       // Update progress: processing response
-      setSaveProgress(80);
-      setSaveStatus("Optimising sort index");
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      setSaveProgress(hasFileUploads ? 70 : 85);
+      setSaveStatus("Processing response...");
 
       // Step 4: Update local state with server response
       let updatedSlides: ExtendedSlideData[] = [];
@@ -1790,13 +2109,16 @@ export function TopicDetailSection({
           }
         }
 
-        // Invalidate cache for slides that had files uploaded
+        // Batch invalidate cache for slides that had files uploaded
+        const slideIdsToInvalidate = new Set<string>();
+        
         // For existing slides with file uploads
         for (const slideId of Array.from(pendingFileUploads.keys())) {
           if (!slideId.startsWith("temp_")) {
-            invalidateSlide(slideId);
+            slideIdsToInvalidate.add(slideId);
           }
         }
+        
         // For newly created slides, invalidate by matching orderIndex
         if (
           result.data &&
@@ -1811,10 +2133,19 @@ export function TopicDetailSection({
               (s: any) => s.orderIndex === tempSlide.orderIndex
             );
             if (createdSlide) {
-              invalidateSlide(createdSlide.id);
+              slideIdsToInvalidate.add(createdSlide.id);
             }
           }
         }
+        
+        // Batch invalidate all slides with uploads at once
+        slideIdsToInvalidate.forEach((slideId) => {
+          if (isCertification) {
+            invalidateCertificationSlide(slideId);
+          } else {
+            invalidateSlide(slideId);
+          }
+        });
 
         // Clear pending changes and update original slides to match saved state
         setPendingFileUploads(new Map());
@@ -1837,7 +2168,7 @@ export function TopicDetailSection({
           );
         }
 
-        // Invalidate caches for all slides
+        // Batch invalidate caches for all slides
         allSlideIds.forEach((slideId) => {
           if (isCertification) {
             invalidateCertificationSlide(slideId);
@@ -1847,23 +2178,26 @@ export function TopicDetailSection({
         });
 
         // Update progress: finalizing changes
-        setSaveProgress(95);
-        setSaveStatus("Finalising changes");
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        setSaveProgress(90);
+        setSaveStatus("Finalising changes...");
 
-        // Completely refetch topic data the same way as initial page load
-        // This will repopulate the cache store and ensure we have the latest data
-        // Skip loading state since we're already in a save operation
-        if (isCertification) {
-          await fetchTopicData(true);
-        } else {
-          // For curriculum flow, use React Query refetch
-          await refetchTopics();
+        // Only refetch if we don't have complete data from the response
+        // The response should already contain all the updated slides
+        const needsRefetch = !responseTopic || !responseTopic.slides || responseTopic.slides.length === 0;
+        
+        if (needsRefetch) {
+          // Only refetch if response doesn't have complete data
+          if (isCertification) {
+            await fetchTopicData(true);
+          } else {
+            // For curriculum flow, use React Query refetch
+            await refetchTopics();
+          }
         }
 
         // Complete progress
         setSaveProgress(100);
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        setSaveStatus("Changes saved successfully!");
 
         // Show success feedback on button
         setShowSaveSuccess(true);
@@ -2567,320 +2901,149 @@ export function TopicDetailSection({
               )}
 
               {/* Slide Gallery */}
-              <div
-                ref={setGalleryRef}
-                className="flex gap-4 overflow-x-auto overflow-y-visible py-3 px-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent relative"
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                onDragLeave={handleSlideDragLeave}
-                onMouseLeave={() => {
-                  // Clear all hover states when leaving the gallery
-                  setHoveredSlideIndex(null);
-                  setShowAddButton(null);
-                  // Clear any pending timeouts
-                  if (hoverTimeoutRef.current) {
-                    clearTimeout(hoverTimeoutRef.current);
-                    hoverTimeoutRef.current = null;
-                  }
-                  if (hideButtonTimeoutRef.current) {
-                    clearTimeout(hideButtonTimeoutRef.current);
-                    hideButtonTimeoutRef.current = null;
-                  }
-                }}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
               >
-                {slides.map((slide, index) => {
-                  const isDragging = draggedSlideId === slide.id;
-                  const showInsertBefore = insertAfterIndex === index - 1;
-                  const showInsertAfter = insertAfterIndex === index;
+                <SortableContext
+                  items={slides.map((s) => s.id)}
+                  strategy={horizontalListSortingStrategy}
+                >
+                  <div
+                    ref={setGalleryRef}
+                    className="flex gap-4 overflow-x-auto overflow-y-visible py-3 px-4 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent relative"
+                    onMouseLeave={() => {
+                      // Clear all hover states when leaving the gallery
+                      setHoveredSlideIndex(null);
+                      setShowAddButton(null);
+                      // Clear any pending timeouts
+                      if (hoverTimeoutRef.current) {
+                        clearTimeout(hoverTimeoutRef.current);
+                        hoverTimeoutRef.current = null;
+                      }
+                      if (hideButtonTimeoutRef.current) {
+                        clearTimeout(hideButtonTimeoutRef.current);
+                        hideButtonTimeoutRef.current = null;
+                      }
+                    }}
+                  >
+                    {slides.map((slide, index) => {
+                      const isLastSlide = index === slides.length - 1;
+                      const showAddButtonForSlide =
+                        (isLastSlide || showAddButton === index) &&
+                        !activeSlideId &&
+                        !isReordering;
 
-                  // Show add button on the right side after 1 second of hovering
-                  // Always show for the last slide, otherwise show on hover
-                  const isLastSlide = index === slides.length - 1;
-                  const showAddButtonForSlide =
-                    (isLastSlide || showAddButton === index) &&
-                    !draggedSlideId &&
-                    !isReordering;
-
-                  return (
-                    <div key={slide.id} className="flex items-center relative">
-                      {/* Drop zone before slide (for drag and drop) */}
-                      <div
-                        data-drop-zone
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (!isReordering && draggedSlideId) {
-                            handleDropZoneDragOver(e, index - 1);
-                          }
-                        }}
-                        onDrop={(e) => {
-                          if (!isReordering && draggedSlideId) {
-                            handleSlideDrop(e);
-                          }
-                        }}
-                        onDragLeave={(e) => {
-                          // Only clear if leaving the drop zone entirely
-                          const relatedTarget = e.relatedTarget as Node | null;
-                          if (
-                            !(
-                              relatedTarget instanceof Element &&
-                              (relatedTarget.closest("[data-drop-zone]") ||
-                                relatedTarget.closest("button"))
-                            )
-                          ) {
-                            if (showInsertBefore) {
-                              setInsertAfterIndex(null);
+                      return (
+                        <SortableSlideItem
+                          key={slide.id}
+                          slide={slide}
+                          index={index}
+                          isActive={activeSlideId === slide.id}
+                          currentSlideIndex={currentSlideIndex}
+                          slideRefreshKey={slideRefreshKey}
+                          isReordering={isReordering}
+                          hoveredSlideIndex={hoveredSlideIndex}
+                          showAddButton={showAddButton}
+                          isCertification={isCertification}
+                          onSlideClick={() => {
+                            if (!isReordering) {
+                              setCurrentSlideIndex(index);
                             }
-                          }
-                        }}
-                        className={`
-                          flex-shrink-0 transition-all duration-200 ease-out
-                          ${showInsertBefore ? "w-[180px] mr-6" : "w-0"}
-                          ${showInsertBefore ? "opacity-100" : "opacity-0"}
-                          ${draggedSlideId && !isReordering ? "cursor-move" : ""}
-                        `}
-                        style={{
-                          aspectRatio: showInsertBefore ? "16 / 9" : "unset",
-                          minHeight: showInsertBefore ? "unset" : "100%",
-                        }}
-                      >
-                        {showInsertBefore && (
-                          <div className="w-full h-full border-2 border-dashed border-primary bg-primary/10 rounded-lg flex flex-col items-center justify-center gap-2 shadow-lg">
-                            <div className="text-sm font-semibold text-primary">
-                              Drop here
-                            </div>
-                            <div className="text-xs text-primary/70">
-                              Insert slide
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Slide button */}
-                      <button
-                        draggable={!isReordering}
-                        onDragStart={(e) => {
-                          if (!isReordering) {
-                            handleSlideDragStart(slide.id, index);
-                            e.dataTransfer.effectAllowed = "move";
-                          }
-                        }}
-                        onDragOver={(e) => {
-                          if (!isReordering && draggedSlideId) {
-                            handleSlideDragOver(e, index);
-                          }
-                        }}
-                        onDragLeave={handleSlideDragLeave}
-                        onDrop={(e) => {
-                          if (!isReordering && draggedSlideId) {
-                            handleSlideDrop(e, index);
-                          }
-                        }}
-                        onDragEnd={handleSlideDragEnd}
-                        onClick={() => {
-                          if (!isReordering) {
-                            setCurrentSlideIndex(index);
-                          }
-                        }}
-                        onMouseEnter={() => {
-                          if (!draggedSlideId && !isReordering) {
-                            setHoveredSlideIndex(index);
-                            // Don't show add button on hover for the last slide (it's always visible)
-                            const isLastSlide = index === slides.length - 1;
+                          }}
+                          onMouseEnter={() => {
+                            if (!activeSlideId && !isReordering) {
+                              setHoveredSlideIndex(index);
+                              // Don't show add button on hover for the last slide (it's always visible)
+                              if (!isLastSlide) {
+                                // Clear any existing timeout
+                                if (hoverTimeoutRef.current) {
+                                  clearTimeout(hoverTimeoutRef.current);
+                                }
+                                // Set timeout to show button after 300ms
+                                hoverTimeoutRef.current = setTimeout(() => {
+                                  setShowAddButton(index);
+                                }, 300);
+                              } else {
+                                setShowAddButton(index);
+                              }
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredSlideIndex(null);
+                            // Don't hide add button for the last slide (it's always visible)
                             if (!isLastSlide) {
-                              // Clear any existing timeout
+                              // Clear timeout if mouse leaves before 300ms
                               if (hoverTimeoutRef.current) {
                                 clearTimeout(hoverTimeoutRef.current);
+                                hoverTimeoutRef.current = null;
                               }
-                              // Set timeout to show button after 300ms
-                              hoverTimeoutRef.current = setTimeout(() => {
-                                setShowAddButton(index);
-                              }, 300);
+                              // Hide button after a short delay to allow moving to button
+                              if (hideButtonTimeoutRef.current) {
+                                clearTimeout(hideButtonTimeoutRef.current);
+                              }
+                              hideButtonTimeoutRef.current = setTimeout(() => {
+                                setShowAddButton((current) => {
+                                  // Only hide if we're not hovering over the button itself
+                                  return current === index ? null : current;
+                                });
+                              }, 200);
                             }
-                          }
-                        }}
-                        onMouseLeave={() => {
-                          setHoveredSlideIndex(null);
-                          // Don't hide add button for the last slide (it's always visible)
-                          const isLastSlide = index === slides.length - 1;
-                          if (!isLastSlide) {
-                            // Clear timeout if mouse leaves before 300ms
-                            if (hoverTimeoutRef.current) {
-                              clearTimeout(hoverTimeoutRef.current);
-                              hoverTimeoutRef.current = null;
-                            }
-                            // Hide button after a short delay to allow moving to button
-                            if (hideButtonTimeoutRef.current) {
-                              clearTimeout(hideButtonTimeoutRef.current);
-                            }
-                            hideButtonTimeoutRef.current = setTimeout(() => {
-                              setShowAddButton((current) => {
-                                // Only hide if we're not hovering over the button itself
-                                return current === index ? null : current;
-                              });
-                            }, 200);
-                          }
-                        }}
-                        className={`
-                          flex-shrink-0 relative group transition-all rounded-lg overflow-hidden shadow-lg bg-background
-                          ${
-                            isReordering
-                              ? "cursor-wait opacity-50"
-                              : "cursor-grab active:cursor-grabbing"
-                          }
-                          ${
-                            index === currentSlideIndex
-                              ? "ring-2 ring-primary ring-offset-2 scale-105"
-                              : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
-                          }
-                          ${isDragging ? "opacity-30 scale-90" : ""}
-                        `}
-                        style={{
-                          width: "180px",
-                          aspectRatio: "16 / 9",
-                        }}
-                      >
-                        <div className="w-full h-full relative">
-                          {slide.kind === "quiz" ? (
-                            <div className="w-full h-full flex items-center justify-center bg-muted pb-4">
-                              <div className="flex items-center gap-2">
-                                <MessageCircleQuestion className="h-6 w-6 text-muted-foreground" />
-                                <span className="text-base font-medium text-muted-foreground">
-                                  Quiz
-                                </span>
-                              </div>
-                            </div>
-                          ) : (
-                            <SlideRenderer
-                              key={`${slide.id}-${slideRefreshKey}`}
-                              slide={slide}
-                              className="w-full h-full"
-                              thumbnailOnly={true}
-                              isCertification={isCertification}
-                            />
-                          )}
-                        </div>
-                        <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                          Slide {slide.orderIndex + 1}
-                        </div>
-                      </button>
-
-                      {/* Add slide button - appears centered between slides after 300ms hover */}
-                      {/* Show after every slide, including the last one */}
-                      <div
-                        className="flex-shrink-0 flex items-center justify-center transition-all duration-200"
-                        style={{
-                          width: showAddButtonForSlide ? "48px" : "0px",
-                          opacity: showAddButtonForSlide ? 1 : 0,
-                          // transform: showAddButtonForSlide
-                          //   ? "padding-left(16px)"
-                          //   : "padding-left(0)",
-                        }}
-                        onMouseEnter={() => {
-                          // Cancel any pending hide timeout
-                          if (hideButtonTimeoutRef.current) {
-                            clearTimeout(hideButtonTimeoutRef.current);
-                            hideButtonTimeoutRef.current = null;
-                          }
-                          // Keep button visible when hovering over it
-                          setShowAddButton(index);
-                        }}
-                        onMouseLeave={() => {
-                          // Don't hide add button for the last slide (it's always visible)
-                          const isLastSlide = index === slides.length - 1;
-                          if (!isLastSlide) {
-                            // Hide button after a short delay
-                            if (hideButtonTimeoutRef.current) {
-                              clearTimeout(hideButtonTimeoutRef.current);
-                            }
-                            hideButtonTimeoutRef.current = setTimeout(() => {
-                              setShowAddButton(null);
-                            }, 200);
-                          }
-                        }}
-                      >
-                        {showAddButtonForSlide && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCreateSlide(index);
-                                }}
-                                disabled={isCreatingSlide}
-                                className="h-10 w-12 rounded-lg bg-background/50 border-2 border-dashed border-muted-foreground/40 shadow-sm flex items-center justify-center hover:bg-background/80 hover:border-muted-foreground/60 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-wait ml-4"
-                              >
-                                <Plus className="h-5 w-5 text-muted-foreground" />
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>Add slide</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-
-                      {/* Drop zone after slide (only show after last slide for drag and drop) */}
-                      {index === slides.length - 1 && (
+                          }}
+                          onCreateSlide={() => {
+                            handleCreateSlide(index);
+                          }}
+                          hoverTimeoutRef={hoverTimeoutRef}
+                          hideButtonTimeoutRef={hideButtonTimeoutRef}
+                        />
+                      );
+                    })}
+                  </div>
+                  <DragOverlay>
+                    {activeSlideId ? (() => {
+                      const draggedSlide = slides.find(
+                        (s) => s.id === activeSlideId
+                      );
+                      if (!draggedSlide) return null;
+                      return (
                         <div
-                          data-drop-zone
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (!isReordering && draggedSlideId) {
-                              handleDropZoneDragOver(e, index);
-                            }
-                          }}
-                          onDrop={(e) => {
-                            if (!isReordering && draggedSlideId) {
-                              handleSlideDrop(e);
-                            }
-                          }}
-                          onDragLeave={(e) => {
-                            // Only clear if leaving the drop zone entirely
-                            const relatedTarget =
-                              e.relatedTarget as Node | null;
-                            if (
-                              !(
-                                relatedTarget instanceof Element &&
-                                (relatedTarget.closest("[data-drop-zone]") ||
-                                  relatedTarget.closest("button"))
-                              )
-                            ) {
-                              if (showInsertAfter) {
-                                setInsertAfterIndex(null);
-                              }
-                            }
-                          }}
-                          className={`
-                            flex-shrink-0 transition-all duration-200 ease-out
-                            ${showInsertAfter ? "w-[180px] ml-6" : "w-0"}
-                            ${showInsertAfter ? "opacity-100" : "opacity-0"}
-                            ${draggedSlideId && !isReordering ? "cursor-move" : ""}
-                          `}
+                          className="flex-shrink-0 relative rounded-lg overflow-hidden shadow-lg bg-background opacity-90 rotate-3 scale-105"
                           style={{
-                            aspectRatio: showInsertAfter ? "16 / 9" : "unset",
-                            minHeight: showInsertAfter ? "unset" : "100%",
+                            width: "180px",
+                            aspectRatio: "16 / 9",
                           }}
                         >
-                          {showInsertAfter && (
-                            <div className="w-full h-full border-2 border-dashed border-primary bg-primary/10 rounded-lg flex flex-col items-center justify-center gap-2 shadow-lg">
-                              <div className="text-sm font-semibold text-primary">
-                                Drop here
+                          <div className="w-full h-full relative">
+                            {draggedSlide.kind === "quiz" ? (
+                              <div className="w-full h-full flex items-center justify-center bg-muted pb-4">
+                                <div className="flex items-center gap-2">
+                                  <MessageCircleQuestion className="h-6 w-6 text-muted-foreground" />
+                                  <span className="text-base font-medium text-muted-foreground">
+                                    Quiz
+                                  </span>
+                                </div>
                               </div>
-                              <div className="text-xs text-primary/70">
-                                Insert slide
-                              </div>
-                            </div>
-                          )}
+                            ) : (
+                              <SlideRenderer
+                                slide={draggedSlide}
+                                className="w-full h-full"
+                                thumbnailOnly={true}
+                                isCertification={isCertification}
+                              />
+                            )}
+                          </div>
+                          <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
+                            Slide {draggedSlide.orderIndex + 1}
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })() : null}
+                  </DragOverlay>
+                </SortableContext>
+              </DndContext>
               {(isReordering || isCreatingSlide) && (
                 <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-lg">
                   <div className="flex flex-col items-center gap-2">
@@ -3010,7 +3173,7 @@ export function TopicDetailSection({
               Saving Changes
             </DialogTitle>
             <DialogDescription>
-              Please wait while your changes are being saved...
+              {saveStatus || "Please wait while your changes are being saved..."}
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">

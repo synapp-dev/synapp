@@ -229,7 +229,7 @@ function AnimatedThumbnail({
           setIsTransitioning(false);
           transitionTimeoutRef.current = null;
         }, 1200); // Match transition duration (doubled from 600ms)
-      }, 3000); // Change every 3 seconds (doubled from 1.5 seconds)
+      }, 5000); // Change every 5 seconds
     }, offsetDelay);
 
     return () => {
@@ -295,6 +295,7 @@ function TopicCard({
   showDragHint,
   isDragActive,
   cardIndex,
+  readonly = false,
   onMouseEnter,
   onMouseLeave,
   onChevronHover,
@@ -316,6 +317,7 @@ function TopicCard({
   showDragHint: boolean;
   isDragActive: boolean;
   cardIndex: number;
+  readonly?: boolean;
   onMouseEnter: () => void;
   onMouseLeave: (e?: React.MouseEvent) => void;
   onChevronHover: (side: "left" | "right") => void;
@@ -397,7 +399,7 @@ function TopicCard({
     isDragging,
   } = useSortable({
     id: topic.id,
-    disabled: topic.id.startsWith("temp_"),
+    disabled: topic.id.startsWith("temp_") || readonly,
   });
 
   const style = {
@@ -431,7 +433,7 @@ function TopicCard({
       )}
 
       {/* Drag Handle Tab - appears on hover or when dragging, top right corner */}
-      {!topic.id.startsWith("temp_") &&
+      {!readonly && !topic.id.startsWith("temp_") &&
         ((isHovered && !isDragging) || isDragHandleHovered || isLeaving) && (
           <div className="absolute top-0 right-0 z-30 flex items-center gap-2">
             {/* Drag hint text */}
@@ -524,7 +526,7 @@ function TopicCard({
         }}
       >
         {/* Hover Overlay with Chevrons */}
-        {(isHovered || isLeaving) &&
+        {!readonly && (isHovered || isLeaving) &&
           !topic.id.startsWith("temp_") &&
           !isDragging && (
             <div className="absolute top-0 left-0 right-0 bottom-4 z-10 flex items-center justify-between pointer-events-none">
@@ -612,7 +614,7 @@ function TopicCard({
                 isPaused={isDragActive}
               />
               {/* Dimming overlay when hovered */}
-              {(isHovered || isLeaving) &&
+              {!readonly && (isHovered || isLeaving) &&
                 !topic.id.startsWith("temp_") &&
                 !isDragging && (
                   <div
@@ -622,7 +624,7 @@ function TopicCard({
                   />
                 )}
               {/* Topic title overlay - appears when drag hint is shown */}
-              {showDragHint && !topic.id.startsWith("temp_") && !isDragging && (
+              {!readonly && showDragHint && !topic.id.startsWith("temp_") && !isDragging && (
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[70%] px-4 py-3 pointer-events-none">
                   <span
                     className={`text-sm font-medium text-secondary text-center block capitalize ${
@@ -648,7 +650,7 @@ function TopicCard({
                 />
               </div>
               {/* Dimming overlay when hovered */}
-              {(isHovered || isLeaving) &&
+              {!readonly && (isHovered || isLeaving) &&
                 !topic.id.startsWith("temp_") &&
                 !isDragging && (
                   <div
@@ -658,7 +660,7 @@ function TopicCard({
                   />
                 )}
               {/* Topic title overlay - appears when drag hint is shown */}
-              {showDragHint && !topic.id.startsWith("temp_") && !isDragging && (
+              {!readonly && showDragHint && !topic.id.startsWith("temp_") && !isDragging && (
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[70%] px-4 py-3 pointer-events-none">
                   <span
                     className={`text-sm font-medium text-secondary text-center block capitalize ${
@@ -751,8 +753,9 @@ function TopicCard({
               )}
             </div>
           )}
-          {/* Dropdown menu - always visible */}
-          <DropdownMenu>
+          {/* Dropdown menu - only visible if not readonly */}
+          {!readonly && (
+            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
                 className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-background/50 transition-colors ml-1"
@@ -797,6 +800,7 @@ function TopicCard({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          )}
         </div>
       </Card>
     </div>
@@ -836,9 +840,17 @@ type TopicWithSlides = Topic & {
 
 interface StageDetailSectionProps {
   slug: string;
+  readonly?: boolean;
+  basePath?: string; // e.g., "/admin/content/curriculum" or "/schools/{schoolId}/resources/content"
+  onBackClick?: () => void; // Optional custom back navigation
 }
 
-export function StageDetailSection({ slug }: StageDetailSectionProps) {
+export function StageDetailSection({ 
+  slug, 
+  readonly = false,
+  basePath = "/admin/content/curriculum",
+  onBackClick,
+}: StageDetailSectionProps) {
   const router = useRouter();
   const [localTopics, setLocalTopics] = useState<TopicWithSlides[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -945,7 +957,11 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
   };
 
   const handleStageDeleted = () => {
-    router.push("/admin/content/curriculum");
+    if (onBackClick) {
+      onBackClick();
+    } else {
+      router.push(basePath);
+    }
   };
 
   const handleTopicClick = (
@@ -953,7 +969,7 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
     event?: React.MouseEvent
   ) => {
     // Don't navigate if we're dragging or if it's a temp topic
-    if (activeId || topic.id.startsWith("temp_")) return;
+    if ((!readonly && activeId) || topic.id.startsWith("temp_")) return;
 
     // Don't navigate if clicking on dropdown menu
     if (
@@ -965,7 +981,7 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
 
     // Navigate to topic page using T{stageOrder} format
     if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`/admin/content/curriculum/${slug}/T${topic.stageOrder}`);
+      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
     }
   };
 
@@ -1001,14 +1017,14 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
   const handleAddSlideBefore = (topic: TopicWithSlides) => {
     // Navigate to topic page - the topic editor should handle adding slide at position 0
     if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`/admin/content/curriculum/${slug}/T${topic.stageOrder}`);
+      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
     }
   };
 
   const handleAddSlideAfter = (topic: TopicWithSlides) => {
     // Navigate to topic page - the topic editor should handle adding slide at the end
     if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`/admin/content/curriculum/${slug}/T${topic.stageOrder}`);
+      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
     }
   };
 
@@ -1214,7 +1230,13 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
       <div className="space-y-4">
         <Button
           variant="ghost"
-          onClick={() => router.push("/admin/content/curriculum")}
+          onClick={() => {
+            if (onBackClick) {
+              onBackClick();
+            } else {
+              router.push(basePath);
+            }
+          }}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1283,7 +1305,13 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
       <div className="space-y-4">
         <Button
           variant="ghost"
-          onClick={() => router.push("/admin/content")}
+          onClick={() => {
+            if (onBackClick) {
+              onBackClick();
+            } else {
+              router.push(basePath);
+            }
+          }}
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -1316,20 +1344,15 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
               </h1>
             </div>
             {stage.years && stage.years.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {stage.years.map((year) => (
-                  <Badge
-                    key={year.id}
-                    variant="secondary"
-                    className="px-2 py-1 text-xs"
-                  >
-                    {year.displayName}
-                  </Badge>
-                ))}
+              <div className="flex items-center gap-x-2 text-xs text-muted-foreground">
+                {stage.years.flatMap((year, index) => [
+                  index > 0 && <span key={`dot-${year.id}`} className="opacity-50">•</span>,
+                  <span key={year.id}>{year.displayName}</span>,
+                ]).filter(Boolean)}
               </div>
             )}
           </div>
-          {hasUnsavedChanges && (
+          {!readonly && hasUnsavedChanges && (
             <Button onClick={handleSaveChanges} disabled={isSaving}>
               {isSaving ? (
                 <>
@@ -1377,6 +1400,41 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
               <div className="text-center py-8 text-muted-foreground">
                 <p className="text-sm">No topics found for this stage.</p>
               </div>
+            ) : readonly ? (
+              // Read-only mode: simple grid without drag/drop
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {displayTopics.map((topic, index) => (
+                  <StaggeredAnimation
+                    key={topic.id}
+                    index={index}
+                    incrementDelay={0.075}
+                  >
+                    <TopicCard
+                      topic={topic}
+                      isHovered={false}
+                      isLeaving={false}
+                      hoveredSide={null}
+                      showPlaceholderOverlay={false}
+                      isDragHandleHovered={false}
+                      showDragHint={false}
+                      isDragActive={false}
+                      cardIndex={index}
+                      readonly={true}
+                      onMouseEnter={() => {}}
+                      onMouseLeave={() => {}}
+                      onChevronHover={() => {}}
+                      onChevronLeave={() => {}}
+                      onDragHandleEnter={() => {}}
+                      onDragHandleLeave={() => {}}
+                      onClick={(e) => handleTopicClick(topic, e)}
+                      onAddTopicClick={() => {}}
+                      onDeleteTopic={() => {}}
+                      onAddSlideBefore={() => {}}
+                      onAddSlideAfter={() => {}}
+                    />
+                  </StaggeredAnimation>
+                ))}
+              </div>
             ) : (
               <DndContext
                 sensors={sensors}
@@ -1417,9 +1475,10 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                             showDragHint={showDragHintIndex === index}
                             isDragActive={isDragActive}
                             cardIndex={index}
+                            readonly={false}
                             onMouseEnter={() => {
-                              // Skip all hover logic during drag to prevent state update loops
-                              if (activeId) return;
+                              // Skip all hover logic during drag or in readonly mode
+                              if (activeId || readonly) return;
 
                               // Clear any leave timeout from previous card
                               if (leaveDelayTimeoutRef.current) {
@@ -1454,8 +1513,8 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                               }, 1000);
                             }}
                             onMouseLeave={(e) => {
-                              // Skip all hover logic during drag to prevent state update loops
-                              if (activeId) return;
+                              // Skip all hover logic during drag or in readonly mode
+                              if (activeId || readonly) return;
 
                               // Check if we're moving to a child element (drag handle) or another card
                               const relatedTarget =
@@ -1533,8 +1592,8 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                               setHoveredSide(null);
                             }}
                             onDragHandleEnter={() => {
-                              // Don't update hover states during drag
-                              if (activeId) return;
+                              // Don't update hover states during drag or in readonly mode
+                              if (activeId || readonly) return;
 
                               // Only update if values actually need to change to prevent unnecessary re-renders
                               if (hoveredDragHandle !== topic.id) {
@@ -1548,8 +1607,8 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
                               }
                             }}
                             onDragHandleLeave={(e) => {
-                              // Don't update hover states during drag
-                              if (activeId) return;
+                              // Don't update hover states during drag or in readonly mode
+                              if (activeId || readonly) return;
 
                               const relatedTarget =
                                 e.relatedTarget as Node | null;
@@ -1652,22 +1711,26 @@ export function StageDetailSection({ slug }: StageDetailSectionProps) {
         </ScrollArea>
       </div>
 
-      {/* Edit Stage Sheet */}
-      <EditStageSheet
-        open={isEditSheetOpen}
-        onOpenChange={setIsEditSheetOpen}
-        stage={stage}
-        onStageUpdated={handleStageUpdated}
-        onStageDeleted={handleStageDeleted}
-      />
+      {/* Edit Stage Sheet - only in edit mode */}
+      {!readonly && (
+        <EditStageSheet
+          open={isEditSheetOpen}
+          onOpenChange={setIsEditSheetOpen}
+          stage={stage}
+          onStageUpdated={handleStageUpdated}
+          onStageDeleted={handleStageDeleted}
+        />
+      )}
 
-      {/* Add Topic Drawer */}
-      <AddTopicDrawer
-        open={isAddTopicDrawerOpen}
-        onOpenChange={setIsAddTopicDrawerOpen}
-        stageId={stage.id}
-        onTopicAdded={handleTopicAdded}
-      />
+      {/* Add Topic Drawer - only in edit mode */}
+      {!readonly && (
+        <AddTopicDrawer
+          open={isAddTopicDrawerOpen}
+          onOpenChange={setIsAddTopicDrawerOpen}
+          stageId={stage.id}
+          onTopicAdded={handleTopicAdded}
+        />
+      )}
     </div>
   );
 }
