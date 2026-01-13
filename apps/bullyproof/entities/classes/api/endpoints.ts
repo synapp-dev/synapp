@@ -23,8 +23,8 @@ export const classesApi = {
       const query = searchParams.toString();
       return apiFetch<ClassWithYearCodes[]>(`/classes${query ? `?${query}` : ""}`);
     },
-    byId(id: string): Promise<ApiResult<Class & { years?: any[] }>> {
-      return apiFetch<Class & { years?: any[] }>(`/classes/${encodeURIComponent(id)}`);
+    byId(id: string): Promise<ApiResult<Class & { years?: any[]; teachers?: any[] }>> {
+      return apiFetch<Class & { years?: any[]; teachers?: any[] }>(`/classes/${encodeURIComponent(id)}`);
     },
   },
   post: {
@@ -56,9 +56,11 @@ export const classesApi = {
         studentCap?: number;
         active?: boolean;
         yearIds?: string[];
+        teacherIds?: string[];
+        startYear?: string;
       }
-    ): Promise<ApiResult<Class & { years?: any[] }>> {
-      return apiFetch<Class & { years?: any[] }>(`/classes/${encodeURIComponent(id)}`, {
+    ): Promise<ApiResult<Class & { years?: any[]; teachers?: any[] }>> {
+      return apiFetch<Class & { years?: any[]; teachers?: any[] }>(`/classes/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify(payload),
       });
@@ -68,6 +70,12 @@ export const classesApi = {
     delete(id: string): Promise<ApiResult<{ success: boolean }>> {
       return apiFetch<{ success: boolean }>(`/classes/${encodeURIComponent(id)}`, {
         method: "DELETE",
+      });
+    },
+    deleteBatch(payload: { classIds: string[] }): Promise<ApiResult<{ success: boolean; deletedCount: number; message: string }>> {
+      return apiFetch<{ success: boolean; deletedCount: number; message: string }>("/classes/delete", {
+        method: "DELETE",
+        body: JSON.stringify(payload),
       });
     },
   },
