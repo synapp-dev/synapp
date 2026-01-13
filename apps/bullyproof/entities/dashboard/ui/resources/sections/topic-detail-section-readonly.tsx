@@ -38,7 +38,7 @@ import type { topics, topicSlides } from "@/server/db/schema";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
-  slides?: Array<typeof topicSlides.$inferSelect>;
+  slides?: Array<typeof topicSlides.$inferSelect & { signedUrl?: string | null }>;
 };
 
 interface TopicDetailSectionReadonlyProps {
