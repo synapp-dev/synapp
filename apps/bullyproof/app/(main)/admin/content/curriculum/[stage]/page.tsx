@@ -17,5 +17,11 @@ export default async function StageDetailPage({
   params: Promise<{ stage: string }>;
 }) {
   const { stage } = await params;
-  return <StageDetailSection slug={stage} />;
+  return (
+    <StageDetailSection 
+      slug={stage} 
+      readonly={false}
+      basePath="/admin/content/curriculum"
+    />
+  );
 }

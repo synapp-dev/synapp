@@ -8,5 +8,12 @@ export const metadata = generateMetadataFromSegments([
 ]);
 
 export default function CurriculumPage() {
-  return <ContentSection />;
+  return (
+    <ContentSection
+      isAdmin={true}
+      title="Curriculum Stages"
+      description="Manage and view curriculum stages for the platform."
+      basePath="/admin/content/curriculum"
+    />
+  );
 }
