@@ -167,12 +167,18 @@ export const rolesRepo = {
     return result.map((r) => r.roleKey || "").filter(Boolean);
   },
 
-  assignRole: async (data: {
-    userId: string;
-    roleId: string;
-    schoolId?: string;
-    roleScope?: string;
-  }) => {
+  assignRole: async (
+    data: {
+      userId: string;
+      roleId: string;
+      schoolId?: string;
+      roleScope?: string;
+    },
+    tx?: typeof db
+  ) => {
+    // Use transaction if provided, otherwise use regular db instance
+    const dbInstance = tx || db;
+
     // Validate platform/school role constraints before assignment
     const isAssigningPlatformRole = await rolesRepo.isPlatformRole(data.roleId);
     const isAssigningSchoolRole = await rolesRepo.isSchoolRole(data.roleId);
@@ -247,7 +253,7 @@ export const rolesRepo = {
       );
     }
 
-    return db
+    return dbInstance
       .insert(userRoles)
       .values({
         ...data,
@@ -270,7 +276,8 @@ export const rolesRepo = {
       )
       .limit(1),
 
-  removeRole: (userId: string, roleId: string, schoolId?: string) => {
+  removeRole: (userId: string, roleId: string, schoolId?: string, tx?: typeof db) => {
+    const dbInstance = tx || db;
     const whereConditions = [
       eq(userRoles.userId, userId),
       eq(userRoles.roleId, roleId),
@@ -280,7 +287,7 @@ export const rolesRepo = {
       whereConditions.push(eq(userRoles.schoolId, schoolId));
     }
 
-    return db.delete(userRoles).where(and(...whereConditions));
+    return dbInstance.delete(userRoles).where(and(...whereConditions));
   },
 
   getUsersByRole: (roleId: string, schoolId?: string) => {

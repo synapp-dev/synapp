@@ -16,6 +16,7 @@ import {
 } from "./roles.validators";
 import { rolesRepo } from "./roles.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { db } from "@/server/db/drizzle";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -107,19 +108,19 @@ export const rolesService = {
     return { success: true };
   },
 
-  async assignRole(ctx: AuthContext, params: unknown) {
+  async assignRole(ctx: AuthContext, params: unknown, tx?: typeof db) {
     const data: AssignRoleParams = assignRoleSchema.parse(params);
     await assertCanManageRoles(ctx);
 
-    const assignment = await rolesRepo.assignRole(data);
+    const assignment = await rolesRepo.assignRole(data, tx);
     return assignment[0];
   },
 
-  async removeRole(ctx: AuthContext, params: unknown) {
+  async removeRole(ctx: AuthContext, params: unknown, tx?: typeof db) {
     const data: RemoveRoleParams = removeRoleSchema.parse(params);
     await assertCanManageRoles(ctx);
 
-    await rolesRepo.removeRole(data.userId, data.roleId, data.schoolId);
+    await rolesRepo.removeRole(data.userId, data.roleId, data.schoolId, tx);
     return { success: true };
   },
 
