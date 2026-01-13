@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SchoolsDataTable } from "./components/schools-data-table";
 import { SchoolDetailDrawer } from "./components/school-detail-drawer";
@@ -69,6 +69,32 @@ function SchoolsSectionContent() {
   const modalFromUrl = searchParams?.get("modal") || null;
   // Extract tab from URL query parameter (e.g., ?tab=overview)
   const tabFromUrl = searchParams?.get("tab") || null;
+  
+  // Memoize initialTab to prevent unnecessary re-renders
+  const initialTab = useMemo(() => {
+    if (
+      tabFromUrl &&
+      [
+        "onboarding",
+        "overview",
+        "users",
+        "classes",
+        "activity",
+        "culture",
+        "settings",
+      ].includes(tabFromUrl)
+    ) {
+      return tabFromUrl as
+        | "onboarding"
+        | "overview"
+        | "users"
+        | "classes"
+        | "activity"
+        | "culture"
+        | "settings";
+    }
+    return undefined;
+  }, [tabFromUrl]);
 
   // Load schools on mount
   useEffect(() => {
@@ -496,6 +522,81 @@ function SchoolsSectionContent() {
     }
   };
 
+  // Use ref to track selectedSchool without causing callback recreation
+  const selectedSchoolRef = useRef(selectedSchool);
+  useEffect(() => {
+    selectedSchoolRef.current = selectedSchool;
+  }, [selectedSchool]);
+
+  // Memoize onSchoolUpdate to prevent infinite loops
+  const handleSchoolUpdate = useCallback(async () => {
+    // Refresh schools list
+    try {
+      const result = await schoolApi.get.listSchools({
+        limit: 100,
+        offset: 0,
+      });
+      if (result.data) {
+        const mappedSchools: School[] = result.data.map((school: any) => {
+          const teacherCount = school.teacherCount ?? 0;
+          const classCount = school.classCount ?? 0;
+          const schoolAdminCount = school.schoolAdminCount ?? 0;
+          const schoolLicenceCount = school.schoolLicenceCount ?? 0;
+          const activeLicence =
+            school.activeLicence ?? school.active_licence ?? false;
+
+          // Status: onboarding if any count < 1, active if all counts >= 1
+          const status: "onboarding" | "active" =
+            teacherCount < 1 ||
+            classCount < 1 ||
+            schoolAdminCount < 1 ||
+            schoolLicenceCount < 1
+              ? "onboarding"
+              : "active";
+
+          return {
+            id: school.id || "",
+            name: school.name || "",
+            state: school.state || null,
+            sector: school.sector || null,
+            teacherCount,
+            classCount,
+            schoolAdminCount,
+            schoolLicenceCount,
+            activeLicence,
+            status,
+            slug: school.slug || null,
+            levels: school.levels || null,
+          };
+        });
+        setSchools(mappedSchools);
+        // Update selected school if it exists - only if it actually changed
+        const currentSelectedSchool = selectedSchoolRef.current;
+        if (currentSelectedSchool) {
+          const updatedSchool = mappedSchools.find(
+            (s) => s.id === currentSelectedSchool.id
+          );
+          if (updatedSchool) {
+            // Only update if the school data actually changed
+            const hasChanged = 
+              updatedSchool.teacherCount !== currentSelectedSchool.teacherCount ||
+              updatedSchool.classCount !== currentSelectedSchool.classCount ||
+              updatedSchool.schoolAdminCount !== currentSelectedSchool.schoolAdminCount ||
+              updatedSchool.schoolLicenceCount !== currentSelectedSchool.schoolLicenceCount ||
+              updatedSchool.activeLicence !== currentSelectedSchool.activeLicence ||
+              updatedSchool.status !== currentSelectedSchool.status;
+            
+            if (hasChanged) {
+              setSelectedSchool(updatedSchool);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Failed to refresh schools:", err);
+    }
+  }, []);
+
   // Skeleton loader component
   const SkeletonTable = () => {
     const skeletonRows = Array.from({ length: 20 }, (_, i) => i);
@@ -885,83 +986,9 @@ function SchoolsSectionContent() {
         school={selectedSchool}
         open={isDrawerOpen}
         onOpenChange={handleDrawerClose}
-        initialTab={
-          tabFromUrl &&
-          [
-            "onboarding",
-            "overview",
-            "users",
-            "classes",
-            "activity",
-            "culture",
-            "settings",
-          ].includes(tabFromUrl)
-            ? (tabFromUrl as
-                | "onboarding"
-                | "overview"
-                | "users"
-                | "classes"
-                | "activity"
-                | "culture"
-                | "settings")
-            : undefined
-        }
+        initialTab={initialTab}
         onTabChange={handleTabChange}
-        onSchoolUpdate={async () => {
-          // Refresh schools list
-          try {
-            const result = await schoolApi.get.listSchools({
-              limit: 100,
-              offset: 0,
-            });
-            if (result.data) {
-              const mappedSchools: School[] = result.data.map((school: any) => {
-                const teacherCount = school.teacherCount ?? 0;
-                const classCount = school.classCount ?? 0;
-                const schoolAdminCount = school.schoolAdminCount ?? 0;
-                const schoolLicenceCount = school.schoolLicenceCount ?? 0;
-                const activeLicence =
-                  school.activeLicence ?? school.active_licence ?? false;
-
-                // Status: onboarding if any count < 1, active if all counts >= 1
-                const status: "onboarding" | "active" =
-                  teacherCount < 1 ||
-                  classCount < 1 ||
-                  schoolAdminCount < 1 ||
-                  schoolLicenceCount < 1
-                    ? "onboarding"
-                    : "active";
-
-                return {
-                  id: school.id || "",
-                  name: school.name || "",
-                  state: school.state || null,
-                  sector: school.sector || null,
-                  teacherCount,
-                  classCount,
-                  schoolAdminCount,
-                  schoolLicenceCount,
-                  activeLicence,
-                  status,
-                  slug: school.slug || null,
-                  levels: school.levels || null,
-                };
-              });
-              setSchools(mappedSchools);
-              // Update selected school if it exists
-              if (selectedSchool) {
-                const updatedSchool = mappedSchools.find(
-                  (s) => s.id === selectedSchool.id
-                );
-                if (updatedSchool) {
-                  setSelectedSchool(updatedSchool);
-                }
-              }
-            }
-          } catch (err) {
-            console.error("Failed to refresh schools:", err);
-          }
-        }}
+        onSchoolUpdate={handleSchoolUpdate}
       />
 
       {/* Add School Wizard */}

@@ -854,13 +854,31 @@ function SchoolDetailDrawerContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<TabId>(initialTab);
+  const [activeSection, setActiveSection] = useState<TabId>(initialTab || "onboarding");
+  const prevInitialTabRef = useRef<TabId | undefined>(initialTab);
+  const prevOpenRef = useRef(open);
+  const isInitialMountRef = useRef(true);
+  const hasHandledInitialDialogRef = useRef(false);
 
   // Reset to initialTab when drawer opens or initialTab changes
   useEffect(() => {
-    if (open) {
-      setActiveSection(initialTab);
+    // Only update if initialTab actually changed or drawer just opened
+    const initialTabChanged = prevInitialTabRef.current !== initialTab;
+    const drawerJustOpened = !prevOpenRef.current && open;
+    
+    if (open && (initialTabChanged || drawerJustOpened)) {
+      const newTab = initialTab || "onboarding";
+      setActiveSection(newTab);
+      prevInitialTabRef.current = initialTab;
     }
+    
+    // Reset initial mount flag when drawer closes
+    if (!open && prevOpenRef.current) {
+      isInitialMountRef.current = true;
+      hasHandledInitialDialogRef.current = false;
+    }
+    
+    prevOpenRef.current = open;
   }, [open, initialTab]);
 
   // Handle tab change
@@ -1008,30 +1026,46 @@ function SchoolDetailDrawerContent({
   }, [classesSearchQuery]);
 
   // Refetch users when section becomes active
+  const prevUsersSectionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeSection === "users" && school) {
-      refetchUsers();
+    if (activeSection === "users" && school?.id) {
+      // Only refetch if we're switching TO the users section (not already on it)
+      if (prevUsersSectionRef.current !== "users") {
+        refetchUsers();
+        prevUsersSectionRef.current = "users";
+      }
+    } else {
+      prevUsersSectionRef.current = activeSection;
     }
-  }, [activeSection, school, refetchUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, school?.id]);
 
+  // Track previous classes section to prevent duplicate fetches
+  const prevClassesSectionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeSection === "classes" && school) {
-      setLoadingClasses(true);
-      classesApi.get
-        .list({ schoolId: school.id })
-        .then((result) => {
-          if (!result.error && result.data) {
-            setClasses(result.data);
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to fetch classes:", error);
-        })
-        .finally(() => {
-          setLoadingClasses(false);
-        });
+    if (activeSection === "classes" && school?.id) {
+      // Only fetch if we're switching TO the classes section (not already on it)
+      if (prevClassesSectionRef.current !== "classes") {
+        setLoadingClasses(true);
+        classesApi.get
+          .list({ schoolId: school.id })
+          .then((result) => {
+            if (!result.error && result.data) {
+              setClasses(result.data);
+            }
+          })
+          .catch((error) => {
+            console.error("Failed to fetch classes:", error);
+          })
+          .finally(() => {
+            setLoadingClasses(false);
+          });
+        prevClassesSectionRef.current = "classes";
+      }
+    } else {
+      prevClassesSectionRef.current = activeSection;
     }
-  }, [activeSection, school]);
+  }, [activeSection, school?.id]);
 
   // Filter classes based on search and year level
   const filteredClasses = useMemo(() => {
@@ -1285,49 +1319,60 @@ function SchoolDetailDrawerContent({
   };
 
   // Fetch school licence when settings section is active
+  const prevSettingsSectionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeSection === "settings" && school) {
-      setLoadingLicence(true);
-      // First check for ACTIVE licence
-      licencesApi.get
-        .list({ schoolId: school.id, status: "ACTIVE", limit: 1 })
-        .then((result) => {
-          if (!result.error && result.data && result.data.length > 0) {
-            setSchoolLicence(result.data[0]);
-            setLoadingLicence(false);
-          } else {
-            // If no ACTIVE licence, check for PENDING status
-            licencesApi.get
-              .list({ schoolId: school.id, status: "PENDING", limit: 1 })
-              .then((pendingResult) => {
-                if (
-                  !pendingResult.error &&
-                  pendingResult.data &&
-                  pendingResult.data.length > 0
-                ) {
-                  setSchoolLicence(pendingResult.data[0]);
-                } else {
+    if (activeSection === "settings" && school?.id) {
+      // Only fetch if we're switching TO the settings section (not already on it)
+      if (prevSettingsSectionRef.current !== "settings") {
+        setLoadingLicence(true);
+        // First check for ACTIVE licence
+        licencesApi.get
+          .list({ schoolId: school.id, status: "ACTIVE", limit: 1 })
+          .then((result) => {
+            if (!result.error && result.data && result.data.length > 0) {
+              setSchoolLicence(result.data[0]);
+              setLoadingLicence(false);
+            } else {
+              // If no ACTIVE licence, check for PENDING status
+              licencesApi.get
+                .list({ schoolId: school.id, status: "PENDING", limit: 1 })
+                .then((pendingResult) => {
+                  if (
+                    !pendingResult.error &&
+                    pendingResult.data &&
+                    pendingResult.data.length > 0
+                  ) {
+                    setSchoolLicence(pendingResult.data[0]);
+                  } else {
+                    setSchoolLicence(null);
+                  }
+                })
+                .catch((error) => {
+                  console.error("Failed to fetch pending licence:", error);
                   setSchoolLicence(null);
-                }
-              })
-              .catch((error) => {
-                console.error("Failed to fetch pending licence:", error);
-                setSchoolLicence(null);
-              })
-              .finally(() => {
-                setLoadingLicence(false);
-              });
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to fetch licence:", error);
-          setSchoolLicence(null);
-          setLoadingLicence(false);
-        });
+                })
+                .finally(() => {
+                  setLoadingLicence(false);
+                });
+            }
+          })
+          .catch((error) => {
+            console.error("Failed to fetch licence:", error);
+            setSchoolLicence(null);
+            setLoadingLicence(false);
+          });
+        prevSettingsSectionRef.current = "settings";
+      }
     } else {
-      setSchoolLicence(null);
+      if (activeSection !== "settings") {
+        prevSettingsSectionRef.current = activeSection;
+      }
     }
-  }, [activeSection, school]);
+  }, [activeSection, school?.id]);
+
+  // Track dialog param value to avoid infinite loops
+  const dialogParam = searchParams?.get("dialog") || null;
+  const prevDialogParamRef = useRef<string | null>(dialogParam);
 
   // Check for dialog query parameter and open dialog if conditions are met
   useEffect(() => {
@@ -1336,32 +1381,55 @@ function SchoolDetailDrawerContent({
       return;
     }
 
+    // Handle initial page load with dialog=add-class - remove it without opening dialog
+    if (isInitialMountRef.current && dialogParam === "add-class" && open && school && activeSection === "classes") {
+      if (!hasHandledInitialDialogRef.current) {
+        hasHandledInitialDialogRef.current = true;
+        // Remove dialog param on initial page load
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.delete("dialog");
+        const newUrl = params.toString()
+          ? `/admin/schools?${params.toString()}`
+          : "/admin/schools";
+        router.replace(newUrl, { scroll: false });
+        return;
+      }
+    }
+
+    // Mark initial mount as complete after first render
+    if (isInitialMountRef.current) {
+      isInitialMountRef.current = false;
+    }
+
+    // Only process if dialog param actually changed
+    const dialogParamChanged = prevDialogParamRef.current !== dialogParam;
+    if (!dialogParamChanged && !open) {
+      return;
+    }
+    prevDialogParamRef.current = dialogParam;
+
     if (open && school && activeSection === "settings") {
-      const dialogParam = searchParams?.get("dialog");
       if (dialogParam === "ADD-school-licence" && !addLicenceDialogOpen) {
         setAddLicenceDialogOpen(true);
+      } else if (!dialogParam && addLicenceDialogOpen) {
+        setAddLicenceDialogOpen(false);
       }
     }
 
     if (open && school && activeSection === "users") {
-      const dialogParam = searchParams?.get("dialog");
-      if (dialogParam === "add-user") {
-        if (!addUserDialogOpen) {
-          setAddUserDialogOpen(true);
-        }
+      if (dialogParam === "add-user" && !addUserDialogOpen) {
+        setAddUserDialogOpen(true);
         // Close import dialog if it's open
         if (importUsersDialogOpen) {
           setImportUsersDialogOpen(false);
         }
-      } else if (dialogParam === "import-users") {
-        if (!importUsersDialogOpen) {
-          setImportUsersDialogOpen(true);
-        }
+      } else if (dialogParam === "import-users" && !importUsersDialogOpen) {
+        setImportUsersDialogOpen(true);
         // Close add user dialog if it's open
         if (addUserDialogOpen) {
           setAddUserDialogOpen(false);
         }
-      } else {
+      } else if (!dialogParam) {
         // Close both dialogs when param is removed
         if (addUserDialogOpen) {
           setAddUserDialogOpen(false);
@@ -1373,22 +1441,24 @@ function SchoolDetailDrawerContent({
     }
 
     if (open && school && activeSection === "classes") {
-      const dialogParam = searchParams?.get("dialog");
       if (dialogParam === "add-class" && !addClassDialogOpen) {
-        setAddClassDialogOpen(true);
-        // Close import dialog if it's open
-        if (importClassesDialogOpen) {
-          setImportClassesDialogOpen(false);
+        // Only open if we've already handled the initial page load case
+        // or if this is a subsequent change (user clicked button)
+        if (!isInitialMountRef.current || hasHandledInitialDialogRef.current) {
+          setAddClassDialogOpen(true);
+          hasHandledInitialDialogRef.current = true; // Mark as handled for future opens
+          // Close import dialog if it's open
+          if (importClassesDialogOpen) {
+            setImportClassesDialogOpen(false);
+          }
         }
-      } else if (dialogParam === "import-classes") {
-        if (!importClassesDialogOpen) {
-          setImportClassesDialogOpen(true);
-        }
+      } else if (dialogParam === "import-classes" && !importClassesDialogOpen) {
+        setImportClassesDialogOpen(true);
         // Close add class dialog if it's open
         if (addClassDialogOpen) {
           setAddClassDialogOpen(false);
         }
-      } else {
+      } else if (!dialogParam) {
         // Close both dialogs when param is removed
         if (addClassDialogOpen) {
           setAddClassDialogOpen(false);
@@ -1400,18 +1470,16 @@ function SchoolDetailDrawerContent({
         if (importClassesDialogOpen) {
           setImportClassesDialogOpen(false);
         }
+        // Reset the initial dialog flag when dialog closes
+        hasHandledInitialDialogRef.current = false;
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
-    school,
+    school?.id,
     activeSection,
-    searchParams,
-    addLicenceDialogOpen,
-    addUserDialogOpen,
-    importUsersDialogOpen,
-    importClassesDialogOpen,
-    addClassDialogOpen,
+    dialogParam,
   ]);
 
   // Fetch existing school licence email when dialog opens
@@ -1711,6 +1779,8 @@ function SchoolDetailDrawerContent({
                                       params.set("school", school.slug);
                                       params.set("tab", "classes");
                                       params.set("dialog", "add-class");
+                                      // Mark that we're opening via click, not page load
+                                      hasHandledInitialDialogRef.current = true;
                                       router.push(
                                         `/admin/schools?${params.toString()}`,
                                         {
@@ -2127,6 +2197,8 @@ function SchoolDetailDrawerContent({
                         <>
                           <Button
                             onClick={() => {
+                              // Mark that we're opening via click, not page load
+                              hasHandledInitialDialogRef.current = true;
                               setAddClassDialogOpen(true);
                               if (school?.slug) {
                                 const params = new URLSearchParams(
