@@ -157,6 +157,15 @@ export const meApi = {
     getSchoolsWithClasses(): Promise<ApiResult<{ schoolIds: string[] }>> {
       return apiFetch<{ schoolIds: string[] }>("/me/teacher-classes/schools");
     },
+    toggle(
+      classId: string,
+      action: "add" | "remove"
+    ): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch<{ success: boolean }>("/me/teacher-classes", {
+        method: "POST",
+        body: JSON.stringify({ classId, action }),
+      });
+    },
   },
   dialogs: {
     dismiss(
