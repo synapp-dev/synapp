@@ -8,9 +8,10 @@
  *
  * Endpoints:
  * - GET /api/me/teacher-classes - Check if current user has any teacher classes
+ * - POST /api/me/teacher-classes - Add or remove a class for current user
  *
  * Responses:
- * - 200 OK: Returns `{ hasClasses: boolean }`.
+ * - 200 OK: Returns `{ hasClasses: boolean }` (GET) or `{ success: boolean }` (POST).
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
  * - 500 Internal Error: `{ error: string }` on unexpected failures.
  */
@@ -18,7 +19,7 @@ import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { db } from "@/server/db/drizzle";
 import { teacherClasses } from "@/drizzle/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 /**
  * Handle GET /api/me/teacher-classes
@@ -48,6 +49,64 @@ export async function GET(request: Request) {
     return NextResponse.json({ hasClasses }, { status: 200 });
   } catch (e: any) {
     console.error("[TEACHER_CLASSES GET] Error:", e);
+    return NextResponse.json(
+      { error: e.message ?? "Internal error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/me/teacher-classes
+ *
+ * Adds or removes a class for the current user.
+ * Request body: { classId: string, action: "add" | "remove" }
+ *
+ * @param request The incoming HTTP request.
+ * @returns A JSON `NextResponse` with success status or an error payload.
+ */
+export async function POST(request: Request) {
+  try {
+    const userId = await getUserIdFromRequest(request);
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { classId, action } = body;
+
+    if (!classId || !action || !["add", "remove"].includes(action)) {
+      return NextResponse.json(
+        { error: "Invalid request. classId and action (add/remove) are required." },
+        { status: 400 }
+      );
+    }
+
+    if (action === "add") {
+      // Add class to teacher_classes
+      await db
+        .insert(teacherClasses)
+        .values({
+          userId,
+          classId,
+        })
+        .onConflictDoNothing();
+    } else {
+      // Remove class from teacher_classes
+      await db
+        .delete(teacherClasses)
+        .where(
+          and(
+            eq(teacherClasses.userId, userId),
+            eq(teacherClasses.classId, classId)
+          )
+        );
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (e: any) {
+    console.error("[TEACHER_CLASSES POST] Error:", e);
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status: 500 }
