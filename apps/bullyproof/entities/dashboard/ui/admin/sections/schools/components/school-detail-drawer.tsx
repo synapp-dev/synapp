@@ -1,4 +1,11 @@
-import { useState, useEffect, useRef, Suspense, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  Suspense,
+  useMemo,
+  useCallback,
+} from "react";
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -28,6 +35,7 @@ import {
   Card,
   CardContent,
   CardHeader,
+  CardFooter,
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
@@ -86,6 +94,7 @@ import { usersApi } from "@/entities/users/api/endpoints";
 import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
 import { statesApi } from "@/entities/states/api/endpoints";
 import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
+import { schoolApi } from "@/entities/school/api/endpoints";
 import { useStatesStore } from "@/entities/states/model/store";
 import { useSchoolSectorsStore } from "@/entities/school-sectors/model/store";
 import { useSchoolLevelsStore } from "@/entities/school-levels/model/store";
@@ -165,12 +174,12 @@ import {
 
 type TabId =
   | "onboarding"
-  | "overview"
+  | "details"
   | "users"
   | "classes"
   | "activity"
   | "culture"
-  | "settings";
+  | "license";
 
 interface SchoolDetailDrawerProps {
   school: SchoolType | null;
@@ -183,12 +192,13 @@ interface SchoolDetailDrawerProps {
 
 const navItems = [
   { id: "onboarding", name: "Onboarding", icon: Rocket },
-  { id: "overview", name: "Overview", icon: Eye },
+  { id: "details", name: "Details", icon: Eye },
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },
   { id: "activity", name: "Activity", icon: Activity, disabled: true },
   { id: "culture", name: "Culture", icon: Star, disabled: true },
-  { id: "settings", name: "License", icon: Key },
+  { id: "license", name: "License", icon: Key },
+  { id: "delete", name: "Delete School", icon: Trash2 },
 ];
 
 // Helper function to format school levels
@@ -248,6 +258,7 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
   const [stateId, setStateId] = useState<string>("");
   const [sectorId, setSectorId] = useState<string>("");
   const [levelIds, setLevelIds] = useState<string[]>([]);
+  const [isP12Mode, setIsP12Mode] = useState(false);
   const [stateComboboxOpen, setStateComboboxOpen] = useState(false);
   const [sectorComboboxOpen, setSectorComboboxOpen] = useState(false);
   const [levelsComboboxOpen, setLevelsComboboxOpen] = useState(false);
@@ -365,8 +376,19 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
           })
           .filter((id): id is string => !!id);
         setLevelIds(mappedLevelIds);
+
+        // Check if both Primary and Secondary are present (P-12)
+        const hasPrimary = mappedLevelIds.some(
+          (id) => levelsData.find((l) => l.id === id)?.key === "primary"
+        );
+        const hasSecondary = mappedLevelIds.some(
+          (id) => levelsData.find((l) => l.id === id)?.key === "secondary"
+        );
+        // Set P-12 mode if both are present and it's exactly these two
+        setIsP12Mode(hasPrimary && hasSecondary && mappedLevelIds.length === 2);
       } else {
         setLevelIds([]);
+        setIsP12Mode(false);
       }
     }
   }, [school?.id, statesData, sectorsData, levelsData]);
@@ -404,30 +426,26 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
       setSaving(true);
       setSaveError(null);
 
-      // TODO: Add API endpoint for updating school
-      // For now, just show an error that the endpoint doesn't exist
-      throw new Error("School update API endpoint not yet implemented");
+      const result = await schoolApi.patch.update(school.id, {
+        name: name.trim() || undefined,
+        address: address.trim() || null,
+        emailDomain: emailDomain.trim() || null,
+        bannerUrl: bannerUrl.trim() || null,
+        avatarUrl: avatarUrl.trim() || null,
+        stateId: stateId || undefined,
+        sectorId: sectorId || undefined,
+        levelIds: levelIds.length > 0 ? levelIds : undefined,
+      });
 
-      // Uncomment when API is ready:
-      // const result = await schoolApi.patch.update(school.id, {
-      //   name: name || undefined,
-      //   address: address || undefined,
-      //   emailDomain: emailDomain || undefined,
-      //   bannerUrl: bannerUrl || undefined,
-      //   avatarUrl: avatarUrl || undefined,
-      //   stateId: stateId || undefined,
-      //   sectorId: sectorId || undefined,
-      //   levelIds: levelIds.length > 0 ? levelIds : undefined,
-      // });
+      if (result.error) {
+        const errorMessage = result.error.message || "Failed to update school";
+        throw new Error(errorMessage);
+      }
 
-      // if (result.error) {
-      //   const errorMessage =
-      //     result.error.message || "Failed to update school";
-      //   throw new Error(errorMessage);
-      // }
-
-      // setEditing(false);
-      // onSchoolUpdate?.();
+      // Exit edit mode but keep drawer open
+      setEditing(false);
+      // Refresh school data
+      onSchoolUpdate?.();
     } catch (err: any) {
       console.error("Failed to update school:", err);
       setSaveError(err.message || "Failed to update school");
@@ -477,6 +495,15 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
   const selectedState = statesData.find((s) => s.id === stateId);
   const selectedSector = sectorsData.find((s) => s.id === sectorId);
   const selectedLevels = levelsData.filter((l) => levelIds.includes(l.id));
+
+  // Find Primary and Secondary level IDs for P-12 logic
+  const primaryLevel = levelsData.find((l) => l.key === "primary");
+  const secondaryLevel = levelsData.find((l) => l.key === "secondary");
+  const hasPrimary = primaryLevel && levelIds.includes(primaryLevel.id);
+  const hasSecondary = secondaryLevel && levelIds.includes(secondaryLevel.id);
+
+  // Determine if we're in P-12 mode (both selected and P-12 mode is active)
+  const isP12 = hasPrimary && hasSecondary && isP12Mode;
 
   // Format levels display
   const formatLevelsDisplay = (levels: typeof selectedLevels): string => {
@@ -718,27 +745,105 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
                   <CommandList>
                     <CommandEmpty>No type found.</CommandEmpty>
                     <CommandGroup>
+                      {/* P-12 option (artificial, selects both Primary and Secondary) */}
+                      {primaryLevel && secondaryLevel && (
+                        <CommandItem
+                          key="p-12"
+                          value="p-12 P-12"
+                          onSelect={() => {
+                            if (isP12) {
+                              // Deselect P-12: remove both Primary and Secondary
+                              setLevelIds(
+                                levelIds.filter(
+                                  (id) =>
+                                    id !== primaryLevel.id &&
+                                    id !== secondaryLevel.id
+                                )
+                              );
+                              setIsP12Mode(false);
+                            } else {
+                              // Select P-12: add both Primary and Secondary and set P-12 mode
+                              const newIds: string[] = [];
+                              if (primaryLevel.id) newIds.push(primaryLevel.id);
+                              if (secondaryLevel.id)
+                                newIds.push(secondaryLevel.id);
+                              setLevelIds(newIds);
+                              setIsP12Mode(true);
+                            }
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              isP12 ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          P-12
+                        </CommandItem>
+                      )}
+                      {/* Individual level options */}
                       {levelsData.map((level) => {
-                        const isSelected = levelIds.includes(level.id);
+                        // If P-12 is selected, don't show Primary/Secondary as checked
+                        // even though their IDs are in levelIds
+                        const isSelected = isP12
+                          ? false // When P-12 is active, individual options show as unchecked
+                          : levelIds.includes(level.id);
+
                         return (
                           <CommandItem
                             key={level.id}
                             value={`${level.id} ${level.name}`}
                             onSelect={() => {
-                              if (isSelected) {
+                              if (
+                                isP12 &&
+                                (level.key === "primary" ||
+                                  level.key === "secondary")
+                              ) {
+                                // If P-12 is selected and user clicks Primary or Secondary,
+                                // deselect P-12 and select only the clicked level
+                                setIsP12Mode(false);
+                                setLevelIds([level.id]);
+                              } else if (isSelected) {
+                                // Deselecting: remove this level
                                 setLevelIds(
                                   levelIds.filter((id) => id !== level.id)
                                 );
+                                setIsP12Mode(false);
                               } else {
+                                // Selecting: add this level
                                 // If selecting primary or secondary, allow multiple
                                 // Otherwise replace with single selection
                                 if (
                                   level.key === "primary" ||
                                   level.key === "secondary"
                                 ) {
-                                  setLevelIds([...levelIds, level.id]);
+                                  // If selecting the other one (primary when secondary is selected or vice versa),
+                                  // check if we should switch to P-12 mode
+                                  const otherLevel =
+                                    level.key === "primary"
+                                      ? secondaryLevel
+                                      : primaryLevel;
+                                  const hasOther =
+                                    otherLevel &&
+                                    levelIds.includes(otherLevel.id);
+
+                                  if (hasOther) {
+                                    // Both will be selected, switch to P-12 mode
+                                    const newIds: string[] = [];
+                                    if (primaryLevel?.id)
+                                      newIds.push(primaryLevel.id);
+                                    if (secondaryLevel?.id)
+                                      newIds.push(secondaryLevel.id);
+                                    setLevelIds(newIds);
+                                    setIsP12Mode(true);
+                                  } else {
+                                    // Just add this one
+                                    setLevelIds([...levelIds, level.id]);
+                                    setIsP12Mode(false);
+                                  }
                                 } else {
                                   setLevelIds([level.id]);
+                                  setIsP12Mode(false);
                                 }
                               }
                             }}
@@ -854,32 +959,92 @@ function SchoolDetailDrawerContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const [activeSection, setActiveSection] = useState<TabId>(initialTab || "onboarding");
+  const [activeSection, setActiveSection] = useState<TabId>(
+    initialTab || "onboarding"
+  );
   const prevInitialTabRef = useRef<TabId | undefined>(initialTab);
   const prevOpenRef = useRef(open);
   const isInitialMountRef = useRef(true);
   const hasHandledInitialDialogRef = useRef(false);
+  const hasRedirectedForLicenseRef = useRef(false);
 
   // Reset to initialTab when drawer opens or initialTab changes
   useEffect(() => {
     // Only update if initialTab actually changed or drawer just opened
     const initialTabChanged = prevInitialTabRef.current !== initialTab;
     const drawerJustOpened = !prevOpenRef.current && open;
-    
+
     if (open && (initialTabChanged || drawerJustOpened)) {
       const newTab = initialTab || "onboarding";
       setActiveSection(newTab);
       prevInitialTabRef.current = initialTab;
     }
-    
+
     // Reset initial mount flag when drawer closes
     if (!open && prevOpenRef.current) {
       isInitialMountRef.current = true;
       hasHandledInitialDialogRef.current = false;
+      hasRedirectedForLicenseRef.current = false;
     }
-    
+
     prevOpenRef.current = open;
   }, [open, initialTab]);
+
+  // Track previous active section to detect transitions
+  const prevActiveSectionRef = useRef<TabId | null>(null);
+  const isInitialMountRefForRedirect = useRef(true);
+
+  // Redirect to license tab if user navigates TO onboarding tab with active license
+  // This should NOT trigger on page refresh when already on onboarding
+  useEffect(() => {
+    // Reset redirect flag when drawer closes
+    if (!open) {
+      hasRedirectedForLicenseRef.current = false;
+      prevActiveSectionRef.current = null;
+      isInitialMountRefForRedirect.current = true;
+      return;
+    }
+
+    // On initial mount, initialize the previous section to current section
+    // This prevents redirect on page refresh when already on onboarding
+    if (isInitialMountRefForRedirect.current) {
+      prevActiveSectionRef.current = activeSection;
+      isInitialMountRefForRedirect.current = false;
+      return;
+    }
+
+    // Only redirect if we're transitioning TO onboarding (not already on it)
+    const isTransitioningToOnboarding =
+      prevActiveSectionRef.current !== "onboarding" &&
+      activeSection === "onboarding";
+
+    if (
+      open &&
+      school &&
+      isTransitioningToOnboarding &&
+      school.activeLicence &&
+      !hasRedirectedForLicenseRef.current
+    ) {
+      hasRedirectedForLicenseRef.current = true;
+      // Redirect to license tab without opening dialog
+      setActiveSection("license");
+      onTabChange?.("license");
+      if (school?.slug) {
+        const params = new URLSearchParams(searchParams?.toString() || "");
+        params.set("school", school.slug);
+        params.set("tab", "license");
+        // Explicitly remove dialog param if it exists
+        params.delete("dialog");
+        router.replace(`/admin/schools?${params.toString()}`, {
+          scroll: false,
+        });
+      }
+    }
+
+    // Update previous section ref
+    prevActiveSectionRef.current = activeSection;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, school?.id, school?.activeLicence, activeSection]);
 
   // Handle tab change
   const handleTabChange = (tab: TabId) => {
@@ -896,13 +1061,16 @@ function SchoolDetailDrawerContent({
 
   // Search and filter state for classes
   const [classesSearchQuery, setClassesSearchQuery] = useState("");
-  const [debouncedClassesSearchQuery, setDebouncedClassesSearchQuery] = useState("");
+  const [debouncedClassesSearchQuery, setDebouncedClassesSearchQuery] =
+    useState("");
   const [yearLevelFilter, setYearLevelFilter] = useState<string>("");
   const [classesRowSelection, setClassesRowSelection] = useState({});
-  
+
   // Edit class dialog state
   const [editClassDialogOpen, setEditClassDialogOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState<ClassWithYearCodes | null>(null);
+  const [editingClass, setEditingClass] = useState<ClassWithYearCodes | null>(
+    null
+  );
   const [editClassName, setEditClassName] = useState("");
   const [editClassCode, setEditClassCode] = useState("");
   const [editClassStudentCap, setEditClassStudentCap] = useState<string>("");
@@ -914,7 +1082,9 @@ function SchoolDetailDrawerContent({
     Array<typeof schoolYears.$inferSelect>
   >([]);
   const [editYearComboboxOpen, setEditYearComboboxOpen] = useState(false);
-  const [editSelectedTeacherIds, setEditSelectedTeacherIds] = useState<string[]>([]);
+  const [editSelectedTeacherIds, setEditSelectedTeacherIds] = useState<
+    string[]
+  >([]);
   const [editTeacherComboboxOpen, setEditTeacherComboboxOpen] = useState(false);
 
   // Roles for filtering
@@ -946,13 +1116,29 @@ function SchoolDetailDrawerContent({
     useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  
+
   // Class deletion state
-  const [isDeleteClassesDialogOpen, setIsDeleteClassesDialogOpen] = useState(false);
-  const [isConfirmDeleteClassesDialogOpen, setIsConfirmDeleteClassesDialogOpen] =
+  const [isDeleteClassesDialogOpen, setIsDeleteClassesDialogOpen] =
     useState(false);
+  const [
+    isConfirmDeleteClassesDialogOpen,
+    setIsConfirmDeleteClassesDialogOpen,
+  ] = useState(false);
   const [isDeletingClasses, setIsDeletingClasses] = useState(false);
-  const [deleteClassesError, setDeleteClassesError] = useState<string | null>(null);
+  const [deleteClassesError, setDeleteClassesError] = useState<string | null>(
+    null
+  );
+
+  // School deletion state
+  const [isDeleteSchoolDialogOpen, setIsDeleteSchoolDialogOpen] =
+    useState(false);
+  const [isConfirmDeleteSchoolDialogOpen, setIsConfirmDeleteSchoolDialogOpen] =
+    useState(false);
+  const [isDeletingSchool, setIsDeletingSchool] = useState(false);
+  const [deleteSchoolError, setDeleteSchoolError] = useState<string | null>(
+    null
+  );
+  const [deleteSchoolConfirmation, setDeleteSchoolConfirmation] = useState("");
 
   // Legacy states for backward compatibility (will be removed)
   const [addAdminDialogOpen, setAddAdminDialogOpen] = useState(false);
@@ -1113,55 +1299,60 @@ function SchoolDetailDrawerContent({
   }, [classes]);
 
   // Stable callback for row selection
-  const handleClassesRowSelectionChange = useCallback((selection: Record<string, boolean>) => {
-    setClassesRowSelection(selection);
-  }, []);
+  const handleClassesRowSelectionChange = useCallback(
+    (selection: Record<string, boolean>) => {
+      setClassesRowSelection(selection);
+    },
+    []
+  );
 
   // Ref to track if edit dialog is open (to prevent infinite loops)
   const editDialogOpenRef = useRef(false);
-  
+
   useEffect(() => {
     editDialogOpenRef.current = editClassDialogOpen;
   }, [editClassDialogOpen]);
 
   // Stable callback for class click
-  const handleClassClick = useCallback(async (classItem: ClassWithYearCodes) => {
-    // Prevent multiple clicks or if dialog is already open
-    if (editDialogOpenRef.current) return;
-    
-    // Load full class data with years
-    try {
-      const result = await classesApi.get.byId(classItem.id);
-      if (result.data && !editDialogOpenRef.current) {
-        setEditingClass(result.data);
-        setEditClassName(result.data.name);
-        setEditClassCode(result.data.code || "");
-        setEditClassStudentCap(
-          result.data.studentCap?.toString() || ""
-        );
-        setEditClassActive(result.data.active ?? true);
-        
-        // Extract running year from startYear
-        const runningYear = result.data.startYear
-          ? new Date(result.data.startYear).getFullYear().toString()
-          : new Date().getFullYear().toString();
-        setEditClassRunningYear(runningYear);
-        
-        // Get year IDs from the years array
-        const yearIds = result.data.years?.map((y: any) => y.yearId) || [];
-        setEditSelectedYearIds(yearIds);
-        
-        // Get teacher IDs from the teachers array
-        const classData = result.data as any;
-        const teacherIds = classData?.teachers?.map((t: any) => t.userId) || [];
-        setEditSelectedTeacherIds(teacherIds);
-        
-        setEditClassDialogOpen(true);
+  const handleClassClick = useCallback(
+    async (classItem: ClassWithYearCodes) => {
+      // Prevent multiple clicks or if dialog is already open
+      if (editDialogOpenRef.current) return;
+
+      // Load full class data with years
+      try {
+        const result = await classesApi.get.byId(classItem.id);
+        if (result.data && !editDialogOpenRef.current) {
+          setEditingClass(result.data);
+          setEditClassName(result.data.name);
+          setEditClassCode(result.data.code || "");
+          setEditClassStudentCap(result.data.studentCap?.toString() || "");
+          setEditClassActive(result.data.active ?? true);
+
+          // Extract running year from startYear
+          const runningYear = result.data.startYear
+            ? new Date(result.data.startYear).getFullYear().toString()
+            : new Date().getFullYear().toString();
+          setEditClassRunningYear(runningYear);
+
+          // Get year IDs from the years array
+          const yearIds = result.data.years?.map((y: any) => y.yearId) || [];
+          setEditSelectedYearIds(yearIds);
+
+          // Get teacher IDs from the teachers array
+          const classData = result.data as any;
+          const teacherIds =
+            classData?.teachers?.map((t: any) => t.userId) || [];
+          setEditSelectedTeacherIds(teacherIds);
+
+          setEditClassDialogOpen(true);
+        }
+      } catch (error) {
+        console.error("Failed to load class:", error);
       }
-    } catch (error) {
-      console.error("Failed to load class:", error);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Fetch school levels on mount to create mapping
   useEffect(() => {
@@ -1188,15 +1379,26 @@ function SchoolDetailDrawerContent({
   }, []);
 
   // Filter teachers from the school (users with TEACHER role)
+  // Find user with SCHOOL_LICENCE role for this school
+  const licenseUser = useMemo(() => {
+    if (!users || !school?.id) return null;
+    return users.find((user) =>
+      user.schoolRoles?.some(
+        (role) =>
+          role.schoolId === school.id && role.roleKey === "SCHOOL_LICENCE"
+      )
+    );
+  }, [users, school?.id]);
+
   const editAvailableTeachers = useMemo(() => {
     if (!school?.id || !users || users.length === 0) return [];
-    
+
     return users.filter((user) => {
       // Check if user has TEACHER role for this school
       const schoolRoles = user.schoolRoles.filter(
         (role) => role.schoolId === school.id
       );
-      
+
       // User must have TEACHER role for this school
       return schoolRoles.some((role) => role.roleKey === "TEACHER");
     });
@@ -1318,12 +1520,12 @@ function SchoolDetailDrawerContent({
     return years;
   };
 
-  // Fetch school licence when settings section is active
-  const prevSettingsSectionRef = useRef<string | null>(null);
+  // Fetch school licence when license section is active
+  const prevLicenseSectionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (activeSection === "settings" && school?.id) {
-      // Only fetch if we're switching TO the settings section (not already on it)
-      if (prevSettingsSectionRef.current !== "settings") {
+    if (activeSection === "license" && school?.id) {
+      // Only fetch if we're switching TO the license section (not already on it)
+      if (prevLicenseSectionRef.current !== "license") {
         setLoadingLicence(true);
         // First check for ACTIVE licence
         licencesApi.get
@@ -1361,11 +1563,11 @@ function SchoolDetailDrawerContent({
             setSchoolLicence(null);
             setLoadingLicence(false);
           });
-        prevSettingsSectionRef.current = "settings";
+        prevLicenseSectionRef.current = "license";
       }
     } else {
-      if (activeSection !== "settings") {
-        prevSettingsSectionRef.current = activeSection;
+      if (activeSection !== "license") {
+        prevLicenseSectionRef.current = activeSection;
       }
     }
   }, [activeSection, school?.id]);
@@ -1382,7 +1584,13 @@ function SchoolDetailDrawerContent({
     }
 
     // Handle initial page load with dialog=add-class - remove it without opening dialog
-    if (isInitialMountRef.current && dialogParam === "add-class" && open && school && activeSection === "classes") {
+    if (
+      isInitialMountRef.current &&
+      dialogParam === "add-class" &&
+      open &&
+      school &&
+      activeSection === "classes"
+    ) {
       if (!hasHandledInitialDialogRef.current) {
         hasHandledInitialDialogRef.current = true;
         // Remove dialog param on initial page load
@@ -1408,7 +1616,7 @@ function SchoolDetailDrawerContent({
     }
     prevDialogParamRef.current = dialogParam;
 
-    if (open && school && activeSection === "settings") {
+    if (open && school && activeSection === "license") {
       if (dialogParam === "ADD-school-licence" && !addLicenceDialogOpen) {
         setAddLicenceDialogOpen(true);
       } else if (!dialogParam && addLicenceDialogOpen) {
@@ -1475,12 +1683,7 @@ function SchoolDetailDrawerContent({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    open,
-    school?.id,
-    activeSection,
-    dialogParam,
-  ]);
+  }, [open, school?.id, activeSection, dialogParam]);
 
   // Fetch existing school licence email when dialog opens
   useEffect(() => {
@@ -1578,6 +1781,7 @@ function SchoolDetailDrawerContent({
           <SchoolDetailSidebar
             activeTab={activeSection}
             onTabChange={handleTabChange}
+            onDeleteClick={() => setIsDeleteSchoolDialogOpen(true)}
           />
 
           {/* Right Content Area */}
@@ -1699,7 +1903,7 @@ function SchoolDetailDrawerContent({
                             return (
                               <Card
                                 key={item.id}
-                                className={`transition-all relative h-full ${
+                                className={`transition-all relative h-fit p-0 ${
                                   isCompleted
                                     ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
                                     : isAvailable
@@ -1707,21 +1911,27 @@ function SchoolDetailDrawerContent({
                                       : "bg-muted/30 opacity-60 border-muted"
                                 } ${isDisabled ? "cursor-not-allowed" : "cursor-pointer"}`}
                                 onClick={() => {
-                                  if (isDisabled || isCompleted) return;
+                                  if (isDisabled) return;
 
-                                  // If this is the "Add School Licence" step, navigate to settings tab with dialog
+                                  // If this is the "Add School Licence" step, navigate to license tab
                                   if (item.id === "add-licence") {
-                                    handleTabChange("settings");
+                                    handleTabChange("license");
                                     if (school?.slug) {
                                       const params = new URLSearchParams(
                                         searchParams?.toString() || ""
                                       );
                                       params.set("school", school.slug);
-                                      params.set("tab", "settings");
-                                      params.set(
-                                        "dialog",
-                                        "ADD-school-licence"
-                                      );
+                                      params.set("tab", "license");
+                                      // If completed or has active license, don't open dialog
+                                      // Otherwise, open dialog to add license
+                                      if (isCompleted || school.activeLicence) {
+                                        params.delete("dialog");
+                                      } else {
+                                        params.set(
+                                          "dialog",
+                                          "ADD-school-licence"
+                                        );
+                                      }
                                       router.push(
                                         `/admin/schools?${params.toString()}`,
                                         {
@@ -1791,23 +2001,11 @@ function SchoolDetailDrawerContent({
                                   }
                                 }}
                               >
-                                <CardContent className="p-4 flex flex-col items-center h-full">
-                                  {/* Step number in top left */}
-                                  <div className="absolute top-2 left-2">
-                                    <span className="text-xs font-semibold text-muted-foreground">
-                                      {index + 1}
-                                    </span>
-                                  </div>
-                                  {/* Check icon in top right */}
-                                  {isCompleted && (
-                                    <div className="absolute top-2 right-2">
-                                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                    </div>
-                                  )}
-                                  {/* Icon in the middle */}
-                                  <div className="flex-1 flex items-center justify-center my-4">
+                                <CardContent className="p-4 pb-3 flex flex-col items-center">
+                                  {/* Icon at top */}
+                                  <div className="flex items-center justify-center mb-3">
                                     <Icon
-                                      className={`h-8 w-8 ${
+                                      className={`h-12 w-12 ${
                                         isCompleted
                                           ? "text-green-600"
                                           : isAvailable
@@ -1816,24 +2014,30 @@ function SchoolDetailDrawerContent({
                                       }`}
                                     />
                                   </div>
-                                  {/* Title and description in flex column */}
-                                  <div className="flex flex-col items-center gap-1 w-full">
-                                    <h3
-                                      className={`text-sm font-semibold text-center ${
-                                        isCompleted
-                                          ? "text-green-700 dark:text-green-400"
-                                          : isAvailable
-                                            ? ""
-                                            : "text-muted-foreground"
-                                      }`}
-                                    >
-                                      {item.title}
-                                    </h3>
-                                    <p className="text-xs text-muted-foreground text-center line-clamp-2">
-                                      {item.description}
-                                    </p>
-                                  </div>
+                                  {/* Title */}
+                                  <h3
+                                    className={`text-sm font-semibold text-center mb-1 ${
+                                      isCompleted
+                                        ? "text-green-700 dark:text-green-400"
+                                        : isAvailable
+                                          ? ""
+                                          : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {item.title}
+                                  </h3>
+                                  {/* Description */}
+                                  <p className="text-xs text-muted-foreground text-center line-clamp-2">
+                                    {item.description}
+                                  </p>
                                 </CardContent>
+                                {isCompleted && (
+                                  <CardFooter className="px-4 py-2 bg-muted border-t-0 rounded-b-xl">
+                                    <span className="text-xs font-medium text-green-700 dark:text-green-400 w-full text-center">
+                                      Completed
+                                    </span>
+                                  </CardFooter>
+                                )}
                               </Card>
                             );
                           })}
@@ -1894,51 +2098,45 @@ function SchoolDetailDrawerContent({
                         return (
                           <Card
                             key={item.id}
-                            className={`transition-all relative h-full ${
+                            className={`transition-all relative h-fit ${
                               isCompleted
                                 ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900"
                                 : "hover:bg-muted/30 border-border"
                             } cursor-pointer`}
                           >
-                            <CardContent className="p-4 flex flex-col items-center h-full">
-                              {/* Step number in top left */}
-                              <div className="absolute top-2 left-2">
-                                <span className="text-xs font-semibold text-muted-foreground">
-                                  {index + 1}
-                                </span>
-                              </div>
-                              {/* Check icon in top right */}
-                              {isCompleted && (
-                                <div className="absolute top-2 right-2">
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                </div>
-                              )}
-                              {/* Icon in the middle */}
-                              <div className="flex-1 flex items-center justify-center my-4">
+                            <CardContent className="p-4 pb-3 flex flex-col items-center">
+                              {/* Icon at top */}
+                              <div className="flex items-center justify-center mb-3">
                                 <Icon
-                                  className={`h-8 w-8 ${
+                                  className={`h-12 w-12 ${
                                     isCompleted
                                       ? "text-green-600"
                                       : "text-muted-foreground"
                                   }`}
                                 />
                               </div>
-                              {/* Title and description in flex column */}
-                              <div className="flex flex-col items-center gap-1 w-full">
-                                <h3
-                                  className={`text-sm font-semibold text-center ${
-                                    isCompleted
-                                      ? "text-green-700 dark:text-green-400"
-                                      : ""
-                                  }`}
-                                >
-                                  {item.title}
-                                </h3>
-                                <p className="text-xs text-muted-foreground text-center line-clamp-2">
-                                  {item.description}
-                                </p>
-                              </div>
+                              {/* Title */}
+                              <h3
+                                className={`text-sm font-semibold text-center mb-1 ${
+                                  isCompleted
+                                    ? "text-green-700 dark:text-green-400"
+                                    : ""
+                                }`}
+                              >
+                                {item.title}
+                              </h3>
+                              {/* Description */}
+                              <p className="text-xs text-muted-foreground text-center line-clamp-2">
+                                {item.description}
+                              </p>
                             </CardContent>
+                            {isCompleted && (
+                              <CardFooter className="p-3 bg-muted/50 border-t-0 rounded-b-xl">
+                                <span className="text-xs font-medium text-green-700 dark:text-green-400 w-full text-center">
+                                  Completed
+                                </span>
+                              </CardFooter>
+                            )}
                           </Card>
                         );
                       })}
@@ -1948,7 +2146,7 @@ function SchoolDetailDrawerContent({
               )}
 
               {/* Details Section */}
-              {activeSection === "overview" && (
+              {activeSection === "details" && (
                 <div className="space-y-6">
                   <SchoolDetailsCard
                     school={school}
@@ -1959,7 +2157,7 @@ function SchoolDetailDrawerContent({
 
               {/* Users Section */}
               {activeSection === "users" && (
-                <div className="space-y-6">
+                <div className="space-y-6 pt-1">
                   {/* Action Buttons and Search/Filters */}
                   <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
                     {/* Add User and Import Data Buttons - Left */}
@@ -1992,7 +2190,7 @@ function SchoolDetailDrawerContent({
                                 <Trash2 className="h-4 w-4 text-destructive opacity-100 group-hover:animate-shake-twice" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Delete</TooltipContent>
+                            <TooltipContent>Remove from School</TooltipContent>
                           </Tooltip>
                         </div>
                       ) : (
@@ -2155,7 +2353,7 @@ function SchoolDetailDrawerContent({
 
               {/* Classes Section */}
               {activeSection === "classes" && (
-                <div className="space-y-6">
+                <div className="space-y-6 pt-1">
                   {/* Action Buttons and Search/Filters */}
                   <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
                     {/* Add Class and Import Classes Buttons - Left */}
@@ -2207,9 +2405,12 @@ function SchoolDetailDrawerContent({
                                 params.set("school", school.slug);
                                 params.set("tab", "classes");
                                 params.set("dialog", "add-class");
-                                router.push(`/admin/schools?${params.toString()}`, {
-                                  scroll: false,
-                                });
+                                router.push(
+                                  `/admin/schools?${params.toString()}`,
+                                  {
+                                    scroll: false,
+                                  }
+                                );
                               }
                             }}
                             disabled={loadingClasses && classes.length === 0}
@@ -2229,9 +2430,12 @@ function SchoolDetailDrawerContent({
                                 params.set("school", school.slug);
                                 params.set("tab", "classes");
                                 params.set("dialog", "import-classes");
-                                router.push(`/admin/schools?${params.toString()}`, {
-                                  scroll: false,
-                                });
+                                router.push(
+                                  `/admin/schools?${params.toString()}`,
+                                  {
+                                    scroll: false,
+                                  }
+                                );
                               }
                             }}
                             variant="outline"
@@ -2256,7 +2460,9 @@ function SchoolDetailDrawerContent({
                         <Input
                           placeholder="Search by class name or code..."
                           value={classesSearchQuery}
-                          onChange={(e) => setClassesSearchQuery(e.target.value)}
+                          onChange={(e) =>
+                            setClassesSearchQuery(e.target.value)
+                          }
                           className={cn(
                             "pl-10 pr-10 transition-all duration-200 ease-in-out",
                             debouncedClassesSearchQuery.trim() &&
@@ -2451,7 +2657,7 @@ function SchoolDetailDrawerContent({
               )}
 
               {/* License Section */}
-              {activeSection === "settings" && (
+              {activeSection === "license" && (
                 <div className="space-y-6">
                   {/* School Licence Card */}
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
@@ -2464,7 +2670,7 @@ function SchoolDetailDrawerContent({
                         </CardContent>
                       </Card>
                     ) : schoolLicence ? (
-                      <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
+                      <Card className="bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-900 p-0">
                         <CardContent className="p-6">
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex items-start gap-3 flex-1">
@@ -2491,6 +2697,11 @@ function SchoolDetailDrawerContent({
                                     {schoolLicence.status}
                                   </Badge>
                                 </div>
+                                {licenseUser?.email && (
+                                  <p className="text-xs text-muted-foreground mb-2">
+                                    {licenseUser.email}
+                                  </p>
+                                )}
                                 <div className="space-y-1 text-sm text-muted-foreground">
                                   {schoolLicence.startsAt && (
                                     <p>
@@ -2533,7 +2744,7 @@ function SchoolDetailDrawerContent({
                               searchParams?.toString() || ""
                             );
                             params.set("school", school.slug);
-                            params.set("tab", "settings");
+                            params.set("tab", "license");
                             params.set("dialog", "ADD-school-licence");
                             router.push(`/admin/schools?${params.toString()}`, {
                               scroll: false,
@@ -2888,7 +3099,7 @@ function SchoolDetailDrawerContent({
 
           // Invalidate React Query cache for users - React Query will automatically refetch
           await queryClient.invalidateQueries({ queryKey: userKeys.all });
-          
+
           // Refresh school data to update counts (including schoolAdminCount)
           onSchoolUpdate?.();
         }}
@@ -2942,7 +3153,7 @@ function SchoolDetailDrawerContent({
               setLoadingClasses(false);
             }
           }
-          
+
           // Refresh school data to update counts
           onSchoolUpdate?.();
         }}
@@ -2982,7 +3193,7 @@ function SchoolDetailDrawerContent({
 
           // Invalidate React Query cache for users - React Query will automatically refetch
           await queryClient.invalidateQueries({ queryKey: userKeys.all });
-          
+
           // Refresh school data to update counts (including schoolAdminCount)
           onSchoolUpdate?.();
         }}
@@ -3357,478 +3568,482 @@ function SchoolDetailDrawerContent({
 
       {/* Edit Class Dialog */}
       {editingClass && (
-      <Dialog
-        open={editClassDialogOpen}
-        onOpenChange={(open) => {
-          if (!open) {
-            setEditClassDialogOpen(false);
-            setEditingClass(null);
-            setEditClassName("");
-            setEditClassCode("");
-            setEditClassStudentCap("");
-            setEditClassActive(true);
-            setEditClassRunningYear("");
-            setEditSelectedYearIds([]);
-            setEditSelectedTeacherIds([]);
-          } else {
-            setEditClassDialogOpen(open);
-          }
-        }}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Edit Class</DialogTitle>
-            <DialogDescription>
-              Update class information for {school?.name || "this school"}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            {editingClass && (
-              <>
-                {/* Class Name and Class Code in same row */}
-              <div className="grid grid-cols-5 gap-4">
-                {/* Class Name - 3/5 width */}
-                <div className="col-span-3 space-y-1.5">
-                  <Label
-                    htmlFor="edit-class-name"
-                    className="text-xs text-muted-foreground ml-2"
-                  >
-                    Class Name <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="edit-class-name"
-                    placeholder="Enter class name"
-                    value={editClassName}
-                    onChange={(e) => setEditClassName(e.target.value)}
-                  />
-                </div>
-                {/* Class Code - 2/5 width */}
-                <div className="col-span-2 space-y-1.5">
-                  <Label
-                    htmlFor="edit-class-code"
-                    className="text-xs text-muted-foreground ml-2"
-                  >
-                    Class Code
-                  </Label>
-                  <Input
-                    id="edit-class-code"
-                    placeholder="Code (optional)"
-                    value={editClassCode}
-                    onChange={(e) => setEditClassCode(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Student Cap and Active Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="edit-student-cap"
-                    className="text-xs text-muted-foreground ml-2"
-                  >
-                    Student Capacity
-                  </Label>
-                  <Input
-                    id="edit-student-cap"
-                    type="number"
-                    placeholder="Number of students"
-                    value={editClassStudentCap}
-                    onChange={(e) => setEditClassStudentCap(e.target.value)}
-                    min="1"
-                    max="1000"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground ml-2">
-                    Status
-                  </Label>
-                  <div className="flex items-center gap-2 pt-2">
-                    <Checkbox
-                      id="edit-class-active"
-                      checked={editClassActive}
-                      onCheckedChange={(checked) =>
-                        setEditClassActive(checked === true)
-                      }
-                    />
-                    <Label
-                      htmlFor="edit-class-active"
-                      className="text-sm font-normal cursor-pointer"
-                    >
-                      Active
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Running Year */}
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="edit-running-year"
-                  className="text-xs text-muted-foreground ml-2"
-                >
-                  Running Year
-                </Label>
-                <Select
-                  value={editClassRunningYear}
-                  onValueChange={setEditClassRunningYear}
-                >
-                  <SelectTrigger id="edit-running-year" className="w-full">
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent className="w-[var(--radix-select-trigger-width)]">
-                    {getClassRunningYearOptions().map((year) => (
-                      <SelectItem key={year.value} value={year.value}>
-                        {year.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* School Years Multi-Select */}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground ml-2">
-                  School Years <span className="text-red-500">*</span>
-                </Label>
-                <Popover
-                  modal
-                  open={editYearComboboxOpen}
-                  onOpenChange={setEditYearComboboxOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={editYearComboboxOpen}
-                      className="w-full justify-between"
-                    >
-                      {editSelectedYearIds.length === 0
-                        ? "Select years..."
-                        : `${editSelectedYearIds.length} year${
-                            editSelectedYearIds.length > 1 ? "s" : ""
-                          } selected`}
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput placeholder="Search years..." />
-                      <CommandList className="[&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80">
-                        <CommandEmpty>
-                          {editLoadingYears
-                            ? "Loading..."
-                            : "No years found."}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {editAvailableYears.map((year) => {
-                            const isSelected = editSelectedYearIds.includes(
-                              year.id
-                            );
-                            return (
-                              <CommandItem
-                                key={year.id}
-                                value={`${year.displayName} ${year.code || ""}`}
-                                onSelect={() => {
-                                  if (isSelected) {
-                                    setEditSelectedYearIds(
-                                      editSelectedYearIds.filter(
-                                        (id) => id !== year.id
-                                      )
-                                    );
-                                  } else {
-                                    setEditSelectedYearIds([
-                                      ...editSelectedYearIds,
-                                      year.id,
-                                    ]);
-                                  }
-                                }}
-                                className={
-                                  isSelected
-                                    ? "bg-[var(--brand-bullyproof-primary)]/10"
-                                    : ""
-                                }
-                              >
-                                <span className="flex-1">
-                                  {year.displayName}
-                                </span>
-                                <Check
-                                  className={`ml-2 h-4 w-4 ${
-                                    isSelected ? "opacity-100" : "opacity-0"
-                                  }`}
-                                />
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              {/* Teachers Multi-Select */}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground ml-2">
-                  Teachers
-                </Label>
-                <Popover
-                  modal
-                  open={editTeacherComboboxOpen}
-                  onOpenChange={setEditTeacherComboboxOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={editTeacherComboboxOpen}
-                      className="w-full justify-between"
-                    >
-                      {editSelectedTeacherIds.length === 0
-                        ? "Select teachers..."
-                        : `${editSelectedTeacherIds.length} teacher${
-                            editSelectedTeacherIds.length > 1 ? "s" : ""
-                          } selected`}
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
-                    align="start"
-                  >
-                    <Command>
-                      <CommandInput placeholder="Search teachers..." />
-                      <CommandList className="[&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80">
-                        <CommandEmpty>
-                          {loadingUsers ? "Loading..." : "No teachers found."}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {editAvailableTeachers.map((teacher) => {
-                            const isSelected = editSelectedTeacherIds.includes(
-                              teacher.id
-                            );
-                            const fullName = `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim() || teacher.email;
-                            return (
-                              <CommandItem
-                                key={teacher.id}
-                                value={`${fullName} ${teacher.email || ""}`}
-                                onSelect={() => {
-                                  if (isSelected) {
-                                    setEditSelectedTeacherIds(
-                                      editSelectedTeacherIds.filter(
-                                        (id) => id !== teacher.id
-                                      )
-                                    );
-                                  } else {
-                                    setEditSelectedTeacherIds([
-                                      ...editSelectedTeacherIds,
-                                      teacher.id,
-                                    ]);
-                                  }
-                                }}
-                                className={
-                                  isSelected
-                                    ? "bg-[var(--brand-bullyproof-primary)]/10"
-                                    : ""
-                                }
-                              >
-                                <span className="flex-1">
-                                  {fullName}
-                                </span>
-                                <Check
-                                  className={`ml-2 h-4 w-4 ${
-                                    isSelected ? "opacity-100" : "opacity-0"
-                                  }`}
-                                />
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <Separator className="mt-6 mb-6" />
-
-              {/* Class Preview Card */}
-              {(editClassName ||
-                editClassCode ||
-                editSelectedYearIds.length > 0) && (
-                <Card className="border-2 border-dashed bg-muted/30 py-4">
-                  <CardContent className="px-4">
-                    <div className="space-y-1.5">
-                      {/* Header: School name */}
-                      {school?.name && (
-                        <div className="text-sm text-muted-foreground">
-                          {school.name}
-                        </div>
-                      )}
-
-                      {/* Class name with icon */}
-                      <div className="flex items-center gap-2">
-                        <GraduationCap className="h-6 w-6 text-muted-foreground" />
-                        {editClassName ? (
-                          <span className="text-xl font-bold">
-                            {editClassName}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground/50 italic">
-                            N/A
-                          </span>
-                        )}
-                        {editClassCode && (
-                          <p className="text-xs text-muted-foreground">
-                            {editClassCode}
-                          </p>
-                        )}
-                      </div>
-                      {/* Year level badges */}
-                      {editSelectedYearIds.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {editSelectedYearIds.map((yearId) => {
-                            const year = editAvailableYears.find(
-                              (y) => y.id === yearId
-                            );
-                            if (!year) return null;
-                            return (
-                              <Badge
-                                key={yearId}
-                                variant="secondary"
-                                className="text-xs"
-                              >
-                                {year.displayName}
-                              </Badge>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {/* Student cap */}
-                      {editClassStudentCap && (
-                        <div className="text-sm text-muted-foreground">
-                          Capacity: {editClassStudentCap} students
-                        </div>
-                      )}
+        <Dialog
+          open={editClassDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditClassDialogOpen(false);
+              setEditingClass(null);
+              setEditClassName("");
+              setEditClassCode("");
+              setEditClassStudentCap("");
+              setEditClassActive(true);
+              setEditClassRunningYear("");
+              setEditSelectedYearIds([]);
+              setEditSelectedTeacherIds([]);
+            } else {
+              setEditClassDialogOpen(open);
+            }
+          }}
+        >
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Class</DialogTitle>
+              <DialogDescription>
+                Update class information for {school?.name || "this school"}.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              {editingClass && (
+                <>
+                  {/* Class Name and Class Code in same row */}
+                  <div className="grid grid-cols-5 gap-4">
+                    {/* Class Name - 3/5 width */}
+                    <div className="col-span-3 space-y-1.5">
+                      <Label
+                        htmlFor="edit-class-name"
+                        className="text-xs text-muted-foreground ml-2"
+                      >
+                        Class Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit-class-name"
+                        placeholder="Enter class name"
+                        value={editClassName}
+                        onChange={(e) => setEditClassName(e.target.value)}
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+                    {/* Class Code - 2/5 width */}
+                    <div className="col-span-2 space-y-1.5">
+                      <Label
+                        htmlFor="edit-class-code"
+                        className="text-xs text-muted-foreground ml-2"
+                      >
+                        Class Code
+                      </Label>
+                      <Input
+                        id="edit-class-code"
+                        placeholder="Code (optional)"
+                        value={editClassCode}
+                        onChange={(e) => setEditClassCode(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Student Cap and Active Status */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="edit-student-cap"
+                        className="text-xs text-muted-foreground ml-2"
+                      >
+                        Student Capacity
+                      </Label>
+                      <Input
+                        id="edit-student-cap"
+                        type="number"
+                        placeholder="Number of students"
+                        value={editClassStudentCap}
+                        onChange={(e) => setEditClassStudentCap(e.target.value)}
+                        min="1"
+                        max="1000"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground ml-2">
+                        Status
+                      </Label>
+                      <div className="flex items-center gap-2 pt-2">
+                        <Checkbox
+                          id="edit-class-active"
+                          checked={editClassActive}
+                          onCheckedChange={(checked) =>
+                            setEditClassActive(checked === true)
+                          }
+                        />
+                        <Label
+                          htmlFor="edit-class-active"
+                          className="text-sm font-normal cursor-pointer"
+                        >
+                          Active
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Running Year */}
+                  <div className="space-y-1.5">
+                    <Label
+                      htmlFor="edit-running-year"
+                      className="text-xs text-muted-foreground ml-2"
+                    >
+                      Running Year
+                    </Label>
+                    <Select
+                      value={editClassRunningYear}
+                      onValueChange={setEditClassRunningYear}
+                    >
+                      <SelectTrigger id="edit-running-year" className="w-full">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent className="w-[var(--radix-select-trigger-width)]">
+                        {getClassRunningYearOptions().map((year) => (
+                          <SelectItem key={year.value} value={year.value}>
+                            {year.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* School Years Multi-Select */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground ml-2">
+                      School Years <span className="text-red-500">*</span>
+                    </Label>
+                    <Popover
+                      modal
+                      open={editYearComboboxOpen}
+                      onOpenChange={setEditYearComboboxOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={editYearComboboxOpen}
+                          className="w-full justify-between"
+                        >
+                          {editSelectedYearIds.length === 0
+                            ? "Select years..."
+                            : `${editSelectedYearIds.length} year${
+                                editSelectedYearIds.length > 1 ? "s" : ""
+                              } selected`}
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
+                        align="start"
+                      >
+                        <Command>
+                          <CommandInput placeholder="Search years..." />
+                          <CommandList className="[&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80">
+                            <CommandEmpty>
+                              {editLoadingYears
+                                ? "Loading..."
+                                : "No years found."}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {editAvailableYears.map((year) => {
+                                const isSelected = editSelectedYearIds.includes(
+                                  year.id
+                                );
+                                return (
+                                  <CommandItem
+                                    key={year.id}
+                                    value={`${year.displayName} ${year.code || ""}`}
+                                    onSelect={() => {
+                                      if (isSelected) {
+                                        setEditSelectedYearIds(
+                                          editSelectedYearIds.filter(
+                                            (id) => id !== year.id
+                                          )
+                                        );
+                                      } else {
+                                        setEditSelectedYearIds([
+                                          ...editSelectedYearIds,
+                                          year.id,
+                                        ]);
+                                      }
+                                    }}
+                                    className={
+                                      isSelected
+                                        ? "bg-[var(--brand-bullyproof-primary)]/10"
+                                        : ""
+                                    }
+                                  >
+                                    <span className="flex-1">
+                                      {year.displayName}
+                                    </span>
+                                    <Check
+                                      className={`ml-2 h-4 w-4 ${
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Teachers Multi-Select */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground ml-2">
+                      Teachers
+                    </Label>
+                    <Popover
+                      modal
+                      open={editTeacherComboboxOpen}
+                      onOpenChange={setEditTeacherComboboxOpen}
+                    >
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={editTeacherComboboxOpen}
+                          className="w-full justify-between"
+                        >
+                          {editSelectedTeacherIds.length === 0
+                            ? "Select teachers..."
+                            : `${editSelectedTeacherIds.length} teacher${
+                                editSelectedTeacherIds.length > 1 ? "s" : ""
+                              } selected`}
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[var(--radix-popover-trigger-width)] p-0 [&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80"
+                        align="start"
+                      >
+                        <Command>
+                          <CommandInput placeholder="Search teachers..." />
+                          <CommandList className="[&_[data-slot='command-list']]:[&::-webkit-scrollbar]:w-2 [&_[data-slot='command-list']]:[&::-webkit-scrollbar-track]:bg-transparent [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:rounded-full [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:bg-border [&_[data-slot='command-list']]:[&::-webkit-scrollbar-thumb]:hover:bg-border/80">
+                            <CommandEmpty>
+                              {loadingUsers
+                                ? "Loading..."
+                                : "No teachers found."}
+                            </CommandEmpty>
+                            <CommandGroup>
+                              {editAvailableTeachers.map((teacher) => {
+                                const isSelected =
+                                  editSelectedTeacherIds.includes(teacher.id);
+                                const fullName =
+                                  `${teacher.firstName || ""} ${teacher.lastName || ""}`.trim() ||
+                                  teacher.email;
+                                return (
+                                  <CommandItem
+                                    key={teacher.id}
+                                    value={`${fullName} ${teacher.email || ""}`}
+                                    onSelect={() => {
+                                      if (isSelected) {
+                                        setEditSelectedTeacherIds(
+                                          editSelectedTeacherIds.filter(
+                                            (id) => id !== teacher.id
+                                          )
+                                        );
+                                      } else {
+                                        setEditSelectedTeacherIds([
+                                          ...editSelectedTeacherIds,
+                                          teacher.id,
+                                        ]);
+                                      }
+                                    }}
+                                    className={
+                                      isSelected
+                                        ? "bg-[var(--brand-bullyproof-primary)]/10"
+                                        : ""
+                                    }
+                                  >
+                                    <span className="flex-1">{fullName}</span>
+                                    <Check
+                                      className={`ml-2 h-4 w-4 ${
+                                        isSelected ? "opacity-100" : "opacity-0"
+                                      }`}
+                                    />
+                                  </CommandItem>
+                                );
+                              })}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <Separator className="mt-6 mb-6" />
+
+                  {/* Class Preview Card */}
+                  {(editClassName ||
+                    editClassCode ||
+                    editSelectedYearIds.length > 0) && (
+                    <Card className="border-2 border-dashed bg-muted/30 py-4">
+                      <CardContent className="px-4">
+                        <div className="space-y-1.5">
+                          {/* Header: School name */}
+                          {school?.name && (
+                            <div className="text-sm text-muted-foreground">
+                              {school.name}
+                            </div>
+                          )}
+
+                          {/* Class name with icon */}
+                          <div className="flex items-center gap-2">
+                            <GraduationCap className="h-6 w-6 text-muted-foreground" />
+                            {editClassName ? (
+                              <span className="text-xl font-bold">
+                                {editClassName}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground/50 italic">
+                                N/A
+                              </span>
+                            )}
+                            {editClassCode && (
+                              <p className="text-xs text-muted-foreground">
+                                {editClassCode}
+                              </p>
+                            )}
+                          </div>
+                          {/* Year level badges */}
+                          {editSelectedYearIds.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {editSelectedYearIds.map((yearId) => {
+                                const year = editAvailableYears.find(
+                                  (y) => y.id === yearId
+                                );
+                                if (!year) return null;
+                                return (
+                                  <Badge
+                                    key={yearId}
+                                    variant="secondary"
+                                    className="text-xs"
+                                  >
+                                    {year.displayName}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          )}
+                          {/* Student cap */}
+                          {editClassStudentCap && (
+                            <div className="text-sm text-muted-foreground">
+                              Capacity: {editClassStudentCap} students
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </>
               )}
-              </>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setEditClassDialogOpen(false);
-                setEditingClass(null);
-                setEditClassName("");
-                setEditClassCode("");
-                setEditClassStudentCap("");
-                setEditClassActive(true);
-                setEditClassRunningYear("");
-                setEditSelectedYearIds([]);
-                setEditSelectedTeacherIds([]);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                if (
-                  !editingClass ||
-                  !school ||
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditClassDialogOpen(false);
+                  setEditingClass(null);
+                  setEditClassName("");
+                  setEditClassCode("");
+                  setEditClassStudentCap("");
+                  setEditClassActive(true);
+                  setEditClassRunningYear("");
+                  setEditSelectedYearIds([]);
+                  setEditSelectedTeacherIds([]);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (
+                    !editingClass ||
+                    !school ||
+                    !editClassName ||
+                    editSelectedYearIds.length === 0
+                  )
+                    return;
+                  setSubmitting(true);
+                  try {
+                    const studentCap = editClassStudentCap.trim()
+                      ? parseInt(editClassStudentCap.trim(), 10)
+                      : undefined;
+
+                    // Convert running year to datetime string (January 1st of that year)
+                    const startYearDate = editClassRunningYear
+                      ? new Date(
+                          `${editClassRunningYear}-01-01T00:00:00.000Z`
+                        ).toISOString()
+                      : undefined;
+
+                    const result = await classesApi.put.update(
+                      editingClass.id,
+                      {
+                        name: editClassName,
+                        code: editClassCode.trim() || undefined,
+                        studentCap,
+                        active: editClassActive,
+                        yearIds: editSelectedYearIds,
+                        teacherIds: editSelectedTeacherIds,
+                        startYear: startYearDate,
+                      }
+                    );
+                    if (result.error) {
+                      console.error("Failed to update class:", result.error);
+                    } else {
+                      // Close dialog
+                      setEditClassDialogOpen(false);
+                      setEditingClass(null);
+                      setEditClassName("");
+                      setEditClassCode("");
+                      setEditClassStudentCap("");
+                      setEditClassActive(true);
+                      setEditClassRunningYear("");
+                      setEditSelectedYearIds([]);
+                      setEditSelectedTeacherIds([]);
+
+                      // Refresh classes list
+                      if (activeSection === "classes") {
+                        setLoadingClasses(true);
+                        classesApi.get
+                          .list({ schoolId: school.id })
+                          .then((refreshResult) => {
+                            if (!refreshResult.error && refreshResult.data) {
+                              setClasses(refreshResult.data);
+                            }
+                          })
+                          .catch((error) => {
+                            console.error("Failed to refresh classes:", error);
+                          })
+                          .finally(() => {
+                            setLoadingClasses(false);
+                          });
+                      }
+                      onSchoolUpdate?.();
+                    }
+                  } catch (error) {
+                    console.error("Failed to update class:", error);
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                disabled={
+                  submitting ||
                   !editClassName ||
                   editSelectedYearIds.length === 0
-                )
-                  return;
-                setSubmitting(true);
-                try {
-                  const studentCap = editClassStudentCap.trim()
-                    ? parseInt(editClassStudentCap.trim(), 10)
-                    : undefined;
-
-                  // Convert running year to datetime string (January 1st of that year)
-                  const startYearDate = editClassRunningYear
-                    ? new Date(
-                        `${editClassRunningYear}-01-01T00:00:00.000Z`
-                      ).toISOString()
-                    : undefined;
-
-                  const result = await classesApi.put.update(
-                    editingClass.id,
-                    {
-                      name: editClassName,
-                      code: editClassCode.trim() || undefined,
-                      studentCap,
-                      active: editClassActive,
-                      yearIds: editSelectedYearIds,
-                      teacherIds: editSelectedTeacherIds,
-                      startYear: startYearDate,
-                    }
-                  );
-                  if (result.error) {
-                    console.error("Failed to update class:", result.error);
-                  } else {
-                    // Close dialog
-                    setEditClassDialogOpen(false);
-                    setEditingClass(null);
-                    setEditClassName("");
-                    setEditClassCode("");
-                    setEditClassStudentCap("");
-                    setEditClassActive(true);
-                    setEditClassRunningYear("");
-                    setEditSelectedYearIds([]);
-                    setEditSelectedTeacherIds([]);
-
-                    // Refresh classes list
-                    if (activeSection === "classes") {
-                      setLoadingClasses(true);
-                      classesApi.get
-                        .list({ schoolId: school.id })
-                        .then((refreshResult) => {
-                          if (!refreshResult.error && refreshResult.data) {
-                            setClasses(refreshResult.data);
-                          }
-                        })
-                        .catch((error) => {
-                          console.error("Failed to refresh classes:", error);
-                        })
-                        .finally(() => {
-                          setLoadingClasses(false);
-                        });
-                    }
-                    onSchoolUpdate?.();
-                  }
-                } catch (error) {
-                  console.error("Failed to update class:", error);
-                } finally {
-                  setSubmitting(false);
                 }
-              }}
-              disabled={
-                submitting ||
-                !editClassName ||
-                editSelectedYearIds.length === 0
-              }
-            >
-              {submitting ? "Saving..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              >
+                {submitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
 
-      {/* Delete Users Dialog */}
+      {/* Remove Users from School Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Users</DialogTitle>
+            <DialogTitle>Remove Users from School</DialogTitle>
             <DialogDescription>
-              You're about to delete these users:
+              You're about to remove these users from{" "}
+              {school?.name || "this school"}. This will remove all their roles,
+              positions, and class associations for this school. The users
+              themselves will not be deleted.
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[400px]">
@@ -3876,13 +4091,13 @@ function SchoolDetailDrawerContent({
                 setIsConfirmDeleteDialogOpen(true);
               }}
             >
-              Delete
+              Remove from School
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Delete Dialog */}
+      {/* Confirm Remove from School Dialog */}
       <Dialog
         open={isConfirmDeleteDialogOpen}
         onOpenChange={(open) => {
@@ -3897,8 +4112,10 @@ function SchoolDetailDrawerContent({
           <DialogHeader>
             <DialogTitle>Are you absolutely sure?</DialogTitle>
             <DialogDescription>
-              This action is irreversible. Are you absolutely sure you want to
-              delete these users?
+              This will remove all roles, positions, and class associations for
+              these users at {school?.name || "this school"}. The users
+              themselves will not be deleted and can be added back to the school
+              later if needed.
             </DialogDescription>
           </DialogHeader>
           {deleteError && (
@@ -3941,33 +4158,42 @@ function SchoolDetailDrawerContent({
                 setIsDeleting(true);
                 setDeleteError(null);
 
+                if (!school?.id) {
+                  setDeleteError("School ID is missing");
+                  setIsDeleting(false);
+                  return;
+                }
+
                 try {
                   const result = await apiFetch<{
                     success: boolean;
-                    deleted: number;
+                    removed: number;
                     failed: number;
                     results: {
                       successful: string[];
                       failed: Array<{ userId: string; error: string }>;
                     };
-                  }>("/users/delete", {
-                    method: "DELETE",
+                  }>(`/schools/${school.id}/users/remove`, {
+                    method: "POST",
                     body: JSON.stringify({ userIds: selectedUserIds }),
                   });
 
                   if (result.error) {
                     setDeleteError(
-                      result.error.message || "Failed to delete users"
+                      result.error.message ||
+                        "Failed to remove users from school"
                     );
                     setIsDeleting(false);
                     return;
                   }
 
                   if (result.data) {
-                    const { deleted, failed, results } = result.data;
+                    const { removed, failed, results } = result.data;
 
                     // Invalidate React Query cache for users - React Query will automatically refetch
-                    await queryClient.invalidateQueries({ queryKey: userKeys.all });
+                    await queryClient.invalidateQueries({
+                      queryKey: userKeys.all,
+                    });
 
                     if (failed > 0) {
                       // Partial success - show error but keep dialog open
@@ -3985,9 +4211,9 @@ function SchoolDetailDrawerContent({
                         })
                         .join(", ");
                       setDeleteError(
-                        `Successfully deleted ${deleted} user(s), but failed to delete ${failed} user(s): ${failedMessages}`
+                        `Successfully removed ${removed} user(s) from school, but failed to remove ${failed} user(s): ${failedMessages}`
                       );
-                      // Clear selection for successfully deleted users
+                      // Clear selection for successfully removed users
                       const newSelection: Record<string, boolean> = {};
                       Object.keys(rowSelection).forEach((key) => {
                         const user = users[parseInt(key)];
@@ -4003,7 +4229,7 @@ function SchoolDetailDrawerContent({
                     }
                   }
                 } catch (error: any) {
-                  console.error("[USER DELETE] Error:", error);
+                  console.error("[REMOVE USERS FROM SCHOOL] Error:", error);
                   setDeleteError(
                     error.message || "An unexpected error occurred"
                   );
@@ -4016,10 +4242,10 @@ function SchoolDetailDrawerContent({
               {isDeleting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
+                  Removing...
                 </>
               ) : (
-                "Delete"
+                "Remove from School"
               )}
             </Button>
           </DialogFooter>
@@ -4200,6 +4426,179 @@ function SchoolDetailDrawerContent({
                 </>
               ) : (
                 "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete School Dialog */}
+      <Dialog
+        open={isDeleteSchoolDialogOpen}
+        onOpenChange={(open) => {
+          setIsDeleteSchoolDialogOpen(open);
+          if (!open) {
+            setDeleteSchoolError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete School</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this school? This action cannot be
+              undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>
+                This will permanently delete the school and all related data
+                including:
+                <ul className="list-disc list-inside mt-2 space-y-1">
+                  <li>All classes</li>
+                  <li>All lessons</li>
+                  <li>All user roles associated with this school</li>
+                  <li>All school licences</li>
+                  <li>All school invites</li>
+                  <li>All school level assignments</li>
+                  <li>All user school positions</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+            {deleteSchoolError && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{deleteSchoolError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsDeleteSchoolDialogOpen(false);
+                setDeleteSchoolError(null);
+              }}
+              disabled={isDeletingSchool}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setIsDeleteSchoolDialogOpen(false);
+                setIsConfirmDeleteSchoolDialogOpen(true);
+              }}
+              disabled={isDeletingSchool}
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete School Dialog */}
+      <Dialog
+        open={isConfirmDeleteSchoolDialogOpen}
+        onOpenChange={(open) => {
+          setIsConfirmDeleteSchoolDialogOpen(open);
+          if (!open) {
+            setDeleteSchoolError(null);
+            setDeleteSchoolConfirmation("");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Type the school name <strong>{school?.name}</strong> to confirm
+              deletion.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="confirm-school-name">School Name</Label>
+              <Input
+                id="confirm-school-name"
+                placeholder={school?.name}
+                value={deleteSchoolConfirmation}
+                onChange={(e) => setDeleteSchoolConfirmation(e.target.value)}
+                disabled={isDeletingSchool}
+              />
+            </div>
+            {deleteSchoolError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{deleteSchoolError}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsConfirmDeleteSchoolDialogOpen(false);
+                setDeleteSchoolError(null);
+                setDeleteSchoolConfirmation("");
+              }}
+              disabled={isDeletingSchool}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!school) return;
+
+                if (deleteSchoolConfirmation !== school.name) {
+                  setDeleteSchoolError("School name does not match");
+                  return;
+                }
+
+                setIsDeletingSchool(true);
+                setDeleteSchoolError(null);
+
+                try {
+                  const result = await schoolApi.delete.delete(school.id);
+
+                  if (result.error) {
+                    setDeleteSchoolError(
+                      result.error.message || "Failed to delete school"
+                    );
+                  } else {
+                    // Success - close dialogs and drawer
+                    setIsConfirmDeleteSchoolDialogOpen(false);
+                    setDeleteSchoolConfirmation("");
+                    onOpenChange(false);
+                    // Refresh the schools list
+                    onSchoolUpdate?.();
+                  }
+                } catch (error: any) {
+                  console.error("[SCHOOL DELETE] Error:", error);
+                  setDeleteSchoolError(
+                    error.message || "An unexpected error occurred"
+                  );
+                } finally {
+                  setIsDeletingSchool(false);
+                }
+              }}
+              disabled={
+                isDeletingSchool || deleteSchoolConfirmation !== school?.name
+              }
+            >
+              {isDeletingSchool ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete School"
               )}
             </Button>
           </DialogFooter>

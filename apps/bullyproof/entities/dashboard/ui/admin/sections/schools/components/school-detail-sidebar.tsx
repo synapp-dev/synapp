@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,6 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
 import {
   Rocket,
@@ -18,35 +20,38 @@ import {
   Activity,
   Star,
   Key,
+  Trash2,
 } from "lucide-react";
 
 type TabId =
   | "onboarding"
-  | "overview"
+  | "details"
   | "users"
   | "classes"
   | "activity"
   | "culture"
-  | "settings";
+  | "license";
 
 interface SchoolDetailSidebarProps {
   activeTab: TabId;
   onTabChange: (tab: TabId) => void;
+  onDeleteClick: () => void;
 }
 
 const navItems = [
   { id: "onboarding", name: "Onboarding", icon: Rocket },
-  { id: "overview", name: "Details", icon: Eye },
+  { id: "details", name: "Details", icon: Eye },
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },
   { id: "activity", name: "Activity", icon: Activity, disabled: true },
   { id: "culture", name: "Culture", icon: Star, disabled: true },
-  { id: "settings", name: "License", icon: Key },
+  { id: "license", name: "License", icon: Key },
 ];
 
 export function SchoolDetailSidebar({
   activeTab,
   onTabChange,
+  onDeleteClick,
 }: SchoolDetailSidebarProps) {
   return (
     <div className="hidden md:flex flex-col w-48 shrink-0 bg-transparent">
@@ -60,10 +65,11 @@ export function SchoolDetailSidebar({
               <SidebarGroup className="p-0">
                 <SidebarGroupContent className="p-0">
                   <SidebarMenu className="p-2">
-                    {navItems.map((item) => {
+                    {navItems.map((item, index) => {
                       const Icon = item.icon;
                       const isOnboarding = item.id === "onboarding";
                       const isDisabled = item.disabled;
+                      
                       return (
                         <SidebarMenuItem key={item.id}>
                           <SidebarMenuButton
@@ -92,6 +98,16 @@ export function SchoolDetailSidebar({
                         </SidebarMenuItem>
                       );
                     })}
+                    <SidebarSeparator className="!mx-0 !ml-0 my-1" />
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={onDeleteClick}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>Delete School</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
               </SidebarGroup>

@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense, useMemo, useCallback } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  Suspense,
+  useMemo,
+  useCallback,
+} from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { SchoolsDataTable } from "./components/schools-data-table";
 import { SchoolDetailDrawer } from "./components/school-detail-drawer";
@@ -58,6 +65,9 @@ function SchoolsSectionContent() {
   const [statusFilter, setStatusFilter] = useState(
     searchParams?.get("status") || "all"
   );
+  const [typeFilter, setTypeFilter] = useState(
+    searchParams?.get("type") || "all"
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const isClosingRef = useRef(false);
@@ -67,31 +77,52 @@ function SchoolsSectionContent() {
   const slugFromUrl = searchParams?.get("school") || null;
   // Extract modal from URL query parameter (e.g., ?modal=add-new-school)
   const modalFromUrl = searchParams?.get("modal") || null;
-  // Extract tab from URL query parameter (e.g., ?tab=overview)
+  // Extract tab from URL query parameter (e.g., ?tab=details)
   const tabFromUrl = searchParams?.get("tab") || null;
-  
+
+  // Redirect old "overview" to "details" and "settings" to "license" for backward compatibility
+  useEffect(() => {
+    if (tabFromUrl === "overview") {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("tab", "details");
+      router.replace(`/admin/schools?${params.toString()}`, { scroll: false });
+    } else if (tabFromUrl === "settings") {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("tab", "license");
+      router.replace(`/admin/schools?${params.toString()}`, { scroll: false });
+    }
+  }, [tabFromUrl, router, searchParams]);
+
   // Memoize initialTab to prevent unnecessary re-renders
   const initialTab = useMemo(() => {
+    // Handle backward compatibility: treat "overview" as "details" and "settings" as "license"
+    const normalizedTab =
+      tabFromUrl === "overview"
+        ? "details"
+        : tabFromUrl === "settings"
+          ? "license"
+          : tabFromUrl;
+
     if (
-      tabFromUrl &&
+      normalizedTab &&
       [
         "onboarding",
-        "overview",
+        "details",
         "users",
         "classes",
         "activity",
         "culture",
-        "settings",
-      ].includes(tabFromUrl)
+        "license",
+      ].includes(normalizedTab)
     ) {
-      return tabFromUrl as
+      return normalizedTab as
         | "onboarding"
-        | "overview"
+        | "details"
         | "users"
         | "classes"
         | "activity"
         | "culture"
-        | "settings";
+        | "license";
     }
     return undefined;
   }, [tabFromUrl]);
@@ -227,6 +258,51 @@ function SchoolsSectionContent() {
     router.replace(`/admin/schools?${params.toString()}`, { scroll: false });
   }, [statusFilter, router, searchParams]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (typeFilter !== "all") {
+      params.set("type", typeFilter);
+    } else {
+      params.delete("type");
+    }
+    router.replace(`/admin/schools?${params.toString()}`, { scroll: false });
+  }, [typeFilter, router, searchParams]);
+
+  // Helper function to check if school matches type filter
+  const matchesTypeFilter = (school: School, filter: string): boolean => {
+    if (filter === "all") return true;
+
+    if (!school.levels || school.levels.length === 0) {
+      return false; // Schools without levels don't match any type filter
+    }
+
+    const normalizedLevels = school.levels
+      .filter(
+        (level): level is string => typeof level === "string" && level != null
+      )
+      .map((level) => level.toLowerCase().trim());
+
+    const hasPrimary = normalizedLevels.some(
+      (level) => level === "primary" || level.includes("primary")
+    );
+    const hasSecondary = normalizedLevels.some(
+      (level) => level === "secondary" || level.includes("secondary")
+    );
+
+    if (filter === "primary") {
+      // Show schools that have primary (including P-12 schools)
+      return hasPrimary;
+    } else if (filter === "secondary") {
+      // Show schools that have secondary (including P-12 schools)
+      return hasSecondary;
+    } else if (filter === "p-12") {
+      // Show only P-12 schools (schools with both primary and secondary)
+      return hasPrimary && hasSecondary;
+    }
+
+    return true;
+  };
+
   // Filter schools based on filter states
   const filteredSchools = schools.filter((school) => {
     // Search filter (name) - use debounced value
@@ -249,6 +325,11 @@ function SchoolsSectionContent() {
 
     // Status filter
     if (statusFilter !== "all" && school.status !== statusFilter) {
+      return false;
+    }
+
+    // Type filter (primary/secondary/p-12)
+    if (!matchesTypeFilter(school, typeFilter)) {
       return false;
     }
 
@@ -292,7 +373,8 @@ function SchoolsSectionContent() {
     debouncedSearchQuery.trim() !== "" ||
     stateFilter !== "all" ||
     sectorFilter !== "all" ||
-    statusFilter !== "all";
+    statusFilter !== "all" ||
+    typeFilter !== "all";
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -300,6 +382,7 @@ function SchoolsSectionContent() {
     setStateFilter("all");
     setSectorFilter("all");
     setStatusFilter("all");
+    setTypeFilter("all");
     router.replace("/admin/schools", { scroll: false });
   };
 
@@ -325,7 +408,14 @@ function SchoolsSectionContent() {
       setIsDrawerOpen(false);
       setSelectedSchool(null);
     }
-  }, [slugFromUrl, schools, selectedSchool?.id, isDrawerOpen]);
+  }, [
+    slugFromUrl,
+    schools,
+    selectedSchool?.id,
+    isDrawerOpen,
+    router,
+    searchParams,
+  ]);
 
   // Open wizard when URL has modal=add-new-school query parameter
   useEffect(() => {
@@ -428,10 +518,10 @@ function SchoolsSectionContent() {
     // Set flag to prevent useEffect from interfering
     isWizardClosingRef.current = true;
 
-    // Close wizard immediately
+    // Close wizard
     setIsWizardOpen(false);
 
-    // Refresh schools list
+    // Refresh schools list first
     try {
       const result = await schoolApi.get.listSchools({
         limit: 100,
@@ -475,28 +565,34 @@ function SchoolsSectionContent() {
         // Trigger data table refresh
         setTableRefreshTrigger((prev) => prev + 1);
 
-        // Update URL with the new school's slug (remove modal param, add school param)
-        const params = new URLSearchParams(searchParams?.toString() || "");
-        params.delete("modal");
-        params.set("school", school.slug);
-        router.replace(`/admin/schools?${params.toString()}`, {
-          scroll: false,
-        });
+        // Find the newly created school by slug
+        const newlyCreatedSchool = mappedSchools.find(
+          (s) => s.slug === school.slug
+        );
 
-        // Reset flag after a brief delay to allow URL update to complete
-        setTimeout(() => {
-          isWizardClosingRef.current = false;
-        }, 100);
+        if (newlyCreatedSchool) {
+          // Set the selected school and open the drawer explicitly
+          setSelectedSchool(newlyCreatedSchool);
+          setIsDrawerOpen(true);
+
+          // Update URL: remove modal param, add school slug
+          const params = new URLSearchParams(searchParams?.toString() || "");
+          params.delete("modal");
+          params.set("school", school.slug);
+          router.push(`/admin/schools?${params.toString()}`, { scroll: false });
+        }
       }
     } catch (err) {
       console.error("Failed to refresh schools:", err);
-      // Still update URL even if refresh fails
       // Trigger data table refresh even on error
       setTableRefreshTrigger((prev) => prev + 1);
+      // Still update URL even if refresh fails
       const params = new URLSearchParams(searchParams?.toString() || "");
       params.delete("modal");
       params.set("school", school.slug);
-      router.replace(`/admin/schools?${params.toString()}`, { scroll: false });
+      router.push(`/admin/schools?${params.toString()}`, { scroll: false });
+    } finally {
+      // Reset flag after a brief delay to allow URL update to complete
       setTimeout(() => {
         isWizardClosingRef.current = false;
       }, 100);
@@ -506,12 +602,12 @@ function SchoolsSectionContent() {
   const handleTabChange = (
     tab:
       | "onboarding"
-      | "overview"
+      | "details"
       | "users"
       | "classes"
       | "activity"
       | "culture"
-      | "settings"
+      | "license"
   ) => {
     // Update URL with tab parameter
     if (selectedSchool?.slug) {
@@ -570,24 +666,32 @@ function SchoolsSectionContent() {
           };
         });
         setSchools(mappedSchools);
-        // Update selected school if it exists - only if it actually changed
+        // Update selected school if it exists - always update to get latest data
         const currentSelectedSchool = selectedSchoolRef.current;
         if (currentSelectedSchool) {
           const updatedSchool = mappedSchools.find(
             (s) => s.id === currentSelectedSchool.id
           );
           if (updatedSchool) {
-            // Only update if the school data actually changed
-            const hasChanged = 
-              updatedSchool.teacherCount !== currentSelectedSchool.teacherCount ||
-              updatedSchool.classCount !== currentSelectedSchool.classCount ||
-              updatedSchool.schoolAdminCount !== currentSelectedSchool.schoolAdminCount ||
-              updatedSchool.schoolLicenceCount !== currentSelectedSchool.schoolLicenceCount ||
-              updatedSchool.activeLicence !== currentSelectedSchool.activeLicence ||
-              updatedSchool.status !== currentSelectedSchool.status;
-            
-            if (hasChanged) {
-              setSelectedSchool(updatedSchool);
+            setSelectedSchool(updatedSchool);
+
+            // If slug changed (name was updated), update URL to match new slug
+            if (
+              updatedSchool.slug &&
+              updatedSchool.slug !== currentSelectedSchool.slug
+            ) {
+              const params = new URLSearchParams(
+                searchParams?.toString() || ""
+              );
+              params.set("school", updatedSchool.slug);
+              // Preserve tab if present
+              const currentTab = searchParams?.get("tab");
+              if (currentTab) {
+                params.set("tab", currentTab);
+              }
+              router.replace(`/admin/schools?${params.toString()}`, {
+                scroll: false,
+              });
             }
           }
         }
@@ -931,6 +1035,30 @@ function SchoolsSectionContent() {
                     </SelectItem>
                   );
                 })}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={typeFilter || "all"}
+              onValueChange={setTypeFilter}
+              disabled={isLoading && schools.length === 0}
+            >
+              <SelectTrigger
+                className={cn(
+                  "w-[140px]",
+                  typeFilter &&
+                    typeFilter !== "all" &&
+                    "border-orange-500 bg-orange-500/10"
+                )}
+                disabled={isLoading && schools.length === 0}
+              >
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="primary">Primary</SelectItem>
+                <SelectItem value="secondary">Secondary</SelectItem>
+                <SelectItem value="p-12">P-12</SelectItem>
               </SelectContent>
             </Select>
           </div>
