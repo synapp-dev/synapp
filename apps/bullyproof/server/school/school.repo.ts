@@ -172,6 +172,65 @@ export const schoolRepo = {
     return result;
   },
 
+  async update(
+    schoolId: string,
+    data: {
+      name?: string;
+      stateId?: string;
+      sectorId?: string;
+      emailDomain?: string | null;
+      address?: string | null;
+      bannerUrl?: string | null;
+      avatarUrl?: string | null;
+    }
+  ) {
+    const updateData: any = {};
+    
+    // If name is being updated, check if it actually changed
+    if (data.name !== undefined) {
+      // Fetch current school to compare names
+      const currentSchool = await db
+        .select({ name: schools.name })
+        .from(schools)
+        .where(eq(schools.id, schoolId))
+        .limit(1);
+      
+      const currentName = currentSchool[0]?.name;
+      // Only regenerate slug if name actually changed
+      if (currentName && currentName !== data.name) {
+        const baseSlug = this.generateSlug(data.name);
+        const uniqueSlug = await this.findUniqueSlug(baseSlug);
+        updateData.slug = uniqueSlug;
+      }
+      updateData.name = data.name;
+    }
+    
+    if (data.stateId !== undefined) updateData.stateId = data.stateId;
+    if (data.sectorId !== undefined) updateData.sectorId = data.sectorId;
+    if (data.emailDomain !== undefined) updateData.emailDomain = data.emailDomain;
+    if (data.address !== undefined) updateData.address = data.address;
+    if (data.bannerUrl !== undefined) updateData.bannerUrl = data.bannerUrl;
+    if (data.avatarUrl !== undefined) updateData.avatarUrl = data.avatarUrl;
+
+    const result = await db
+      .update(schools)
+      .set(updateData)
+      .where(eq(schools.id, schoolId))
+      .returning();
+
+    return result[0] ?? null;
+  },
+
+  async delete(schoolId: string) {
+    // Delete the school - CASCADE will handle related records
+    const result = await db
+      .delete(schools)
+      .where(eq(schools.id, schoolId))
+      .returning();
+    
+    return result[0] ?? null;
+  },
+
   // Example: join table lookups can live here too (e.g., teacher_school_assignments)
   // getByTeacher: (teacherId: string) => db.select()...join(...).where(...)
 };

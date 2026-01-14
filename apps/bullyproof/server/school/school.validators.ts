@@ -44,3 +44,22 @@ export const createSchoolSchema = z.object({
 });
 
 export type CreateSchoolParams = z.infer<typeof createSchoolSchema>;
+
+// Schema for updating a school
+export const updateSchoolSchema = z.object({
+  name: z
+    .string()
+    .min(1, "School name is required")
+    .max(255)
+    .transform((val) => capitalizeSchoolName(val.trim()))
+    .optional(),
+  stateId: z.string().uuid("Invalid state ID").optional(),
+  sectorId: z.string().uuid("Invalid sector ID").optional(),
+  emailDomain: z.string().trim().max(255).optional().nullable(),
+  address: z.string().trim().max(1000).optional().nullable(),
+  bannerUrl: z.string().url("Invalid banner URL").optional().nullable(),
+  avatarUrl: z.string().url("Invalid avatar URL").optional().nullable(),
+  levelIds: z.array(z.string().uuid("Invalid level ID")).optional(),
+});
+
+export type UpdateSchoolParams = z.infer<typeof updateSchoolSchema>;

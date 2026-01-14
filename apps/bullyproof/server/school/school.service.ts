@@ -1,13 +1,16 @@
 import {
   listSchoolsQuerySchema,
   createSchoolSchema,
+  updateSchoolSchema,
   type ListSchoolsQuery,
   type CreateSchoolParams,
+  type UpdateSchoolParams,
 } from "./school.validators";
 import { schoolRepo } from "./school.repo";
 import { getUserScopedRoles } from "../auth/rbac";
 import { db } from "@/server/db/drizzle";
 import { schoolLevelAssignments } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -85,6 +88,30 @@ async function assertCanCreateSchool(ctx: AuthContext) {
   throw new Error("Unauthorized to create schools");
 }
 
+async function assertCanUpdateSchool(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+  const roles = await getUserScopedRoles(ctx.userId);
+  // Only platform admins can update schools
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+  throw new Error("Unauthorized to update schools");
+}
+
+async function assertCanDeleteSchool(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+  const roles = await getUserScopedRoles(ctx.userId);
+  // Only platform admins can delete schools
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+  throw new Error("Unauthorized to delete schools");
+}
+
 export const schoolService = {
   async listSchools(ctx: AuthContext, query: unknown) {
     await assertCanListSchools(ctx);
@@ -140,5 +167,58 @@ export const schoolService = {
     }
 
     return createdSchool;
+  },
+  async updateSchool(ctx: AuthContext, schoolId: string, params: unknown) {
+    await assertCanUpdateSchool(ctx);
+    const data: UpdateSchoolParams = updateSchoolSchema.parse(params);
+
+    // Extract levelIds before updating school (repo doesn't handle them)
+    const { levelIds, ...schoolData } = data;
+
+    // Update the school
+    const updatedSchool = await schoolRepo.update(schoolId, schoolData);
+
+    if (!updatedSchool) {
+      throw new Error("School not found");
+    }
+
+    // Update school level assignments if levelIds provided
+    if (levelIds !== undefined) {
+      // Delete existing level assignments
+      await db
+        .delete(schoolLevelAssignments)
+        .where(eq(schoolLevelAssignments.schoolId, schoolId));
+
+      // Insert new level assignments
+      if (levelIds.length > 0) {
+        await db.insert(schoolLevelAssignments).values(
+          levelIds.map((levelId) => ({
+            schoolId,
+            levelId,
+          }))
+        );
+      }
+    }
+
+    return updatedSchool;
+  },
+  async deleteSchool(ctx: AuthContext, schoolId: string) {
+    await assertCanDeleteSchool(ctx);
+    
+    // Delete the school - CASCADE will handle related records:
+    // - school_licences
+    // - school_invites
+    // - classes
+    // - lessons
+    // - user_roles (school-scoped)
+    // - user_school_positions
+    // - school_level_assignments
+    const deletedSchool = await schoolRepo.delete(schoolId);
+    
+    if (!deletedSchool) {
+      throw new Error("School not found");
+    }
+    
+    return deletedSchool;
   },
 };
