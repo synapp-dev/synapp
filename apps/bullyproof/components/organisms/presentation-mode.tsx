@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -24,9 +24,10 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Separator } from "@workspace/ui/components/separator";
-import { SlideRenderer } from "./slide-renderer";
+import { SlideRenderer, type SlideData } from "./slide-renderer";
 import { useLessonLiveState } from "@/hooks/use-lesson-live-state";
 import { usePrefetchTopicImages } from "@/hooks/use-prefetch-topic-images";
+import { usePreloadSlideImages } from "@/hooks/use-preload-slide-images";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useMeStore } from "@/entities/me/model/store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
@@ -40,13 +41,61 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const {
-    slides,
+    slides: allSlides,
     currentSlideIndex,
     currentSlide,
     updateSlide,
     isLoading,
     error,
   } = useLessonLiveState(lessonId);
+
+  // Helper function to check if a slide has content
+  const slideHasContent = useCallback((slide: SlideData): boolean => {
+    const hasImageUrl = !!slide.imageUrl && slide.imageUrl.trim() !== "";
+    const hasVideoUrl = !!slide.videoUrl && slide.videoUrl.trim() !== "";
+    const hasTextHtml = slide.kind === "text" && !!slide.textHtml?.trim();
+    
+    return hasImageUrl || hasVideoUrl || hasTextHtml;
+  }, []);
+
+  // Filter out empty slides (slides without any content)
+  const slides = useMemo(() => {
+    return allSlides.filter(slideHasContent);
+  }, [allSlides, slideHasContent]);
+
+  // Find the current slide in the filtered list
+  const filteredCurrentSlide = useMemo(() => {
+    if (!currentSlide) return slides[0] || null;
+    // Find the slide in filtered list by ID
+    const found = slides.find((slide) => slide.id === currentSlide.id);
+    // If current slide was filtered out (empty), use first valid slide
+    return found || slides[0] || null;
+  }, [currentSlide, slides]);
+
+  // Find the current slide index in the filtered list
+  const filteredCurrentSlideIndex = useMemo(() => {
+    if (!currentSlide) return 0;
+    const index = slides.findIndex((slide) => slide.id === currentSlide.id);
+    // If current slide was filtered out (empty), use first valid slide
+    return index >= 0 ? index : 0;
+  }, [currentSlide, slides]);
+
+  // If current slide was filtered out, navigate to first valid slide
+  useEffect(() => {
+    if (!isLoading && currentSlide && slides.length > 0) {
+      const foundIndex = slides.findIndex((slide) => slide.id === currentSlide.id);
+      if (foundIndex < 0) {
+        // Current slide is empty and was filtered out, navigate to first valid slide
+        const firstValidSlide = slides[0];
+        if (firstValidSlide) {
+          const originalIndex = allSlides.findIndex((s) => s.id === firstValidSlide.id);
+          if (originalIndex >= 0) {
+            updateSlide(originalIndex);
+          }
+        }
+      }
+    }
+  }, [isLoading, currentSlide, slides, allSlides, updateSlide]);
 
   // Check permissions in parallel (non-blocking)
   const { data: lessonData, isLoading: isLoadingLesson } =
@@ -56,6 +105,14 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
 
   // Pre-fetch all topic images in the background on page load
   usePrefetchTopicImages(slides, !isLoading && slides.length > 0);
+  
+  // Preload images for upcoming slides into browser cache
+  usePreloadSlideImages(
+    slides,
+    filteredCurrentSlideIndex,
+    !isLoading && slides.length > 0,
+    2 // Preload next 2 slides
+  );
 
   const [showControls, setShowControls] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -70,21 +127,35 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
 
   const nextSlide = useCallback(() => {
     // If we're on the last slide, show completion slide instead
-    if (currentSlideIndex === slides.length - 1) {
+    if (filteredCurrentSlideIndex === slides.length - 1) {
       setShowCompletionSlide(true);
-    } else if (currentSlideIndex < slides.length - 1) {
-      updateSlide(currentSlideIndex + 1);
+    } else if (filteredCurrentSlideIndex < slides.length - 1) {
+      // Get the next slide from filtered list and update to its original index
+      const nextSlide = slides[filteredCurrentSlideIndex + 1];
+      if (nextSlide) {
+        const originalIndex = allSlides.findIndex((s) => s.id === nextSlide.id);
+        if (originalIndex >= 0) {
+          updateSlide(originalIndex);
+        }
+      }
     }
-  }, [currentSlideIndex, slides.length, updateSlide]);
+  }, [filteredCurrentSlideIndex, slides, allSlides, updateSlide]);
 
   const prevSlide = useCallback(() => {
     // If we're showing completion slide, go back to last regular slide
     if (showCompletionSlide) {
       setShowCompletionSlide(false);
-    } else if (currentSlideIndex > 0) {
-      updateSlide(currentSlideIndex - 1);
+    } else if (filteredCurrentSlideIndex > 0) {
+      // Get the previous slide from filtered list and update to its original index
+      const prevSlide = slides[filteredCurrentSlideIndex - 1];
+      if (prevSlide) {
+        const originalIndex = allSlides.findIndex((s) => s.id === prevSlide.id);
+        if (originalIndex >= 0) {
+          updateSlide(originalIndex);
+        }
+      }
     }
-  }, [currentSlideIndex, showCompletionSlide, updateSlide]);
+  }, [filteredCurrentSlideIndex, slides, allSlides, showCompletionSlide, updateSlide]);
 
   // Mark lesson as pending_review when completion slide is shown
   useEffect(() => {
@@ -190,7 +261,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
   // All hooks must be called before any conditional returns
   // Keyboard navigation
   useEffect(() => {
-    if (isLoading || error || !slides.length || !currentSlide) return;
+    if (isLoading || error || !slides.length || !filteredCurrentSlide) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (showCompletionSlide) {
@@ -234,7 +305,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     isLoading,
     error,
     slides.length,
-    currentSlide,
+    filteredCurrentSlide,
     showCompletionSlide,
     handleExitRequest,
     handleCloseExitDialog,
@@ -251,6 +322,13 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     return () =>
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
+
+  // Hide controls when slide changes (unless mouse is moving)
+  useEffect(() => {
+    if (isLoading || error || !slides.length || showCompletionSlide) return;
+    // Hide controls when slide changes
+    setShowControls(false);
+  }, [filteredCurrentSlideIndex, isLoading, error, slides.length, showCompletionSlide]);
 
   // Mouse movement detection for controls
   useEffect(() => {
@@ -271,7 +349,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       window.removeEventListener("mousemove", handleMouseMove);
       clearTimeout(timeoutId);
     };
-  }, [isLoading, error, slides.length, currentSlide, showCompletionSlide]);
+  }, [isLoading, error, slides.length, showCompletionSlide]);
 
   // Update date and time every second
   useEffect(() => {
@@ -343,7 +421,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
   }
 
   // Ensure we have a current slide for regular slides
-  if (!currentSlide) {
+  if (!filteredCurrentSlide) {
     return (
       <div className="relative w-full h-full flex items-center justify-center">
         <div className="text-center text-muted-foreground">
@@ -386,28 +464,46 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
         </div>
       )}
       {/* Main slide display */}
-      <div className="w-full h-full flex items-center justify-center">
+      <div className="w-full h-full flex items-center justify-center relative">
         {/* 16:9 aspect ratio container - maximizes space while maintaining aspect ratio */}
         <div
-          className="flex items-center justify-center"
+          className="flex items-center justify-center relative"
           style={{
             width: "min(100vw, calc(100vh * 16 / 9))",
             height: "min(100vh, calc(100vw * 9 / 16))",
             aspectRatio: "16 / 9",
           }}
         >
-          <div
-            key={currentSlide.id}
-            className="w-full h-full flex items-center justify-center"
-            style={{
-              animation: "slide-up-fade-in 0.5s ease-out forwards",
-            }}
-          >
-            <SlideRenderer
-              slide={currentSlide}
-              className="w-full h-full flex items-center justify-center"
-            />
-          </div>
+          {/* Pre-render current, next, and previous slides for instant transitions */}
+          {slides.map((slide, index) => {
+            const isCurrent = index === filteredCurrentSlideIndex;
+            const isNext = index === filteredCurrentSlideIndex + 1;
+            const isPrev = index === filteredCurrentSlideIndex - 1;
+            
+            // Only render current slide and adjacent slides
+            if (!isCurrent && !isNext && !isPrev) {
+              return null;
+            }
+
+            return (
+              <div
+                key={slide.id}
+                className={cn(
+                  "absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200 ease-in-out",
+                  isCurrent ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
+                )}
+                style={{
+                  // Ensure smooth transition
+                  willChange: isCurrent || isNext || isPrev ? "opacity" : "auto",
+                }}
+              >
+                <SlideRenderer
+                  slide={slide}
+                  className="w-full h-full flex items-center justify-center"
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -495,7 +591,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
               variant="ghost"
               size="sm"
               onClick={prevSlide}
-              disabled={currentSlideIndex === 0 && !showCompletionSlide}
+              disabled={filteredCurrentSlideIndex === 0 && !showCompletionSlide}
               className="text-foreground hover:bg-foreground/20 disabled:opacity-50 flex items-center gap-2"
             >
               <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
@@ -505,7 +601,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
             </Button>
 
             <div className="text-foreground text-sm font-medium text-center min-w-[80px]">
-              {currentSlideIndex + 1} / {slides.length}
+              {filteredCurrentSlideIndex + 1} / {slides.length}
             </div>
 
             <Button

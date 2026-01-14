@@ -117,26 +117,37 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
   const filledRating = hoveredRating ?? rating;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Rate Your Lesson Experience</CardTitle>
-        <CardDescription>
+    <Card className="max-w-md mx-auto">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg">Rate Your Lesson Experience</CardTitle>
+        <CardDescription className="text-sm">
           Please provide your feedback. Rating is required to complete the
           lesson.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         {isLoading ? (
           <div className="flex items-center justify-center p-6">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
+            {/* SVG Gradient Definition */}
+            <svg width="0" height="0" className="absolute">
+              <defs>
+                <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#fbbf24" />
+                  <stop offset="50%" stopColor="#f59e0b" />
+                  <stop offset="100%" stopColor="#d97706" />
+                </linearGradient>
+              </defs>
+            </svg>
+            
             {/* Star Rating */}
             <div className="space-y-2">
-              <Label htmlFor="rating">Rating *</Label>
+              <Label htmlFor="rating" className="text-sm">Rating *</Label>
               <div
-                className="flex gap-2"
+                className="flex gap-1.5"
                 role="radiogroup"
                 aria-label="Lesson rating"
               >
@@ -153,16 +164,24 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
                     disabled={isSubmitting}
                   >
                     <Star
-                      className={`h-8 w-8 transition-colors ${
+                      className={`h-7 w-7 transition-all ${
                         value <= (filledRating ?? 0)
-                          ? "fill-primary text-primary"
+                          ? "text-yellow-500"
                           : "fill-none text-muted-foreground"
-                      } group-hover:fill-primary group-hover:text-primary`}
+                      } group-hover:text-yellow-500`}
+                      style={
+                        value <= (filledRating ?? 0)
+                          ? {
+                              fill: "url(#gold-gradient)",
+                              stroke: "url(#gold-gradient)",
+                            }
+                          : undefined
+                      }
                     />
                   </button>
                 ))}
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {!rating && "Click a star to rate this lesson"}
                 {rating && `You rated this lesson ${rating} out of 5 stars`}
               </p>
@@ -170,30 +189,32 @@ export function LessonFeedbackForm({ lessonId }: LessonFeedbackFormProps) {
 
             {/* Comments */}
             <div className="space-y-2">
-              <Label htmlFor="comments">Comments (Optional)</Label>
+              <Label htmlFor="comments" className="text-sm">Comments (Optional)</Label>
               <Textarea
                 id="comments"
                 placeholder="Share your thoughts about this lesson..."
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                rows={6}
+                rows={4}
                 disabled={isSubmitting}
+                className="text-sm"
               />
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                <p className="text-sm text-destructive">{error}</p>
+              <div className="p-2.5 bg-destructive/10 border border-destructive/20 rounded-md">
+                <p className="text-xs text-destructive">{error}</p>
               </div>
             )}
 
             {/* Submit Button */}
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pt-2">
               <Button
                 onClick={handleSubmit}
                 disabled={!rating || isSubmitting}
-                className="min-w-[200px]"
+                className="min-w-[160px] text-sm"
+                size="sm"
               >
                 {isSubmitting ? (
                   <>

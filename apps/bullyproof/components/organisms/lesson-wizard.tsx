@@ -204,29 +204,29 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
   return (
     <Drawer open={open} onOpenChange={onOpenChange} direction="top">
       <DrawerContent className="h-[90vh] max-w-3xl mx-auto">
-        <DrawerHeader>
+        <DrawerHeader className="bg-muted">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
+            <div className="flex-1 text-left">
               <DrawerTitle>{getStepTitle()}</DrawerTitle>
               <DrawerDescription>{getStepDescription()}</DrawerDescription>
-              <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs text-muted-foreground">Step {state.step + 1} of {totalSteps}</span>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalSteps }, (_, i) => i).map((step) => (
-                    <span
-                      key={step}
-                      className={`
-                        inline-block h-1.5 w-4 rounded-full transition-colors
-                        ${step === state.step
-                          ? 'bg-primary'
-                          : step < state.step
-                          ? 'bg-primary/40'
-                          : 'bg-border'
-                        }
-                      `}
-                    />
-                  ))}
-                </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Step {state.step + 1} of {totalSteps}</span>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalSteps }, (_, i) => i).map((step) => (
+                  <span
+                    key={step}
+                    className={`
+                      inline-block h-1.5 w-4 rounded-full transition-colors
+                      ${step === state.step
+                        ? 'bg-primary'
+                        : step < state.step
+                        ? 'bg-primary/40'
+                        : 'bg-border'
+                      }
+                    `}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -284,7 +284,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
               />
             </div>
 
-            <div className={state.step === 2 ? 'block' : 'hidden'}>
+            <div className={state.step === 2 ? 'flex flex-col h-full' : 'hidden'}>
               <LessonWizardTopic
                 selectedTopic={state.selectedTopic}
                 selectedClasses={state.selectedClasses}
@@ -309,13 +309,12 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
           </div>
         </div>
 
-        <DrawerFooter className="border-t bg-[var(--brand-bullyproof-primary)]">
+        <DrawerFooter className="border-t">
           <div className="flex items-center justify-between max-w-3xl mx-auto w-full">
             <Button
               variant="outline"
               onClick={state.step === 0 ? () => onOpenChange(false) : goBack}
               disabled={loading}
-              className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:text-white"
             >
               <ChevronLeft className="h-4 w-4 mr-2" />
               {state.step === 0 ? 'Cancel' : 'Back'}
@@ -328,7 +327,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
               <Button 
                 onClick={goNext} 
                 disabled={!canProceed() || loading}
-                className="bg-white text-[var(--brand-bullyproof-primary)] hover:bg-white/90"
+                className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
               >
                 Continue
                 <ChevronRight className="h-4 w-4 ml-2" />
@@ -337,7 +336,7 @@ export function LessonWizard({ schoolId, open, onOpenChange }: LessonWizardProps
               <Button
                 onClick={handleCreateLesson}
                 disabled={loading || !canProceed()}
-                className="bg-white text-[var(--brand-bullyproof-primary)] hover:bg-white/90"
+                className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
               >
                 {loading ? (
                   <>

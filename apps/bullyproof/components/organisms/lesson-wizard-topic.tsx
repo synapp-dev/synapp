@@ -13,7 +13,10 @@ import { topicsApi } from "@/entities/topics/api/endpoints";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { classesApi } from "@/entities/classes/api/endpoints";
-import { useTopicsStore, useSlideUrl } from "@/entities/topics/model/store-enhanced";
+import {
+  useTopicsStore,
+  useSlideUrl,
+} from "@/entities/topics/model/store-enhanced";
 import { useStages } from "@/entities/stages/model/store";
 
 interface LessonWizardTopicProps {
@@ -54,7 +57,7 @@ function TopicThumbnail({ topic }: { topic: TopicWithSlides }) {
 
   if (hasError || !imageUrl) {
     return (
-      <div className="w-full aspect-video rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+      <div className="w-full aspect-video rounded-t-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
         <Image
           src="/images/bp-small-logo.svg"
           alt="Bullyproof Logo"
@@ -67,7 +70,7 @@ function TopicThumbnail({ topic }: { topic: TopicWithSlides }) {
   }
 
   return (
-    <div className="relative w-full aspect-video rounded-md overflow-hidden bg-muted">
+    <div className="relative w-full aspect-video rounded-t-md overflow-hidden bg-muted">
       <Image
         src={imageUrl}
         alt={topic.title}
@@ -91,7 +94,11 @@ export function LessonWizardTopic({
   const [loadingRecommended, setLoadingRecommended] = useState(false);
 
   // Fetch all stages first (like the content page does)
-  const { stages, isLoading: isLoadingStages, error: stagesError } = useStages();
+  const {
+    stages,
+    isLoading: isLoadingStages,
+    error: stagesError,
+  } = useStages();
 
   // Memoize stage IDs for stable queryKey
   const stageIds = useMemo(() => stages.map((s) => s.id), [stages]);
@@ -103,7 +110,13 @@ export function LessonWizardTopic({
     isLoading: isLoadingTopics,
     error: topicsError,
   } = useQuery({
-    queryKey: ["topics", "all-stages", "with-slides", "with-urls", stageIdsString],
+    queryKey: [
+      "topics",
+      "all-stages",
+      "with-slides",
+      "with-urls",
+      stageIdsString,
+    ],
     queryFn: async () => {
       if (!stages || stages.length === 0) return [];
 
@@ -116,7 +129,10 @@ export function LessonWizardTopic({
           limit: 100,
         });
         if (result.error) {
-          console.warn(`Failed to fetch topics for stage ${stage.id}:`, result.error.message);
+          console.warn(
+            `Failed to fetch topics for stage ${stage.id}:`,
+            result.error.message
+          );
           return [];
         }
         return (result.data || []).map((topic: any) => ({
@@ -147,14 +163,19 @@ export function LessonWizardTopic({
       stageId: item.stageId || item.stage_id || "",
       stageSortIndex: item.stageSortIndex ?? item.stage_sort_index ?? 999999,
       stageOrder: item.stageOrder ?? item.stage_order ?? null,
-      slideCount: item.slideCount || item.slide_count || (item.slides?.length || 0),
+      slideCount:
+        item.slideCount || item.slide_count || item.slides?.length || 0,
       description: item.description || item.officialNotes || item.title,
       slides: item.slides || [],
     }));
   }, [allTopicsData]);
 
   const loading = isLoadingStages || isLoadingTopics;
-  const error = stagesError ? (stagesError as Error).message : (topicsError ? (topicsError as Error).message : null);
+  const error = stagesError
+    ? (stagesError as Error).message
+    : topicsError
+      ? (topicsError as Error).message
+      : null;
 
   // Memoize selected class IDs for stable comparison
   const selectedClassIds = useMemo(
@@ -189,7 +210,10 @@ export function LessonWizardTopic({
   // Calculate recommended topics
   useEffect(() => {
     // Early return if no classes or topics
-    if (selectedClassesRef.current.length === 0 || topicsRef.current.length === 0) {
+    if (
+      selectedClassesRef.current.length === 0 ||
+      topicsRef.current.length === 0
+    ) {
       setRecommendedTopicIds((prev) => {
         // Only update if actually changing
         if (prev.size === 0) return prev;
@@ -210,7 +234,9 @@ export function LessonWizardTopic({
         const completedLessonsPromises = classIds.map((classId) =>
           lessonsApi.get.list({ classId, status: "completed", limit: 100 })
         );
-        const completedLessonsResults = await Promise.all(completedLessonsPromises);
+        const completedLessonsResults = await Promise.all(
+          completedLessonsPromises
+        );
 
         if (cancelled) return;
 
@@ -227,9 +253,15 @@ export function LessonWizardTopic({
           )[0];
 
           const completedTopicId = mostRecentLesson.topicId;
-          const completedTopic = topicsRef.current.find((t) => t.id === completedTopicId);
+          const completedTopic = topicsRef.current.find(
+            (t) => t.id === completedTopicId
+          );
 
-          if (completedTopic && completedTopic.stageId && completedTopic.stageOrder !== null) {
+          if (
+            completedTopic &&
+            completedTopic.stageId &&
+            completedTopic.stageOrder !== null
+          ) {
             // Find next sequential topic in same stage
             const stageTopics = topicsRef.current.filter(
               (t) => t.stageId === completedTopic.stageId
@@ -274,9 +306,7 @@ export function LessonWizardTopic({
             // Find stages that match the year codes
             const matchingStages = stagesRef.current.filter((stage) => {
               if (!stage.years || stage.years.length === 0) return false;
-              return stage.years.some((year) =>
-                yearCodesSet.has(year.code)
-              );
+              return stage.years.some((year) => yearCodesSet.has(year.code));
             });
 
             // Sort stages by sortIndex and get first matching stage
@@ -405,7 +435,7 @@ export function LessonWizardTopic({
       >
         <Card
           className={`
-            h-full transition-all overflow-hidden
+            h-full transition-all overflow-hidden p-0 gap-0
             ${
               isSelected
                 ? "border-primary border-2 bg-primary/5"
@@ -449,7 +479,11 @@ export function LessonWizardTopic({
                 </div>
               )}
               {isSelected && (
-                <div className={`text-lg ${isSelected ? "text-white" : "text-primary"}`}>✓</div>
+                <div
+                  className={`text-sm ${isSelected ? "text-white" : "text-primary"}`}
+                >
+                  ✓
+                </div>
               )}
               <Badge
                 variant="outline"
@@ -475,17 +509,17 @@ export function LessonWizardTopic({
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 h-full min-h-0">
       {/* Search input */}
       <Input
         placeholder="Search topics..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
-        className="w-full"
+        className="w-full flex-shrink-0"
       />
 
       {/* Topic cards grid */}
-      <ScrollArea className="h-[400px]">
+      <ScrollArea className="flex-1 min-h-0">
         {loading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -501,7 +535,10 @@ export function LessonWizardTopic({
               <div className="space-y-3">
                 <div className="flex items-center gap-2 pb-2 border-b">
                   <h4 className="text-lg font-semibold">Recommended Lesson</h4>
-                  <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
+                  <Badge
+                    variant="outline"
+                    className="text-xs bg-amber-50 text-amber-700 border-amber-300"
+                  >
                     {recommendedTopics.length}{" "}
                     {recommendedTopics.length === 1 ? "topic" : "topics"}
                   </Badge>
