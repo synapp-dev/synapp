@@ -14,7 +14,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { LessonWizard } from "@/components/organisms/lesson-wizard";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSchoolStore } from "@/stores/school-store";
-import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { useLessons } from "@/entities/lessons/model/store";
 import {
   BookOpen,
   Plus,
@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useQuery } from "@tanstack/react-query";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import Image from "next/image";
 
@@ -194,9 +195,6 @@ export default function LessonsPage({
   const currentSchool = useSchoolStore((state) => state.currentSchool);
   const [schoolSlug, setSchoolSlug] = useState<string>("");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const searchParams = useSearchParams();
 
@@ -216,56 +214,22 @@ export default function LessonsPage({
     }
   }, [searchParams, currentSchool?.id]);
 
-  useEffect(() => {
-    async function fetchLessons() {
-      // Wait for school to be loaded from the store (set by layout)
-      if (!currentSchool?.id) {
-        setLoading(true);
-        return;
-      }
+  // Use React Query hook for lessons
+  const {
+    lessons,
+    isLoading: loading,
+    isError,
+    error: queryError,
+  } = useLessons({
+    schoolId: currentSchool?.id,
+    limit: 100,
+  });
 
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch lessons for this school
-        const result = await lessonsApi.get.list({
-          schoolId: currentSchool.id,
-          limit: 100,
-        });
-
-        if (result.error) {
-          setError(result.error.message || "Failed to load lessons");
-          setLessons([]);
-        } else {
-          // Fetch details for each lesson to get topic and teacher info
-          const lessonsWithDetails = await Promise.all(
-            (result.data || []).map(async (lesson) => {
-              const lessonDetailResult = await lessonsApi.get.byId(lesson.id);
-              if (!lessonDetailResult.error && lessonDetailResult.data) {
-                return {
-                  ...lesson,
-                  topic: lessonDetailResult.data.topic,
-                  teacher: lessonDetailResult.data.teacher,
-                  assignedClasses:
-                    lessonDetailResult.data.assignedClasses || [],
-                };
-              }
-              return lesson;
-            })
-          );
-          setLessons(lessonsWithDetails);
-        }
-      } catch (err: any) {
-        setError(err.message || "An error occurred");
-        setLessons([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchLessons();
-  }, [currentSchool?.id]);
+  const error = isError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Failed to load lessons"
+    : null;
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {

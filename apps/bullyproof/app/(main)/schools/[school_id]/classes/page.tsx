@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useSchoolStore } from "@/stores/school-store";
-import { classesApi } from "@/entities/classes/api/endpoints";
+import { useClasses } from "@/entities/classes/model/store";
+import { useMeStore } from "@/entities/me/model/store";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { meApi } from "@/entities/me/api/endpoints";
+import { apiFetch } from "@/lib/api/fetcher.client";
 import {
   Card,
   CardContent,
@@ -11,21 +15,22 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { GraduationCap, Plus, Loader2, Search } from "lucide-react";
+import { GraduationCap, Plus, Loader2, Search, Star } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { cn } from "@workspace/ui/lib/utils";
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
   if (!query) return true;
-  
+
   const queryLower = query.toLowerCase().trim();
   const textLower = text.toLowerCase();
-  
+
   // Exact match
   if (textLower.includes(queryLower)) return true;
-  
+
   // Fuzzy match: check if all characters in query appear in order in text
   let queryIndex = 0;
   for (let i = 0; i < textLower.length && queryIndex < queryLower.length; i++) {
@@ -33,83 +38,128 @@ function fuzzySearch(query: string, text: string): boolean {
       queryIndex++;
     }
   }
-  
+
   return queryIndex === queryLower.length;
 }
 
-type ClassWithYearCodes = {
-  id: string;
+type UserClass = {
+  classId: string;
+  className: string;
+  classCode: string | null;
   schoolId: string;
-  name: string;
-  code: string | null;
-  stream: string | null;
-  room: string | null;
-  studentCap: number | null;
+  schoolName: string | null;
   active: boolean;
   createdAt: string;
-  yearCodes?: string[] | null;
 };
 
 export default function ClassesPage() {
   usePageTitle(["schools", "classes"]);
   const currentSchool = useSchoolStore((state) => state.currentSchool);
-  const [classes, setClasses] = useState<ClassWithYearCodes[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const currentUser = useMeStore((state) => state.currentUser);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
-    async function fetchClasses() {
-      // Wait for school to be loaded from the store (set by layout)
-      if (!currentSchool?.id) {
-        setLoading(true);
-        return;
+  // Use React Query hook for classes
+  const {
+    classes,
+    isLoading: loading,
+    isError,
+    error: queryError,
+  } = useClasses({
+    schoolId: currentSchool?.id,
+  });
+
+  const error = isError
+    ? queryError instanceof Error
+      ? queryError.message
+      : "Failed to load classes"
+    : null;
+
+  // Fetch current user's classes to determine star state
+  const { data: userClassesData } = useQuery<UserClass[]>({
+    queryKey: ["user-classes", currentUser?.id],
+    queryFn: async () => {
+      if (!currentUser?.id) return [];
+      const result = await apiFetch<UserClass[]>(
+        `/users/${currentUser.id}/classes`
+      );
+      if (result.error) {
+        console.error("Failed to fetch user classes:", result.error);
+        return [];
       }
+      return result.data || [];
+    },
+    enabled: !!currentUser?.id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
-      try {
-        setLoading(true);
-        setError(null);
+  const userClassIds = useMemo(() => {
+    return new Set(userClassesData?.map((uc) => uc.classId) || []);
+  }, [userClassesData]);
 
-        // Query classes table where school_id matches the school UUID from store
-        const result = await classesApi.get.list({
-          schoolId: currentSchool.id,
-        });
-
-        if (result.error) {
-          setError(result.error.message || "Failed to load classes");
-          setClasses([]);
-        } else {
-          setClasses(result.data || []);
-        }
-      } catch (err: any) {
-        setError(err.message || "An error occurred");
-        setClasses([]);
-      } finally {
-        setLoading(false);
+  // Mutation to toggle class star
+  const toggleClassMutation = useMutation({
+    mutationFn: async ({
+      classId,
+      isStarred,
+    }: {
+      classId: string;
+      isStarred: boolean;
+    }) => {
+      const result = await meApi.teacherClasses.toggle(
+        classId,
+        isStarred ? "remove" : "add"
+      );
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to toggle class");
       }
+      return result.data;
+    },
+    onSuccess: () => {
+      // Invalidate user classes query to refresh star states
+      queryClient.invalidateQueries({
+        queryKey: ["user-classes", currentUser?.id],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["teacher-classes", currentUser?.id],
+      });
+    },
+  });
+
+  // Filter classes based on search query and sort starred classes first
+  const filteredClasses = useMemo(() => {
+    let filtered = classes;
+
+    // Filter by search query if provided
+    if (searchQuery.trim()) {
+      filtered = classes.filter((classItem) => {
+        const name = classItem.name || "";
+        const code = classItem.code || "";
+        const stream = classItem.stream || "";
+        const yearCodes = classItem.yearCodes?.join(" ") || "";
+
+        return (
+          fuzzySearch(searchQuery, name) ||
+          fuzzySearch(searchQuery, code) ||
+          fuzzySearch(searchQuery, stream) ||
+          fuzzySearch(searchQuery, yearCodes)
+        );
+      });
     }
 
-    fetchClasses();
-  }, [currentSchool?.id]);
+    // Sort: starred classes first, then by name
+    return filtered.sort((a, b) => {
+      const aStarred = userClassIds.has(a.id);
+      const bStarred = userClassIds.has(b.id);
 
-  // Filter classes based on search query
-  const filteredClasses = useMemo(() => {
-    if (!searchQuery.trim()) return classes;
+      // If one is starred and the other isn't, starred comes first
+      if (aStarred && !bStarred) return -1;
+      if (!aStarred && bStarred) return 1;
 
-    return classes.filter((classItem) => {
-      const name = classItem.name || "";
-      const code = classItem.code || "";
-      const stream = classItem.stream || "";
-      const yearCodes = classItem.yearCodes?.join(" ") || "";
-      
-      return (
-        fuzzySearch(searchQuery, name) ||
-        fuzzySearch(searchQuery, code) ||
-        fuzzySearch(searchQuery, stream) ||
-        fuzzySearch(searchQuery, yearCodes)
-      );
+      // Otherwise, sort alphabetically by name
+      return (a.name || "").localeCompare(b.name || "");
     });
-  }, [classes, searchQuery]);
+  }, [classes, searchQuery, userClassIds]);
 
   // Class card skeleton component
   const ClassCardSkeleton = () => (
@@ -202,66 +252,111 @@ export default function ClassesPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredClasses.map((classItem) => (
-            <Card key={classItem.id} className="hover:shadow-md transition-shadow h-full">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg truncate">
-                      {classItem.name}
-                    </CardTitle>
-                    {classItem.stream && (
-                      <p className="text-sm text-muted-foreground mt-1">
-                        Stream: {classItem.stream}
-                      </p>
+          {filteredClasses.map((classItem) => {
+            const isStarred = userClassIds.has(classItem.id);
+            const isToggling = toggleClassMutation.isPending;
+
+            return (
+              <Card
+                key={classItem.id}
+                className={cn(
+                  "hover:shadow-md transition-shadow h-full",
+                  isStarred && "bg-[var(--brand-bullyproof-primary)]/5"
+                )}
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate">
+                        {classItem.name}
+                      </CardTitle>
+                      {classItem.stream && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Stream: {classItem.stream}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (!isToggling && currentUser?.id) {
+                          toggleClassMutation.mutate({
+                            classId: classItem.id,
+                            isStarred,
+                          });
+                        }
+                      }}
+                      disabled={isToggling || !currentUser?.id}
+                      className={cn(
+                        "shrink-0 p-1 rounded-md transition-colors",
+                        "hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed",
+                        isStarred && "text-amber-500"
+                      )}
+                      title={
+                        isStarred
+                          ? "Remove from my classes"
+                          : "Add to my classes"
+                      }
+                    >
+                      <Star
+                        className={cn(
+                          "h-5 w-5",
+                          isStarred
+                            ? "fill-amber-500 text-amber-500"
+                            : "text-muted-foreground"
+                        )}
+                      />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {classItem.code && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Code: </span>
+                        <span className="font-medium">{classItem.code}</span>
+                      </div>
+                    )}
+                    {classItem.yearCodes && classItem.yearCodes.length > 0 && (
+                      <div>
+                        <div className="text-sm text-muted-foreground mb-1">
+                          Year Levels:
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {classItem.yearCodes.map((yearCode, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {yearCode}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {classItem.room && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Room: </span>
+                        <span className="font-medium">{classItem.room}</span>
+                      </div>
+                    )}
+                    {classItem.studentCap && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">
+                          Capacity:{" "}
+                        </span>
+                        <span className="font-medium">
+                          {classItem.studentCap}
+                        </span>
+                      </div>
                     )}
                   </div>
-                  <Badge
-                    variant={classItem.active ? "default" : "secondary"}
-                    className="shrink-0"
-                  >
-                    {classItem.active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {classItem.code && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Code: </span>
-                      <span className="font-medium">{classItem.code}</span>
-                    </div>
-                  )}
-                  {classItem.yearCodes && classItem.yearCodes.length > 0 && (
-                    <div>
-                      <div className="text-sm text-muted-foreground mb-1">
-                        Year Levels:
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {classItem.yearCodes.map((yearCode, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {yearCode}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {classItem.room && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Room: </span>
-                      <span className="font-medium">{classItem.room}</span>
-                    </div>
-                  )}
-                  {classItem.studentCap && (
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Capacity: </span>
-                      <span className="font-medium">{classItem.studentCap}</span>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
