@@ -1,4 +1,5 @@
 import { SchoolStoreProviderWrapper } from "@/components/atoms/school-store-provider-wrapper";
+import { SchoolPageTutorialGuard } from "@/components/molecules/school-page-tutorial-guard";
 
 export default async function SchoolLayout({
   children,
@@ -14,6 +15,8 @@ export default async function SchoolLayout({
     <>
       {/* School Store Provider - populates the store with school data */}
       <SchoolStoreProviderWrapper slug={slug} />
+      {/* Tutorial Guard - shows tutorials on first visit to school pages */}
+      <SchoolPageTutorialGuard />
       {children}
     </>
   );
