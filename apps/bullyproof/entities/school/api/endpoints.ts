@@ -51,4 +51,34 @@ export const schoolApi = {
       });
     },
   },
+  patch: {
+    update(
+      schoolId: string,
+      payload: {
+        name?: string;
+        stateId?: string;
+        sectorId?: string;
+        emailDomain?: string | null;
+        address?: string | null;
+        bannerUrl?: string | null;
+        avatarUrl?: string | null;
+        levelIds?: string[];
+      }
+    ): Promise<ApiResult<School>> {
+      return apiFetch<School>(`/schools/${encodeURIComponent(schoolId)}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    },
+  },
+  delete: {
+    delete(schoolId: string): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch<{ success: boolean }>(
+        `/schools/${encodeURIComponent(schoolId)}`,
+        {
+          method: "DELETE",
+        }
+      );
+    },
+  },
 };
