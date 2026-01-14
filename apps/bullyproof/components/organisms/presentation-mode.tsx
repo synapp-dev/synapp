@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -80,22 +80,31 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     return index >= 0 ? index : 0;
   }, [currentSlide, slides]);
 
+  // Cache the mapping from filtered index to original index for faster lookups
+  const filteredToOriginalIndexMap = useMemo(() => {
+    const map = new Map<number, number>();
+    slides.forEach((slide, filteredIndex) => {
+      const originalIndex = allSlides.findIndex((s) => s.id === slide.id);
+      if (originalIndex >= 0) {
+        map.set(filteredIndex, originalIndex);
+      }
+    });
+    return map;
+  }, [slides, allSlides]);
+
   // If current slide was filtered out, navigate to first valid slide
   useEffect(() => {
     if (!isLoading && currentSlide && slides.length > 0) {
       const foundIndex = slides.findIndex((slide) => slide.id === currentSlide.id);
       if (foundIndex < 0) {
         // Current slide is empty and was filtered out, navigate to first valid slide
-        const firstValidSlide = slides[0];
-        if (firstValidSlide) {
-          const originalIndex = allSlides.findIndex((s) => s.id === firstValidSlide.id);
-          if (originalIndex >= 0) {
-            updateSlide(originalIndex);
-          }
+        const originalIndex = filteredToOriginalIndexMap.get(0);
+        if (originalIndex !== undefined && originalIndex >= 0) {
+          updateSlide(originalIndex);
         }
       }
     }
-  }, [isLoading, currentSlide, slides, allSlides, updateSlide]);
+  }, [isLoading, currentSlide, slides.length, filteredToOriginalIndexMap, updateSlide]);
 
   // Check permissions in parallel (non-blocking)
   const { data: lessonData, isLoading: isLoadingLesson } =
@@ -130,32 +139,30 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     if (filteredCurrentSlideIndex === slides.length - 1) {
       setShowCompletionSlide(true);
     } else if (filteredCurrentSlideIndex < slides.length - 1) {
-      // Get the next slide from filtered list and update to its original index
-      const nextSlide = slides[filteredCurrentSlideIndex + 1];
-      if (nextSlide) {
-        const originalIndex = allSlides.findIndex((s) => s.id === nextSlide.id);
-        if (originalIndex >= 0) {
-          updateSlide(originalIndex);
-        }
+      // Use cached mapping for faster lookup
+      const nextFilteredIndex = filteredCurrentSlideIndex + 1;
+      const originalIndex = filteredToOriginalIndexMap.get(nextFilteredIndex);
+      if (originalIndex !== undefined && originalIndex >= 0) {
+        // Update immediately without waiting for API response
+        updateSlide(originalIndex);
       }
     }
-  }, [filteredCurrentSlideIndex, slides, allSlides, updateSlide]);
+  }, [filteredCurrentSlideIndex, slides.length, filteredToOriginalIndexMap, updateSlide]);
 
   const prevSlide = useCallback(() => {
     // If we're showing completion slide, go back to last regular slide
     if (showCompletionSlide) {
       setShowCompletionSlide(false);
     } else if (filteredCurrentSlideIndex > 0) {
-      // Get the previous slide from filtered list and update to its original index
-      const prevSlide = slides[filteredCurrentSlideIndex - 1];
-      if (prevSlide) {
-        const originalIndex = allSlides.findIndex((s) => s.id === prevSlide.id);
-        if (originalIndex >= 0) {
-          updateSlide(originalIndex);
-        }
+      // Use cached mapping for faster lookup
+      const prevFilteredIndex = filteredCurrentSlideIndex - 1;
+      const originalIndex = filteredToOriginalIndexMap.get(prevFilteredIndex);
+      if (originalIndex !== undefined && originalIndex >= 0) {
+        // Update immediately without waiting for API response
+        updateSlide(originalIndex);
       }
     }
-  }, [filteredCurrentSlideIndex, slides, allSlides, showCompletionSlide, updateSlide]);
+  }, [filteredCurrentSlideIndex, showCompletionSlide, filteredToOriginalIndexMap, updateSlide]);
 
   // Mark lesson as pending_review when completion slide is shown
   useEffect(() => {
@@ -323,33 +330,42 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
-  // Hide controls when slide changes (unless mouse is moving)
-  useEffect(() => {
-    if (isLoading || error || !slides.length || showCompletionSlide) return;
-    // Hide controls when slide changes
-    setShowControls(false);
-  }, [filteredCurrentSlideIndex, isLoading, error, slides.length, showCompletionSlide]);
+  // Note: Controls visibility is now solely controlled by mouse movement timeout
+  // Removing automatic hide on slide change to prevent conflicts with mouse movement handler
 
   // Mouse movement detection for controls
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const showControlsWithTimeout = useCallback(() => {
+    setShowControls(true);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000); // Hide controls after 3 seconds of no movement
+  }, []);
+  
   useEffect(() => {
     if (isLoading || error || !slides.length || showCompletionSlide) return;
 
-    let timeoutId: NodeJS.Timeout;
-
     const handleMouseMove = () => {
-      setShowControls(true);
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setShowControls(false);
-      }, 3000); // Hide controls after 3 seconds of no movement
+      showControlsWithTimeout();
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    // Attach to both document and window for maximum compatibility
+    document.addEventListener("mousemove", handleMouseMove, { passive: true, capture: true });
+    window.addEventListener("mousemove", handleMouseMove, { passive: true, capture: true });
+    
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      clearTimeout(timeoutId);
+      document.removeEventListener("mousemove", handleMouseMove, { capture: true });
+      window.removeEventListener("mousemove", handleMouseMove, { capture: true });
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
-  }, [isLoading, error, slides.length, showCompletionSlide]);
+  }, [isLoading, error, slides.length, showCompletionSlide, showControlsWithTimeout]);
 
   // Update date and time every second
   useEffect(() => {
@@ -448,6 +464,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
         "relative w-full h-full flex items-center justify-center overflow-hidden bg-muted",
         !showControls && "cursor-none"
       )}
+      onMouseMove={showControlsWithTimeout}
     >
       {/* Unauthorized warning overlay - shows if user is not the lesson creator */}
       {showUnauthorizedWarning && (
@@ -489,7 +506,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
               <div
                 key={slide.id}
                 className={cn(
-                  "absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-200 ease-in-out",
+                  "absolute inset-0 w-full h-full flex items-center justify-center transition-opacity duration-100 ease-in-out",
                   isCurrent ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
                 )}
                 style={{
@@ -510,7 +527,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       {/* Instructions overlay - appears on mouse movement at top */}
       <div
         className={cn(
-          "absolute top-0 left-0 right-0 transition-all duration-300 ease-in-out",
+          "absolute top-0 left-0 right-0 transition-all duration-300 ease-in-out z-50",
           showControls
             ? "opacity-100 translate-y-0"
             : "opacity-0 -translate-y-4 pointer-events-none"
@@ -578,7 +595,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
       {/* Controls overlay - appears on hover at bottom */}
       <div
         className={cn(
-          "absolute bottom-0 left-0 right-0 transition-all duration-300 ease-in-out",
+          "absolute bottom-0 left-0 right-0 transition-all duration-300 ease-in-out z-50",
           showControls
             ? "opacity-100 translate-y-0"
             : "opacity-0 translate-y-4 pointer-events-none"
