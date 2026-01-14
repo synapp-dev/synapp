@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { SlideData } from "@/components/organisms/slide-renderer";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
@@ -36,6 +36,8 @@ export function useLessonLiveState(
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const supabase = createBrowserClient();
+  const apiUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdateRef = useRef<{ slideId: string; index: number } | null>(null);
 
   // Fetch initial data and get latest live state from database
   useEffect(() => {
@@ -224,7 +226,7 @@ export function useLessonLiveState(
     };
   }, [actualLessonId, slides, supabase]);
 
-  // Update slide function
+  // Update slide function - optimistically updates UI immediately, debounces API call
   const updateSlide = useCallback(
     async (index: number) => {
       if (index < 0 || index >= slides.length) {
@@ -236,26 +238,63 @@ export function useLessonLiveState(
         return;
       }
 
-      try {
-        const result = await lessonsApi.liveState.post.update(actualLessonId, {
-          currentSlideId: targetSlide.id,
-          currentIndex: index,
-        });
+      // Optimistically update UI immediately for instant feedback
+      setCurrentSlideIndex(index);
 
-        if (result.error) {
-          throw new Error(result.error.message || "Failed to update slide");
-        }
+      // Store the pending update
+      pendingUpdateRef.current = {
+        slideId: targetSlide.id,
+        index: index,
+      };
 
-        // The realtime subscription will handle the state update
-        // But we can optimistically update if needed
-        setCurrentSlideIndex(index);
-      } catch (err: any) {
-        console.error("Error updating slide:", err);
-        setError(err.message || "Failed to update slide");
+      // Clear any existing timeout
+      if (apiUpdateTimeoutRef.current) {
+        clearTimeout(apiUpdateTimeoutRef.current);
       }
+
+      // Debounce the API call - only fire after user stops navigating for 2 seconds
+      apiUpdateTimeoutRef.current = setTimeout(() => {
+        const pending = pendingUpdateRef.current;
+        if (pending) {
+          // Fire API call in background without blocking UI
+          lessonsApi.liveState.post.update(actualLessonId, {
+            currentSlideId: pending.slideId,
+            currentIndex: pending.index,
+          }).catch((err: any) => {
+            // Only log errors, don't revert UI - realtime subscription will sync if needed
+            console.error("Error updating slide (non-blocking):", err);
+          });
+          
+          // Clear pending update after sending
+          pendingUpdateRef.current = null;
+        }
+        apiUpdateTimeoutRef.current = null;
+      }, 2000); // 2 second debounce
     },
     [actualLessonId, slides]
   );
+
+  // Cleanup timeout on unmount and send final update if pending
+  useEffect(() => {
+    return () => {
+      if (apiUpdateTimeoutRef.current) {
+        clearTimeout(apiUpdateTimeoutRef.current);
+        apiUpdateTimeoutRef.current = null;
+      }
+      
+      // Send final pending update immediately on unmount
+      const pending = pendingUpdateRef.current;
+      if (pending) {
+        lessonsApi.liveState.post.update(actualLessonId, {
+          currentSlideId: pending.slideId,
+          currentIndex: pending.index,
+        }).catch((err: any) => {
+          console.error("Error sending final slide update:", err);
+        });
+        pendingUpdateRef.current = null;
+      }
+    };
+  }, [actualLessonId]);
 
   const currentSlide = slides[currentSlideIndex] || null;
 
