@@ -17,7 +17,7 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import { createServerClient } from "@/utils/supabase/server";
 import { getUserScopedRoles } from "@/server/auth/rbac";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { rolesRepo } from "@/server/roles/roles.repo";
@@ -64,11 +64,19 @@ const createUserSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const userId = await getUserIdFromRequest(request);
+    // Use createServerClient to get authenticated user with proper headers
+    const supabase = await createServerClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (!userId) {
+    if (authError || !user?.id) {
+      console.error("[USER CREATE] Authentication error:", authError);
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const userId = user.id;
 
     const body = await request.json();
     console.log("[USER CREATE] Request received:", {
@@ -87,14 +95,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check permissions: must be platform admin
-    const userRoles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
+    // Check permissions: must have PLATFORM_ADMIN role key
+    const userScopedRoles = await getUserScopedRoles(userId);
+    const isPlatformAdmin = userScopedRoles.platform.includes("PLATFORM_ADMIN");
 
     if (!isPlatformAdmin) {
       console.error("[USER CREATE] Unauthorized - insufficient permissions:", {
         userId,
-        platformRoles: userRoles.platform,
+        platformRoles: userScopedRoles.platform,
       });
       return NextResponse.json(
         {
@@ -120,11 +128,11 @@ export async function POST(request: Request) {
 
     const scopeId = scopeResult[0].id;
 
-    // Find role by name within the scope
+    // Find role by key (client sends role key like "SCHOOL_STAFF", "TEACHER", etc.)
     const roleResult = await db
       .select()
       .from(roles)
-      .where(and(eq(roles.name, data.roleName), eq(roles.scopeId, scopeId)))
+      .where(and(eq(roles.key, data.roleName), eq(roles.scopeId, scopeId)))
       .limit(1);
 
     if (roleResult.length === 0) {
@@ -171,66 +179,61 @@ export async function POST(request: Request) {
       // Wait a bit for profile to be ready
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Update user_profile with firstName and lastName if provided, and add creation log
-      const updateData: {
-        first_name?: string;
-        last_name?: string;
-        metadata?: any;
-      } = {};
-      if (data.firstName) updateData.first_name = data.firstName;
-      if (data.lastName) updateData.last_name = data.lastName;
+      // Get current profile using Drizzle
+      const currentProfileResult = await db
+        .select()
+        .from(userProfile)
+        .where(eq(userProfile.id, newUserId))
+        .limit(1);
 
-      // Get current metadata and add creation log
-      const { data: currentProfile } = await adminClient
-        .from("user_profile")
-        .select("metadata")
-        .eq("id", newUserId)
-        .single();
+      if (currentProfileResult.length > 0) {
+        const currentProfile = currentProfileResult[0];
+        const currentMetadata = (currentProfile.metadata as UserMetadata | null) || ({} as UserMetadata);
+        const updateLogs = Array.isArray(currentMetadata.updateLogs)
+          ? currentMetadata.updateLogs
+          : [];
 
-      const currentMetadata = (currentProfile?.metadata as UserMetadata | null) || ({} as UserMetadata);
-      const updateLogs = Array.isArray(currentMetadata.updateLogs)
-        ? currentMetadata.updateLogs
-        : [];
+        // Add creation log if it doesn't already exist
+        const hasCreationLog = updateLogs.some(
+          (log: any) => log.type === "creation"
+        );
+        if (!hasCreationLog) {
+          updateLogs.push({
+            type: "creation",
+            updatedAt: new Date().toISOString(),
+            updatedBy: userId,
+          });
+        }
 
-      // Add creation log if it doesn't already exist
-      const hasCreationLog = updateLogs.some(
-        (log: any) => log.type === "creation"
-      );
-      if (!hasCreationLog) {
-        updateLogs.push({
-          type: "creation",
-          updatedAt: new Date().toISOString(),
-          updatedBy: userId,
-        });
+        // Update user_profile with firstName, lastName, and metadata using Drizzle
+        const updateData: {
+          firstName?: string;
+          lastName?: string;
+          metadata?: any;
+        } = {};
+        if (data.firstName) updateData.firstName = data.firstName;
+        if (data.lastName) updateData.lastName = data.lastName;
         updateData.metadata = {
           ...currentMetadata,
           updateLogs,
         };
-      }
 
-      try {
-        const { error: updateError } = await adminClient
-          .from("user_profile")
-          .update(updateData)
-          .eq("id", newUserId);
+        try {
+          await db
+            .update(userProfile)
+            .set(updateData)
+            .where(eq(userProfile.id, newUserId));
 
-        if (updateError) {
-          console.error(
-            "[USER CREATE] Failed to update user profile:",
-            updateError
-          );
-          // Non-fatal error, continue
-        } else {
           console.log(
             "[USER CREATE] User profile updated with firstName/lastName and creation log"
           );
+        } catch (updateErr: any) {
+          console.error(
+            "[USER CREATE] Error updating user profile:",
+            updateErr
+          );
+          // Non-fatal error, continue
         }
-      } catch (updateErr: any) {
-        console.error(
-          "[USER CREATE] Error updating user profile:",
-          updateErr
-        );
-        // Non-fatal error, continue
       }
     } else {
       // Create new user in auth.users
@@ -271,67 +274,49 @@ export async function POST(request: Request) {
       );
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      // Verify user_profile was created
-      const { data: profile, error: profileError } = await adminClient
-        .from("user_profile")
-        .select("id")
-        .eq("id", newUserId)
-        .single();
+      // Verify user_profile was created using Drizzle
+      const profileResult = await db
+        .select()
+        .from(userProfile)
+        .where(eq(userProfile.id, newUserId))
+        .limit(1);
 
-      if (profileError && profileError.code !== "PGRST116") {
-        // PGRST116 is "not found" - we'll try to create it
-        console.error(
-          "[USER CREATE] Failed to verify user_profile:",
-          profileError
-        );
-      }
+      // If profile doesn't exist, create it using Drizzle
+      if (profileResult.length === 0) {
+        console.log("[USER CREATE] Creating user_profile using Drizzle");
+        try {
+          await db.insert(userProfile).values({
+            id: newUserId,
+            email: data.email,
+            firstName: data.firstName !== undefined ? (data.firstName || null) : null,
+            lastName: data.lastName !== undefined ? (data.lastName || null) : null,
+            metadata: {
+              updateLogs: [
+                {
+                  type: "creation",
+                  updatedAt: new Date().toISOString(),
+                  updatedBy: userId,
+                },
+              ],
+            },
+          });
+          console.log("[USER CREATE] User profile created successfully using Drizzle");
+        } catch (insertError: any) {
+          // Check if it's a unique constraint violation (profile was created by trigger)
+          if (insertError.code === "23505") {
+            console.log(
+              "[USER CREATE] Profile already exists (created by trigger)"
+            );
+            // Profile was created by trigger, just update metadata with creation log
+            const currentProfileResult = await db
+              .select()
+              .from(userProfile)
+              .where(eq(userProfile.id, newUserId))
+              .limit(1);
 
-        // If profile doesn't exist, create it
-        if (!profile) {
-          console.log("[USER CREATE] Creating user_profile manually");
-          const maxAttempts = 5;
-          let attempts = 0;
-          let updateError: any = null;
-
-          while (attempts < maxAttempts) {
-            attempts++;
-            const { error } = await adminClient.from("user_profile").insert({
-              id: newUserId,
-              email: data.email,
-              first_name: data.firstName,
-              last_name: data.lastName,
-              metadata: {
-                updateLogs: [
-                  {
-                    type: "creation",
-                    updatedAt: new Date().toISOString(),
-                    updatedBy: userId,
-                  },
-                ],
-              },
-            });
-
-            if (!error) {
-              updateError = null;
-              break;
-            }
-
-            updateError = error;
-
-            if (error.code === "23505") {
-              // Unique constraint violation - profile was created by trigger
-              console.log(
-                "[USER CREATE] Profile already exists (created by trigger)"
-              );
-              updateError = null;
-              // Update metadata with creation log since trigger created it
-              const { data: currentProfile } = await adminClient
-                .from("user_profile")
-                .select("metadata")
-                .eq("id", newUserId)
-                .single();
-
-              const currentMetadata = (currentProfile?.metadata as UserMetadata | null) || ({} as UserMetadata);
+            if (currentProfileResult.length > 0) {
+              const currentProfile = currentProfileResult[0];
+              const currentMetadata = (currentProfile.metadata as UserMetadata | null) || ({} as UserMetadata);
               const updateLogs = Array.isArray(currentMetadata.updateLogs)
                 ? currentMetadata.updateLogs
                 : [];
@@ -345,69 +330,73 @@ export async function POST(request: Request) {
                   updatedAt: new Date().toISOString(),
                   updatedBy: userId,
                 });
-                await adminClient
-                  .from("user_profile")
-                  .update({
-                    metadata: {
-                      ...currentMetadata,
-                      updateLogs,
-                    } as any,
-                  })
-                  .eq("id", newUserId);
               }
-              break;
+              
+              // Update firstName, lastName, and metadata
+              const updateData: {
+                firstName?: string | null;
+                lastName?: string | null;
+                metadata?: any;
+              } = {};
+              if (data.firstName !== undefined) updateData.firstName = data.firstName || null;
+              if (data.lastName !== undefined) updateData.lastName = data.lastName || null;
+              updateData.metadata = {
+                ...currentMetadata,
+                updateLogs,
+              };
+              
+              await db
+                .update(userProfile)
+                .set(updateData)
+                .where(eq(userProfile.id, newUserId));
             }
-
-            // Wait before retrying
-            await new Promise((resolve) => setTimeout(resolve, 200 * attempts));
-          }
-
-          if (updateError) {
+          } else {
             console.error(
-              "[USER CREATE] Failed to create user_profile after all retries:",
-              {
-                error: updateError,
-                attempts,
-                userId: newUserId,
-              }
+              "[USER CREATE] Failed to create user_profile:",
+              insertError
             );
             throw new Error(
-              `Failed to create user profile after ${maxAttempts} attempts: ${updateError.message}`
+              `Failed to create user profile: ${insertError.message}`
             );
           }
-        } else {
-          // Profile exists, ensure creation log is present
-          const { data: currentProfile } = await adminClient
-            .from("user_profile")
-            .select("metadata")
-            .eq("id", newUserId)
-            .single();
-
-          const currentMetadata = (currentProfile?.metadata as UserMetadata | null) || ({} as UserMetadata);
-          const updateLogs = Array.isArray(currentMetadata.updateLogs)
-            ? currentMetadata.updateLogs
-            : [];
-
-          const hasCreationLog = updateLogs.some(
-            (log: any) => log.type === "creation"
-          );
-          if (!hasCreationLog) {
-            updateLogs.push({
-              type: "creation",
-              updatedAt: new Date().toISOString(),
-              updatedBy: userId,
-            });
-            await adminClient
-              .from("user_profile")
-              .update({
-                metadata: {
-                  ...currentMetadata,
-                  updateLogs,
-                } as any,
-              })
-              .eq("id", newUserId);
-          }
         }
+      } else {
+        // Profile exists, update firstName, lastName, and ensure creation log is present using Drizzle
+        const currentProfile = profileResult[0];
+        const currentMetadata = (currentProfile.metadata as UserMetadata | null) || ({} as UserMetadata);
+        const updateLogs = Array.isArray(currentMetadata.updateLogs)
+          ? currentMetadata.updateLogs
+          : [];
+
+        const hasCreationLog = updateLogs.some(
+          (log: any) => log.type === "creation"
+        );
+        if (!hasCreationLog) {
+          updateLogs.push({
+            type: "creation",
+            updatedAt: new Date().toISOString(),
+            updatedBy: userId,
+          });
+        }
+        
+        // Update firstName, lastName, and metadata
+        const updateData: {
+          firstName?: string | null;
+          lastName?: string | null;
+          metadata?: any;
+        } = {};
+        if (data.firstName !== undefined) updateData.firstName = data.firstName || null;
+        if (data.lastName !== undefined) updateData.lastName = data.lastName || null;
+        updateData.metadata = {
+          ...currentMetadata,
+          updateLogs,
+        };
+        
+        await db
+          .update(userProfile)
+          .set(updateData)
+          .where(eq(userProfile.id, newUserId));
+      }
     }
 
     // Check if user already has this role for this school (if applicable)
@@ -417,7 +406,7 @@ export async function POST(request: Request) {
       data.schoolId || ""
     );
 
-    // Assign role if not already assigned
+    // Assign role if not already assigned (rolesRepo uses Drizzle internally)
     if (existingRoleCheck.length === 0) {
       console.log("[USER CREATE] Assigning role to user");
       await rolesRepo.assignRole({
