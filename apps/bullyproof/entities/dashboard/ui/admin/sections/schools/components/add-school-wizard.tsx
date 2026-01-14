@@ -24,7 +24,6 @@ import { statesApi } from "@/entities/states/api/endpoints";
 import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
 import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
-import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
 import { capitalizeSchoolName } from "@/utils/school-name";
 
@@ -217,13 +216,12 @@ export function AddSchoolWizard({
       const createdSchool = result.data;
       if (!createdSchool) {
         setError("School was created but no data was returned");
+        setLoading(false);
         return;
       }
 
-      // Close the wizard
-      onOpenChange(false);
-
       // Call the callback with the created school's slug
+      // The parent component will handle closing the wizard and updating the URL
       if (onSchoolCreated) {
         onSchoolCreated({ slug: createdSchool.slug || null });
       }
@@ -238,7 +236,7 @@ export function AddSchoolWizard({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="top"
-        className="h-[65vh] left-1/2 -translate-x-1/2 w-2/5 !right-auto rounded-b-2xl p-4 flex flex-col"
+        className="h-[65vh] left-1/2 -translate-x-1/2 w-1/3 max-w-md !right-auto rounded-b-2xl p-4 flex flex-col"
       >
         {/* Header - Full width */}
         <SheetHeader className="flex items-center justify-center">
@@ -251,24 +249,9 @@ export function AddSchoolWizard({
           </SheetDescription> */}
         </SheetHeader>
 
-        {/* Body - Image and Form side by side */}
+        {/* Body - Form content */}
         <div className="flex flex-1 min-h-0">
-          {/* Left side - Image placeholder - Full height */}
-          <div className="w-1/2 h-full flex items-center justify-center border-r border-border">
-            <div className="w-full h-full flex items-center justify-center p-6">
-              {/* Placeholder for vector image */}
-              <Image
-                src="/images/new-school.webp"
-                alt="School Placeholder"
-                width={500}
-                height={500}
-                className="object-cover w-full h-full"
-              />
-            </div>
-          </div>
-
-          {/* Right side - Form content */}
-          <div className="w-1/2 flex flex-col min-h-0">
+          <div className="w-full flex flex-col min-h-0">
             <div className="flex-1 px-6 py-4 overflow-y-auto">
               <div className="space-y-6">
                 {/* Row 1: School Name */}
@@ -282,6 +265,11 @@ export function AddSchoolWizard({
                     placeholder="New School"
                     value={formData.name}
                     onChange={(e) => {
+                      // Allow free typing - preserve spaces
+                      setFormData({ ...formData, name: e.target.value });
+                    }}
+                    onBlur={(e) => {
+                      // Apply capitalization when user finishes typing
                       const capitalized = capitalizeSchoolName(e.target.value);
                       setFormData({ ...formData, name: capitalized });
                     }}

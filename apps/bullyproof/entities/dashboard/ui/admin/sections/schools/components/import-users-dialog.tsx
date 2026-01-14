@@ -37,6 +37,7 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnFiltersState,
@@ -174,6 +175,11 @@ export function ImportUsersDialog({
       });
       setFailedUsers([]);
       setShowFailedUsersDialog(false);
+      // Reset table state
+      setCsvTableSorting([]);
+      setCsvTableColumnFilters([]);
+      setCsvTableRowSelection({});
+      setCsvTableGlobalFilter("");
 
       // Remove dialog query parameter from URL
       const params = new URLSearchParams(searchParams?.toString() || "");
@@ -644,7 +650,7 @@ export function ImportUsersDialog({
     }
   };
 
-  // Function to save edited row
+  // Function to save edited row (optimized duplicate checking)
   const handleSaveEditedRow = () => {
     if (!editingRow || editingRow.rowIndex === undefined) return;
 
@@ -682,7 +688,7 @@ export function ImportUsersDialog({
         return row;
       });
 
-      // Re-check duplicates across all rows (after the update)
+      // Optimized duplicate checking - single pass through data
       const emailCounts = new Map<string, number>();
       updated.forEach((row) => {
         if (row.email) {
@@ -691,6 +697,7 @@ export function ImportUsersDialog({
         }
       });
 
+      // Single pass to update duplicate flags
       return updated.map((row) => {
         if (row.email) {
           const emailLower = row.email.toLowerCase();
@@ -700,7 +707,7 @@ export function ImportUsersDialog({
             isDuplicate: count > 1,
           };
         }
-        return row;
+        return { ...row, isDuplicate: false };
       });
     });
 
@@ -947,7 +954,61 @@ export function ImportUsersDialog({
     return `${rowIndex}-${firstName}-${lastName}`;
   };
 
-  // CSV Table setup (no pagination - infinite scroll)
+  // Memoize validation summary to avoid recalculating on every render
+  const validationSummary = useMemo(() => {
+    const incompleteRows = csvData.filter((row) => row.isIncomplete);
+    const invalidRows = csvData.filter(
+      (row) => !row.isValid && row.email && !row.isIncomplete
+    );
+    const duplicateRows = csvData.filter(
+      (row) => row.isDuplicate && !row.isIncomplete
+    );
+    const hasErrors =
+      incompleteRows.length > 0 ||
+      invalidRows.length > 0 ||
+      duplicateRows.length > 0;
+
+    const allErrorRows = [
+      ...incompleteRows.map((row) => {
+        const missing: string[] = [];
+        if (!row.email) missing.push("email");
+        if (!row.firstName) missing.push("firstName");
+        if (!row.lastName) missing.push("lastName");
+        return {
+          row,
+          type: "incomplete" as const,
+          icon: XCircle,
+          status: "Missing",
+          missingFields: missing,
+        };
+      }),
+      ...invalidRows.map((row) => ({
+        row,
+        type: "invalid" as const,
+        icon: XCircle,
+        status: "Invalid",
+        missingFields: ["email"],
+      })),
+      ...duplicateRows.map((row) => ({
+        row,
+        type: "duplicate" as const,
+        icon: AlertTriangle,
+        status: "Duplicate",
+        missingFields: ["email"],
+      })),
+    ];
+
+    return { hasErrors, allErrorRows };
+  }, [csvData]);
+
+  // Memoize valid user count for button text
+  const validUserCount = useMemo(() => {
+    return csvData.filter(
+      (r) => r.isValid && !r.isDuplicate && !r.isIncomplete
+    ).length;
+  }, [csvData]);
+
+  // CSV Table setup (with pagination for performance)
   const csvTable = useReactTable({
     data: csvData,
     columns: csvTableColumns,
@@ -956,6 +1017,12 @@ export function ImportUsersDialog({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 50, // Show 50 rows per page for better performance
+      },
+    },
     onColumnVisibilityChange: setCsvTableColumnVisibility,
     onRowSelectionChange: setCsvTableRowSelection,
     globalFilterFn: (row, columnId, filterValue) => {
@@ -1112,52 +1179,9 @@ export function ImportUsersDialog({
 
             {csvFile && csvData.length > 0 && (
               <>
-                {/* Validation Summary */}
+                {/* Validation Summary - using memoized data */}
                 {(() => {
-                  const incompleteRows = csvData.filter(
-                    (row) => row.isIncomplete
-                  );
-                  const invalidRows = csvData.filter(
-                    (row) => !row.isValid && row.email && !row.isIncomplete
-                  );
-                  const duplicateRows = csvData.filter(
-                    (row) => row.isDuplicate && !row.isIncomplete
-                  );
-                  const hasErrors =
-                    incompleteRows.length > 0 ||
-                    invalidRows.length > 0 ||
-                    duplicateRows.length > 0;
-
-                  // Combine all error rows into a single array with their error types
-                  const allErrorRows = [
-                    ...incompleteRows.map((row) => {
-                      const missing: string[] = [];
-                      if (!row.email) missing.push("email");
-                      if (!row.firstName) missing.push("firstName");
-                      if (!row.lastName) missing.push("lastName");
-                      return {
-                        row,
-                        type: "incomplete" as const,
-                        icon: XCircle,
-                        status: "Missing",
-                        missingFields: missing,
-                      };
-                    }),
-                    ...invalidRows.map((row) => ({
-                      row,
-                      type: "invalid" as const,
-                      icon: XCircle,
-                      status: "Invalid",
-                      missingFields: ["email"],
-                    })),
-                    ...duplicateRows.map((row) => ({
-                      row,
-                      type: "duplicate" as const,
-                      icon: AlertTriangle,
-                      status: "Duplicate",
-                      missingFields: ["email"],
-                    })),
-                  ];
+                  const { hasErrors, allErrorRows } = validationSummary;
 
                   // Show 3 cards + "X more" if more than 4 issues, otherwise show all (up to 4)
                   const maxVisible = allErrorRows.length > 4 ? 3 : 4;
@@ -1629,10 +1653,34 @@ export function ImportUsersDialog({
                   </div>
                 )}
 
-                {/* Row Selection Info */}
-                <div className="text-muted-foreground text-sm py-2">
-                  {csvTable.getFilteredSelectedRowModel().rows.length} of{" "}
-                  {csvTable.getFilteredRowModel().rows.length} row(s) selected.
+                {/* Row Selection Info and Pagination */}
+                <div className="flex items-center justify-between py-2">
+                  <div className="text-muted-foreground text-sm">
+                    {csvTable.getFilteredSelectedRowModel().rows.length} of{" "}
+                    {csvTable.getFilteredRowModel().rows.length} row(s) selected.
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => csvTable.previousPage()}
+                      disabled={!csvTable.getCanPreviousPage()}
+                    >
+                      Previous
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      Page {csvTable.getState().pagination.pageIndex + 1} of{" "}
+                      {csvTable.getPageCount()}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => csvTable.nextPage()}
+                      disabled={!csvTable.getCanNextPage()}
+                    >
+                      Next
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
@@ -1702,7 +1750,7 @@ export function ImportUsersDialog({
                 ? "Upload Successful"
                 : bulkSubmitting
                   ? `Adding... (${bulkProgress.completed}/${bulkProgress.total})`
-                  : `Add ${csvData.filter((r) => r.isValid && !r.isDuplicate && !r.isIncomplete).length} User${csvData.filter((r) => r.isValid && !r.isDuplicate && !r.isIncomplete).length !== 1 ? "s" : ""}`}
+                  : `Add ${validUserCount} User${validUserCount !== 1 ? "s" : ""}`}
             </Button>
           </DialogFooter>
         </DialogContent>

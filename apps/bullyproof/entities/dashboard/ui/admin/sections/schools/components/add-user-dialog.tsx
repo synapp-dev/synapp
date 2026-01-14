@@ -24,6 +24,11 @@ import {
 } from "@workspace/ui/components/alert";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -176,6 +181,8 @@ export function AddUserDialog({
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [apTeacher, setApTeacher] = useState(false);
+  const [schoolAdmin, setSchoolAdmin] = useState(false);
 
   const hasValidEmail = email ? isValidEmail(email) : false;
 
@@ -189,6 +196,8 @@ export function AddUserDialog({
       setEmail("");
       setFirstName("");
       setLastName("");
+      setApTeacher(false);
+      setSchoolAdmin(false);
       setCsvFile(null);
       setCsvData([]);
       setCsvError(null);
@@ -645,14 +654,17 @@ export function AddUserDialog({
     setBulkSubmitting(false);
   };
 
-  // Handle manual user creation - creates user with SCHOOL_STAFF role
+  // Handle manual user creation - creates user with SCHOOL_STAFF role and optionally TEACHER and SCHOOL_ADMIN
   const handleManualCreate = async () => {
     if (!school || !hasValidEmail || addUserSuccess) return;
 
     setSubmitting(true);
     try {
-      // Get SCHOOL_STAFF role
+      // Get roles
       const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
+      const teacherRole = roles.find((r) => r.key === "TEACHER");
+      const adminRole = roles.find((r) => r.key === "SCHOOL_ADMIN");
+
       if (!staffRole) {
         console.error("SCHOOL_STAFF role not found");
         return;
@@ -677,7 +689,35 @@ export function AddUserDialog({
 
       if (createResult.error) {
         console.error("Failed to create user:", createResult.error);
-      } else {
+      } else if (createResult.data) {
+        // Assign additional roles if checked
+        const roleAssignments = [];
+
+        if (apTeacher && teacherRole) {
+          roleAssignments.push(
+            rolesApi.post.assignRole({
+              userId: createResult.data.userId,
+              roleId: teacherRole.id,
+              schoolId: school.id,
+            })
+          );
+        }
+
+        if (schoolAdmin && adminRole) {
+          roleAssignments.push(
+            rolesApi.post.assignRole({
+              userId: createResult.data.userId,
+              roleId: adminRole.id,
+              schoolId: school.id,
+            })
+          );
+        }
+
+        // Wait for all role assignments to complete
+        if (roleAssignments.length > 0) {
+          await Promise.all(roleAssignments);
+        }
+
         setAddUserSuccess(true);
         onSuccess?.();
         setTimeout(() => {
@@ -1391,6 +1431,63 @@ export function AddUserDialog({
                     Please enter a valid email address (e.g., name@domain.com)
                   </p>
                 )}
+              </div>
+
+              {/* Roles Section */}
+              <div className="space-y-3 pt-2">
+                <Label className="text-xs text-muted-foreground ml-2">
+                  Roles
+                </Label>
+                
+                {/* Staff Role - Always checked and disabled */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-background p-3 cursor-not-allowed opacity-60 shadow-sm">
+                      <Checkbox
+                        id="user-role-staff"
+                        checked={true}
+                        disabled={true}
+                        className="data-[state=checked]:border-[#038493] data-[state=checked]:bg-[#038493] data-[state=checked]:text-white dark:data-[state=checked]:border-[#038493] dark:data-[state=checked]:bg-[#038493] rounded"
+                      />
+                      <span className="text-sm font-medium text-foreground">Staff</span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>All new users to a school have the staff role by default</p>
+                  </TooltipContent>
+                </Tooltip>
+
+                {/* AP Teacher Role */}
+                <Label
+                  htmlFor="user-role-ap-teacher"
+                  className="hover:bg-accent/50 flex items-center gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-background p-3 has-[[aria-checked=true]]:border-[#038493] has-[[aria-checked=true]]:bg-[#038493]/10 dark:has-[[aria-checked=true]]:border-[#038493] dark:has-[[aria-checked=true]]:bg-[#038493]/20 cursor-pointer shadow-sm transition-colors"
+                >
+                  <Checkbox
+                    id="user-role-ap-teacher"
+                    checked={apTeacher}
+                    onCheckedChange={(checked) =>
+                      setApTeacher(checked === true)
+                    }
+                    className="data-[state=checked]:border-[#038493] data-[state=checked]:bg-[#038493] data-[state=checked]:text-white dark:data-[state=checked]:border-[#038493] dark:data-[state=checked]:bg-[#038493] rounded"
+                  />
+                  <span className="text-sm font-medium">AP Teacher</span>
+                </Label>
+
+                {/* School Admin Role */}
+                <Label
+                  htmlFor="user-role-school-admin"
+                  className="hover:bg-accent/50 flex items-center gap-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-background p-3 has-[[aria-checked=true]]:border-[#038493] has-[[aria-checked=true]]:bg-[#038493]/10 dark:has-[[aria-checked=true]]:border-[#038493] dark:has-[[aria-checked=true]]:bg-[#038493]/20 cursor-pointer shadow-sm transition-colors"
+                >
+                  <Checkbox
+                    id="user-role-school-admin"
+                    checked={schoolAdmin}
+                    onCheckedChange={(checked) =>
+                      setSchoolAdmin(checked === true)
+                    }
+                    className="data-[state=checked]:border-[#038493] data-[state=checked]:bg-[#038493] data-[state=checked]:text-white dark:data-[state=checked]:border-[#038493] dark:data-[state=checked]:bg-[#038493] rounded"
+                  />
+                  <span className="text-sm font-medium">School Admin</span>
+                </Label>
               </div>
             </div>
             <DialogFooter className="px-6 pb-6 pt-4 flex-shrink-0 border-t">

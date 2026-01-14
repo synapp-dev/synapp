@@ -74,6 +74,7 @@ import {
   ChevronsUpDown,
   ChevronDown,
   Check,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
@@ -1443,6 +1444,36 @@ export function ImportClassesDialog({
                       </button>
                     )}
                   </div>
+                  {csvTable.getSelectedRowModel().rows.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {csvTable.getSelectedRowModel().rows.length} selected
+                      </span>
+                      <div className="h-6 w-px bg-border" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const selectedRows =
+                            csvTable.getSelectedRowModel().rows;
+                          const selectedIndices = selectedRows.map(
+                            (row) => row.original.rowIndex
+                          );
+                          setCsvData((prev) =>
+                            prev.filter(
+                              (row) =>
+                                row.rowIndex === undefined ||
+                                !selectedIndices.includes(row.rowIndex)
+                            )
+                          );
+                          csvTable.resetRowSelection();
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Data Table */}
