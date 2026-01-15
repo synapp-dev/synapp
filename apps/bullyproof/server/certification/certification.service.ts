@@ -2,9 +2,15 @@ import {
   getStagesSchema,
   getStageByIdSchema,
   getStageByCodeSchema,
+  createStageSchema,
+  updateStageSchema,
+  deleteStageSchema,
   type GetStagesParams,
   type GetStageByIdParams,
   type GetStageByCodeParams,
+  type CreateStageParams,
+  type UpdateStageParams,
+  type DeleteStageParams,
 } from "./certification.validators";
 import { certificationRepo } from "./certification.repo";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -22,6 +28,21 @@ async function assertCanViewCertification(ctx: AuthContext) {
 
   // All authenticated users can view certification
   return;
+}
+
+async function assertCanManageCertification(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const roles = await getUserScopedRoles(ctx.userId);
+
+  // Only platform admins can manage certification stages
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+
+  throw new Error("Unauthorized to manage certification stages");
 }
 
 export const certificationService = {
@@ -47,5 +68,32 @@ export const certificationService = {
     await assertCanViewCertification(ctx);
 
     return await certificationRepo.getStageByCodeWithTopics(code);
+  },
+
+  async createStage(ctx: AuthContext, params: unknown) {
+    const data: CreateStageParams = createStageSchema.parse(params);
+    await assertCanManageCertification(ctx);
+
+    const newStage = await certificationRepo.createStage(data);
+    return newStage;
+  },
+
+  async updateStage(ctx: AuthContext, params: unknown) {
+    const data: UpdateStageParams = updateStageSchema.parse(params);
+    await assertCanManageCertification(ctx);
+
+    const updatedStage = await certificationRepo.updateStage(data.id, {
+      name: data.name,
+      sortIndex: data.sortIndex,
+    });
+    return updatedStage;
+  },
+
+  async deleteStage(ctx: AuthContext, params: unknown) {
+    const { id } = deleteStageSchema.parse(params);
+    await assertCanManageCertification(ctx);
+
+    await certificationRepo.deleteStage(id);
+    return { success: true };
   },
 };

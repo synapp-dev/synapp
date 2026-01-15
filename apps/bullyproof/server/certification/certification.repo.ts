@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { certificationStages } from "@/server/db/schema";
-import { eq, asc, sql } from "drizzle-orm";
+import { eq, asc, sql, desc } from "drizzle-orm";
 
 export const certificationRepo = {
   getStages: () =>
@@ -69,5 +69,95 @@ export const certificationRepo = {
       ...stage[0],
       topicCount,
     };
+  },
+
+  getMaxSortIndex: async () => {
+    const existingStages = await db
+      .select({ sortIndex: certificationStages.sortIndex })
+      .from(certificationStages)
+      .orderBy(desc(certificationStages.sortIndex))
+      .limit(1);
+
+    return existingStages.length > 0 ? existingStages[0].sortIndex : -1;
+  },
+
+  createStage: async (data: {
+    code: string;
+    name: string;
+    sortIndex?: number;
+  }) => {
+    // If sortIndex not provided, calculate next available
+    let finalSortIndex = data.sortIndex;
+    if (finalSortIndex === undefined || finalSortIndex === null) {
+      const maxSortIndex = await certificationRepo.getMaxSortIndex();
+      finalSortIndex = Math.min(maxSortIndex + 1, 32766); // Cap at max smallint - 1
+    }
+
+    const [stage] = await db
+      .insert(certificationStages)
+      .values({
+        code: data.code,
+        name: data.name,
+        sortIndex: finalSortIndex,
+      })
+      .returning();
+
+    return stage;
+  },
+
+  updateStage: async (
+    stageId: string,
+    data: { name?: string; sortIndex?: number }
+  ) => {
+    // Check if stage exists
+    const existingStage = await db
+      .select()
+      .from(certificationStages)
+      .where(eq(certificationStages.id, stageId))
+      .limit(1);
+
+    if (existingStage.length === 0) {
+      throw new Error("Stage not found");
+    }
+
+    const updateData: { name?: string; sortIndex?: number; updatedAt?: any } = {};
+    if (data.name !== undefined) {
+      updateData.name = data.name;
+    }
+    if (data.sortIndex !== undefined) {
+      updateData.sortIndex = data.sortIndex;
+    }
+    updateData.updatedAt = sql`now()`;
+
+    await db
+      .update(certificationStages)
+      .set(updateData)
+      .where(eq(certificationStages.id, stageId));
+
+    const [updatedStage] = await db
+      .select()
+      .from(certificationStages)
+      .where(eq(certificationStages.id, stageId))
+      .limit(1);
+
+    return updatedStage;
+  },
+
+  deleteStage: async (stageId: string) => {
+    // Check if stage exists
+    const existingStage = await db
+      .select()
+      .from(certificationStages)
+      .where(eq(certificationStages.id, stageId))
+      .limit(1);
+
+    if (existingStage.length === 0) {
+      throw new Error("Stage not found");
+    }
+
+    // Delete the stage (cascade will handle related data deletion)
+    await db.delete(certificationStages).where(eq(certificationStages.id, stageId));
+
+    return { success: true };
   },
 };

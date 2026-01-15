@@ -21,3 +21,33 @@ export const getStageByCodeSchema = z.object({
 });
 
 export type GetStageByCodeParams = z.infer<typeof getStageByCodeSchema>;
+
+// Schema for creating a certification stage
+export const createStageSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .min(1)
+    .max(50)
+    .regex(/^C[0-9]*$/, "Code must match pattern C[0-9]* (e.g., C, C1, C2)"),
+  name: z.string().trim().min(1).max(500),
+  sortIndex: z.coerce.number().int().min(0).max(32767).optional(),
+});
+
+export type CreateStageParams = z.infer<typeof createStageSchema>;
+
+// Schema for updating a certification stage
+export const updateStageSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string().trim().min(1).max(500).optional(),
+  sortIndex: z.coerce.number().int().min(0).max(32767).optional(),
+});
+
+export type UpdateStageParams = z.infer<typeof updateStageSchema>;
+
+// Schema for deleting a certification stage
+export const deleteStageSchema = z.object({
+  id: z.string().uuid(),
+});
+
+export type DeleteStageParams = z.infer<typeof deleteStageSchema>;

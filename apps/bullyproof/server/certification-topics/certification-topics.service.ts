@@ -1,11 +1,25 @@
 import {
   getTopicsByStageCodeSchema,
   getTopicsByStageIdSchema,
+  createTopicSchema,
+  updateTopicSchema,
+  deleteTopicSchema,
+  reorderTopicsSchema,
   type GetTopicsByStageCodeParams,
   type GetTopicsByStageIdParams,
+  type CreateTopicParams,
+  type UpdateTopicParams,
+  type DeleteTopicParams,
+  type ReorderTopicsParams,
 } from "./certification-topics.validators";
 import { certificationTopicsRepo } from "./certification-topics.repo";
 import { certificationSlidesRepo } from "../certification-slides/certification-slides.repo";
+import { certificationSlidesService } from "../certification-slides/certification-slides.service";
+import { getUserScopedRoles } from "../auth/rbac";
+import { createServerClient } from "@/utils/supabase/server";
+import { db } from "@/server/db/drizzle";
+import { certificationStages } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -22,12 +36,49 @@ async function assertCanViewCertificationTopics(ctx: AuthContext) {
   return;
 }
 
+async function assertCanManageCertificationTopics(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const roles = await getUserScopedRoles(ctx.userId);
+
+  // Only platform admins can manage certification topics
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+
+  throw new Error("Unauthorized to manage certification topics");
+}
+
 export const certificationTopicsService = {
   async getTopicsByStageCode(ctx: AuthContext, params: unknown) {
-    const { code } = getTopicsByStageCodeSchema.parse(params);
+    const parsed = getTopicsByStageCodeSchema.parse(params);
+    const { code, includeSlides, includeUrls } = parsed as any;
     await assertCanViewCertificationTopics(ctx);
 
-    return await certificationTopicsRepo.getByStageCode(code);
+    const topics = await certificationTopicsRepo.getByStageCode(code);
+
+    // If includeSlides is true, fetch slides for each topic
+    if (includeSlides) {
+      const topicsWithSlides = await Promise.all(
+        topics.map(async (topic) => {
+          // Use the service which already generates URLs if includeUrls is true
+          const slides = includeUrls
+            ? await certificationSlidesService.getSlidesByTopicId(ctx, topic.id)
+            : await certificationSlidesRepo.getByTopicId(topic.id);
+
+          return {
+            ...topic,
+            slides,
+          };
+        })
+      );
+
+      return topicsWithSlides;
+    }
+
+    return topics;
   },
 
   async getTopicsByStageId(ctx: AuthContext, params: unknown) {
@@ -37,18 +88,65 @@ export const certificationTopicsService = {
     return await certificationTopicsRepo.getByStageId(stageId);
   },
 
-  async getTopicById(ctx: AuthContext, topicId: string) {
+  async getTopicById(ctx: AuthContext, topicId: string, query?: unknown) {
     await assertCanViewCertificationTopics(ctx);
 
     const topics = await certificationTopicsRepo.getById(topicId);
     if (topics.length === 0) return null;
 
+    // Parse query parameters
+    const params = query as any;
+    const includeSlides = params?.includeSlides === "true" || params?.includeSlides === true;
+    const includeUrls = params?.includeUrls === "true" || params?.includeUrls === true;
+
     // Get slides for this topic
-    const slides = await certificationSlidesRepo.getByTopicId(topicId);
+    const slides = includeSlides
+      ? includeUrls
+        ? await certificationSlidesService.getSlidesByTopicId(ctx, topicId)
+        : await certificationSlidesRepo.getByTopicId(topicId)
+      : [];
 
     return {
       ...topics[0],
       slides,
     };
+  },
+
+  async createTopic(ctx: AuthContext, params: unknown) {
+    const data: CreateTopicParams = createTopicSchema.parse(params);
+    await assertCanManageCertificationTopics(ctx);
+
+    const result = await certificationTopicsRepo.create(data);
+    return result[0];
+  },
+
+  async updateTopic(ctx: AuthContext, params: unknown) {
+    const data: UpdateTopicParams = updateTopicSchema.parse(params);
+    await assertCanManageCertificationTopics(ctx);
+
+    const { id, ...updateData } = data;
+    const result = await certificationTopicsRepo.update(id, updateData);
+    return result[0];
+  },
+
+  async deleteTopic(ctx: AuthContext, params: unknown) {
+    const { id } = deleteTopicSchema.parse(params);
+    await assertCanManageCertificationTopics(ctx);
+
+    await certificationTopicsRepo.delete(id);
+    return { success: true };
+  },
+
+  async reorderTopics(ctx: AuthContext, params: unknown) {
+    const data: ReorderTopicsParams = reorderTopicsSchema.parse(params);
+    await assertCanManageCertificationTopics(ctx);
+
+    // Reorder topics in database
+    // Note: Since we now use topic IDs in file paths instead of order numbers,
+    // we don't need to rename storage directories when topics are reordered.
+    // The paths are stable and never change.
+    await certificationTopicsRepo.reorderTopics(data.stageId, data.topicIds);
+
+    return { success: true };
   },
 };

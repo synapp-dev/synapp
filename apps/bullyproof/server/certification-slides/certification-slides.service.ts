@@ -7,8 +7,12 @@ import {
   type BulkSaveCertificationSlidesParams,
 } from "./certification-slides.validators";
 import { certificationSlidesRepo } from "./certification-slides.repo";
+import { certificationTopicsRepo } from "../certification-topics/certification-topics.repo";
 import { getUserScopedRoles } from "../auth/rbac";
 import { createServerClient } from "@/utils/supabase/server";
+import { db } from "@/server/db/drizzle";
+import { certificationTopics, certificationStages } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 type AuthContext = {
   userId: string | null;
@@ -36,7 +40,96 @@ async function assertCanViewCertificationSlides(ctx: AuthContext) {
 export const certificationSlidesService = {
   async getSlidesByTopicId(ctx: AuthContext, topicId: string) {
     await assertCanViewCertificationSlides(ctx);
-    return await certificationSlidesRepo.getByTopicId(topicId);
+    
+    // Get slides from repo
+    const slides = await certificationSlidesRepo.getByTopicId(topicId);
+    
+    if (slides.length === 0) {
+      return slides;
+    }
+    
+    // Get topic and stage info for file path construction
+    const topicResult = await certificationTopicsRepo.getById(topicId);
+    if (topicResult.length === 0) {
+      return slides;
+    }
+    
+    const topic = topicResult[0];
+    
+    // Get stage info
+    const stageResult = await db
+      .select()
+      .from(certificationStages)
+      .where(eq(certificationStages.id, topic.stageId))
+      .limit(1);
+    
+    if (stageResult.length === 0) {
+      return slides;
+    }
+    
+    const stage = stageResult[0];
+    const stageCode = stage.code;
+    
+    // Generate signed URLs for image slides
+    const supabase = await createServerClient();
+    const slidesWithUrls = await Promise.all(
+      slides.map(async (slide) => {
+        if (slide.kind !== "image" || !slide.imageUrl) {
+          return slide;
+        }
+        
+        // Extract file extension from stored imageUrl or use default
+        let fileExtension = "jpg"; // default
+        if (slide.imageUrl) {
+          const urlMatch = slide.imageUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
+          if (urlMatch) {
+            fileExtension = urlMatch[1];
+          }
+        }
+        
+        // Construct file path: slides/certification/{stageCode}/{topicId}/{slideId}.{extension}
+        // Using topic ID instead of order number makes paths stable when topics are reordered
+        const fileName = `${slide.id}.${fileExtension}`;
+        const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
+        
+        // Check if file exists in storage
+        const { data: fileList, error: listError } = await supabase.storage
+          .from("content")
+          .list(`slides/certification/${stageCode}/${topicId}/`);
+        
+        if (listError) {
+          console.warn(
+            `Failed to list files for certification slide ${slide.id}:`,
+            listError.message
+          );
+          return { ...slide, signedUrl: null };
+        }
+        
+        const fileExists =
+          fileList && fileList.some((file) => file.name === fileName);
+        
+        if (!fileExists) {
+          return { ...slide, signedUrl: null };
+        }
+        
+        // Generate signed URL with 1-week expiry (604800 seconds)
+        const { data, error } = await supabase.storage
+          .from("content")
+          .createSignedUrl(filePath, 604800);
+        
+        if (error) {
+          console.warn(
+            `Failed to generate signed URL for certification slide ${slide.id}:`,
+            error.message
+          );
+          return { ...slide, signedUrl: null };
+        }
+        
+        return { ...slide, signedUrl: data.signedUrl };
+      })
+    );
+    
+    return slidesWithUrls;
   },
 
   async createSlide(ctx: AuthContext, params: unknown) {
@@ -133,12 +226,6 @@ export const certificationSlidesService = {
     // Get stage code (e.g., "C", "C1")
     const stageCode = stage.code;
 
-    // Get topic number from topic.stageOrder
-    const topicNumber = topic.stageOrder;
-    if (topicNumber === null || topicNumber === undefined) {
-      throw new Error("Topic stageOrder is missing");
-    }
-
     // Extract file extension from stored imageUrl or use default
     // If imageUrl exists and has an extension, extract it
     let fileExtension = "jpg"; // default
@@ -149,9 +236,10 @@ export const certificationSlidesService = {
       }
     }
 
-    // Construct file path: slides/certification/{stageCode}/t{topic}/{slideId}.{extension}
+    // Construct file path: slides/certification/{stageCode}/{topicId}/{slideId}.{extension}
+    // Using topic ID instead of order number makes paths stable when topics are reordered
     const fileName = `${slideId}.${fileExtension}`;
-    const filePath = `slides/certification/${stageCode}/t${topicNumber}/${fileName}`;
+    const filePath = `slides/certification/${stageCode}/${topic.id}/${fileName}`;
 
     // Check if file exists in storage before generating signed URL
     const supabase = await createServerClient();
@@ -159,7 +247,7 @@ export const certificationSlidesService = {
     // First, check if the file exists by listing files in the directory
     const { data: fileList, error: listError } = await supabase.storage
       .from("content")
-      .list(`slides/certification/${stageCode}/t${topicNumber}/`);
+      .list(`slides/certification/${stageCode}/${topic.id}/`);
 
     // Check if the file exists in the list
     const fileExists =
