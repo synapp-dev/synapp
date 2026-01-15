@@ -60,6 +60,7 @@ import {
   Check,
   Save,
   GripHorizontal,
+  Pencil,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import {
@@ -116,6 +117,7 @@ import { useStageByCode } from "@/entities/stages/model/store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
+import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -134,6 +136,11 @@ function slideHasContent(
   isCertification: boolean,
   pendingFileUploads?: Map<string, File>
 ): boolean {
+  // Always show image slides, even if empty - users can add images to them later
+  if (slide.kind === "image") {
+    return true;
+  }
+  
   // Check if imageUrl exists and is not just a placeholder/invalid URL
   // Blob URLs are temporary and valid (from file uploads)
   const imageUrl = slide.imageUrl;
@@ -159,9 +166,9 @@ function slideHasContent(
 
   const hasContent = hasValidImageUrl || hasVideoUrl || hasQuizData || hasTextHtml || hasPendingUpload;
   
-  // Log detailed info for debugging empty slides
-  if (slide.kind === "image" && !hasContent) {
-    console.warn("[slideHasContent] Empty image slide detected:", {
+  // Log detailed info for debugging empty slides (non-image slides)
+  if (slide.kind !== "image" && !hasContent) {
+    console.warn("[slideHasContent] Empty slide detected:", {
       id: slide.id,
       kind: slide.kind,
       imageUrl: imageUrl?.substring(0, 100),
@@ -440,6 +447,7 @@ export function TopicDetailSection({
   >(null);
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState<string>("");
+  const [isEditTopicDrawerOpen, setIsEditTopicDrawerOpen] = useState(false);
 
   // @dnd-kit sensors
   const sensors = useSensors(
@@ -652,26 +660,37 @@ export function TopicDetailSection({
 
           setTopic(topicResult.data);
 
-          // Fetch slides separately
+          // Fetch slides separately (this includes signedUrl from batch fetch)
           const slidesResult =
             await certificationApi.topics.slides.list(topicId);
           if (slidesResult.data) {
+            const cacheStore = useCertificationSlidesCacheStore.getState();
+            
             const allSlides: ExtendedSlideData[] = slidesResult.data
               .sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((slide) => ({
-                id: slide.id,
-                kind: slide.kind as SlideData["kind"],
-                orderIndex: slide.orderIndex,
-                textHtml: slide.textHtml ?? null,
-                imageUrl: slide.imageUrl ?? null,
-                videoUrl: slide.videoUrl ?? null,
-                videoStartS: slide.videoStartS ?? null,
-                videoEndS: slide.videoEndS ?? null,
-                quizData: (slide as any).quizData as QuizData | null,
-                effectiveNotes: (slide as any).officialNotes ?? null,
-              }));
+              .map((slide) => {
+                // Extract signedUrl from API response and cache it
+                const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
+                if (slideWithUrl.signedUrl && slide.kind === "image") {
+                  cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
+                }
+                
+                return {
+                  id: slide.id,
+                  kind: slide.kind as SlideData["kind"],
+                  orderIndex: slide.orderIndex,
+                  textHtml: slide.textHtml ?? null,
+                  imageUrl: slide.imageUrl ?? null,
+                  videoUrl: slide.videoUrl ?? null,
+                  videoStartS: slide.videoStartS ?? null,
+                  videoEndS: slide.videoEndS ?? null,
+                  quizData: (slide as any).quizData as QuizData | null,
+                  effectiveNotes: (slide as any).officialNotes ?? null,
+                };
+              });
             
             // Filter out empty slides (slides without any content)
+            // Note: Image slides are always shown, even if empty, so users can add images to them
             console.log("[topic-detail] [CERTIFICATION] Loading slides - total slides from DB:", allSlides.length);
             const validSlides = allSlides.filter((slide) => {
               const hasContent = slideHasContent(slide, isCertification);
@@ -700,9 +719,10 @@ export function TopicDetailSection({
               orderIndex: index,
             }));
             
-            // If we filtered out any slides, mark them for deletion
+            // If we filtered out any slides (non-image slides), mark them for deletion
+            // Image slides are never marked for deletion even if empty
             const emptySlideIds = allSlides
-              .filter((slide) => !slideHasContent(slide, isCertification))
+              .filter((slide) => slide.kind !== "image" && !slideHasContent(slide, isCertification))
               .map((slide) => slide.id);
             
             if (emptySlideIds.length > 0) {
@@ -715,11 +735,6 @@ export function TopicDetailSection({
             setHasUnsavedChanges(emptySlideIds.length > 0);
             setDeletedSlideIds(new Set(emptySlideIds));
             setPendingFileUploads(new Map());
-
-            // Invalidate all slide caches to force refresh
-            initialSlides.forEach((slide) => {
-              invalidateCertificationSlide(slide.id);
-            });
           }
         } else {
           // Curriculum flow: use cached data from hooks
@@ -840,6 +855,7 @@ export function TopicDetailSection({
         })) ?? [];
     
     // Filter out empty slides (slides without any content)
+    // Note: Image slides are always shown, even if empty, so users can add images to them
     console.log("[topic-detail] Loading slides - total slides from DB:", allSlides.length);
     const validSlides = allSlides.filter((slide) => {
       const hasContent = slideHasContent(slide, isCertification);
@@ -882,10 +898,11 @@ export function TopicDetailSection({
       orderIndex: index,
     }));
     
-    // If we filtered out any slides, mark them for deletion
+    // If we filtered out any slides (non-image slides), mark them for deletion
+    // Image slides are never marked for deletion even if empty
     if (allSlides.length !== validSlides.length) {
       const emptySlideIds = allSlides
-        .filter((slide) => !slideHasContent(slide, isCertification))
+        .filter((slide) => slide.kind !== "image" && !slideHasContent(slide, isCertification))
         .map((slide) => slide.id);
       console.log("[topic-detail] Marking empty slides for deletion:", emptySlideIds);
       setDeletedSlideIds(new Set(emptySlideIds));
@@ -1513,6 +1530,56 @@ export function TopicDetailSection({
       videoEndS: null,
       effectiveNotes: null,
       quizData: null,
+    };
+
+    // Insert slide at correct position (after insertAfterIndex)
+    const updatedSlides = [...localSlides];
+    updatedSlides.splice(insertAfterIndex + 1, 0, newSlide);
+
+    // Reorder all slides to have sequential orderIndex
+    const reorderedSlides = updatedSlides.map((slide, index) => ({
+      ...slide,
+      orderIndex: index,
+    }));
+
+    setLocalSlides(reorderedSlides);
+    setHasUnsavedChanges(true);
+
+    // Navigate to the newly created slide
+    const newSlideIndex = reorderedSlides.findIndex((s) => s.id === tempId);
+    if (newSlideIndex !== -1) {
+      setCurrentSlideIndex(newSlideIndex);
+    }
+
+    setHoveredSlideIndex(null);
+    setSlideRefreshKey((prev) => prev + 1);
+  };
+
+  // Handle inserting a quiz slide at a specific position
+  const handleInsertQuiz = (insertAfterIndex: number) => {
+    if (!topic || !isCertification) return;
+
+    // Generate temporary ID for new slide
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Create new quiz slide with default quiz data
+    const newSlide: ExtendedSlideData = {
+      id: tempId,
+      kind: "quiz" as const,
+      orderIndex: insertAfterIndex + 1, // Will be reordered below
+      textHtml: null,
+      imageUrl: null,
+      videoUrl: null,
+      videoStartS: null,
+      videoEndS: null,
+      effectiveNotes: null,
+      quizData: {
+        question: "",
+        answers: [
+          { id: `answer_${Date.now()}_1`, text: "", isCorrect: false },
+          { id: `answer_${Date.now()}_2`, text: "", isCorrect: false },
+        ],
+      },
     };
 
     // Insert slide at correct position (after insertAfterIndex)
@@ -2452,7 +2519,19 @@ export function TopicDetailSection({
         <div className=" flex items-center justify-start gap-8">
           <div className="flex items-center gap-2">
             <FileText className="text-primary" />
-            <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
+            {isCertification ? (
+              <div
+                className="flex items-center gap-2 cursor-pointer group"
+                onClick={() => setIsEditTopicDrawerOpen(true)}
+              >
+                <h1 className="text-3xl font-bold tracking-tight group-hover:text-primary transition-colors">
+                  {topic.title}
+                </h1>
+                <Pencil className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+            ) : (
+              <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {stage && <Badge variant="secondary">{stage.name}</Badge>}
@@ -3232,8 +3311,38 @@ export function TopicDetailSection({
               }
             : undefined
         }
+        onAddQuiz={
+          isCertification && insertAfterIndexForDialog !== null
+            ? () => {
+                handleInsertQuiz(insertAfterIndexForDialog);
+                setShowImageSelectorDialog(false);
+                setInsertAfterIndexForDialog(null);
+              }
+            : undefined
+        }
         allowMultipleSelection={insertAfterIndexForDialog !== null}
       />
+
+      {/* Edit Certification Topic Drawer */}
+      {isCertification && topic && (
+        <EditCertificationTopicDrawer
+          open={isEditTopicDrawerOpen}
+          onOpenChange={setIsEditTopicDrawerOpen}
+          topic={topic as CertificationTopic}
+          onTopicUpdated={() => {
+            // Refetch topic data after update
+            if (topicId) {
+              fetchTopicData();
+            }
+          }}
+          onTopicDeleted={() => {
+            // Navigate back to stage page after deletion
+            if (stageCode) {
+              router.push(`/admin/content/certification/${stageCode}`);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

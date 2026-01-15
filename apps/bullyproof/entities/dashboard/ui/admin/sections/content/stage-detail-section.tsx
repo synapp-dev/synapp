@@ -75,6 +75,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { AnimatedThumbnail, type TopicSlide } from "@/components/organisms/animated-thumbnail";
 
 // Component to handle thumbnail image with error fallback
 function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
@@ -113,9 +114,19 @@ function getSlideStatsForCard(topic: TopicWithSlides) {
   const videoSlides = slides.filter((s) => s.kind === "video").length;
 
   // Get all image slides sorted by orderIndex
-  const imageSlidesList = slides
+  const imageSlidesList: TopicSlide[] = slides
     .filter((s) => s.kind === "image" && s.imageUrl)
-    .sort((a, b) => a.orderIndex - b.orderIndex);
+    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .map((s) => ({
+      id: s.id,
+      orderIndex: s.orderIndex,
+      kind: s.kind,
+      imageUrl: s.imageUrl,
+      signedUrl: s.signedUrl,
+      topicId: s.topicId,
+      videoUrl: s.videoUrl,
+      textHtml: s.textHtml,
+    }));
 
   return {
     totalSlides,
@@ -125,164 +136,6 @@ function getSlideStatsForCard(topic: TopicWithSlides) {
   };
 }
 
-// Component to render animated thumbnail with multiple slides
-function AnimatedThumbnail({
-  imageSlidesList,
-  topicTitle,
-  cardIndex = 0,
-  isPaused = false,
-}: {
-  imageSlidesList: TopicSlide[];
-  topicTitle: string;
-  cardIndex?: number;
-  isPaused?: boolean;
-}) {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const isMountedRef = useRef(true);
-  const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const startTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Pre-fetch URLs for current and next slides
-  const currentSlide = imageSlidesList[currentIndex];
-  const nextIndex = (currentIndex + 1) % imageSlidesList.length;
-  const nextSlide = imageSlidesList[nextIndex];
-
-  // Always call hooks at top level
-  const currentImageUrl = currentSlide ? useSlideUrl(currentSlide.id) : null;
-  const nextImageUrl = nextSlide ? useSlideUrl(nextSlide.id) : null;
-
-  // Clear all timers helper
-  const clearAllTimers = () => {
-    if (startTimeoutRef.current) {
-      clearTimeout(startTimeoutRef.current);
-      startTimeoutRef.current = null;
-    }
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    if (transitionTimeoutRef.current) {
-      clearTimeout(transitionTimeoutRef.current);
-      transitionTimeoutRef.current = null;
-    }
-  };
-
-  // Track paused state with ref to avoid triggering re-renders
-  const isPausedRef = useRef(isPaused);
-
-  // Update ref when paused state changes, but don't trigger effect
-  useEffect(() => {
-    isPausedRef.current = isPaused;
-    // If paused, clear timers immediately without state updates
-    if (isPaused) {
-      clearAllTimers();
-    }
-  }, [isPaused]);
-
-  // Animate through image slides with offset timing
-  // NOTE: isPaused is NOT in dependency array - we use ref to check it
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    // Don't start animation if paused
-    if (isPausedRef.current) {
-      return;
-    }
-
-    if (imageSlidesList.length <= 1) {
-      return;
-    }
-
-    // Clear any existing timers before starting new ones
-    clearAllTimers();
-
-    // Offset each card by its index to desync animations
-    const offsetDelay = cardIndex * 400; // 400ms offset per card
-
-    startTimeoutRef.current = setTimeout(() => {
-      if (!isMountedRef.current || isPausedRef.current) return;
-
-      intervalRef.current = setInterval(() => {
-        if (!isMountedRef.current || isPausedRef.current) {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-          }
-          return;
-        }
-
-        setIsTransitioning(true);
-
-        // Clear any existing transition timeout
-        if (transitionTimeoutRef.current) {
-          clearTimeout(transitionTimeoutRef.current);
-        }
-
-        transitionTimeoutRef.current = setTimeout(() => {
-          if (!isMountedRef.current || isPausedRef.current) {
-            transitionTimeoutRef.current = null;
-            return;
-          }
-          setCurrentIndex((prev) => (prev + 1) % imageSlidesList.length);
-          setIsTransitioning(false);
-          transitionTimeoutRef.current = null;
-        }, 1200); // Match transition duration (doubled from 600ms)
-      }, 5000); // Change every 5 seconds
-    }, offsetDelay);
-
-    return () => {
-      isMountedRef.current = false;
-      clearAllTimers();
-    };
-  }, [imageSlidesList.length, cardIndex]);
-
-  if (!currentSlide || !currentImageUrl) {
-    return (
-      <div className="w-full h-full flex items-center justify-center">
-        <FileText className="h-12 w-12 text-muted-foreground" />
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {/* Current image - slides up and out when transitioning */}
-      <div
-        key={`current-${currentSlide.id}`}
-        className={`absolute inset-0 transition-transform duration-[1200ms] ease-in-out ${
-          isTransitioning ? "-translate-y-full" : "translate-y-0"
-        }`}
-      >
-        <Image
-          src={currentImageUrl}
-          alt={`${topicTitle} - Slide ${currentSlide.orderIndex + 1}`}
-          fill
-          className="object-cover"
-          sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-        />
-      </div>
-      {/* Next image - slides up from bottom */}
-      {nextSlide && nextImageUrl && (
-        <div
-          key={`next-${nextSlide.id}`}
-          className={`absolute inset-0 transition-transform duration-[1200ms] ease-in-out ${
-            isTransitioning ? "translate-y-0" : "translate-y-full"
-          }`}
-        >
-          <Image
-            src={nextImageUrl}
-            alt={`${topicTitle} - Slide ${nextSlide.orderIndex + 1}`}
-            fill
-            className="object-cover"
-            sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-          />
-        </div>
-      )}
-    </>
-  );
-}
 
 // Animated topic card component similar to PDF library FolderCard
 function TopicCard({
@@ -612,6 +465,7 @@ function TopicCard({
                 topicTitle={topic.title}
                 cardIndex={cardIndex}
                 isPaused={isDragActive}
+                isCertification={false}
               />
               {/* Dimming overlay when hovered */}
               {!readonly && (isHovered || isLeaving) &&
@@ -1680,6 +1534,7 @@ export function StageDetailSection({
                                     imageSlidesList={imageSlidesList}
                                     topicTitle={draggedTopic.title}
                                     cardIndex={0}
+                                    isCertification={false}
                                   />
                                 ) : (
                                   <div className="w-full h-full flex items-center justify-center">
