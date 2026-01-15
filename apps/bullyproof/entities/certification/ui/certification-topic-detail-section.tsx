@@ -54,6 +54,7 @@ import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
+import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 
 type Topic = typeof certificationTopics.$inferSelect & {
   slides?: Array<typeof certificationSlides.$inferSelect>;
@@ -110,22 +111,32 @@ export function CertificationTopicDetailSection({
 
         setTopic(topicResult.data);
 
-        // Fetch slides separately
+        // Fetch slides separately (this includes signedUrl from batch fetch)
         const slidesResult = await certificationApi.topics.slides.list(topicId);
         if (slidesResult.data) {
+          const cacheStore = useCertificationSlidesCacheStore.getState();
+          
           const initialSlides = slidesResult.data
             .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map((slide) => ({
-              id: slide.id,
-              kind: slide.kind as "image" | "video" | "quiz" | "test",
-              orderIndex: slide.orderIndex,
-              textHtml: slide.textHtml ?? null,
-              imageUrl: slide.imageUrl ?? null,
-              videoUrl: slide.videoUrl ?? null,
-              videoStartS: slide.videoStartS ?? null,
-              videoEndS: slide.videoEndS ?? null,
-              quizData: slide.quizData as QuizData | null,
-            }));
+            .map((slide) => {
+              // Extract signedUrl from API response and cache it
+              const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
+              if (slideWithUrl.signedUrl && slide.kind === "image") {
+                cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
+              }
+              
+              return {
+                id: slide.id,
+                kind: slide.kind as "image" | "video" | "quiz" | "test",
+                orderIndex: slide.orderIndex,
+                textHtml: slide.textHtml ?? null,
+                imageUrl: slide.imageUrl ?? null,
+                videoUrl: slide.videoUrl ?? null,
+                videoStartS: slide.videoStartS ?? null,
+                videoEndS: slide.videoEndS ?? null,
+                quizData: slide.quizData as QuizData | null,
+              };
+            });
           setLocalSlides(initialSlides);
         }
       } catch (err) {

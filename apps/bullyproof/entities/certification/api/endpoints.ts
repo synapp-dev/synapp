@@ -50,16 +50,108 @@ export const certificationApi = {
         );
       },
     },
+    create(data: {
+      code: string;
+      name: string;
+      sortIndex?: number;
+    }): Promise<ApiResult<Stage>> {
+      return apiFetch<Stage>("/certification/stages", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    update(
+      id: string,
+      data: { name?: string; sortIndex?: number }
+    ): Promise<ApiResult<Stage>> {
+      return apiFetch<Stage>(`/certification/stages/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    delete(id: string): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch<{ success: boolean }>(
+        `/certification/stages/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
+    },
   },
   topics: {
-    byId(id: string): Promise<ApiResult<Topic>> {
-      // First get the topic, then get its slides
-      return apiFetch<Topic>(`/certification/topics/${encodeURIComponent(id)}`);
-    },
-    byStageCode(code: string): Promise<ApiResult<Topic[]>> {
-      return apiFetch<Topic[]>(
-        `/certification/topics/by-stage-code/${encodeURIComponent(code)}`
+    byId(
+      id: string,
+      params?: {
+        includeSlides?: boolean;
+        includeUrls?: boolean;
+      }
+    ): Promise<ApiResult<Topic>> {
+      const searchParams = new URLSearchParams();
+      if (params?.includeSlides) searchParams.set("includeSlides", "true");
+      if (params?.includeUrls) searchParams.set("includeUrls", "true");
+
+      const query = searchParams.toString();
+      return apiFetch<Topic>(
+        `/certification/topics/${encodeURIComponent(id)}${query ? `?${query}` : ""}`
       );
+    },
+    byStageCode(
+      code: string,
+      params?: {
+        includeSlides?: boolean;
+        includeUrls?: boolean;
+      }
+    ): Promise<ApiResult<Topic[]>> {
+      const searchParams = new URLSearchParams();
+      if (params?.includeSlides) searchParams.set("includeSlides", "true");
+      if (params?.includeUrls) searchParams.set("includeUrls", "true");
+
+      const query = searchParams.toString();
+      return apiFetch<Topic[]>(
+        `/certification/topics/by-stage-code/${encodeURIComponent(code)}${query ? `?${query}` : ""}`
+      );
+    },
+    create(data: {
+      stageId: string;
+      title: string;
+      officialNotes?: string | null;
+      stageOrder?: number | null;
+    }): Promise<ApiResult<Topic>> {
+      return apiFetch<Topic>("/certification/topics", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    update(
+      id: string,
+      data: {
+        title?: string;
+        officialNotes?: string | null;
+        status?: "draft" | "published" | "archived";
+        stageOrder?: number | null;
+      }
+    ): Promise<ApiResult<Topic>> {
+      return apiFetch<Topic>(`/certification/topics/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    delete(id: string): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch<{ success: boolean }>(
+        `/certification/topics/${encodeURIComponent(id)}`,
+        {
+          method: "DELETE",
+        }
+      );
+    },
+    reorder(data: {
+      stageId: string;
+      topicIds: string[];
+    }): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch<{ success: boolean }>("/certification/topics/reorder", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
     },
     slides: {
       list(topicId: string): Promise<ApiResult<Slide[]>> {

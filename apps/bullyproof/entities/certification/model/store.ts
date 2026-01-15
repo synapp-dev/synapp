@@ -57,3 +57,65 @@ export function useCertificationStages() {
     stages: query.data || [],
   };
 }
+
+export function useCertificationStageByCode(stageCode: string | null | undefined) {
+  const queryClient = useQueryClient();
+  const { stages, setStages } = useCertificationStore();
+
+  const query = useQuery({
+    queryKey: ["certification", "stages", "by-code", stageCode],
+    queryFn: async () => {
+      if (!stageCode) return null;
+
+      const result = await certificationApi.stages.byCode(stageCode);
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch certification stage");
+      }
+      if (result.data) {
+        // Update Zustand store - add to stages array if not already present
+        setStages([...stages.filter(s => s.id !== result.data!.id), result.data]);
+        return result.data;
+      }
+      return null;
+    },
+    enabled: !!stageCode,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  // Use React Query's cached data directly for immediate display
+  // Fallback to Zustand store if React Query doesn't have data yet
+  const cachedStage = query.data || (stageCode
+    ? stages.find((s) => s.code === stageCode) || null
+    : null);
+
+  return {
+    ...query,
+    stage: cachedStage,
+  };
+}
+
+// Hook for invalidating certification stage cache
+export function useInvalidateCertificationStage() {
+  const queryClient = useQueryClient();
+
+  const invalidateAllStages = () => {
+    queryClient.invalidateQueries({ queryKey: ["certification", "stages"] });
+  };
+
+  const invalidateStage = (stageId: string) => {
+    queryClient.invalidateQueries({ queryKey: ["certification", "stages"] });
+    queryClient.invalidateQueries({ queryKey: ["certification", "stages", stageId] });
+  };
+
+  const invalidateStageByCode = (code: string) => {
+    queryClient.invalidateQueries({ queryKey: ["certification", "stages"] });
+    queryClient.invalidateQueries({ queryKey: ["certification", "stages", "by-code", code] });
+  };
+
+  return {
+    invalidateAllStages,
+    invalidateStage,
+    invalidateStageByCode,
+  };
+}
