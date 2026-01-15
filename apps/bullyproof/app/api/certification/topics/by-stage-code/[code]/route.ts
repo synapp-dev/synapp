@@ -40,9 +40,12 @@ export async function GET(
     }
 
     const { code } = await params;
+    const { searchParams } = new URL(request.url);
+    const query = Object.fromEntries(searchParams.entries());
+    
     const topics = await certificationTopicsService.getTopicsByStageCode(
       { userId },
-      { code }
+      { code, ...query }
     );
 
     return NextResponse.json(topics, { status: 200 });

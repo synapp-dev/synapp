@@ -108,16 +108,15 @@ export async function POST(
         if (
           slideData?.slide.imageUrl &&
           slideData.stage &&
-          slideData.topic.stageOrder !== null &&
-          slideData.topic.stageOrder !== undefined
+          slideData.topic.id
         ) {
           try {
             const stageCode = slideData.stage.code; // e.g., "C", "C1"
-            const topicNumber = slideData.topic.stageOrder;
+            const topicId = slideData.topic.id;
             const fileExtension =
               slideData.slide.imageUrl.split(".").pop()?.split("?")[0] || "jpg";
             const fileName = `${slideId}.${fileExtension}`;
-            const filePath = `slides/certification/${stageCode}/t${topicNumber}/${fileName}`;
+            const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
 
             await supabase.storage.from("content").remove([filePath]);
           } catch (error) {
@@ -162,13 +161,6 @@ export async function POST(
     }
 
     const stageCode = stageResult[0].stage.code; // e.g., "C", "C1"
-    const topicNumber = topic[0].stageOrder;
-    if (topicNumber === null || topicNumber === undefined) {
-      return NextResponse.json(
-        { error: "Topic stageOrder is missing" },
-        { status: 400 }
-      );
-    }
 
     // Step 3: Create new slides
     // Use temporary high orderIndex values to avoid unique constraint violations
@@ -205,7 +197,7 @@ export async function POST(
             const tempUuid = randomUUID();
             const fileExtension = file.name.split(".").pop() || "jpg";
             const tempFileName = `temp_${tempUuid}.${fileExtension}`;
-            const tempFilePath = `slides/certification/${stageCode}/t${topicNumber}/${tempFileName}`;
+            const tempFilePath = `slides/certification/${stageCode}/${topicId}/${tempFileName}`;
 
             const arrayBuffer = await file.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
@@ -295,7 +287,7 @@ export async function POST(
               const fileExtension =
                 tempFileData.path.split(".").pop()?.split("?")[0] || "jpg";
               const finalFileName = `${slideId}.${fileExtension}`;
-              const finalFilePath = `slides/certification/${stageCode}/t${topicNumber}/${finalFileName}`;
+              const finalFilePath = `slides/certification/${stageCode}/${topicId}/${finalFileName}`;
 
               // Copy the file to the final location
               const { data: downloadedFile, error: downloadError } =
@@ -367,7 +359,7 @@ export async function POST(
         if (slideId && !uploadedUrls[slideId]) {
           const fileExtension = file.name.split(".").pop() || "jpg";
           const fileName = `${slideId}.${fileExtension}`;
-          const filePath = `slides/certification/${stageCode}/t${topicNumber}/${fileName}`;
+          const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
 
           const arrayBuffer = await file.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
@@ -420,7 +412,7 @@ export async function POST(
         const file = value;
         const fileExtension = file.name.split(".").pop() || "jpg";
         const fileName = `${slideId}.${fileExtension}`;
-        const filePath = `slides/certification/${stageCode}/t${topicNumber}/${fileName}`;
+        const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
