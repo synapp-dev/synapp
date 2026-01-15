@@ -26,6 +26,7 @@ import {
   Images,
   SquareLibrary,
   X,
+  FileQuestion,
 } from "lucide-react";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { YouTubeVideoDialog } from "./youtube-video-dialog";
@@ -38,6 +39,7 @@ interface ImageSelectorDialogProps {
     images: Array<{ imageData: Blob; blobUrl: string }>
   ) => void;
   onAddYouTubeVideo?: (videoUrl: string) => void;
+  onAddQuiz?: () => void;
   allowMultipleSelection?: boolean;
 }
 
@@ -219,6 +221,7 @@ export function ImageSelectorDialog({
   onSelectImage,
   onSelectMultipleImages,
   onAddYouTubeVideo,
+  onAddQuiz,
   allowMultipleSelection = false,
 }: ImageSelectorDialogProps) {
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
@@ -745,6 +748,20 @@ export function ImageSelectorDialog({
                           title="Add Video"
                           description="Link to a YouTube URL"
                           onClick={() => setShowYouTubeDialog(true)}
+                          disabled={isProcessingPdf}
+                        />
+                      )}
+
+                      {/* Add Quiz Card - Only show for certification */}
+                      {onAddQuiz && (
+                        <UploadCard
+                          icon={FileQuestion}
+                          title="Add Quiz"
+                          description="Create a new quiz slide"
+                          onClick={() => {
+                            onAddQuiz();
+                            onOpenChange(false);
+                          }}
                           disabled={isProcessingPdf}
                         />
                       )}
