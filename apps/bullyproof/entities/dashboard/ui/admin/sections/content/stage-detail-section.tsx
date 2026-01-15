@@ -75,7 +75,7 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
-import { AnimatedThumbnail, type TopicSlide } from "@/components/organisms/animated-thumbnail";
+import { AnimatedThumbnail } from "@/components/organisms/animated-thumbnail";
 
 // Component to handle thumbnail image with error fallback
 function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
@@ -135,7 +135,6 @@ function getSlideStatsForCard(topic: TopicWithSlides) {
     imageSlidesList,
   };
 }
-
 
 // Animated topic card component similar to PDF library FolderCard
 function TopicCard({
@@ -286,7 +285,8 @@ function TopicCard({
       )}
 
       {/* Drag Handle Tab - appears on hover or when dragging, top right corner */}
-      {!readonly && !topic.id.startsWith("temp_") &&
+      {!readonly &&
+        !topic.id.startsWith("temp_") &&
         ((isHovered && !isDragging) || isDragHandleHovered || isLeaving) && (
           <div className="absolute top-0 right-0 z-30 flex items-center gap-2">
             {/* Drag hint text */}
@@ -379,7 +379,8 @@ function TopicCard({
         }}
       >
         {/* Hover Overlay with Chevrons */}
-        {!readonly && (isHovered || isLeaving) &&
+        {!readonly &&
+          (isHovered || isLeaving) &&
           !topic.id.startsWith("temp_") &&
           !isDragging && (
             <div className="absolute top-0 left-0 right-0 bottom-4 z-10 flex items-center justify-between pointer-events-none">
@@ -468,7 +469,8 @@ function TopicCard({
                 isCertification={false}
               />
               {/* Dimming overlay when hovered */}
-              {!readonly && (isHovered || isLeaving) &&
+              {!readonly &&
+                (isHovered || isLeaving) &&
                 !topic.id.startsWith("temp_") &&
                 !isDragging && (
                   <div
@@ -478,19 +480,22 @@ function TopicCard({
                   />
                 )}
               {/* Topic title overlay - appears when drag hint is shown */}
-              {!readonly && showDragHint && !topic.id.startsWith("temp_") && !isDragging && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[70%] px-4 py-3 pointer-events-none">
-                  <span
-                    className={`text-sm font-medium text-secondary text-center block capitalize ${
-                      isLeaving
-                        ? "opacity-0 translate-y-2 transition-all duration-300"
-                        : "opacity-0 translate-y-2 animate-slide-up-fade-in"
-                    }`}
-                  >
-                    {topic.title}
-                  </span>
-                </div>
-              )}
+              {!readonly &&
+                showDragHint &&
+                !topic.id.startsWith("temp_") &&
+                !isDragging && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[70%] px-4 py-3 pointer-events-none">
+                    <span
+                      className={`text-sm font-medium text-secondary text-center block capitalize ${
+                        isLeaving
+                          ? "opacity-0 translate-y-2 transition-all duration-300"
+                          : "opacity-0 translate-y-2 animate-slide-up-fade-in"
+                      }`}
+                    >
+                      {topic.title}
+                    </span>
+                  </div>
+                )}
             </>
           ) : (
             <>
@@ -504,7 +509,8 @@ function TopicCard({
                 />
               </div>
               {/* Dimming overlay when hovered */}
-              {!readonly && (isHovered || isLeaving) &&
+              {!readonly &&
+                (isHovered || isLeaving) &&
                 !topic.id.startsWith("temp_") &&
                 !isDragging && (
                   <div
@@ -514,19 +520,22 @@ function TopicCard({
                   />
                 )}
               {/* Topic title overlay - appears when drag hint is shown */}
-              {!readonly && showDragHint && !topic.id.startsWith("temp_") && !isDragging && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[70%] px-4 py-3 pointer-events-none">
-                  <span
-                    className={`text-sm font-medium text-secondary text-center block capitalize ${
-                      isLeaving
-                        ? "opacity-0 translate-y-2 transition-all duration-300"
-                        : "opacity-0 translate-y-2 animate-slide-up-fade-in"
-                    }`}
-                  >
-                    {topic.title}
-                  </span>
-                </div>
-              )}
+              {!readonly &&
+                showDragHint &&
+                !topic.id.startsWith("temp_") &&
+                !isDragging && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-[70%] px-4 py-3 pointer-events-none">
+                    <span
+                      className={`text-sm font-medium text-secondary text-center block capitalize ${
+                        isLeaving
+                          ? "opacity-0 translate-y-2 transition-all duration-300"
+                          : "opacity-0 translate-y-2 animate-slide-up-fade-in"
+                      }`}
+                    >
+                      {topic.title}
+                    </span>
+                  </div>
+                )}
             </>
           )}
         </div>
@@ -610,50 +619,50 @@ function TopicCard({
           {/* Dropdown menu - only visible if not readonly */}
           {!readonly && (
             <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-background/50 transition-colors ml-1"
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="h-5 w-5 flex items-center justify-center rounded-md hover:bg-background/50 transition-colors ml-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreVertical className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
                 onClick={(e) => e.stopPropagation()}
+                data-dropdown-menu
               >
-                <MoreVertical className="h-3 w-3 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="end"
-              onClick={(e) => e.stopPropagation()}
-              data-dropdown-menu
-            >
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddSlideBefore();
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Add slide before
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onAddSlideAfter();
-                }}
-              >
-                <Plus className="h-4 w-4" />
-                Add slide after
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteTopic();
-                }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete topic
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddSlideBefore();
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add slide before
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onAddSlideAfter();
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Add slide after
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeleteTopic();
+                  }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete topic
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
         </div>
       </Card>
@@ -699,8 +708,8 @@ interface StageDetailSectionProps {
   onBackClick?: () => void; // Optional custom back navigation
 }
 
-export function StageDetailSection({ 
-  slug, 
+export function StageDetailSection({
+  slug,
   readonly = false,
   basePath = "/admin/content/curriculum",
   onBackClick,
@@ -1199,10 +1208,16 @@ export function StageDetailSection({
             </div>
             {stage.years && stage.years.length > 0 && (
               <div className="flex items-center gap-x-2 text-xs text-muted-foreground">
-                {stage.years.flatMap((year, index) => [
-                  index > 0 && <span key={`dot-${year.id}`} className="opacity-50">•</span>,
-                  <span key={year.id}>{year.displayName}</span>,
-                ]).filter(Boolean)}
+                {stage.years
+                  .flatMap((year, index) => [
+                    index > 0 && (
+                      <span key={`dot-${year.id}`} className="opacity-50">
+                        •
+                      </span>
+                    ),
+                    <span key={year.id}>{year.displayName}</span>,
+                  ])
+                  .filter(Boolean)}
               </div>
             )}
           </div>

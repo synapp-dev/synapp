@@ -63,7 +63,7 @@ export async function apiFetch<T>(
   if (contentType?.includes("application/json")) {
     try {
       body = JSON.parse(text);
-    } catch (parseError) {
+    } catch {
       // If JSON parsing fails, return error with text content
       return {
         data: null,
