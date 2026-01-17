@@ -18,13 +18,18 @@ import {
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { BookOpen } from "lucide-react";
-import type { curriculumStages, topics } from "@/server/db/schema";
+import type { curriculumStages, certificationStages, topics, certificationTopics } from "@/server/db/schema";
 import {
   useTopicsByStage,
   useTopicsStore,
 } from "@/entities/topics/model/store-enhanced";
+import {
+  useCertificationTopicsByStageCode,
+  useCertificationTopicsStore,
+} from "@/entities/certification/model/topics-store";
 
-type Stage = typeof curriculumStages.$inferSelect & {
+// Base stage types
+type CurriculumStage = typeof curriculumStages.$inferSelect & {
   years?: Array<{
     id: string;
     code: string;
@@ -38,9 +43,19 @@ type Stage = typeof curriculumStages.$inferSelect & {
   }>;
 };
 
-type Topic = typeof topics.$inferSelect;
+type CertificationStage = typeof certificationStages.$inferSelect & {
+  topicCount?: number;
+};
 
-type TopicWithImage = Topic & {
+// Union type for stages
+type Stage = CurriculumStage | CertificationStage;
+
+// Topic types
+type CurriculumTopic = typeof topics.$inferSelect;
+type CertificationTopic = typeof certificationTopics.$inferSelect;
+
+// Generic topic type that works for both
+type TopicWithImage = (CurriculumTopic | CertificationTopic) & {
   slides?: Array<{
     id: string;
     kind: string;
@@ -48,18 +63,21 @@ type TopicWithImage = Topic & {
     signedUrl?: string | null;
   }>;
   imageSlideId?: string | null;
+  stageOrder?: number | null;
 };
 
 interface TopicImageThumbnailProps {
   topic: TopicWithImage;
-  onTopicClick: (topic: Topic, e: React.MouseEvent) => void;
+  onTopicClick: (topic: TopicWithImage, e: React.MouseEvent) => void;
   index?: number; // Index for staggered animation start
+  type?: "curriculum" | "certification";
 }
 
 function TopicImageThumbnail({
   topic,
   onTopicClick,
   index = 0,
+  type = "curriculum",
 }: TopicImageThumbnailProps) {
   // Get all image slides sorted by orderIndex
   const imageSlides = useMemo(() => {
@@ -69,8 +87,10 @@ function TopicImageThumbnail({
       .sort((a, b) => a.orderIndex - b.orderIndex);
   }, [topic.slides]);
 
-  // Access store directly to get URLs for all slides
-  const { slideUrls: storeSlideUrls } = useTopicsStore();
+  // Access appropriate store based on type
+  const { slideUrls: curriculumSlideUrls } = useTopicsStore();
+  const { slideUrls: certificationSlideUrls } = useCertificationTopicsStore();
+  const storeSlideUrls = type === "certification" ? certificationSlideUrls : curriculumSlideUrls;
 
   // Get URLs for all image slides
   const slideUrls = useMemo(() => {
@@ -206,21 +226,43 @@ interface StageCardProps {
   index: number;
   onStageClick?: (stage: Stage) => void;
   basePath?: string; // e.g., "/admin/content/curriculum"
+  type?: "curriculum" | "certification";
 }
 
-function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
+function StageCard({ stage, index, onStageClick, basePath, type = "curriculum" }: StageCardProps) {
   const router = useRouter();
 
-  // Use new store hook to fetch topics with slides and URLs
-  const { topics, isLoading: isLoadingTopics } = useTopicsByStage(stage.id, {
-    includeSlides: true,
-    includeUrls: true,
-  });
+  // Use appropriate hook based on type
+  const curriculumTopicsQuery = useTopicsByStage(
+    type === "curriculum" ? (stage as CurriculumStage).id : null,
+    type === "curriculum" ? {
+      includeSlides: true,
+      includeUrls: true,
+    } : undefined
+  );
 
-  const displayedTopics = topics.slice(0, 4);
-  const hasMoreTopics = topics.length > 4;
+  const certificationTopicsQuery = useCertificationTopicsByStageCode(
+    type === "certification" ? (stage as CertificationStage).code : null,
+    type === "certification" ? {
+      includeSlides: true,
+      includeUrls: true,
+    } : undefined
+  );
 
-  const handleTopicClick = (topic: Topic, e: React.MouseEvent) => {
+  const topics = type === "certification" 
+    ? (certificationTopicsQuery.topics || [])
+    : (curriculumTopicsQuery.topics || []);
+  const isLoadingTopics = type === "certification"
+    ? certificationTopicsQuery.isLoading
+    : curriculumTopicsQuery.isLoading;
+
+  // For certification (2 columns), show single row. For curriculum, show 2x2 grid
+  const displayedTopics = type === "certification" 
+    ? topics.slice(0, 4) // Show up to 4 topics in a single row
+    : topics.slice(0, 4); // Show 4 topics in 2x2 grid
+  const hasMoreTopics = topics.length > displayedTopics.length;
+
+  const handleTopicClick = (topic: TopicWithImage, e: React.MouseEvent) => {
     e.stopPropagation();
     if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
       if (basePath) {
@@ -233,13 +275,14 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
   };
 
   return (
-    <StaggeredAnimation key={stage.id} index={index}>
-      <Card
-        className={`relative transition-shadow pb-0 overflow-hidden ${
-          onStageClick ? "cursor-pointer hover:shadow-md" : ""
-        }`}
-        onClick={() => onStageClick?.(stage)}
-      >
+    <div className={type === "certification" ? "md:col-span-2" : ""}>
+      <StaggeredAnimation key={stage.id} index={index}>
+        <Card
+          className={`relative transition-shadow pb-0 overflow-hidden ${
+            onStageClick ? "cursor-pointer hover:shadow-md" : ""
+          }`}
+          onClick={() => onStageClick?.(stage)}
+        >
         <CardHeader className="py-0">
           <div className="space-y-0">
             <div className="flex items-center justify-between gap-2">
@@ -253,9 +296,9 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
                 </span>
               )}
             </div>
-            {stage.years && stage.years.length > 0 && (
+            {type === "curriculum" && (stage as CurriculumStage).years && (stage as CurriculumStage).years!.length > 0 && (
               <div className="flex items-center gap-x-2 text-xs text-muted-foreground">
-                {stage.years
+                {(stage as CurriculumStage).years!
                   .flatMap((year, index) => [
                     index > 0 && (
                       <span key={`dot-${year.id}`} className="opacity-50">
@@ -271,20 +314,21 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
         </CardHeader>
         <CardContent className="p-0">
           {isLoadingTopics ? (
-            <div className="grid grid-cols-2">
-              {[...Array(4)].map((_, i) => (
+            <div className={type === "certification" ? "grid grid-cols-4" : "grid grid-cols-2"}>
+              {[...Array(type === "certification" ? 4 : 4)].map((_, i) => (
                 <Skeleton key={i} className="aspect-video" />
               ))}
             </div>
           ) : displayedTopics.length > 0 ? (
             <TooltipProvider>
-              <div className="grid grid-cols-2">
+              <div className={type === "certification" ? "grid grid-cols-4" : "grid grid-cols-2"}>
                 {displayedTopics.map((topic, topicIndex) => (
                   <TopicImageThumbnail
                     key={topic.id}
                     topic={topic}
                     onTopicClick={handleTopicClick}
                     index={topicIndex}
+                    type={type}
                   />
                 ))}
               </div>
@@ -297,6 +341,7 @@ function StageCard({ stage, index, onStageClick, basePath }: StageCardProps) {
         </CardContent>
       </Card>
     </StaggeredAnimation>
+    </div>
   );
 }
 
@@ -304,12 +349,14 @@ interface StageCardsProps {
   stages: Stage[];
   onStageClick?: (stage: Stage) => void;
   basePath?: string; // e.g., "/admin/content/curriculum"
+  type?: "curriculum" | "certification";
 }
 
 export function StageCards({
   stages,
   onStageClick,
   basePath,
+  type = "curriculum",
 }: StageCardsProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -320,6 +367,7 @@ export function StageCards({
           index={index}
           onStageClick={onStageClick}
           basePath={basePath}
+          type={type}
         />
       ))}
     </div>

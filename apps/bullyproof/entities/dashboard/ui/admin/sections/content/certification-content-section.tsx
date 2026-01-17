@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { certificationStages } from "@/server/db/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, Plus } from "lucide-react";
 import { AddCertificationStageSheet } from "./add-certification-stage-sheet";
@@ -11,6 +11,7 @@ import {
   useCertificationStages,
   useInvalidateCertificationStage,
 } from "@/entities/certification/model/store";
+import { StageCards } from "@/entities/curriculum/ui/stage-cards";
 
 type Stage = typeof certificationStages.$inferSelect & {
   topicCount?: number;
@@ -118,32 +119,12 @@ export function CertificationContentSection({
             <p className="text-sm">{emptyDescription}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {stages.map((stage) => (
-              <Card
-                key={stage.id}
-                className="transition-shadow hover:shadow-md cursor-pointer"
-                onClick={() => handleStageClick(stage)}
-              >
-                <CardHeader>
-                  <CardTitle className="text-lg">{stage.name}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div>
-                      <span className="font-medium">Code:</span> {stage.code}
-                    </div>
-                    <div>
-                      <span className="font-medium">Topics:</span> {stage.topicCount ?? 0}
-                    </div>
-                    <div>
-                      <span className="font-medium">Sort Index:</span> {stage.sortIndex}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <StageCards
+            stages={stages}
+            onStageClick={handleStageClick}
+            basePath={basePath}
+            type="certification"
+          />
         )}
       </div>
       {isAdmin && (
