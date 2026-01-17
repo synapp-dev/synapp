@@ -165,10 +165,12 @@ export async function POST(
     // Step 3: Create new slides
     // Use temporary high orderIndex values to avoid unique constraint violations
     // We'll normalize the order after all operations complete
-    // Use 1000000+ to avoid conflicts with reorderSlides which uses 100000 as tempOffset
+    // Calculate tempOrderOffset dynamically to avoid conflicts with existing slides
     const createdSlideIds: string[] = [];
     const tempIdToSlideIdMap = new Map<string, string>();
-    const tempOrderOffset = 1000000; // Very high offset to avoid conflicts with reorderSlides (which uses 100000)
+    // Use an offset that's higher than any existing orderIndex to avoid conflicts
+    // Add 1000000 to ensure we're well above any temporary values
+    const tempOrderOffset = Math.max(1000000, maxOrderIndex + 1000000);
     const newSlideOrderMap = new Map<string, number>(); // Map: slideId -> intended orderIndex
     const uploadedUrls: Record<string, string> = {};
     const tempFileInfo = new Map<
