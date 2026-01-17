@@ -69,7 +69,10 @@ export const certificationSlidesRepo = {
       return 0;
     }
 
-    const tempOffset = 100000;
+    // Calculate tempOffset based on current max orderIndex to avoid conflicts
+    const maxOrderIndex = Math.max(...allSlides.map((s) => s.orderIndex));
+    // Use an offset that's higher than any existing orderIndex
+    const tempOffset = Math.max(100000, maxOrderIndex + 100000);
     for (let i = 0; i < allSlides.length; i++) {
       await db
         .update(certificationSlides)
@@ -113,7 +116,13 @@ export const certificationSlidesRepo = {
 
     // Phase 1: Move all slides to temporary high indices to avoid conflicts
     // This ensures we don't have unique constraint violations when reassigning
-    const tempOffset = 1000000;
+    // Calculate tempOffset based on current max orderIndex to avoid conflicts with newly created slides
+    const maxOrderIndex = allSlides.length > 0
+      ? Math.max(...allSlides.map((s) => s.orderIndex))
+      : -1;
+    // Use an offset that's higher than any existing orderIndex
+    // Add 1000000 to ensure we're well above any temporary values used during creation
+    const tempOffset = Math.max(1000000, maxOrderIndex + 1000000);
     const tempSqlChunks: SQL[] = [sql`(CASE`];
     const allSlideIds = [...slideIds, ...slidesNotInArray.map((s) => s.id)];
 
