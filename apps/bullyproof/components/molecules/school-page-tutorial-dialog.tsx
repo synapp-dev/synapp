@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { HelpCircle, ChevronsRight } from "lucide-react";
+import { ChevronsRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -54,7 +54,7 @@ export function SchoolPageTutorialDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="sm:max-w-xs max-h-[65vh] flex flex-col"
+        className="sm:max-w-md max-h-[65vh] flex flex-col"
         showCloseButton={false}
       >
         <DialogHeader className="text-center shrink-0">
@@ -67,8 +67,7 @@ export function SchoolPageTutorialDialog({
               className="h-auto"
             />
           </div>
-          <DialogTitle className="flex items-center justify-center gap-2 text-2xl mt-6">
-            <HelpCircle className="h-8 w-8" />
+          <DialogTitle className="text-center text-2xl mt-6">
             {title}
           </DialogTitle>
           <DialogDescription className="text-center">

@@ -99,43 +99,37 @@ export default function HomePage({
 
           setTeachers(filteredTeachers);
 
-          // Fetch lessons for each teacher
-          const allLessons: Lesson[] = [];
-
+          // Fetch lessons directly by schoolId (more efficient and correct)
           if (schoolId) {
-            for (const teacher of filteredTeachers) {
-              const lessonsResult = await lessonsApi.get.list({
-                teacherId: teacher.id,
-                limit: 100,
-              });
+            const lessonsResult = await lessonsApi.get.list({
+              schoolId: schoolId,
+              limit: 100,
+            });
 
-              if (!lessonsResult.error && lessonsResult.data) {
-                // Filter lessons by schoolId and fetch details
-                const schoolLessons = lessonsResult.data.filter(
-                  (lesson) => lesson.schoolId === schoolId
-                );
-
-                const lessonsWithDetails = await Promise.all(
-                  schoolLessons.map(async (lesson) => {
-                    const lessonDetailResult = await lessonsApi.get.byId(
-                      lesson.id
-                    );
-                    if (!lessonDetailResult.error && lessonDetailResult.data) {
-                      return {
-                        ...lesson,
-                        topic: lessonDetailResult.data.topic,
-                        teacher: lessonDetailResult.data.teacher,
-                      };
-                    }
-                    return lesson;
-                  })
-                );
-                allLessons.push(...lessonsWithDetails);
-              }
+            if (!lessonsResult.error && lessonsResult.data) {
+              // Fetch details for each lesson
+              const lessonsWithDetails = await Promise.all(
+                lessonsResult.data.map(async (lesson) => {
+                  const lessonDetailResult = await lessonsApi.get.byId(
+                    lesson.id
+                  );
+                  if (!lessonDetailResult.error && lessonDetailResult.data) {
+                    return {
+                      ...lesson,
+                      topic: lessonDetailResult.data.topic,
+                      teacher: lessonDetailResult.data.teacher,
+                    };
+                  }
+                  return lesson;
+                })
+              );
+              setLessons(lessonsWithDetails);
+            } else {
+              setLessons([]);
             }
+          } else {
+            setLessons([]);
           }
-
-          setLessons(allLessons);
         }
       } catch (error) {
         console.error("Failed to fetch data:", error);
