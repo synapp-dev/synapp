@@ -20,6 +20,8 @@ export interface WizardState {
   selectedTopic: TopicOption | null;
 }
 
+export type ScheduleOption = "immediate" | "scheduled";
+
 export interface LessonCreatePayload {
   schoolId: string;
   topicId: string;
