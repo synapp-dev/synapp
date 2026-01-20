@@ -155,6 +155,7 @@ export const topicsRepo = {
       title?: string;
       description?: string;
       officialNotes?: string;
+      status?: "draft" | "published" | "archived";
     }
   ) => db.update(topics).set(data).where(eq(topics.id, id)).returning(),
 
@@ -163,7 +164,8 @@ export const topicsRepo = {
   // Reorder topics based on an array of topic IDs in the desired order
   reorderTopics: async (stageId: string, topicIds: string[]) => {
     // First, move all topics to temporary high indices to avoid conflicts
-    const tempOffset = 100000;
+    // Using 30000 as tempOffset to stay within smallint range (max 32767)
+    const tempOffset = 30000;
     const allTopics = await db
       .select()
       .from(topics)

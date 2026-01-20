@@ -5,7 +5,7 @@ export const createTopicSchema = z.object({
   stageId: z.string().trim().min(1).max(500),
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(1000).optional(),
-  officialNotes: z.string().trim().max(5000).optional(),
+  officialNotes: z.string().trim().max(5000).optional().nullable(),
 });
 
 export type CreateTopicParams = z.infer<typeof createTopicSchema>;
@@ -14,7 +14,8 @@ export type CreateTopicParams = z.infer<typeof createTopicSchema>;
 export const updateTopicSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
-  officialNotes: z.string().trim().max(5000).optional(),
+  officialNotes: z.string().trim().max(5000).optional().nullable(),
+  status: z.enum(["draft", "published", "archived"]).optional(),
 });
 
 export type UpdateTopicParams = z.infer<typeof updateTopicSchema>;
