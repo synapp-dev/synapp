@@ -80,17 +80,17 @@ export function useLessonStatusRealtime(lessonId?: string) {
 
             // Always refetch live lesson when status changes to/from live states OR when it becomes completed
             // This ensures we update the sidebar/dashboard correctly
-            const isLiveStatus = ["in_progress", "pending_review"].includes(
+            const isLiveStatus = ["in_progress", "feedback"].includes(
               updatedLesson.status
             );
-            const wasLiveStatus = ["in_progress", "pending_review"].includes(
+            const wasLiveStatus = ["in_progress", "feedback"].includes(
               oldLesson.status
             );
             const becameCompleted = updatedLesson.status === "completed";
 
             if (isLiveStatus || wasLiveStatus || becameCompleted) {
               // Refetch the live lesson store to get updated list
-              // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/pending_review)
+              // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/feedback)
               fetchInProgressLesson(currentUser?.id);
             }
           }
@@ -185,17 +185,17 @@ export function useUserLessonsStatusRealtime(userId?: string) {
 
             // Always refetch live lesson when status changes to/from live states OR when it becomes completed
             // This ensures we update the sidebar/dashboard correctly
-            const isLiveStatus = ["in_progress", "pending_review"].includes(
+            const isLiveStatus = ["in_progress", "feedback"].includes(
               updatedLesson.status
             );
-            const wasLiveStatus = ["in_progress", "pending_review"].includes(
+            const wasLiveStatus = ["in_progress", "feedback"].includes(
               oldLesson.status
             );
             const becameCompleted = updatedLesson.status === "completed";
 
             if (isLiveStatus || wasLiveStatus || becameCompleted) {
               // Refetch the live lesson store to get updated list
-              // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/pending_review)
+              // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/feedback)
               fetchInProgressLesson(userId);
             }
           }

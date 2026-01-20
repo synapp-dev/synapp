@@ -1,5 +1,3 @@
-export type ScheduleOption = 'immediate' | 'scheduled';
-
 export interface ClassOption {
   id: string;
   name: string;
@@ -20,16 +18,12 @@ export interface WizardState {
   step: number;
   selectedClasses: ClassOption[];
   selectedTopic: TopicOption | null;
-  scheduleOption: ScheduleOption;
-  scheduledDate: string;
-  scheduledTime: string;
 }
 
 export interface LessonCreatePayload {
   schoolId: string;
   topicId: string;
   classIds: string[];
-  status: 'draft' | 'scheduled' | 'in_progress';
-  scheduledFor?: string;
+  status: 'preparing' | 'ready' | 'in_progress' | 'feedback' | 'completed' | 'cancelled';
 }
 
