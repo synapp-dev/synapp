@@ -104,7 +104,7 @@ export function LessonSidebarNav({
     title: item.title,
     url: item.url ? `${baseUrl}${item.url}` : baseUrl,
     icon: iconMap[item.iconName],
-    exact: item.exact,
+    exact: (item as { exact?: boolean }).exact ?? false,
     // Disable Run Lesson if user is not the lesson creator
     // Enable feedback button if lesson is feedback or completed
     disabled:

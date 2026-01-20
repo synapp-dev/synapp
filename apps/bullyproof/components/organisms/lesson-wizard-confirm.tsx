@@ -117,9 +117,9 @@ export function LessonWizardConfirm({
 
   // Fetch stage data with years to get all year codes for the stage
   const { data: stageData } = useQuery({
-    queryKey: ["stage", topicData?.stageId || selectedTopic?.stageId, "with-years"],
+    queryKey: ["stage", topicData?.stageId, "with-years"],
     queryFn: async () => {
-      const stageId = topicData?.stageId || selectedTopic?.stageId;
+      const stageId = topicData?.stageId;
       if (!stageId) return null;
       
       const result = await curriculumApi.stages.byId(stageId);
@@ -131,7 +131,7 @@ export function LessonWizardConfirm({
       
       return result.data;
     },
-    enabled: !!(topicData?.stageId || selectedTopic?.stageId),
+    enabled: !!topicData?.stageId,
     staleTime: 5 * 60 * 1000,
   });
 
