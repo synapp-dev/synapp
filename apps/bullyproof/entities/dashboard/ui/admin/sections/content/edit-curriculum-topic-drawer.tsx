@@ -31,6 +31,11 @@ import {
 import { Loader2, Trash2 } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics } from "@/server/db/schema";
+import {
+  useTopicsStore,
+  useInvalidateTopics,
+} from "@/entities/topics/model/store-enhanced";
+import { useQueryClient } from "@tanstack/react-query";
 
 type Topic = typeof topics.$inferSelect & {
   slides?: any[];
@@ -59,6 +64,11 @@ export function EditCurriculumTopicDrawer({
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
+  // Zustand store and invalidation hooks
+  const { setTopic, removeTopic } = useTopicsStore();
+  const { invalidateTopic, invalidateTopicsByStage } = useInvalidateTopics();
+  const queryClient = useQueryClient();
 
   // Load topic data when drawer opens
   useEffect(() => {
@@ -94,6 +104,24 @@ export function EditCurriculumTopicDrawer({
         return;
       }
 
+      // Update Zustand store with the returned topic data
+      if (result.data) {
+        setTopic(result.data as any);
+      }
+
+      // Invalidate React Query cache
+      invalidateTopic(topic.id);
+      if (topic.stageId) {
+        invalidateTopicsByStage(topic.stageId);
+      }
+
+      // Trigger background refetch (non-blocking)
+      queryClient.invalidateQueries({ queryKey: ["topics"] });
+      queryClient.refetchQueries({ queryKey: ["topics", topic.id] });
+      if (topic.stageId) {
+        queryClient.refetchQueries({ queryKey: ["topics", topic.stageId] });
+      }
+
       // Success - close drawer and refresh
       onOpenChange(false);
       onTopicUpdated?.();
@@ -115,6 +143,21 @@ export function EditCurriculumTopicDrawer({
         setError(result.error.message || "Failed to delete topic");
         setShowDeleteDialog(false);
         return;
+      }
+
+      // Remove topic from Zustand store
+      removeTopic(topic.id);
+
+      // Invalidate React Query cache
+      invalidateTopic(topic.id);
+      if (topic.stageId) {
+        invalidateTopicsByStage(topic.stageId);
+      }
+
+      // Trigger background refetch (non-blocking)
+      queryClient.invalidateQueries({ queryKey: ["topics"] });
+      if (topic.stageId) {
+        queryClient.refetchQueries({ queryKey: ["topics", topic.stageId] });
       }
 
       // Success - close drawer and refresh

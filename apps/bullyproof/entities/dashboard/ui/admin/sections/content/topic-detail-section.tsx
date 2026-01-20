@@ -640,9 +640,12 @@ export function TopicDetailSection({
   );
 
   // Invalidation hooks for curriculum topics
-  const { invalidateTopicsByStage } = useInvalidateTopics();
+  const { invalidateTopicsByStage, invalidateTopic } = useInvalidateTopics();
   const { invalidateStage } = useInvalidateStage();
-  const { removeTopic } = useTopicsStore();
+  const { removeTopic, setTopic: setTopicInStore } = useTopicsStore();
+  
+  // Get topic from Zustand store to sync with updates
+  const { topics: storeTopics } = useTopicsStore();
 
   // Extract fetchData function so it can be reused after save (for certification and manual refetch)
   const fetchTopicData = useCallback(
@@ -833,7 +836,18 @@ export function TopicDetailSection({
     const isNewTopic = lastProcessedTopicIdRef.current !== foundTopic.id;
 
     if (!isNewTopic) {
-      // Same topic - just update loading state, don't reset user changes
+      // Same topic - sync title/status from store if it changed, but don't reset slides
+      const storeTopic = storeTopics[foundTopic.id];
+      if (storeTopic && topic) {
+        // Only update if title or status changed
+        if (storeTopic.title !== topic.title || storeTopic.status !== topic.status) {
+          setTopic({
+            ...topic,
+            title: storeTopic.title,
+            status: storeTopic.status,
+          });
+        }
+      }
       setIsLoading(false);
       return;
     }
@@ -949,6 +963,24 @@ export function TopicDetailSection({
     topicsError,
     // Note: setSlideUrl is stable from Zustand, cachedTopics is tracked via foundTopic
   ]);
+
+  // Sync local topic state with store when topic is updated (for same topic ID)
+  useEffect(() => {
+    if (isCertification || !foundTopic || !topic) return;
+    
+    // Check if the topic in the store has been updated
+    const storeTopic = storeTopics[foundTopic.id];
+    if (storeTopic && storeTopic.id === topic.id) {
+      // Only update title and status, preserve slides and other local state
+      if (storeTopic.title !== topic.title || storeTopic.status !== topic.status) {
+        setTopic({
+          ...topic,
+          title: storeTopic.title,
+          status: storeTopic.status,
+        });
+      }
+    }
+  }, [foundTopic, storeTopics, isCertification, topic]);
 
   // Use local slides instead of topic.slides
   const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
@@ -2065,20 +2097,316 @@ export function TopicDetailSection({
         }
       }
 
-      // Update progress: files prepared
-      setSaveProgress(hasFileUploads ? 20 : 40);
+      // Check total payload size and chunk if necessary
+      let totalSize = 0;
+      const fileCount = pendingFileUploads.size;
+      for (const file of pendingFileUploads.values()) {
+        totalSize += file.size;
+      }
+      const sizeInMB = totalSize / (1024 * 1024);
+      const operationsJson = JSON.stringify({
+        topicId: topic.id,
+        creates,
+        updates,
+        deletes: finalDeletedIds,
+        reorder: slideIds,
+      });
+      const operationsSize = operationsJson.length;
+      const totalPayloadSizeMB = (totalSize + operationsSize) / (1024 * 1024);
+      
+      console.log("[topic-detail] Upload size check:", {
+        fileCount,
+        totalSizeMB: sizeInMB.toFixed(2),
+        operationsSize,
+        totalPayloadSizeMB: totalPayloadSizeMB.toFixed(2),
+      });
 
-      // Step 3: Call bulk save API with FormData
-      if (hasFileUploads) {
-        setSaveStatus("Uploading files...");
+      // Chunk size limit: 3.5MB to be safe (Vercel limit is ~4.5MB, but we account for FormData overhead)
+      const MAX_CHUNK_SIZE_MB = 3.5;
+      const MAX_CHUNK_SIZE_BYTES = MAX_CHUNK_SIZE_MB * 1024 * 1024;
+
+      // Helper function to create a chunk
+      const createChunk = (
+        chunkCreates: typeof creates,
+        chunkUpdates: typeof updates,
+        chunkDeletes: string[],
+        chunkFiles: Map<string, File>
+      ) => {
+        const chunkFormData = new FormData();
+        chunkFormData.append(
+          "operations",
+          JSON.stringify({
+            topicId: topic.id,
+            creates: chunkCreates,
+            updates: chunkUpdates,
+            deletes: chunkDeletes,
+            reorder: [], // We'll handle reorder at the end
+          })
+        );
+
+        for (const [key, file] of chunkFiles.entries()) {
+          if (key.startsWith("temp_")) {
+            chunkFormData.append(`file_${key}`, file);
+          } else {
+            chunkFormData.append(`file_${key}`, file);
+          }
+        }
+
+        return chunkFormData;
+      };
+
+      // Helper function to estimate chunk size
+      const estimateChunkSize = (
+        chunkCreates: typeof creates,
+        chunkUpdates: typeof updates,
+        chunkFiles: Map<string, File>
+      ): number => {
+        let size = JSON.stringify({
+          topicId: topic.id,
+          creates: chunkCreates,
+          updates: chunkUpdates,
+          deletes: [],
+          reorder: [],
+        }).length;
+
+        for (const file of chunkFiles.values()) {
+          size += file.size;
+        }
+
+        return size;
+      };
+
+      // Check if we need to chunk
+      if (totalPayloadSizeMB <= MAX_CHUNK_SIZE_MB) {
+        // Single request - no chunking needed
+        console.log("[topic-detail] Payload size OK, sending single request");
+
+        // Update progress: files prepared
+        setSaveProgress(hasFileUploads ? 20 : 40);
+
+        // Step 3: Call bulk save API with FormData
+        if (hasFileUploads) {
+          setSaveStatus("Uploading files...");
+        } else {
+          setSaveStatus("Processing changes...");
+        }
+
+        var result = isCertification
+          ? await certificationApi.topics.slides.bulkSave(topic.id, formData)
+          : await topicsApi.slides.bulkSave(formData);
+
+        if (result.error) {
+          throw new Error(result.error.message || "Failed to save changes");
+        }
       } else {
-        setSaveStatus("Processing changes...");
+        // Need to chunk - split into multiple requests
+        console.log(
+          `[topic-detail] Payload too large (${totalPayloadSizeMB.toFixed(2)} MB), chunking into smaller batches...`
+        );
+
+        const chunks: Array<{
+          creates: typeof creates;
+          updates: typeof updates;
+          deletes: string[];
+          files: Map<string, File>;
+        }> = [];
+
+        // Strategy: Process deletes first (no files), then chunk creates/updates with their files
+        // Step 1: Handle all deletes in first chunk (if any)
+        if (finalDeletedIds.length > 0) {
+          chunks.push({
+            creates: [],
+            updates: [],
+            deletes: [...finalDeletedIds],
+            files: new Map(),
+          });
+        }
+
+        // Step 2: Chunk creates with their files
+        let currentChunkCreates: typeof creates = [];
+        let currentChunkFiles = new Map<string, File>();
+        let currentChunkSize = 0;
+
+        for (const create of creates) {
+          const tempId = create.tempId;
+          const file = tempId ? pendingFileUploads.get(tempId) : undefined;
+          const fileSize = file ? file.size : 0;
+          const createSize = JSON.stringify(create).length;
+          const estimatedSize = currentChunkSize + createSize + fileSize;
+
+          // If adding this create would exceed the limit, start a new chunk
+          if (
+            currentChunkCreates.length > 0 &&
+            estimatedSize > MAX_CHUNK_SIZE_BYTES
+          ) {
+            chunks.push({
+              creates: currentChunkCreates,
+              updates: [],
+              deletes: [],
+              files: new Map(currentChunkFiles),
+            });
+            currentChunkCreates = [];
+            currentChunkFiles = new Map();
+            currentChunkSize = 0;
+          }
+
+          currentChunkCreates.push(create);
+          if (file && tempId) {
+            currentChunkFiles.set(tempId, file);
+          }
+          currentChunkSize += createSize + fileSize;
+        }
+
+        // Add remaining creates chunk
+        if (currentChunkCreates.length > 0) {
+          chunks.push({
+            creates: currentChunkCreates,
+            updates: [],
+            deletes: [],
+            files: new Map(currentChunkFiles),
+          });
+        }
+
+        // Step 3: Chunk updates with their files
+        let currentChunkUpdates: typeof updates = [];
+        currentChunkFiles = new Map();
+        currentChunkSize = 0;
+
+        for (const update of updates) {
+          const file = pendingFileUploads.get(update.id);
+          const fileSize = file ? file.size : 0;
+          const updateSize = JSON.stringify(update).length;
+          const estimatedSize = currentChunkSize + updateSize + fileSize;
+
+          // If adding this update would exceed the limit, start a new chunk
+          if (
+            currentChunkUpdates.length > 0 &&
+            estimatedSize > MAX_CHUNK_SIZE_BYTES
+          ) {
+            chunks.push({
+              creates: [],
+              updates: currentChunkUpdates,
+              deletes: [],
+              files: new Map(currentChunkFiles),
+            });
+            currentChunkUpdates = [];
+            currentChunkFiles = new Map();
+            currentChunkSize = 0;
+          }
+
+          currentChunkUpdates.push(update);
+          if (file) {
+            currentChunkFiles.set(update.id, file);
+          }
+          currentChunkSize += updateSize + fileSize;
+        }
+
+        // Add remaining updates chunk
+        if (currentChunkUpdates.length > 0) {
+          chunks.push({
+            creates: [],
+            updates: currentChunkUpdates,
+            deletes: [],
+            files: new Map(currentChunkFiles),
+          });
+        }
+
+        console.log(
+          `[topic-detail] Split into ${chunks.length} chunks:`,
+          chunks.map((c, i) => ({
+            chunk: i + 1,
+            creates: c.creates.length,
+            updates: c.updates.length,
+            deletes: c.deletes.length,
+            files: c.files.size,
+            estimatedSizeMB: (
+              estimateChunkSize(c.creates, c.updates, c.files) /
+              (1024 * 1024)
+            ).toFixed(2),
+          }))
+        );
+
+        // Process chunks sequentially
+        let lastResult: any = null;
+        const totalChunks = chunks.length;
+        const progressPerChunk = hasFileUploads ? 60 / totalChunks : 80 / totalChunks;
+
+        for (let i = 0; i < chunks.length; i++) {
+          const chunk = chunks[i];
+          const chunkNum = i + 1;
+
+          console.log(
+            `[topic-detail] Processing chunk ${chunkNum}/${totalChunks}...`
+          );
+
+          setSaveStatus(
+            `Processing batch ${chunkNum} of ${totalChunks}...`
+          );
+          setSaveProgress(20 + progressPerChunk * i);
+
+          const chunkFormData = createChunk(
+            chunk.creates,
+            chunk.updates,
+            chunk.deletes,
+            chunk.files
+          );
+
+          const chunkResult = isCertification
+            ? await certificationApi.topics.slides.bulkSave(
+                topic.id,
+                chunkFormData
+              )
+            : await topicsApi.slides.bulkSave(chunkFormData);
+
+          if (chunkResult.error) {
+            throw new Error(
+              chunkResult.error.message ||
+                `Failed to save chunk ${chunkNum} of ${totalChunks}`
+            );
+          }
+
+          lastResult = chunkResult;
+        }
+
+        // Step 4: Final reorder operation (if we have slideIds to reorder)
+        if (slideIds.length > 0) {
+          console.log("[topic-detail] Performing final reorder...");
+          setSaveStatus("Reordering slides...");
+          setSaveProgress(hasFileUploads ? 85 : 90);
+
+          const reorderFormData = new FormData();
+          reorderFormData.append(
+            "operations",
+            JSON.stringify({
+              topicId: topic.id,
+              creates: [],
+              updates: [],
+              deletes: [],
+              reorder: slideIds,
+            })
+          );
+
+          const reorderResult = isCertification
+            ? await certificationApi.topics.slides.bulkSave(
+                topic.id,
+                reorderFormData
+              )
+            : await topicsApi.slides.bulkSave(reorderFormData);
+
+          if (reorderResult.error) {
+            throw new Error(
+              reorderResult.error.message || "Failed to reorder slides"
+            );
+          }
+
+          lastResult = reorderResult;
+        }
+
+        // Use the last result for processing (will continue to response handling below)
+        result = lastResult;
       }
 
-      const result = isCertification
-        ? await certificationApi.topics.slides.bulkSave(topic.id, formData)
-        : await topicsApi.slides.bulkSave(formData);
-
+      // Both single and chunked requests end up here with result set
       if (result.error) {
         throw new Error(result.error.message || "Failed to save changes");
       }
@@ -2287,11 +2615,37 @@ export function TopicDetailSection({
       }
     } catch (err) {
       console.error("Bulk save error:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to save changes";
+      
+      // Check for payload size errors
+      let errorMessage = "Failed to save changes";
+      if (err instanceof Error) {
+        const errMsg = err.message.toLowerCase();
+        if (
+          errMsg.includes("too large") ||
+          errMsg.includes("payload") ||
+          errMsg.includes("413") ||
+          errMsg.includes("request entity too large") ||
+          errMsg.includes("function_payload_too_large")
+        ) {
+          errorMessage =
+            "Upload too large. Please try compressing your images before uploading, or upload in smaller batches.";
+        } else if (
+          errMsg.includes("formdata") ||
+          errMsg.includes("failed to parse")
+        ) {
+          errorMessage =
+            "Failed to process upload. The request may be too large or corrupted. Please try uploading fewer slides at once.";
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       setUploadError(errorMessage);
+      setSaveProgress(0);
+      setSaveStatus("Upload failed");
       toast.error(errorMessage, {
         position: "bottom-right",
+        duration: 5000, // Show for longer so user can read it
       });
     } finally {
       setIsSaving(false);
@@ -3367,14 +3721,34 @@ export function TopicDetailSection({
           onOpenChange={setIsEditCurriculumTopicDrawerOpen}
           topic={topic as Topic}
           onTopicUpdated={async () => {
+            // Fetch the updated topic with slides and URLs to update Zustand store
+            if (topic?.id) {
+              try {
+                const result = await topicsApi.get.byId(topic.id, {
+                  includeSlides: true,
+                  includeUrls: true,
+                });
+                if (result.data) {
+                  // Update Zustand store with the full topic data
+                  setTopic(result.data as any);
+                }
+              } catch (err) {
+                console.error("Failed to fetch updated topic:", err);
+              }
+            }
+
             // Invalidate React Query cache
+            if (topic?.id) {
+              invalidateTopic(topic.id);
+            }
             if (cachedStage.id) {
               invalidateTopicsByStage(cachedStage.id);
               invalidateStage(cachedStage.id);
             }
-            // Refetch to repopulate data
-            await refetchTopics();
-            await refetchStage();
+
+            // Trigger background refetch (non-blocking)
+            refetchTopics();
+            refetchStage();
           }}
           onTopicDeleted={async () => {
             // Remove topic from Zustand store
