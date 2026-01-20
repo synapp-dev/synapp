@@ -186,7 +186,7 @@ export function TopicDetailSectionReadonly({
         <Button
           variant="ghost"
           onClick={() =>
-            router.push(`/schools/${schoolId}/resources/content/${stageSlug}`)
+            router.push(`/schools/${schoolId}/content/${stageSlug}`)
           }
           className="mb-4"
         >
@@ -216,7 +216,7 @@ export function TopicDetailSectionReadonly({
             variant="ghost"
             size="icon"
             onClick={() =>
-              router.push(`/schools/${schoolId}/resources/content/${stageSlug}`)
+              router.push(`/schools/${schoolId}/content/${stageSlug}`)
             }
           >
             <ArrowLeft className="h-4 w-4" />

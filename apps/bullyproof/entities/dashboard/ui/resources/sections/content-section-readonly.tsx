@@ -14,7 +14,7 @@ export function ContentSectionReadonly({
       isAdmin={false}
       title="Lesson Levels"
       description="Browse lesson levels and topics for the platform."
-      basePath={`/schools/${schoolId}/resources/content`}
+      basePath={`/schools/${schoolId}/content`}
       schoolId={schoolId}
     />
   );
