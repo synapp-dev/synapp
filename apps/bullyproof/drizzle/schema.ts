@@ -942,6 +942,23 @@ export const topicSlides = pgTable("topic_slides", {
 	check("topic_slides_payload_chk", sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (text_html IS NULL))`),
 ]);
 
+export const certificationStages = pgTable("certification_stages", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	code: text().notNull(),
+	name: text().notNull(),
+	sortIndex: smallint("sort_index").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("certification_stages_code_key").on(table.code),
+	unique("certification_stages_name_key").on(table.name),
+	unique("certification_stages_sort_index_key").on(table.sortIndex),
+	pgPolicy("certification_stages_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("certification_stages_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("certification_stages_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("certification_stages_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
 export const certificationUserTopicProgress = pgTable("certification_user_topic_progress", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -1044,23 +1061,6 @@ export const certificationTopics = pgTable("certification_topics", {
 	check("certification_topics_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
 ]);
 
-export const certificationStages = pgTable("certification_stages", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	code: text().notNull(),
-	name: text().notNull(),
-	sortIndex: smallint("sort_index").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	unique("certification_stages_code_key").on(table.code),
-	unique("certification_stages_name_key").on(table.name),
-	unique("certification_stages_sort_index_key").on(table.sortIndex),
-	pgPolicy("certification_stages_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-	pgPolicy("certification_stages_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_stages_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_stages_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-]);
-
 export const userSchoolPositions = pgTable("user_school_positions", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -1149,12 +1149,12 @@ export const lessonClasses = pgTable("lesson_classes", {
 			columns: [table.classId],
 			foreignColumns: [classes.id],
 			name: "lesson_classes_class_id_fkey"
-		}).onDelete("restrict"),
+		}).onUpdate("cascade").onDelete("set null"),
 	foreignKey({
 			columns: [table.lessonId],
 			foreignColumns: [lessons.id],
 			name: "lesson_classes_lesson_id_fkey"
-		}).onDelete("cascade"),
+		}).onUpdate("cascade").onDelete("set null"),
 	primaryKey({ columns: [table.lessonId, table.classId], name: "lesson_classes_pkey"}),
 ]);
 
