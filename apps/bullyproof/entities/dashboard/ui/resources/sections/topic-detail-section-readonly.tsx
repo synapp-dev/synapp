@@ -86,6 +86,13 @@ export function TopicDetailSectionReadonly({
   }, [fetchedStage]);
 
   useEffect(() => {
+    // Wait for queries to complete before checking for data
+    if (isLoadingStage || isLoadingTopics) {
+      setIsLoading(true);
+      return;
+    }
+
+    // Only check for data after loading completes
     if (fetchedTopics && stageOrder !== null) {
       const foundTopic = fetchedTopics.find(
         (t) => t.stageOrder === stageOrder
@@ -93,19 +100,34 @@ export function TopicDetailSectionReadonly({
       if (foundTopic) {
         setTopic(foundTopic as Topic);
         setIsLoading(false);
-      } else if (!isLoadingTopics) {
+        setError(null);
+      } else {
+        // Topics loaded but specific topic not found
         setError("Topic not found");
         setIsLoading(false);
       }
+    } else if (!isLoadingStage && !isLoadingTopics) {
+      // Loading completed but no topics found
+      if (!fetchedStage) {
+        setError("Stage not found");
+      } else if (!fetchedTopics || fetchedTopics.length === 0) {
+        setError("No topics found for this stage");
+      }
+      setIsLoading(false);
     }
-  }, [fetchedTopics, stageOrder, isLoadingTopics]);
+  }, [fetchedTopics, fetchedStage, stageOrder, isLoadingStage, isLoadingTopics]);
 
   useEffect(() => {
+    // Only set errors after loading completes
+    if (isLoadingStage || isLoadingTopics) {
+      return;
+    }
+    
     if (stageError) {
       setError(stageError.message || "Failed to fetch stage");
       setIsLoading(false);
     }
-  }, [stageError]);
+  }, [stageError, isLoadingStage, isLoadingTopics]);
 
   // Helper function to check if a slide has content
   const slideHasContent = (slide: SlideData): boolean => {
