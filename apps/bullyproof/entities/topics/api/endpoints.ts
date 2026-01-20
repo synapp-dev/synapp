@@ -66,6 +66,7 @@ export const topicsApi = {
         title?: string;
         description?: string;
         officialNotes?: string;
+        status?: "draft" | "published" | "archived";
       }
     ): Promise<ApiResult<Topic & { stage?: any; slides?: any[] }>> {
       return apiFetch<Topic & { stage?: any; slides?: any[] }>(
