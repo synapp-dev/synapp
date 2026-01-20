@@ -222,11 +222,28 @@ export function convertToYouTubeEmbedUrl(
  * @param url - Vimeo video URL
  * @param startTime - Start time in seconds (Vimeo uses hash fragment: #t=30s)
  * @param endTime - End time in seconds (not directly supported in embed URL)
+ * @param options - Additional Vimeo-specific options
+ * @param options.autoplay - Autoplay the video (default: false)
+ * @param options.loop - Loop the video (default: false)
+ * @param options.muted - Start muted (default: false)
+ * @param options.title - Show video title (default: true)
+ * @param options.byline - Show byline (default: true)
+ * @param options.portrait - Show portrait (default: true)
+ * @param options.color - Custom color for controls (hex color without #)
  */
 export function convertToVimeoEmbedUrl(
   url: string,
   startTime?: number | null,
-  endTime?: number | null
+  endTime?: number | null,
+  options?: {
+    autoplay?: boolean;
+    loop?: boolean;
+    muted?: boolean;
+    title?: boolean;
+    byline?: boolean;
+    portrait?: boolean;
+    color?: string;
+  }
 ): string {
   const videoId = extractVimeoVideoId(url);
 
@@ -244,6 +261,31 @@ export function convertToVimeoEmbedUrl(
       embedUrl.hash = `t=${Math.floor(startTime)}s`;
     }
 
+    // Add Vimeo-specific query parameters
+    if (options) {
+      if (options.autoplay === true) {
+        embedUrl.searchParams.set("autoplay", "1");
+      }
+      if (options.loop === true) {
+        embedUrl.searchParams.set("loop", "1");
+      }
+      if (options.muted === true) {
+        embedUrl.searchParams.set("muted", "1");
+      }
+      if (options.title === false) {
+        embedUrl.searchParams.set("title", "0");
+      }
+      if (options.byline === false) {
+        embedUrl.searchParams.set("byline", "0");
+      }
+      if (options.portrait === false) {
+        embedUrl.searchParams.set("portrait", "0");
+      }
+      if (options.color) {
+        embedUrl.searchParams.set("color", options.color.replace("#", ""));
+      }
+    }
+
     return embedUrl.toString();
   } catch {
     return url; // Return original URL if parsing fails
@@ -256,17 +298,27 @@ export function convertToVimeoEmbedUrl(
  * @param startTime - Start time in seconds
  * @param endTime - End time in seconds
  * @param hideControls - If true, hides YouTube player controls (default: false, only applies to YouTube)
+ * @param vimeoOptions - Additional Vimeo-specific options (only applies to Vimeo)
  */
 export function getVideoEmbedUrl(
   url: string,
   startTime?: number | null,
   endTime?: number | null,
-  hideControls: boolean = false
+  hideControls: boolean = false,
+  vimeoOptions?: {
+    autoplay?: boolean;
+    loop?: boolean;
+    muted?: boolean;
+    title?: boolean;
+    byline?: boolean;
+    portrait?: boolean;
+    color?: string;
+  }
 ): string | null {
   if (isYouTubeUrl(url)) {
     return convertToYouTubeEmbedUrl(url, startTime, endTime, hideControls);
   } else if (isVimeoUrl(url)) {
-    return convertToVimeoEmbedUrl(url, startTime, endTime);
+    return convertToVimeoEmbedUrl(url, startTime, endTime, vimeoOptions);
   }
   return null;
 }
