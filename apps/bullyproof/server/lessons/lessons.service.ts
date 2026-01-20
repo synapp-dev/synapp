@@ -424,13 +424,10 @@ export const lessonsService = {
               });
               const stage = allStages.find((s) => s.id === recommendedTopic.stageId);
               // Get completed lesson info for the explanation
-              const completedLessonInfo = firstProgress.lessonTitle
-                ? {
-                    lessonTitle: firstProgress.lessonTitle,
-                    topicTitle: firstProgress.topicTitle,
-                    completedAt: firstProgress.lessonCreatedAt,
-                  }
-                : null;
+              const completedLessonInfo = {
+                topicTitle: firstProgress.topicTitle,
+                completedAt: firstProgress.lessonCreatedAt,
+              };
               
               console.log(`${requestId} [SERVICE] SUCCESS: Returning recommendation with reason "next_topic"`);
               return {
