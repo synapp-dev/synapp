@@ -70,9 +70,19 @@ export function SchoolPageTutorialDialog({
           <DialogTitle className="text-center text-2xl mt-6">
             {title}
           </DialogTitle>
-          <DialogDescription className="text-center">
-            {description}
-          </DialogDescription>
+          <div className="flex items-center gap-4">
+            <DialogDescription className="flex-1 text-left m-0">
+              {description}
+            </DialogDescription>
+            <div className="relative w-24 h-24 flex-shrink-0">
+              <Image
+                src="/images/bp-man/bp-man-pointleft.svg"
+                alt="BP-Man pointing left"
+                fill
+                className="object-contain"
+              />
+            </div>
+          </div>
         </DialogHeader>
 
         {showDontShowAgain && (
