@@ -755,8 +755,13 @@ export function CertificationStageDetailSection({
     }
   }, [cachedTopics, hasUnsavedChanges]);
 
-  // Set error from topics query if any
+  // Set error from topics query if any - only after loading completes
   useEffect(() => {
+    // Don't set errors while still loading
+    if (isLoadingStage || isLoadingTopics) {
+      return;
+    }
+    
     if (topicsQueryError) {
       setError(
         topicsQueryError instanceof Error
@@ -764,7 +769,7 @@ export function CertificationStageDetailSection({
           : "Failed to fetch topics"
       );
     }
-  }, [topicsQueryError]);
+  }, [topicsQueryError, isLoadingStage, isLoadingTopics]);
 
   const isLoading = isLoadingStage || isLoadingTopics;
 
@@ -999,7 +1004,8 @@ export function CertificationStageDetailSection({
   // Show skeleton loaders only if we have no cached data
   const showSkeletons = isLoading && !stage;
 
-  if (error) {
+  // Only show errors after loading completes
+  if (error && !isLoading) {
     return (
       <div className="space-y-4">
         <Button
@@ -1045,7 +1051,8 @@ export function CertificationStageDetailSection({
     );
   }
 
-  if (!stage) {
+  // Only check for missing stage after loading completes
+  if (!stage && !isLoading) {
     return (
       <div className="space-y-4">
         <Button
