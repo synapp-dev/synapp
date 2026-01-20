@@ -234,6 +234,15 @@ export function useTopicsByStage(
     enabled: !!stageId,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+    // Use initialData from Zustand if available for instant display
+    initialData: () => {
+      if (!stageId) return undefined;
+      const topicIds = topicsByStage[stageId] || [];
+      const zustandTopics = topicIds
+        .map((id) => topics[id])
+        .filter(Boolean);
+      return zustandTopics.length > 0 ? zustandTopics : undefined;
+    },
   });
 
   const topicIds = stageId ? topicsByStage[stageId] || [] : [];
@@ -286,6 +295,12 @@ export function useTopic(
     enabled: !!topicId,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    // Use initialData from Zustand if available for instant display
+    initialData: () => {
+      if (!topicId) return undefined;
+      const storeTopic = topics[topicId];
+      return storeTopic || undefined;
+    },
   });
 
   return {
