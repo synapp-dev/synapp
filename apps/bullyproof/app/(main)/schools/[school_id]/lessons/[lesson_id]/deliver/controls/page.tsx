@@ -4,11 +4,11 @@ import { generateMetadataFromSegments } from "@/utils/metadata";
 export const metadata = generateMetadataFromSegments([
   "schools",
   "lessons",
-  "deliver",
+  "run-lesson",
   "controls",
 ]);
 
-export default async function LessonDeliverControlsPage({
+export default async function LessonRunLessonControlsPage({
   params,
 }: {
   params: Promise<{ school_id: string; lesson_id: string }>;

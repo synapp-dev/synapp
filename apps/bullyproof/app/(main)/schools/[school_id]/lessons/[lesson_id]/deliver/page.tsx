@@ -25,12 +25,12 @@ import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useMeStore } from "@/entities/me/model/store";
 import { Loader2 } from "lucide-react";
 
-export default function LessonDeliverPage({
+export default function LessonRunLessonPage({
   params,
 }: {
   params: Promise<{ school_id: string; lesson_id: string }>;
 }) {
-  usePageTitle(["schools", "lessons", "deliver"]);
+  usePageTitle(["schools", "lessons", "run-lesson"]);
   const { school_id, lesson_id } = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -77,7 +77,7 @@ export default function LessonDeliverPage({
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <p className="text-destructive font-medium">
-            Only the teacher can deliver this lesson
+            Only the teacher can run this lesson
           </p>
           <p className="text-muted-foreground mt-2">
             Redirecting...
@@ -88,14 +88,14 @@ export default function LessonDeliverPage({
   }
 
   const handlePresentAccept = () => {
-    const presentUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver/present`;
+    const presentUrl = `/schools/${school_id}/lessons/${lesson_id}/run-lesson/present`;
     window.open(presentUrl, "_blank", "noopener,noreferrer");
     setPresentDialogOpen(false);
   };
 
   // Commented out - control mode disabled
   // const handleControlsAccept = () => {
-  //   const controlsUrl = `/schools/${school_id}/lessons/${lesson_id}/deliver/controls`;
+  //   const controlsUrl = `/schools/${school_id}/lessons/${lesson_id}/run-lesson/controls`;
   //   window.open(controlsUrl, "_blank", "noopener,noreferrer");
   //   setControlsDialogOpen(false);
   // };
