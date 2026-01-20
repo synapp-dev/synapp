@@ -997,10 +997,8 @@ export function StageDetailSection({
   const handleTopicAdded = async (newTopic: TopicWithSlides) => {
     // Optimistically add to Zustand store for immediate UI update
     if (stage?.id && newTopic) {
-      setTopic({
-        ...newTopic,
-        slides: newTopic.slides || [],
-      });
+      // Type assertion needed because the store expects the full database schema type
+      setTopic(newTopic as any);
     }
     
     // Invalidate React Query cache
@@ -1200,7 +1198,7 @@ export function StageDetailSection({
   }
 
   return (
-    <div className="space-y2">
+    <div className="space-y-2">
       {/* Stage Header - Sticky */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-2">
         <div className="flex items-center justify-between gap-3">
