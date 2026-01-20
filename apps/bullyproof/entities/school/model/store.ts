@@ -196,7 +196,7 @@ export function useInvalidateSchools() {
       queryClient.invalidateQueries({ queryKey: schoolKeys.listSchools(filters) });
     },
     invalidateAllSchools: () => {
-      queryClient.invalidateQueries({ queryKey: schoolKeys.all });
+      queryClient.invalidateQueries({ queryKey: schoolKeys.all() });
     },
   };
 }

@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { api } from "@/lib/api/client";
 import type { schools } from "@/drizzle/schema";
 import { schoolKeys } from "@/entities/school/model/keys";
-import { useSchoolStore } from "@/entities/school/model/store";
+import { useSchoolsStore } from "@/entities/school/model/store";
 
 type School = typeof schools.$inferSelect;
 
@@ -23,7 +23,7 @@ export const getAllSchoolsOptions = () =>
   });
 
 export function useSchools(): UseQueryResult<School[], Error> {
-  const setSchools = useSchoolStore((s: any) => s.setSchools);
+  const setSchools = useSchoolsStore((s: any) => s.setSchools);
   const query = useQuery(getAllSchoolsOptions());
   useEffect(() => {
     if (query.data) setSchools(query.data);
