@@ -271,10 +271,3 @@ export function getVideoEmbedUrl(
   return null;
 }
 
-// Re-export YouTube functions for backward compatibility
-export {
-  isYouTubeUrl,
-  extractYouTubeVideoId,
-  getYouTubeThumbnailUrl,
-  convertToYouTubeEmbedUrl,
-};
