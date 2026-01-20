@@ -784,8 +784,13 @@ export function StageDetailSection({
     }
   }, [stage?.id, refetchStage, refetchTopics]);
 
-  // Set error from stage query
+  // Set error from stage query - only after loading completes
   useEffect(() => {
+    // Don't set errors while still loading
+    if (isLoading || isLoadingTopics) {
+      return;
+    }
+    
     if (stageError) {
       setError(
         stageError.message || "Failed to fetch curriculum stage details"
@@ -793,7 +798,7 @@ export function StageDetailSection({
     } else {
       setError(null);
     }
-  }, [stageError]);
+  }, [stageError, isLoading, isLoadingTopics]);
 
   // Sync localTopics with topics when topics change (but not when we're reordering)
   // Use topic IDs string for comparison to avoid infinite loops from array reference changes
@@ -1089,9 +1094,10 @@ export function StageDetailSection({
 
   // Show skeleton loaders only if we have no cached data
   // If we have cached data, show it immediately while refetching in background
-  const showSkeletons = isLoading && !stage;
+  const showSkeletons = (isLoading || isLoadingTopics) && !stage;
 
-  if (error) {
+  // Only show errors after loading completes
+  if (error && !isLoading && !isLoadingTopics) {
     return (
       <div className="space-y-4">
         <Button
@@ -1166,7 +1172,8 @@ export function StageDetailSection({
     );
   }
 
-  if (!stage) {
+  // Only check for missing stage after loading completes
+  if (!stage && !isLoading && !isLoadingTopics) {
     return (
       <div className="space-y-4">
         <Button
