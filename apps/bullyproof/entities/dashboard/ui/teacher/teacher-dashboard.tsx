@@ -4,7 +4,7 @@ import { Separator } from "@workspace/ui/components/separator";
 
 export function TeacherDashboard() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 h-full my-6">
       <TeacherHeroSection />
 
       {/* Tab Menu */}
@@ -12,7 +12,9 @@ export function TeacherDashboard() {
         <Separator className="my-10" />
       </div>
 
+      <div className="min-h-48 max-h-56 h-full">
       <TeacherOverviewSection />
+      </div>
     </div>
   );
 }
