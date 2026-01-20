@@ -12,36 +12,46 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
-import { Loader2, Youtube } from "lucide-react";
-import { isYouTubeUrl, convertToYouTubeEmbedUrl } from "@/utils/youtube";
+import { Loader2, Youtube, Video } from "lucide-react";
+import { isVideoUrl, getVideoEmbedUrl, isYouTubeUrl, isVimeoUrl } from "@/utils/video";
+import { VimeoPlayer } from "./vimeo-player";
 import { toast } from "sonner";
 
-interface YouTubeVideoDialogProps {
+interface VideoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddVideo: (videoUrl: string) => void;
 }
 
-export function YouTubeVideoDialog({
+export function VideoDialog({
   open,
   onOpenChange,
   onAddVideo,
-}: YouTubeVideoDialogProps) {
+}: VideoDialogProps) {
   const [videoUrl, setVideoUrl] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [isValid, setIsValid] = useState(false);
+  const [videoType, setVideoType] = useState<"youtube" | "vimeo" | null>(null);
 
   const handleUrlChange = (url: string) => {
     setVideoUrl(url);
     setIsValid(false);
+    setVideoType(null);
 
     // Validate URL as user types
     if (url.trim()) {
       setIsValidating(true);
       // Small delay to avoid excessive validation
       setTimeout(() => {
-        const valid = isYouTubeUrl(url.trim());
+        const valid = isVideoUrl(url.trim());
         setIsValid(valid);
+        if (valid) {
+          if (isYouTubeUrl(url.trim())) {
+            setVideoType("youtube");
+          } else if (isVimeoUrl(url.trim())) {
+            setVideoType("vimeo");
+          }
+        }
         setIsValidating(false);
       }, 300);
     }
@@ -49,44 +59,46 @@ export function YouTubeVideoDialog({
 
   const handleAddSlide = () => {
     if (!isValid || !videoUrl.trim()) {
-      toast.error("Please enter a valid YouTube URL");
+      toast.error("Please enter a valid YouTube or Vimeo URL");
       return;
     }
 
     onAddVideo(videoUrl.trim());
     setVideoUrl("");
     setIsValid(false);
+    setVideoType(null);
     onOpenChange(false);
   };
 
   const handleClose = () => {
     setVideoUrl("");
     setIsValid(false);
+    setVideoType(null);
     onOpenChange(false);
   };
 
   const embedUrl = isValid && videoUrl.trim()
-    ? convertToYouTubeEmbedUrl(videoUrl.trim())
+    ? getVideoEmbedUrl(videoUrl.trim())
     : null;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl">
         <DialogHeader>
-          <DialogTitle>Add YouTube Video</DialogTitle>
+          <DialogTitle>Add Video</DialogTitle>
           <DialogDescription>
-            Paste a YouTube URL to add it as a video slide. The video will be
+            Paste a YouTube or Vimeo URL to add it as a video slide. The video will be
             inserted at the selected position.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="youtube-url">YouTube URL</Label>
+            <Label htmlFor="video-url">Video URL</Label>
             <Input
-              id="youtube-url"
+              id="video-url"
               type="url"
-              placeholder="https://www.youtube.com/watch?v=..."
+              placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
               value={videoUrl}
               onChange={(e) => handleUrlChange(e.target.value)}
               className="font-mono text-sm"
@@ -99,13 +111,17 @@ export function YouTubeVideoDialog({
             )}
             {videoUrl.trim() && !isValidating && !isValid && (
               <p className="text-sm text-destructive">
-                Please enter a valid YouTube URL (youtube.com or youtu.be)
+                Please enter a valid YouTube URL (youtube.com or youtu.be) or Vimeo URL (vimeo.com)
               </p>
             )}
-            {isValid && (
+            {isValid && videoType && (
               <p className="text-sm text-green-600 flex items-center gap-2">
-                <Youtube className="h-4 w-4" />
-                Valid YouTube URL
+                {videoType === "youtube" ? (
+                  <Youtube className="h-4 w-4" />
+                ) : (
+                  <Video className="h-4 w-4" />
+                )}
+                Valid {videoType === "youtube" ? "YouTube" : "Vimeo"} URL
               </p>
             )}
           </div>
@@ -115,13 +131,20 @@ export function YouTubeVideoDialog({
             <div className="space-y-2">
               <Label>Preview</Label>
               <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
-                <iframe
-                  src={embedUrl}
-                  className="w-full h-full"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title="YouTube video preview"
-                />
+                {isVimeoUrl(videoUrl.trim()) ? (
+                  <VimeoPlayer
+                    videoUrl={videoUrl.trim()}
+                    className="w-full h-full"
+                  />
+                ) : (
+                  <iframe
+                    src={embedUrl}
+                    className="w-full h-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    title="Video preview"
+                  />
+                )}
               </div>
             </div>
           )}
