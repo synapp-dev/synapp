@@ -627,7 +627,7 @@ export function CertificationTopicDetailSection({
                     <Input
                       value={videoUrlValue}
                       onChange={(e) => handleVideoUrlChange(e.target.value)}
-                      placeholder="https://www.youtube.com/watch?v=..."
+                      placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
                     />
                   </div>
                 )}

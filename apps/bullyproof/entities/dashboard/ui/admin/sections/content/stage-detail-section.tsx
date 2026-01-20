@@ -704,7 +704,7 @@ type TopicWithSlides = Topic & {
 interface StageDetailSectionProps {
   slug: string;
   readonly?: boolean;
-  basePath?: string; // e.g., "/admin/content/curriculum" or "/schools/{schoolId}/resources/content"
+  basePath?: string; // e.g., "/admin/content/curriculum" or "/schools/{schoolId}/content"
   onBackClick?: () => void; // Optional custom back navigation
 }
 

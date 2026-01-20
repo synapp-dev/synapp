@@ -32,7 +32,8 @@ import {
 } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
-import { isYouTubeUrl, convertToYouTubeEmbedUrl } from "@/utils/youtube";
+import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
+import { VimeoPlayer } from "@/components/organisms/vimeo-player";
 import {
   Select,
   SelectContent,
@@ -361,9 +362,9 @@ function SlidePreview({ slide }: { slide: Slide }) {
       {slide.kind === "video" &&
         slide.videoUrl &&
         (() => {
-          const isYouTube = isYouTubeUrl(slide.videoUrl);
-          const embedUrl = isYouTube
-            ? convertToYouTubeEmbedUrl(
+          const isVideo = isVideoUrl(slide.videoUrl);
+          const embedUrl = isVideo
+            ? getVideoEmbedUrl(
                 slide.videoUrl,
                 slide.videoStartS ?? null,
                 slide.videoEndS ?? null
@@ -373,7 +374,14 @@ function SlidePreview({ slide }: { slide: Slide }) {
           return (
             <div className="space-y-2">
               <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
-                {isYouTube && embedUrl ? (
+                {isVimeoUrl(slide.videoUrl) ? (
+                  <VimeoPlayer
+                    videoUrl={slide.videoUrl}
+                    startTime={slide.videoStartS ?? undefined}
+                    endTime={slide.videoEndS ?? undefined}
+                    className="w-full h-full"
+                  />
+                ) : isYouTubeUrl(slide.videoUrl) && embedUrl ? (
                   <iframe
                     src={embedUrl}
                     className="w-full h-full"
@@ -542,9 +550,9 @@ function SlideEditForm({
           </div>
           {videoUrl &&
             (() => {
-              const isYouTube = isYouTubeUrl(videoUrl);
-              const embedUrl = isYouTube
-                ? convertToYouTubeEmbedUrl(
+              const isVideo = isVideoUrl(videoUrl);
+              const embedUrl = isVideo
+                ? getVideoEmbedUrl(
                     videoUrl,
                     videoStartS ? parseInt(videoStartS) : null,
                     videoEndS ? parseInt(videoEndS) : null
@@ -553,7 +561,14 @@ function SlideEditForm({
 
               return (
                 <div className="relative w-full aspect-video rounded-md border overflow-hidden bg-muted">
-                  {isYouTube && embedUrl ? (
+                  {isVimeoUrl(videoUrl) ? (
+                    <VimeoPlayer
+                      videoUrl={videoUrl}
+                      startTime={videoStartS ? parseInt(videoStartS) : undefined}
+                      endTime={videoEndS ? parseInt(videoEndS) : undefined}
+                      className="w-full h-full"
+                    />
+                  ) : isYouTubeUrl(videoUrl) && embedUrl ? (
                     <iframe
                       src={embedUrl}
                       className="w-full h-full"

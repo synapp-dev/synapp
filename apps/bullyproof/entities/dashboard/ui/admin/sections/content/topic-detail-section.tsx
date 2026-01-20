@@ -1508,8 +1508,8 @@ export function TopicDetailSection({
     setSlideRefreshKey((prev) => prev + 1);
   };
 
-  // Handle inserting a YouTube video slide at a specific position
-  const handleInsertYouTubeVideo = (
+  // Handle inserting a video slide (YouTube or Vimeo) at a specific position
+  const handleInsertVideo = (
     videoUrl: string,
     insertAfterIndex: number
   ) => {
@@ -2904,7 +2904,7 @@ export function TopicDetailSection({
                           id="video-url"
                           value={videoUrlValue}
                           onChange={(e) => handleVideoUrlChange(e.target.value)}
-                          placeholder="https://www.youtube.com/watch?v=..."
+                          placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
                           disabled={isUploading}
                         />
                       </div>
@@ -3302,10 +3302,10 @@ export function TopicDetailSection({
               }
             : undefined
         }
-        onAddYouTubeVideo={
+        onAddVideo={
           insertAfterIndexForDialog !== null
             ? (videoUrl) => {
-                handleInsertYouTubeVideo(videoUrl, insertAfterIndexForDialog);
+                handleInsertVideo(videoUrl, insertAfterIndexForDialog);
                 setShowImageSelectorDialog(false);
                 setInsertAfterIndexForDialog(null);
               }
