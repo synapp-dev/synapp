@@ -7,7 +7,7 @@ export const createLessonSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
   scheduledFor: z.string().datetime().optional(),
-  status: z.enum(['draft', 'scheduled', 'in_progress', 'pending_review', 'completed', 'cancelled']).optional(),
+  status: z.enum(['preparing', 'ready', 'in_progress', 'feedback', 'completed', 'cancelled']).optional(),
   classIds: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -18,7 +18,7 @@ export const updateLessonSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
   scheduledFor: z.string().datetime().optional(),
-  status: z.enum(['draft', 'scheduled', 'in_progress', 'pending_review', 'completed', 'cancelled']).optional(),
+  status: z.enum(['preparing', 'ready', 'in_progress', 'feedback', 'completed', 'cancelled']).optional(),
   classIds: z.array(z.string().trim().min(1)).optional(),
 });
 
@@ -31,7 +31,7 @@ export const listLessonsSchema = z
     teacherId: z.string().trim().min(1).max(500).optional(),
     classId: z.string().trim().min(1).max(500).optional(),
     topicId: z.string().trim().min(1).max(500).optional(),
-    status: z.enum(['draft', 'scheduled', 'in_progress', 'pending_review', 'completed', 'cancelled']).optional(),
+    status: z.enum(['preparing', 'ready', 'in_progress', 'feedback', 'completed', 'cancelled']).optional(),
     limit: z
       .string()
       .optional()
@@ -67,3 +67,10 @@ export const getLessonByIdSchema = z.object({
 });
 
 export type GetLessonByIdParams = z.infer<typeof getLessonByIdSchema>;
+
+// Schema for getting topic recommendations
+export const getRecommendationsSchema = z.object({
+  classIds: z.array(z.string().uuid()).min(1).max(10),
+});
+
+export type GetRecommendationsParams = z.infer<typeof getRecommendationsSchema>;

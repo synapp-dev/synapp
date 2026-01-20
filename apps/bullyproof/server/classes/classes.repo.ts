@@ -32,6 +32,11 @@ export const classesRepo = {
           FILTER (WHERE ${schoolYears.code} IS NOT NULL),
           ARRAY[]::text[]
         )`,
+        yearNames: sql<string[]>`COALESCE(
+          array_agg(${schoolYears.displayName} ORDER BY ${schoolYears.sortIndex}) 
+          FILTER (WHERE ${schoolYears.displayName} IS NOT NULL),
+          ARRAY[]::text[]
+        )`,
       })
       .from(classes)
       .leftJoin(classYears, eq(classYears.classId, classes.id))
