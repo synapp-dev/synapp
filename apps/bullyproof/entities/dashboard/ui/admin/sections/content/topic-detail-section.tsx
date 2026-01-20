@@ -112,12 +112,14 @@ import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import {
   useTopicsStore,
   useTopicsByStage,
+  useInvalidateTopics,
 } from "@/entities/topics/model/store-enhanced";
-import { useStageByCode } from "@/entities/stages/model/store";
+import { useStageByCode, useInvalidateStage } from "@/entities/stages/model/store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
 import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer";
+import { EditCurriculumTopicDrawer } from "./edit-curriculum-topic-drawer";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -448,6 +450,7 @@ export function TopicDetailSection({
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [isEditTopicDrawerOpen, setIsEditTopicDrawerOpen] = useState(false);
+  const [isEditCurriculumTopicDrawerOpen, setIsEditCurriculumTopicDrawerOpen] = useState(false);
 
   // @dnd-kit sensors
   const sensors = useSensors(
@@ -635,6 +638,11 @@ export function TopicDetailSection({
           includeUrls: true,
         }
   );
+
+  // Invalidation hooks for curriculum topics
+  const { invalidateTopicsByStage } = useInvalidateTopics();
+  const { invalidateStage } = useInvalidateStage();
+  const { removeTopic } = useTopicsStore();
 
   // Extract fetchData function so it can be reused after save (for certification and manual refetch)
   const fetchTopicData = useCallback(
@@ -2530,7 +2538,15 @@ export function TopicDetailSection({
                 <Pencil className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
             ) : (
-              <h1 className="text-3xl font-bold tracking-tight">{topic.title}</h1>
+              <div
+                className="flex items-center gap-2 cursor-pointer group"
+                onClick={() => setIsEditCurriculumTopicDrawerOpen(true)}
+              >
+                <h1 className="text-3xl font-bold tracking-tight group-hover:text-primary transition-colors">
+                  {topic.title}
+                </h1>
+                <Pencil className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -3339,6 +3355,43 @@ export function TopicDetailSection({
             // Navigate back to stage page after deletion
             if (stageCode) {
               router.push(`/admin/content/certification/${stageCode}`);
+            }
+          }}
+        />
+      )}
+
+      {/* Edit Curriculum Topic Drawer */}
+      {!isCertification && topic && cachedStage && (
+        <EditCurriculumTopicDrawer
+          open={isEditCurriculumTopicDrawerOpen}
+          onOpenChange={setIsEditCurriculumTopicDrawerOpen}
+          topic={topic as Topic}
+          onTopicUpdated={async () => {
+            // Invalidate React Query cache
+            if (cachedStage.id) {
+              invalidateTopicsByStage(cachedStage.id);
+              invalidateStage(cachedStage.id);
+            }
+            // Refetch to repopulate data
+            await refetchTopics();
+            await refetchStage();
+          }}
+          onTopicDeleted={async () => {
+            // Remove topic from Zustand store
+            if (topic.id) {
+              removeTopic(topic.id);
+            }
+            // Invalidate React Query cache
+            if (cachedStage.id) {
+              invalidateTopicsByStage(cachedStage.id);
+              invalidateStage(cachedStage.id);
+            }
+            // Refetch to repopulate data
+            await refetchTopics();
+            await refetchStage();
+            // Navigate back to stage page after deletion
+            if (stageSlug) {
+              router.push(`/admin/content/curriculum/${stageSlug}`);
             }
           }}
         />

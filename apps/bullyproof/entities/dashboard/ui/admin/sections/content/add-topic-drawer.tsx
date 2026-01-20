@@ -13,6 +13,7 @@ import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { Label } from "@workspace/ui/components/label";
 import { Loader2 } from "lucide-react";
+import { topicsApi } from "@/entities/topics/api/endpoints";
 
 interface AddTopicDrawerProps {
   open: boolean;
@@ -53,24 +54,37 @@ export function AddTopicDrawer({
     setError(null);
 
     try {
-      // Create a temporary topic object for local cache
-      const tempTopic = {
-        id: `temp_${Date.now()}`,
+      const result = await topicsApi.post.create({
+        stageId,
         title: title.trim(),
         officialNotes: officialNotes.trim() || null,
-        stageId,
-        stageOrder: null, // Will be set when saved
-        status: "draft" as const,
-        createdAt: new Date().toISOString(),
-        slides: [],
-      };
+      });
 
-      onTopicAdded(tempTopic);
-      
-      // Reset form
-      setTitle("");
-      setOfficialNotes("");
-      onOpenChange(false);
+      if (result.error) {
+        setError(result.error.message || "Failed to create topic");
+        return;
+      }
+
+      if (result.data) {
+        // Create a topic object for callback
+        const newTopic = {
+          id: result.data.id,
+          title: result.data.title,
+          officialNotes: result.data.officialNotes || null,
+          stageId,
+          stageOrder: result.data.stageOrder || null,
+          status: result.data.status || "draft",
+          createdAt: result.data.createdAt || new Date().toISOString(),
+          slides: [],
+        };
+
+        onTopicAdded(newTopic);
+        
+        // Reset form
+        setTitle("");
+        setOfficialNotes("");
+        onOpenChange(false);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create topic");
     } finally {

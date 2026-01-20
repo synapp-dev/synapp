@@ -33,6 +33,7 @@ import {
   useTopicsByStage,
   useSlideUrl,
   useInvalidateTopics,
+  useTopicsStore,
 } from "@/entities/topics/model/store-enhanced";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
@@ -769,6 +770,7 @@ export function StageDetailSection({
 
   const { invalidateStage } = useInvalidateStage();
   const { invalidateTopicsByStage } = useInvalidateTopics();
+  const { setTopic } = useTopicsStore();
 
   // Trigger background refetch on mount to ensure complete data
   // This ensures that even if we navigated from a topic page that only cached
@@ -992,21 +994,24 @@ export function StageDetailSection({
   };
 
   // Handle adding new topic
-  const handleTopicAdded = (newTopic: TopicWithSlides) => {
-    // Add to local topics at the end
-    const maxOrder =
-      localTopics.length > 0
-        ? Math.max(...localTopics.map((t) => t.stageOrder || 0))
-        : 0;
-
-    const topicWithOrder = {
-      ...newTopic,
-      stageOrder: maxOrder + 1,
-      slides: [],
-    };
-
-    setLocalTopics([...localTopics, topicWithOrder]);
-    setHasUnsavedChanges(true);
+  const handleTopicAdded = async (newTopic: TopicWithSlides) => {
+    // Optimistically add to Zustand store for immediate UI update
+    if (stage?.id && newTopic) {
+      setTopic({
+        ...newTopic,
+        slides: newTopic.slides || [],
+      });
+    }
+    
+    // Invalidate React Query cache
+    if (stage?.id) {
+      invalidateTopicsByStage(stage.id);
+      invalidateStage(stage.id);
+    }
+    
+    // Refetch in background to ensure data is in sync
+    refetchTopics();
+    refetchStage();
   };
 
   // Handle saving changes
@@ -1234,6 +1239,12 @@ export function StageDetailSection({
                   Save Changes
                 </>
               )}
+            </Button>
+          )}
+          {!readonly && !hasUnsavedChanges && stage && (
+            <Button onClick={() => setIsAddTopicDrawerOpen(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Topic
             </Button>
           )}
         </div>
