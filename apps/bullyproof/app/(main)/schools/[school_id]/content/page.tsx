@@ -3,7 +3,7 @@
 import * as React from "react";
 import { ContentSectionReadonly } from "@/entities/dashboard/ui/resources/sections/content-section-readonly";
 
-export default function ResourcesContentPage({
+export default function ContentPage({
   params,
 }: {
   params: Promise<{ school_id: string }>;

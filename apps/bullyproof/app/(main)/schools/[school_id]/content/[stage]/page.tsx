@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { StageDetailSection } from "@/entities/dashboard/ui/admin/sections/content/stage-detail-section";
 
-export default function ResourcesContentStagePage({
+export default function ContentStagePage({
   params,
 }: {
   params: Promise<{ school_id: string; stage: string }>;
@@ -28,8 +28,8 @@ export default function ResourcesContentStagePage({
     <StageDetailSection
       slug={stageSlug}
       readonly={true}
-      basePath={`/schools/${schoolId}/resources/content`}
-      onBackClick={() => router.push(`/schools/${schoolId}/resources/content`)}
+      basePath={`/schools/${schoolId}/content`}
+      onBackClick={() => router.push(`/schools/${schoolId}/content`)}
     />
   );
 }

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { TopicDetailSectionReadonly } from "@/entities/dashboard/ui/resources/sections/topic-detail-section-readonly";
 
-export default function ResourcesContentTopicPage({
+export default function ContentTopicPage({
   params,
 }: {
   params: Promise<{ school_id: string; stage: string; slug: string }>;
