@@ -13,8 +13,7 @@ CREATE TABLE IF NOT EXISTS "certification_stages" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "certification_stages_code_key" UNIQUE("code"),
 	CONSTRAINT "certification_stages_name_key" UNIQUE("name"),
-	CONSTRAINT "certification_stages_sort_index_key" UNIQUE("sort_index"),
-	CONSTRAINT "certification_stages_code_chk" CHECK (code ~ '^C[0-9]*$'::text)
+	CONSTRAINT "certification_stages_sort_index_key" UNIQUE("sort_index")
 );
 
 -- Create certification_topics table (similar to topics)
