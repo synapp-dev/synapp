@@ -116,6 +116,7 @@ import {
 } from "@/entities/topics/model/store-enhanced";
 import { useStageByCode, useInvalidateStage } from "@/entities/stages/model/store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
+import { useMutationInvalidation } from "@/hooks/use-mutation-invalidation";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
 import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer";
@@ -643,6 +644,7 @@ export function TopicDetailSection({
   const { invalidateTopicsByStage, invalidateTopic } = useInvalidateTopics();
   const { invalidateStage } = useInvalidateStage();
   const { removeTopic, setTopic: setTopicInStore } = useTopicsStore();
+  const { invalidateAfterMutation } = useMutationInvalidation();
   
   // Get topic from Zustand store to sync with updates
   const { topics: storeTopics } = useTopicsStore();
@@ -808,7 +810,13 @@ export function TopicDetailSection({
     // Set loading state based on hooks
     setIsLoading(isLoadingStage || isLoadingTopics);
 
-    // Handle errors
+    // Wait for queries to complete before checking for errors or missing data
+    if (isLoadingStage || isLoadingTopics) {
+      // Still loading - wait for queries to complete
+      return;
+    }
+
+    // Only check for errors after loading completes
     if (stageError) {
       setError(stageError.message || "Failed to fetch curriculum stage");
       setIsLoading(false);
@@ -820,13 +828,21 @@ export function TopicDetailSection({
       return;
     }
 
-    // Wait for data to be available
+    // Only check for missing data after loading completes
     if (!cachedStage || !foundTopic) {
       if (!foundTopic && cachedTopics && cachedTopics.length > 0) {
         // Topics loaded but this specific topic not found
         setError(`Topic with order ${topicOrder} not found`);
         setIsLoading(false);
         lastProcessedTopicIdRef.current = null;
+      } else if (!cachedStage) {
+        // Stage not found after loading completed
+        setError(`Stage with code ${stageSlug} not found`);
+        setIsLoading(false);
+      } else if (!foundTopic && !cachedTopics) {
+        // Topics not loaded after loading completed
+        setError(`Failed to load topics for stage`);
+        setIsLoading(false);
       }
       return;
     }
@@ -3737,13 +3753,12 @@ export function TopicDetailSection({
               }
             }
 
-            // Invalidate React Query cache
+            // Invalidate React Query cache automatically
             if (topic?.id) {
-              invalidateTopic(topic.id);
+              invalidateAfterMutation(`/topics/${topic.id}`, { id: topic.id });
             }
             if (cachedStage.id) {
-              invalidateTopicsByStage(cachedStage.id);
-              invalidateStage(cachedStage.id);
+              invalidateAfterMutation(`/stages/${cachedStage.id}`, { id: cachedStage.id });
             }
 
             // Trigger background refetch (non-blocking)
@@ -3755,10 +3770,12 @@ export function TopicDetailSection({
             if (topic.id) {
               removeTopic(topic.id);
             }
-            // Invalidate React Query cache
+            // Invalidate React Query cache automatically
             if (cachedStage.id) {
-              invalidateTopicsByStage(cachedStage.id);
-              invalidateStage(cachedStage.id);
+              invalidateAfterMutation(`/stages/${cachedStage.id}`, { id: cachedStage.id });
+            }
+            if (topic.id) {
+              invalidateAfterMutation(`/topics/${topic.id}`, { id: topic.id });
             }
             // Refetch to repopulate data
             await refetchTopics();
