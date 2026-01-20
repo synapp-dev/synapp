@@ -519,6 +519,45 @@ export function ImageSelectorDialog({
     setHoveredAfterSelection(new Set());
   };
 
+  const handleSelectAllPdfPages = () => {
+    if (!currentPdfFolder) return;
+    
+    const currentGroup = pdfGroups[currentPdfFolder];
+    if (!currentGroup) return;
+
+    // Get all page IDs from current PDF, sorted by pageNumber
+    const sortedPages = [...currentGroup.pages].sort(
+      (a, b) => a.pageNumber - b.pageNumber
+    );
+    const allPageIds = new Set(sortedPages.map((page) => page.id));
+
+    // Check if all pages are currently selected
+    const allSelected = sortedPages.every((page) =>
+      selectedImageIds.has(page.id)
+    );
+
+    setSelectedImageIds((prev) => {
+      const newSet = new Set(prev);
+      if (allSelected) {
+        // Deselect all pages from this PDF
+        allPageIds.forEach((id) => newSet.delete(id));
+      } else {
+        // Select all pages from this PDF in order
+        allPageIds.forEach((id) => newSet.add(id));
+      }
+      return newSet;
+    });
+
+    // Clear hovered state for pages that are no longer selected
+    if (allSelected) {
+      setHoveredAfterSelection((prev) => {
+        const newSet = new Set(prev);
+        allPageIds.forEach((id) => newSet.delete(id));
+        return newSet;
+      });
+    }
+  };
+
   // Reset selection and folder view when dialog closes
   const handleDialogOpenChange = (open: boolean) => {
     if (!open) {
@@ -601,12 +640,47 @@ export function ImageSelectorDialog({
                   (() => {
                     const currentGroup = pdfGroups[currentPdfFolder];
                     if (!currentGroup) return null;
+
+                    // Calculate checkbox state for select all
+                    const sortedPages = [...currentGroup.pages].sort(
+                      (a, b) => a.pageNumber - b.pageNumber
+                    );
+                    const selectedCount = sortedPages.filter((page) =>
+                      selectedImageIds.has(page.id)
+                    ).length;
+                    const allSelected = selectedCount === sortedPages.length;
+                    const someSelected = selectedCount > 0 && selectedCount < sortedPages.length;
+
                     return (
                       <div className="space-y-4">
+                        {/* Select All Checkbox - Only show when allowMultipleSelection is true */}
+                        {allowMultipleSelection && (
+                          <div className="flex items-center gap-3 pb-2 border-b">
+                            <Checkbox
+                              checked={
+                                allSelected
+                                  ? true
+                                  : someSelected
+                                    ? "indeterminate"
+                                    : false
+                              }
+                              onCheckedChange={handleSelectAllPdfPages}
+                              className="h-5 w-5"
+                            />
+                            <label
+                              onClick={handleSelectAllPdfPages}
+                              className="text-sm font-medium cursor-pointer select-none"
+                            >
+                              {allSelected
+                                ? "Deselect All"
+                                : someSelected
+                                  ? `Select All (${selectedCount} of ${sortedPages.length} selected)`
+                                  : "Select All"}
+                            </label>
+                          </div>
+                        )}
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                          {currentGroup.pages
-                            .sort((a, b) => a.pageNumber - b.pageNumber)
-                            .map((page) => {
+                          {sortedPages.map((page) => {
                               const isSelected = allowMultipleSelection
                                 ? selectedImageIds.has(page.id)
                                 : selectedImageId === page.id;
