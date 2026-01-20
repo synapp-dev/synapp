@@ -9,6 +9,12 @@ import { useCompleteTutorial } from "@/entities/me/api/completeTutorial";
 import { useMeStore } from "@/entities/me/model/store";
 import Image from "next/image";
 import { Button } from "@workspace/ui/components/button";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { ChevronsRight } from "lucide-react";
 
@@ -33,8 +39,11 @@ export default function WelcomePage() {
     }
   }, [currentUser, router]);
 
-  // Video URL - you can change this to any YouTube URL or video URL
-  const videoUrl = "https://youtu.be/Y3SiLdBRGgQ";
+  // Video URL - you can change this to any YouTube or Vimeo URL
+  // Examples:
+  // YouTube: "https://youtu.be/Y3SiLdBRGgQ" or "https://www.youtube.com/watch?v=VIDEO_ID"
+  // Vimeo: "https://vimeo.com/VIDEO_ID" or "https://player.vimeo.com/video/VIDEO_ID"
+  const videoUrl = "https://vimeo.com/1156280257";
 
   const videoEmbedUrl = useMemo(() => {
     if (!videoUrl) return null;
@@ -71,8 +80,8 @@ export default function WelcomePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
-      <div className="container max-w-3xl mx-auto px-4 py-8 md:py-12">
+    <div className="min-h-fit bg-background flex items-start justify-center">
+      <div className="container max-w-5xl mx-auto px-4">
         {/* Intro Step */}
         {currentStep === "intro" && (
           <div
@@ -147,55 +156,71 @@ export default function WelcomePage() {
               isTransitioning && "opacity-0"
             )}
           >
-            <div className="flex flex-col items-center text-center space-y-8">
-              {/* Video Section */}
-              <div className="w-full">
-                <h2 className="text-2xl md:text-3xl font-semibold mb-6">
-                  Watch our welcome video
-                </h2>
-                <div
-                  className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted shadow-lg"
-                  onClick={handleVideoInteraction}
-                  onMouseEnter={handleVideoInteraction}
-                >
-                  {videoEmbedUrl ? (
-                    <iframe
-                      src={videoEmbedUrl}
-                      className="w-full h-full"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      title="Welcome video"
-                      onLoad={handleVideoInteraction}
-                    />
-                  ) : (
-                    <video
-                      src={videoUrl}
-                      controls
-                      className="w-full h-full"
-                      onPlay={handleVideoInteraction}
+            <Card className="p-0 gap-0 bg-[var(--brand-bullyproof-primary)] text-white">
+              <CardHeader className="h-fit p-0">
+                <CardTitle className="text-xl flex items-center gap-2 py-0 pt-3 px-6">
+                  <Image
+                    src="/images/bp-small-logo.svg"
+                    alt="Bullyproof Logo"
+                    width={48}
+                    height={48}
+                    className="h-8 w-auto md:h-10"
+                  />
+                  <ChevronsRight className="w-4 h-4 animate-bounce-right-subtle" />
+                  <p className="font-light">Meet <span className="font-bold text-white">Bullyproof Ambassador, Jeff Horn!</span></p>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="flex flex-col items-center text-center space-y-8">
+                  {/* Video Section */}
+                  <div className="w-full">
+                    <div
+                      className="relative w-full aspect-video rounded-lg overflow-hidden bg-muted shadow-lg"
                       onClick={handleVideoInteraction}
+                      onMouseEnter={handleVideoInteraction}
                     >
-                      Your browser does not support the video tag.
-                    </video>
-                  )}
+                      {videoEmbedUrl ? (
+                        <iframe
+                          src={videoEmbedUrl}
+                          className="w-full h-full"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                          title="Welcome video"
+                          onLoad={handleVideoInteraction}
+                        />
+                      ) : (
+                        <video
+                          src={videoUrl}
+                          controls
+                          className="w-full h-full"
+                          onPlay={handleVideoInteraction}
+                          onClick={handleVideoInteraction}
+                        >
+                          Your browser does not support the video tag.
+                        </video>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
 
-              {/* Get Started Button (appears after video interaction) */}
-              {videoInteracted && (
-                <div className="animate-slide-up-fade-in">
-                  <Button
-                    onClick={handleGetStarted}
-                    size="lg"
-                    disabled={completeTutorial.isPending}
-                  >
-                    {completeTutorial.isPending
-                      ? "Getting Started..."
-                      : "Get Started"}
-                  </Button>
-                </div>
-              )}
-            </div>
+            {/* Get Started Button (appears after video interaction) */}
+            {videoInteracted && (
+              <div className="flex justify-center mt-8 animate-slide-up-fade-in">
+                <Button
+                  onClick={handleGetStarted}
+                  size="lg"
+                  disabled={completeTutorial.isPending}
+                  className="bg-[var(--brand-bullyproof-primary)] text-3xl w-full max-w-xs font-bold px-20 py-8 hover:bg-[var(--brand-bullyproof-primary)]/90"
+                >
+                  {completeTutorial.isPending
+                    ? "Getting Started..."
+                    : <><span className="font-light">Get </span><span className="font-bold">Started</span></>}
+                    <ChevronsRight className="size-6 [animation:var(--animate-bounce-right)]" />
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
