@@ -31,6 +31,66 @@ export const lessonsApi = {
     byId(id: string): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
       return apiFetch<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>(`/lessons/${encodeURIComponent(id)}`);
     },
+    recommendations(params: { classIds: string[] }): Promise<ApiResult<{
+      recommendedTopicId: string | null;
+      recommendedTopic: {
+        id: string;
+        title: string;
+        stageId: string;
+        stageName: string;
+        stageOrder: number | null;
+      } | null;
+      warning: {
+        show: boolean;
+        classes: Array<{
+          classId: string;
+          className: string;
+          topicTitle: string;
+          stageName: string;
+        }>;
+        multipleStages?: Array<{
+          stageId: string;
+          stageName: string;
+          stageCode: string;
+          stageSortIndex: number;
+          classes: Array<{
+            classId: string;
+            className: string;
+            yearCodes: string[];
+          }>;
+          firstTopic: {
+            id: string;
+            title: string;
+            stageOrder: number | null;
+          } | null;
+        }>;
+      } | null;
+      reason: "next_topic" | "fallback_year_match" | "final_fallback" | null;
+      completedLessonInfo: {
+        lessonTitle: string;
+        topicTitle: string;
+        completedAt: string;
+      } | null;
+      activeLessons: Array<{
+        lessonId: string;
+        title: string;
+        status: "preparing" | "ready" | "in_progress" | "feedback";
+        topicId: string;
+        topicTitle: string;
+        classIds: string[];
+        className: string;
+        schoolId: string;
+        schoolSlug: string | null;
+        createdByUserId: string;
+        ownerName: string | null;
+        ownerEmail: string | null;
+      }>;
+    }>> {
+      return apiFetch(`/lessons/recommendations`, {
+        method: "POST",
+        body: JSON.stringify({ classIds: params.classIds }),
+      });
+    },
   },
   post: {
     create(payload: {

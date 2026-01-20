@@ -2,7 +2,7 @@ import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type { classes } from "@/server/db/schema";
 
 type Class = typeof classes.$inferSelect;
-type ClassWithYearCodes = Class & { yearCodes?: string[] };
+type ClassWithYearCodes = Class & { yearCodes?: string[]; yearNames?: string[] };
 
 export const classesApi = {
   get: {
