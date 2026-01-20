@@ -33,12 +33,9 @@ export function AppHeader() {
     const isSchool = pathname.startsWith("/schools/");
     setIsSchoolPage(isSchool);
 
-    if (isSchool) {
-      const config = getTutorialForPathname(pathname);
-      setTutorialConfig(config);
-    } else {
-      setTutorialConfig(null);
-    }
+    // Check for tutorial config for any page (not just school pages)
+    const config = getTutorialForPathname(pathname);
+    setTutorialConfig(config);
   }, [pathname]);
 
   const handleHelpClick = () => {
@@ -76,7 +73,7 @@ export function AppHeader() {
               <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             </>
           )}
-          {isSchoolPage && tutorialConfig && (
+          {tutorialConfig && (
             <>
               <Button
                 variant="outline"

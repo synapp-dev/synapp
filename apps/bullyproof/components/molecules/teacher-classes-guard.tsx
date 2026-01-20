@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useMeStore, useIsTeacher } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +13,7 @@ import { AddClassesDialog } from "./add-classes-dialog";
  * Client-side guard that checks if a teacher user should see the "Add Your Classes" dialog.
  * Shows the dialog if:
  * - User is a teacher
+ * - Welcome tutorial is completed
  * - User has no classes in teacher_classes table
  * - Dialog hasn't been dismissed in metadata
  */
@@ -21,6 +22,13 @@ export function TeacherClassesGuard() {
   const { isLoading } = useCurrentUser();
   const isTeacher = useIsTeacher();
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Check if welcome tutorial is completed
+  const isWelcomeCompleted = useMemo(() => {
+    if (!currentUser?.metadata) return false;
+    const metadata = currentUser.metadata as any;
+    return metadata?.tutorials?.welcome?.completed === true;
+  }, [currentUser]);
 
   // Query to check if user has teacher classes
   const { data: teacherClassesData, isLoading: isLoadingClasses } = useQuery({
@@ -52,6 +60,11 @@ export function TeacherClassesGuard() {
       return;
     }
 
+    // Don't show dialog if welcome tutorial is not completed
+    if (!isWelcomeCompleted) {
+      return;
+    }
+
     // Check if user has classes
     const hasClasses = teacherClassesData?.hasClasses ?? false;
     if (hasClasses) {
@@ -72,10 +85,16 @@ export function TeacherClassesGuard() {
     isLoading,
     isLoadingClasses,
     isTeacher,
+    isWelcomeCompleted,
     teacherClassesData,
   ]);
 
   if (!isTeacher) {
+    return null;
+  }
+
+  // Don't render dialog if welcome tutorial is not completed
+  if (!isWelcomeCompleted) {
     return null;
   }
 
