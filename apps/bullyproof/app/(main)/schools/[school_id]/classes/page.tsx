@@ -20,6 +20,13 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -58,6 +65,9 @@ export default function ClassesPage() {
   const currentUser = useMeStore((state) => state.currentUser);
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "my-classes" | "other-classes">(
+    "all"
+  );
 
   // Use React Query hook for classes
   const {
@@ -126,40 +136,71 @@ export default function ClassesPage() {
     },
   });
 
-  // Filter classes based on search query and sort starred classes first
+  // Separate classes into categories
+  const { myClasses, otherClasses } = useMemo(() => {
+    const myClassesList = classes.filter((classItem) =>
+      userClassIds.has(classItem.id)
+    );
+    const otherClassesList = classes.filter(
+      (classItem) => !userClassIds.has(classItem.id)
+    );
+
+    // Sort each category alphabetically by name
+    myClassesList.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    otherClassesList.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    return { myClasses: myClassesList, otherClasses: otherClassesList };
+  }, [classes, userClassIds]);
+
+  // Filter classes based on search query and filter dropdown
   const filteredClasses = useMemo(() => {
-    let filtered = classes;
+    let classesToFilter = [];
 
-    // Filter by search query if provided
-    if (searchQuery.trim()) {
-      filtered = classes.filter((classItem) => {
-        const name = classItem.name || "";
-        const code = classItem.code || "";
-        const stream = classItem.stream || "";
-        const yearCodes = classItem.yearCodes?.join(" ") || "";
-
-        return (
-          fuzzySearch(searchQuery, name) ||
-          fuzzySearch(searchQuery, code) ||
-          fuzzySearch(searchQuery, stream) ||
-          fuzzySearch(searchQuery, yearCodes)
-        );
-      });
+    // Apply filter dropdown
+    if (filter === "my-classes") {
+      classesToFilter = myClasses;
+    } else if (filter === "other-classes") {
+      classesToFilter = otherClasses;
+    } else {
+      classesToFilter = classes;
     }
 
-    // Sort: starred classes first, then by name
-    return filtered.sort((a, b) => {
-      const aStarred = userClassIds.has(a.id);
-      const bStarred = userClassIds.has(b.id);
+    // Apply search query
+    if (!searchQuery.trim()) return classesToFilter;
 
-      // If one is starred and the other isn't, starred comes first
-      if (aStarred && !bStarred) return -1;
-      if (!aStarred && bStarred) return 1;
+    return classesToFilter.filter((classItem) => {
+      const name = classItem.name || "";
+      const code = classItem.code || "";
+      const stream = classItem.stream || "";
+      const yearCodes = classItem.yearCodes?.join(" ") || "";
 
-      // Otherwise, sort alphabetically by name
-      return (a.name || "").localeCompare(b.name || "");
+      return (
+        fuzzySearch(searchQuery, name) ||
+        fuzzySearch(searchQuery, code) ||
+        fuzzySearch(searchQuery, stream) ||
+        fuzzySearch(searchQuery, yearCodes)
+      );
     });
-  }, [classes, searchQuery, userClassIds]);
+  }, [classes, myClasses, otherClasses, filter, searchQuery]);
+
+  // Separate filtered classes back into categories for display
+  const { filteredMyClasses, filteredOtherClasses } = useMemo(() => {
+    const myClassesList = filteredClasses.filter((classItem) =>
+      userClassIds.has(classItem.id)
+    );
+    const otherClassesList = filteredClasses.filter(
+      (classItem) => !userClassIds.has(classItem.id)
+    );
+
+    // Sort each category alphabetically by name
+    myClassesList.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+    otherClassesList.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+
+    return {
+      filteredMyClasses: myClassesList,
+      filteredOtherClasses: otherClassesList,
+    };
+  }, [filteredClasses, userClassIds]);
 
   // Class card skeleton component
   const ClassCardSkeleton = () => (
@@ -211,16 +252,33 @@ export default function ClassesPage() {
         <h1 className="text-3xl font-bold">Classes</h1>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search classes by name, code, stream, or year level..."
-          className="pl-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          disabled={loading}
-        />
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search classes by name, code, stream, or year level..."
+            className="pl-10"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            disabled={loading}
+          />
+        </div>
+        <Select
+          value={filter}
+          onValueChange={(value: "all" | "my-classes" | "other-classes") =>
+            setFilter(value)
+          }
+        >
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Filter classes" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Classes</SelectItem>
+            <SelectItem value="my-classes">My Classes</SelectItem>
+            <SelectItem value="other-classes">Other Classes</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Classes Grid */}
@@ -238,125 +296,272 @@ export default function ClassesPage() {
             </div>
           </CardContent>
         </Card>
-      ) : filteredClasses.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">
-                {searchQuery
-                  ? "No classes found matching your search."
-                  : "No classes found for this school."}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredClasses.map((classItem) => {
-            const isStarred = userClassIds.has(classItem.id);
-            const isToggling = toggleClassMutation.isPending;
+        <div className="space-y-8">
+          {/* My Classes Section */}
+          {filter !== "other-classes" && filteredMyClasses.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold">My Classes</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredMyClasses.map((classItem) => {
+                  const isStarred = userClassIds.has(classItem.id);
+                  const isToggling = toggleClassMutation.isPending;
 
-            return (
-              <Card
-                key={classItem.id}
-                className={cn(
-                  "hover:shadow-md transition-shadow h-full",
-                  isStarred && "bg-[var(--brand-bullyproof-primary)]/5"
-                )}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">
-                        {classItem.name}
-                      </CardTitle>
-                      {classItem.stream && (
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Stream: {classItem.stream}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (!isToggling && currentUser?.id) {
-                          toggleClassMutation.mutate({
-                            classId: classItem.id,
-                            isStarred,
-                          });
-                        }
-                      }}
-                      disabled={isToggling || !currentUser?.id}
+                  return (
+                    <Card
+                      key={classItem.id}
                       className={cn(
-                        "shrink-0 p-1 rounded-md transition-colors",
-                        "hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed",
-                        isStarred && "text-amber-500"
+                        "hover:shadow-md transition-shadow h-full",
+                        isStarred && "bg-[var(--brand-bullyproof-primary)]/5"
                       )}
-                      title={
-                        isStarred
-                          ? "Remove from my classes"
-                          : "Add to my classes"
-                      }
                     >
-                      <Star
-                        className={cn(
-                          "h-5 w-5",
-                          isStarred
-                            ? "fill-amber-500 text-amber-500"
-                            : "text-muted-foreground"
-                        )}
-                      />
-                    </button>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {classItem.code && (
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Code: </span>
-                        <span className="font-medium">{classItem.code}</span>
-                      </div>
-                    )}
-                    {classItem.yearCodes && classItem.yearCodes.length > 0 && (
-                      <div>
-                        <div className="text-sm text-muted-foreground mb-1">
-                          Year Levels:
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg truncate">
+                              {classItem.name}
+                            </CardTitle>
+                            {classItem.stream && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Stream: {classItem.stream}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!isToggling && currentUser?.id) {
+                                toggleClassMutation.mutate({
+                                  classId: classItem.id,
+                                  isStarred,
+                                });
+                              }
+                            }}
+                            disabled={isToggling || !currentUser?.id}
+                            className={cn(
+                              "shrink-0 p-1 rounded-md transition-colors",
+                              "hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed",
+                              isStarred && "text-amber-500"
+                            )}
+                            title={
+                              isStarred
+                                ? "Remove from my classes"
+                                : "Add to my classes"
+                            }
+                          >
+                            <Star
+                              className={cn(
+                                "h-5 w-5",
+                                isStarred
+                                  ? "fill-amber-500 text-amber-500"
+                                  : "text-muted-foreground"
+                              )}
+                            />
+                          </button>
                         </div>
-                        <div className="flex flex-wrap gap-1">
-                          {classItem.yearCodes.map((yearCode, idx) => (
-                            <Badge
-                              key={idx}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {yearCode}
-                            </Badge>
-                          ))}
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {classItem.code && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">
+                                Code:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {classItem.code}
+                              </span>
+                            </div>
+                          )}
+                          {classItem.yearCodes &&
+                            classItem.yearCodes.length > 0 && (
+                              <div>
+                                <div className="text-sm text-muted-foreground mb-1">
+                                  Year Levels:
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {classItem.yearCodes.map((yearCode, idx) => (
+                                    <Badge
+                                      key={idx}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {yearCode}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          {classItem.room && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">
+                                Room:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {classItem.room}
+                              </span>
+                            </div>
+                          )}
+                          {classItem.studentCap && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">
+                                Capacity:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {classItem.studentCap}
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                    {classItem.room && (
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">Room: </span>
-                        <span className="font-medium">{classItem.room}</span>
-                      </div>
-                    )}
-                    {classItem.studentCap && (
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">
-                          Capacity:{" "}
-                        </span>
-                        <span className="font-medium">
-                          {classItem.studentCap}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Other Classes Section */}
+          {filter !== "my-classes" && filteredOtherClasses.length > 0 && (
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold">Other Classes</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredOtherClasses.map((classItem) => {
+                  const isStarred = userClassIds.has(classItem.id);
+                  const isToggling = toggleClassMutation.isPending;
+
+                  return (
+                    <Card
+                      key={classItem.id}
+                      className={cn(
+                        "hover:shadow-md transition-shadow h-full",
+                        isStarred && "bg-[var(--brand-bullyproof-primary)]/5"
+                      )}
+                    >
+                      <CardHeader>
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg truncate">
+                              {classItem.name}
+                            </CardTitle>
+                            {classItem.stream && (
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Stream: {classItem.stream}
+                              </p>
+                            )}
+                          </div>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!isToggling && currentUser?.id) {
+                                toggleClassMutation.mutate({
+                                  classId: classItem.id,
+                                  isStarred,
+                                });
+                              }
+                            }}
+                            disabled={isToggling || !currentUser?.id}
+                            className={cn(
+                              "shrink-0 p-1 rounded-md transition-colors",
+                              "hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed",
+                              isStarred && "text-amber-500"
+                            )}
+                            title={
+                              isStarred
+                                ? "Remove from my classes"
+                                : "Add to my classes"
+                            }
+                          >
+                            <Star
+                              className={cn(
+                                "h-5 w-5",
+                                isStarred
+                                  ? "fill-amber-500 text-amber-500"
+                                  : "text-muted-foreground"
+                              )}
+                            />
+                          </button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          {classItem.code && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">
+                                Code:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {classItem.code}
+                              </span>
+                            </div>
+                          )}
+                          {classItem.yearCodes &&
+                            classItem.yearCodes.length > 0 && (
+                              <div>
+                                <div className="text-sm text-muted-foreground mb-1">
+                                  Year Levels:
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {classItem.yearCodes.map((yearCode, idx) => (
+                                    <Badge
+                                      key={idx}
+                                      variant="outline"
+                                      className="text-xs"
+                                    >
+                                      {yearCode}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          {classItem.room && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">
+                                Room:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {classItem.room}
+                              </span>
+                            </div>
+                          )}
+                          {classItem.studentCap && (
+                            <div className="text-sm">
+                              <span className="text-muted-foreground">
+                                Capacity:{" "}
+                              </span>
+                              <span className="font-medium">
+                                {classItem.studentCap}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {filteredClasses.length === 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    {searchQuery
+                      ? "No classes found matching your search."
+                      : filter === "my-classes"
+                        ? "You haven't added any classes to your list yet."
+                        : filter === "other-classes"
+                          ? "No other classes found."
+                          : "No classes found for this school."}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>
