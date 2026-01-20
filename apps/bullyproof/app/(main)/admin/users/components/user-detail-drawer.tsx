@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Sheet,
@@ -178,22 +178,33 @@ function UserDetailDrawerContent({
   const [addRoleComboboxOpen, setAddRoleComboboxOpen] = useState(false);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
 
-  // Auto-add STAFF role when school is selected
+  // Memoize staff role ID to avoid unnecessary re-renders
+  const staffRoleId = useMemo(() => {
+    const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
+    return staffRole?.id;
+  }, [roles]);
+
+  // Reset selected roles when school is cleared
   useEffect(() => {
-    if (addRoleSchoolId && roles.length > 0) {
-      const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
-      if (staffRole) {
-        setAddRoleSelectedRoles((prev) => {
-          const newSet = new Set(prev);
-          newSet.add(staffRole.id);
-          return newSet;
-        });
-      }
-    } else if (!addRoleSchoolId) {
-      // Reset selected roles when school is cleared
+    if (!addRoleSchoolId) {
       setAddRoleSelectedRoles(new Set());
     }
-  }, [addRoleSchoolId, roles]);
+  }, [addRoleSchoolId]);
+
+  // Auto-add STAFF role when school is selected
+  useEffect(() => {
+    if (addRoleSchoolId && staffRoleId) {
+      setAddRoleSelectedRoles((prev) => {
+        // Only update if staff role is not already in the set
+        if (prev.has(staffRoleId)) {
+          return prev;
+        }
+        const newSet = new Set(prev);
+        newSet.add(staffRoleId);
+        return newSet;
+      });
+    }
+  }, [addRoleSchoolId, staffRoleId]);
 
   // Toggle role confirmation dialog
   const [isToggleRoleDialogOpen, setIsToggleRoleDialogOpen] = useState(false);

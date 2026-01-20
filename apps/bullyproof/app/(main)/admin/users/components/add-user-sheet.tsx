@@ -285,6 +285,12 @@ export function AddUserSheet({
       case 1:
         return (
           <div className="space-y-4">
+            <DialogHeader>
+              <DialogTitle>Add New User</DialogTitle>
+              <DialogDescription>
+                Enter the user's basic information.
+              </DialogDescription>
+            </DialogHeader>
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
               <Input
@@ -343,9 +349,12 @@ export function AddUserSheet({
       case 2:
         return (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground mb-4">
-              What kind of user are you adding?
-            </p>
+            <DialogHeader>
+              <DialogTitle>Select User Type</DialogTitle>
+              <DialogDescription>
+                What kind of user are you adding?
+              </DialogDescription>
+            </DialogHeader>
             <div className="grid grid-cols-1 gap-3">
               <Button
                 type="button"
@@ -644,7 +653,17 @@ export function AddUserSheet({
         );
 
       case 4:
-        return renderConfirmation();
+        return (
+          <>
+            <DialogHeader>
+              <DialogTitle>Confirm User Details</DialogTitle>
+              <DialogDescription>
+                Review the user information before creating the account.
+              </DialogDescription>
+            </DialogHeader>
+            {renderConfirmation()}
+          </>
+        );
 
       default:
         return null;
