@@ -218,6 +218,7 @@
   --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
   --animate-float-gentle: float-gentle 3s ease-in-out infinite;
   --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
+  --animate-bounce-gentle: bounce-gentle 1.5s ease-in-out infinite;
 
   @keyframes gradient-animation {
     0%,
@@ -541,6 +542,15 @@
     50% {
       transform: translateY(0);
       animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
+  @keyframes bounce-gentle {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-3px);
     }
   }
 }
