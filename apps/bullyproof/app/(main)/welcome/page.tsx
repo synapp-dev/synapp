@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { isYouTubeUrl, convertToYouTubeEmbedUrl } from "@/utils/youtube";
+import { isVideoUrl, getVideoEmbedUrl } from "@/utils/video";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { useCompleteTutorial } from "@/entities/me/api/completeTutorial";
 import { useMeStore } from "@/entities/me/model/store";
@@ -38,8 +38,8 @@ export default function WelcomePage() {
 
   const videoEmbedUrl = useMemo(() => {
     if (!videoUrl) return null;
-    if (isYouTubeUrl(videoUrl)) {
-      return convertToYouTubeEmbedUrl(videoUrl);
+    if (isVideoUrl(videoUrl)) {
+      return getVideoEmbedUrl(videoUrl);
     }
     return null;
   }, [videoUrl]);

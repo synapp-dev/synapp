@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo, Suspense } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  useMemo,
+  Suspense,
+} from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
@@ -917,7 +924,7 @@ function APCertificationTopicPageContent() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Left Column - Slide Display (2/3 width on large screens) */}
           <div className="lg:col-span-2">
             {/* Slide Display - Consistent Aspect Ratio */}
@@ -1090,150 +1097,6 @@ function APCertificationTopicPageContent() {
           </div>
 
           {/* Right Column - Controls and Information (1/3 width on large screens) */}
-          <div className="lg:col-span-1">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-sm text-muted-foreground mb-2">
-                      Slide Navigation
-                    </div>
-                    <div className="text-lg font-semibold">
-                      {currentSlideIndex + 1} of {slides.length + 1}
-                    </div>
-                  </div>
-
-                  {/* Slide Selector Dropdown */}
-                  {slides.length > 1 && (
-                    <div>
-                      <Label className="text-sm text-muted-foreground mb-2 block">
-                        Jump to Slide
-                      </Label>
-                      <Select
-                        value={currentSlideIndex.toString()}
-                        onValueChange={(value) => {
-                          const index = parseInt(value, 10);
-                          handleGoToSlide(index);
-                        }}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue>
-                            {isOnCompletionSlide
-                              ? "Complete Topic"
-                              : `Slide ${currentSlideIndex + 1}${currentSlide?.kind === "quiz" ? " (Quiz)" : ""}`}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {slides.map((slide, index) => {
-                            const slideIdsForDropdown = slides.map((s) => s.id);
-                            const isUnlocked =
-                              isCompleted ||
-                              (foundTopicId &&
-                                isSlideUnlocked(
-                                  foundTopicId,
-                                  slide.id,
-                                  slideIdsForDropdown
-                                ));
-                            const slideProgress =
-                              (currentAttempt?.slideProgress as Record<
-                                string,
-                                any
-                              >) || {};
-                            const progress = slideProgress[slide.id];
-                            const isQuizUnanswered =
-                              slide.kind === "quiz" &&
-                              isUnlocked &&
-                              progress?.viewed === true &&
-                              progress?.answered !== true;
-
-                            return (
-                              <SelectItem
-                                key={slide.id}
-                                value={index.toString()}
-                                disabled={!isUnlocked}
-                                className={!isUnlocked ? "opacity-50" : ""}
-                              >
-                                <div className="flex items-center gap-2">
-                                  {!isUnlocked && <Lock className="h-3 w-3" />}
-                                  {isQuizUnanswered && (
-                                    <AlertTriangle className="h-3 w-3 text-orange-600" />
-                                  )}
-                                  <span
-                                    className={
-                                      isQuizUnanswered ? "text-orange-600" : ""
-                                    }
-                                  >
-                                    Slide {index + 1}
-                                    {slide.kind === "quiz" && " (Quiz)"}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                          {!isCompleted && (
-                            <SelectItem value={slides.length.toString()}>
-                              Complete Topic
-                            </SelectItem>
-                          )}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handlePrevSlide}
-                      disabled={!canGoPrev}
-                      className="flex-1"
-                    >
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Previous
-                    </Button>
-
-                    {isOnCompletionSlide && !isCompleted ? (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={handleCompleteTopic}
-                        disabled={isCompleting || !allSlidesCompleted}
-                        className="flex-1"
-                        title={
-                          !allSlidesCompleted
-                            ? "Complete all slides and answer all quizzes to finish"
-                            : ""
-                        }
-                      >
-                        {isCompleting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                            Completing...
-                          </>
-                        ) : (
-                          <>
-                            Complete
-                            <CheckCircle2 className="h-4 w-4 ml-1" />
-                          </>
-                        )}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleNextSlide}
-                        disabled={!canGoNext}
-                        className="flex-1"
-                      >
-                        Next
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       )}
     </div>
