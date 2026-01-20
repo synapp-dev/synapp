@@ -701,7 +701,7 @@ export const lessons = pgTable("lessons", {
 	schoolId: uuid("school_id").notNull(),
 	topicId: uuid("topic_id").notNull(),
 	createdByUserId: uuid("created_by_user_id"),
-	status: text().default('draft').notNull(),
+	status: text().default('preparing').notNull(),
 	scheduledFor: timestamp("scheduled_for", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -726,7 +726,7 @@ export const lessons = pgTable("lessons", {
 	pgPolicy("lessons_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	pgPolicy("lessons_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 	pgPolicy("lessons_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	check("lessons_status_check", sql`status = ANY (ARRAY['draft'::text, 'scheduled'::text, 'in_progress'::text, 'pending_review'::text, 'completed'::text, 'cancelled'::text])`),
+	check("lessons_status_check", sql`status = ANY (ARRAY['preparing'::text, 'ready'::text, 'in_progress'::text, 'feedback'::text, 'completed'::text, 'cancelled'::text])`),
 ]);
 
 export const topics = pgTable("topics", {
