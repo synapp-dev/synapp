@@ -37,6 +37,10 @@ import { db } from "@/server/db/drizzle";
 import { topicSlides } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
+// Configure route to handle large payloads
+export const runtime = "nodejs";
+export const maxDuration = 60; // 60 seconds for large uploads
+
 /**
  * Helper function to check if a slide has valid content
  * Returns true if the slide has content, false if it's empty
@@ -138,6 +142,20 @@ export async function POST(request: Request) {
   console.log("[bulk-save] Starting bulk save request");
 
   try {
+    // Check Content-Length header to warn about large payloads
+    const contentLength = request.headers.get("content-length");
+    if (contentLength) {
+      const sizeInMB = parseInt(contentLength, 10) / (1024 * 1024);
+      console.log(`[bulk-save] Request size: ${sizeInMB.toFixed(2)} MB`);
+      
+      // Warn if payload is very large (Vercel limit is ~4.5MB for serverless functions)
+      if (sizeInMB > 4) {
+        console.warn(
+          `[bulk-save] WARNING: Large payload detected (${sizeInMB.toFixed(2)} MB). This may exceed serverless function limits.`
+        );
+      }
+    }
+
     console.log("[bulk-save] Getting userId from request...");
     const userId = await getUserIdFromRequest(request);
     console.log(
@@ -165,7 +183,45 @@ export async function POST(request: Request) {
     console.log("[bulk-save] Permission check passed - user is PLATFORM_ADMIN");
 
     console.log("[bulk-save] Parsing form data...");
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (error: any) {
+      console.error("[bulk-save] ERROR: Failed to parse FormData:", {
+        error: error?.message,
+        name: error?.name,
+        stack: error?.stack,
+      });
+      
+      // Check if it's a payload size error
+      if (
+        error?.message?.includes("Too Large") ||
+        error?.message?.includes("Payload") ||
+        error?.message?.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
+        error?.message?.includes("413")
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "Upload too large. Please try uploading fewer slides at once, or compress your images before uploading.",
+          },
+          { status: 413 }
+        );
+      }
+      
+      // Check if it's a FormData parsing error
+      if (error?.message?.includes("FormData") || error?.message?.includes("parse")) {
+        return NextResponse.json(
+          {
+            error:
+              "Failed to process upload. The request may be too large. Please try uploading fewer slides at once.",
+          },
+          { status: 400 }
+        );
+      }
+      
+      throw error; // Re-throw if it's an unexpected error
+    }
     const operationsJson = formData.get("operations") as string;
     console.log(
       "[bulk-save] operationsJson:",
@@ -1069,6 +1125,39 @@ export async function POST(request: Request) {
       name: e?.name,
       userId: e?.userId,
     });
+
+    // Check if this is a payload size error
+    if (
+      e?.message?.includes("Too Large") ||
+      e?.message?.includes("Payload") ||
+      e?.message?.includes("FUNCTION_PAYLOAD_TOO_LARGE") ||
+      e?.message?.includes("413") ||
+      e?.message?.includes("Request Entity Too Large")
+    ) {
+      console.error("[bulk-save] Payload too large error detected - returning 413");
+      return NextResponse.json(
+        {
+          error:
+            "Upload too large. Please try uploading fewer slides at once, or compress your images before uploading. Maximum recommended: 10-15 slides per upload.",
+        },
+        { status: 413 }
+      );
+    }
+
+    // Check if this is a FormData parsing error
+    if (
+      e?.message?.includes("FormData") ||
+      e?.message?.includes("Failed to parse body as FormData")
+    ) {
+      console.error("[bulk-save] FormData parsing error detected - returning 400");
+      return NextResponse.json(
+        {
+          error:
+            "Failed to process upload. The request may be too large or corrupted. Please try uploading fewer slides at once.",
+        },
+        { status: 400 }
+      );
+    }
 
     // Check if this is an authorization error
     if (e?.message?.includes("Unauthorized") || e?.message?.includes("401")) {
