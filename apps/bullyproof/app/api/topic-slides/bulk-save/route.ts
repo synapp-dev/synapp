@@ -234,7 +234,14 @@ export async function POST(request: Request) {
         const slideId = deletes[i];
         const slideData = slidesToDelete[i];
 
-        console.log(`[bulk-save] Attempting to delete slide: ${slideId}`);
+        console.log(`[bulk-save] Attempting to delete slide:`, {
+          id: slideId,
+          kind: slideData?.slide?.kind || "unknown",
+          orderIndex: slideData?.slide?.orderIndex,
+          imageUrl: slideData?.slide?.imageUrl ? "exists" : "missing",
+          videoUrl: slideData?.slide?.videoUrl ? "exists" : "missing",
+          textHtml: slideData?.slide?.textHtml ? "exists" : "missing",
+        });
 
         // Delete file if it exists
         if (
@@ -380,6 +387,19 @@ export async function POST(request: Request) {
             if (tempId) {
               tempIdToSlideIdMap.set(tempId, slide.id);
             }
+            
+            // Log all created slides with their details
+            console.log(`[bulk-save] Created slide:`, {
+              id: slide.id,
+              kind: slide.kind,
+              orderIndex: slide.orderIndex,
+              topicId: slide.topicId,
+              imageUrl: slide.imageUrl || null,
+              videoUrl: slide.videoUrl || null,
+              textHtml: slide.textHtml ? (slide.textHtml.substring(0, 50) + "...") : null,
+              videoStartS: slide.videoStartS || null,
+              videoEndS: slide.videoEndS || null,
+            });
           }
         });
 
@@ -549,11 +569,15 @@ export async function POST(request: Request) {
     if (updates && Array.isArray(updates) && updates.length > 0) {
       console.log(`[bulk-save] Found ${updates.length} slide(s) to update`);
       for (const slideData of updates) {
-        console.log(`[bulk-save] Updating slide: ${slideData.id}`, {
+        console.log(`[bulk-save] Updating slide:`, {
+          id: slideData.id,
           kind: slideData.kind,
-          hasImageUrl: !!slideData.imageUrl,
-          hasVideoUrl: !!slideData.videoUrl,
-          hasTextHtml: !!slideData.textHtml,
+          orderIndex: slideData.orderIndex,
+          imageUrl: slideData.imageUrl || null,
+          videoUrl: slideData.videoUrl || null,
+          textHtml: slideData.textHtml ? (slideData.textHtml.substring(0, 50) + "...") : null,
+          videoStartS: slideData.videoStartS || null,
+          videoEndS: slideData.videoEndS || null,
           hasUploadedFile: !!uploadedUrls[slideData.id],
         });
         
@@ -571,9 +595,13 @@ export async function POST(request: Request) {
 
         try {
           await topicsRepo.updateSlide(slideData.id, updateData);
-          console.log(
-            `[bulk-save] Successfully updated slide: ${slideData.id}`
-          );
+          console.log(`[bulk-save] Successfully updated slide:`, {
+            id: slideData.id,
+            kind: slideData.kind,
+            finalImageUrl: updateData.imageUrl || null,
+            finalVideoUrl: updateData.videoUrl || null,
+            finalTextHtml: updateData.textHtml ? (updateData.textHtml.substring(0, 50) + "...") : null,
+          });
         } catch (error: any) {
           console.error(
             `[bulk-save] ERROR: Failed to update slide ${slideData.id}:`,
@@ -807,6 +835,16 @@ export async function POST(request: Request) {
       // SAFETY: Only mark for deletion if slide is CLEARLY empty AND wasn't just modified
       const emptySlideIds: string[] = [];
       for (const slide of topicDataForCleanup.slides) {
+        // Log all slides being checked during cleanup
+        console.log(`[bulk-save] [cleanup] Checking slide:`, {
+          id: slide.id,
+          kind: slide.kind,
+          orderIndex: slide.orderIndex,
+          imageUrl: slide.imageUrl || null,
+          videoUrl: slide.videoUrl || null,
+          textHtml: slide.textHtml ? (slide.textHtml.substring(0, 50) + "...") : null,
+        });
+
         // SAFETY CHECK: Never delete slides that were just created/updated in this request
         if (slidesModifiedInThisRequest.has(slide.id)) {
           console.log(
@@ -895,8 +933,9 @@ export async function POST(request: Request) {
             
             // Only delete if we're CERTAIN it's empty (hasContent === false)
             if (!hasContent) {
-              // Delete file if it exists
+              // Delete file if it exists - only for image slides
               if (
+                slideData.slide.kind === "image" &&
                 slideData.slide.imageUrl &&
                 stageNumber !== undefined &&
                 topicNumber !== undefined
