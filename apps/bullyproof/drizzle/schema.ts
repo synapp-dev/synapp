@@ -1059,7 +1059,6 @@ export const certificationStages = pgTable("certification_stages", {
 	pgPolicy("certification_stages_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	pgPolicy("certification_stages_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 	pgPolicy("certification_stages_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	check("certification_stages_code_chk", sql`code ~ '^C[0-9]*$'::text`),
 ]);
 
 export const userSchoolPositions = pgTable("user_school_positions", {
