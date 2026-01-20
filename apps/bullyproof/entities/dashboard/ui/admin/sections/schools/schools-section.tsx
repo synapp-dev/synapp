@@ -13,7 +13,7 @@ import { SchoolsDataTable } from "./components/schools-data-table";
 import { SchoolDetailDrawer } from "./components/school-detail-drawer";
 import { AddSchoolWizard } from "./components/add-school-wizard";
 import { type School } from "./components/schools-table-columns";
-import { schoolApi } from "@/entities/school/api/endpoints";
+import { useSchools } from "@/entities/school/model/store";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import {
@@ -49,8 +49,6 @@ function SchoolsSectionContent() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [schools, setSchools] = useState<School[]>([]);
-  const [tableRefreshTrigger, setTableRefreshTrigger] = useState(0);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState(
     searchParams?.get("search") || ""
@@ -68,10 +66,33 @@ function SchoolsSectionContent() {
   const [typeFilter, setTypeFilter] = useState(
     searchParams?.get("type") || "all"
   );
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const isClosingRef = useRef(false);
   const isWizardClosingRef = useRef(false);
+
+  // Use React Query hooks with Zustand caching for schools
+  const {
+    schools,
+    isLoading,
+    error: queryError,
+    refetch: refetchSchools,
+  } = useSchools({
+    search: debouncedSearchQuery || undefined,
+    state: stateFilter !== "all" ? stateFilter : undefined,
+    sector: sectorFilter !== "all" ? sectorFilter : undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+    type: typeFilter !== "all" ? typeFilter : undefined,
+  });
+
+  const error = queryError?.message || null;
+
+  // Trigger background refetch on mount to ensure complete data
+  // This ensures that even if we navigated from a page that only cached
+  // partial data, we'll fetch all schools in the background while showing cached data
+  useEffect(() => {
+    // Refetch in the background without blocking the UI
+    // The cached data will display immediately, and the UI will update when fresh data arrives
+    refetchSchools();
+  }, [refetchSchools]);
 
   // Extract slug from URL query parameter (e.g., ?school=mazenod-college-vic)
   const slugFromUrl = searchParams?.get("school") || null;
@@ -126,90 +147,6 @@ function SchoolsSectionContent() {
     }
     return undefined;
   }, [tabFromUrl]);
-
-  // Load schools on mount
-  useEffect(() => {
-    const fetchSchools = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Fetch all schools in batches (max limit is 100 per API)
-        const allSchools: School[] = [];
-        let offset = 0;
-        const limit = 100; // Maximum allowed by API
-        let hasMore = true;
-
-        while (hasMore) {
-          const result = await schoolApi.get.listSchools({
-            limit,
-            offset,
-          });
-
-          if (result.data === null) {
-            const errorObj = result.error as {
-              message: string;
-              status?: number;
-            };
-            setError(errorObj?.message || "Failed to fetch schools");
-            break;
-          }
-
-          const mappedSchools: School[] = result.data.map((school: any) => {
-            const teacherCount = school.teacherCount ?? 0;
-            const classCount = school.classCount ?? 0;
-            const schoolAdminCount = school.schoolAdminCount ?? 0;
-            const schoolLicenceCount = school.schoolLicenceCount ?? 0;
-            const activeLicence =
-              school.activeLicence ?? school.active_licence ?? false;
-
-            // Status: onboarding if any count < 1, active if all counts >= 1
-            const status: "onboarding" | "active" =
-              teacherCount < 1 ||
-              classCount < 1 ||
-              schoolAdminCount < 1 ||
-              schoolLicenceCount < 1
-                ? "onboarding"
-                : "active";
-
-            return {
-              id: school.id || "",
-              name: school.name || "",
-              state: school.state || null,
-              sector: school.sector || null,
-              teacherCount,
-              classCount,
-              schoolAdminCount,
-              schoolLicenceCount,
-              staffCount: school.staffCount ?? 0,
-              activeLicence,
-              status,
-              slug: school.slug || null,
-              levels: school.levels || null,
-            };
-          });
-
-          allSchools.push(...mappedSchools);
-
-          // If we got fewer than the limit, we've fetched all schools
-          if (mappedSchools.length < limit) {
-            hasMore = false;
-          } else {
-            offset += limit;
-          }
-        }
-
-        setSchools(allSchools);
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to fetch schools"
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchSchools();
-  }, [tableRefreshTrigger]);
 
   // Debounce search query updates (500ms)
   useEffect(() => {
@@ -521,52 +458,12 @@ function SchoolsSectionContent() {
     // Close wizard
     setIsWizardOpen(false);
 
-    // Refresh schools list first
+    // Refresh schools list using React Query refetch
     try {
-      const result = await schoolApi.get.listSchools({
-        limit: 100,
-        offset: 0,
-      });
+      const result = await refetchSchools();
       if (result.data) {
-        const mappedSchools: School[] = result.data.map((school: any) => {
-          const teacherCount = school.teacherCount ?? 0;
-          const classCount = school.classCount ?? 0;
-          const schoolAdminCount = school.schoolAdminCount ?? 0;
-          const schoolLicenceCount = school.schoolLicenceCount ?? 0;
-          const activeLicence =
-            school.activeLicence ?? school.active_licence ?? false;
-
-          // Status: onboarding if any count < 1, active if all counts >= 1
-          const status: "onboarding" | "active" =
-            teacherCount < 1 ||
-            classCount < 1 ||
-            schoolAdminCount < 1 ||
-            schoolLicenceCount < 1
-              ? "onboarding"
-              : "active";
-
-          return {
-            id: school.id || "",
-            name: school.name || "",
-            state: school.state || null,
-            sector: school.sector || null,
-            teacherCount,
-            classCount,
-            schoolAdminCount,
-            schoolLicenceCount,
-            activeLicence,
-            status,
-            slug: school.slug || null,
-            levels: school.levels || null,
-          };
-        });
-        setSchools(mappedSchools);
-
-        // Trigger data table refresh
-        setTableRefreshTrigger((prev) => prev + 1);
-
         // Find the newly created school by slug
-        const newlyCreatedSchool = mappedSchools.find(
+        const newlyCreatedSchool = result.data.find(
           (s) => s.slug === school.slug
         );
 
@@ -584,8 +481,6 @@ function SchoolsSectionContent() {
       }
     } catch (err) {
       console.error("Failed to refresh schools:", err);
-      // Trigger data table refresh even on error
-      setTableRefreshTrigger((prev) => prev + 1);
       // Still update URL even if refresh fails
       const params = new URLSearchParams(searchParams?.toString() || "");
       params.delete("modal");
@@ -626,50 +521,14 @@ function SchoolsSectionContent() {
 
   // Memoize onSchoolUpdate to prevent infinite loops
   const handleSchoolUpdate = useCallback(async () => {
-    // Refresh schools list
+    // Refresh schools list using React Query refetch
     try {
-      const result = await schoolApi.get.listSchools({
-        limit: 100,
-        offset: 0,
-      });
+      const result = await refetchSchools();
       if (result.data) {
-        const mappedSchools: School[] = result.data.map((school: any) => {
-          const teacherCount = school.teacherCount ?? 0;
-          const classCount = school.classCount ?? 0;
-          const schoolAdminCount = school.schoolAdminCount ?? 0;
-          const schoolLicenceCount = school.schoolLicenceCount ?? 0;
-          const activeLicence =
-            school.activeLicence ?? school.active_licence ?? false;
-
-          // Status: onboarding if any count < 1, active if all counts >= 1
-          const status: "onboarding" | "active" =
-            teacherCount < 1 ||
-            classCount < 1 ||
-            schoolAdminCount < 1 ||
-            schoolLicenceCount < 1
-              ? "onboarding"
-              : "active";
-
-          return {
-            id: school.id || "",
-            name: school.name || "",
-            state: school.state || null,
-            sector: school.sector || null,
-            teacherCount,
-            classCount,
-            schoolAdminCount,
-            schoolLicenceCount,
-            activeLicence,
-            status,
-            slug: school.slug || null,
-            levels: school.levels || null,
-          };
-        });
-        setSchools(mappedSchools);
         // Update selected school if it exists - always update to get latest data
         const currentSelectedSchool = selectedSchoolRef.current;
         if (currentSelectedSchool) {
-          const updatedSchool = mappedSchools.find(
+          const updatedSchool = result.data.find(
             (s) => s.id === currentSelectedSchool.id
           );
           if (updatedSchool) {
@@ -699,7 +558,7 @@ function SchoolsSectionContent() {
     } catch (err) {
       console.error("Failed to refresh schools:", err);
     }
-  }, []);
+  }, [refetchSchools, router, searchParams]);
 
   // Skeleton loader component
   const SkeletonTable = () => {
@@ -1101,7 +960,6 @@ function SchoolsSectionContent() {
           <SchoolsDataTable
             schools={filteredSchools}
             onSchoolClick={handleSchoolClick}
-            refreshTrigger={tableRefreshTrigger}
             isLoading={isLoading}
             error={error}
             onRowSelectionChange={setRowSelection}

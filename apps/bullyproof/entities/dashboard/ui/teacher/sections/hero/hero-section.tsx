@@ -1,21 +1,25 @@
-import { Card, CardDescription } from "@workspace/ui/components/card";
-import { CardHeader } from "@workspace/ui/components/card";
-import { CardTitle } from "@workspace/ui/components/card";
-import { CardContent } from "@workspace/ui/components/card";
-import Image from "next/image";
+import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { useState, useEffect, useMemo } from "react";
-import { Calendar as CalendarIcon, BookOpen, Plus, WandSparkles } from "lucide-react";
+import { Calendar as CalendarIcon, BookOpen, School } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
-import { Button } from "@workspace/ui/components/button";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { useMeStore } from "@/entities/me/model/store";
+import { HeroCard } from "@/entities/dashboard/ui/shared/hero-card";
 import { useQuery } from "@tanstack/react-query";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { cn } from "@workspace/ui/lib/utils";
-import { useSchoolStore } from "@/stores/school-store";
-import { LessonWizard } from "@/components/organisms/lesson-wizard";
-import { getDisplayStatus } from "@/utils/lesson-status";
+import { useRouter } from "next/navigation";
+import { useMySchoolsQuery, type School as SchoolType } from "@/entities/me/model/useMySchoolsQuery";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@workspace/ui/components/dialog";
+import { ScrollArea } from "@workspace/ui/components/scroll-area";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 
 type LessonWithDetails = {
   id: string;
@@ -33,13 +37,17 @@ type LessonWithDetails = {
 };
 
 export function TeacherHeroSection() {
+  const router = useRouter();
   const [date, setDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [isSchoolDialogOpen, setIsSchoolDialogOpen] = useState(false);
   const currentUser = useMeStore((s) => s.currentUser);
-  const currentSchool = useSchoolStore((s) => s.currentSchool);
   const teacherId = currentUser?.id;
-  const schoolSlug = currentSchool?.slug || "";
+
+  // Fetch user's schools
+  const { data: schools = [], isLoading: isLoadingSchools } = useMySchoolsQuery({
+    limit: 50,
+  });
 
   // Fetch lessons for the current teacher
   const { data: lessonsData, isLoading: isLoadingLessons } = useQuery({
@@ -132,81 +140,39 @@ export function TeacherHeroSection() {
     return () => clearInterval(timer);
   }, []);
 
-  // Get greeting based on time of day
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return "Good morning!";
-    if (hour < 17) return "Good afternoon!";
-    return "Good evening!";
-  };
-
-  // Get user name
-  const firstName = currentUser?.firstName || "";
-  const lastName = currentUser?.lastName || "";
-  const fullName =
-    currentUser?.fullName ||
-    [firstName, lastName].filter(Boolean).join(" ") ||
-    "Teacher";
-  const nameParts = fullName.split(" ");
-  const displayFirstName = nameParts[0] || "";
-  const displayLastName = nameParts.slice(1).join(" ") || "";
-
   // Get user role/title
   const userTitle = "Teacher";
 
-  // Get avatar URL
-  const avatarUrl = currentUser?.avatarUrl || "/images/default-avatar.svg";
+  // Handle prepare new lesson click
+  const handlePrepareNewLesson = () => {
+    if (schools.length === 0) {
+      // No schools available
+      return;
+    } else if (schools.length === 1) {
+      // Single school - navigate directly
+      const schoolSlug = schools[0].slug;
+      router.push(`/schools/${schoolSlug}/lessons?wizardOpen=true&step=0`);
+    } else {
+      // Multiple schools - show dialog
+      setIsSchoolDialogOpen(true);
+    }
+  };
+
+  // Handle school selection from dialog
+  const handleSchoolSelect = (schoolSlug: string) => {
+    setIsSchoolDialogOpen(false);
+    router.push(`/schools/${schoolSlug}/lessons?wizardOpen=true&step=0`);
+  };
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
       <div className="col-span-2 flex flex-col gap-4">
         <StaggeredAnimation index={0} fadeDirection="down">
-          <Card className="relative overflow-visible col-span-2 min-h-52 flex-shrink-0">
-            <CardHeader>
-              <CardTitle>{getGreeting()}</CardTitle>
-              <CardDescription>
-                <div>
-                  {currentTime.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </div>
-                <div>
-                  {currentTime.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
-                </div>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-end h-full gap-4">
-              <div className="flex flex-col gap-0 h-full justify-end items-start">
-                <h1 className="text-3xl font-medium">
-                  {displayFirstName}{" "}
-                  {displayLastName && (
-                    <span className="font-black">{displayLastName}</span>
-                  )}
-                </h1>
-                <h2 className="text-muted-foreground">{userTitle}</h2>
-              </div>
-
-              {/* Profile Image - positioned to ignore card padding and bleed above */}
-              <div className="absolute bottom-0 right-4 w-48 h-full pointer-events-none">
-                <div className="relative h-full w-full">
-                  <Image
-                    src="/images/bp-man/bp-man-thumbsup.svg"
-                    alt="BP-Man Thumbs Up"
-                    fill
-                    className="object-contain w-full h-full"
-                    priority
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <HeroCard
+            currentTime={currentTime}
+            userTitle={userTitle}
+            defaultName="Teacher"
+          />
         </StaggeredAnimation>
 
         <StaggeredAnimation
@@ -214,17 +180,11 @@ export function TeacherHeroSection() {
           fadeDirection="up"
           className="flex-1 min-h-0"
         >
-          <Card className="h-full flex flex-col items-center justify-center p-6">
-            <Button
-              onClick={() => setIsWizardOpen(true)}
-              className="w-full h-auto py-8 text-lg font-medium text-white hover:opacity-90 transition-opacity"
-              style={{
-                backgroundColor: "var(--brand-bullyproof-primary)",
-              }}
-            >
-              <WandSparkles className="mr-2 h-5 w-5" />
-              Prepare New Lesson
-            </Button>
+          <Card 
+            className="h-full flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={handlePrepareNewLesson}
+          >
+            <p className="text-lg font-medium">Prepare New Lesson</p>
           </Card>
         </StaggeredAnimation>
       </div>
@@ -370,13 +330,74 @@ export function TeacherHeroSection() {
         </Card>
       </StaggeredAnimation>
 
-      {schoolSlug && (
-        <LessonWizard
-          schoolId={schoolSlug}
-          open={isWizardOpen}
-          onOpenChange={setIsWizardOpen}
-        />
-      )}
+      {/* School Selection Dialog */}
+      <Dialog open={isSchoolDialogOpen} onOpenChange={setIsSchoolDialogOpen}>
+        <DialogContent
+          className="sm:max-w-md max-h-[65vh] flex flex-col"
+          showCloseButton={true}
+        >
+          <DialogHeader className="text-center shrink-0">
+            <DialogTitle className="flex items-center justify-center gap-2 text-2xl">
+              <School className="h-8 w-8" />
+              Select a School
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              You are assigned to multiple schools. Choose which school you'd like to prepare a lesson for.
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="space-y-2 py-2 pr-4">
+              {isLoadingSchools ? (
+                <>
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i} className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
+                        <div className="flex flex-col gap-1 flex-1">
+                          <Skeleton className="h-4 w-3/4" />
+                          <Skeleton className="h-3 w-1/2" />
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </>
+              ) : schools.length === 0 ? (
+                <div className="flex items-center justify-center py-8">
+                  <p className="text-sm text-muted-foreground">No schools found</p>
+                </div>
+              ) : (
+                schools.map((school) => (
+                  <Card
+                    key={school.id}
+                    className={cn(
+                      "px-4 py-2.5 cursor-pointer transition-colors hover:bg-muted/50",
+                      "border-border"
+                    )}
+                    onClick={() => handleSchoolSelect(school.slug)}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <School className="h-4 w-4 text-primary" />
+                      </div>
+                      <div className="flex flex-col gap-1 flex-1 min-w-0">
+                        <span className="font-medium text-sm truncate">
+                          {school.name || "Unknown School"}
+                        </span>
+                        {school.slug && (
+                          <span className="text-xs text-muted-foreground truncate">
+                            {school.slug}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

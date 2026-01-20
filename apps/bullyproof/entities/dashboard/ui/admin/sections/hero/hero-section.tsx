@@ -1,8 +1,4 @@
-import { Card, CardDescription } from "@workspace/ui/components/card";
-import { CardHeader } from "@workspace/ui/components/card";
-import { CardTitle } from "@workspace/ui/components/card";
-import { CardContent } from "@workspace/ui/components/card";
-import Image from "next/image";
+import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { useState, useEffect } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
@@ -10,6 +6,7 @@ import { Separator } from "@workspace/ui/components/separator";
 import { LiveActivityFeed } from "./components/live-activity-feed";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { useMeStore } from "@/entities/me/model/store";
+import { HeroCard } from "@/entities/dashboard/ui/shared/hero-card";
 
 export function HeroSection() {
   const [date, setDate] = useState<Date>(new Date());
@@ -24,25 +21,6 @@ export function HeroSection() {
 
     return () => clearInterval(timer);
   }, []);
-
-  // Get greeting based on time of day
-  const getGreeting = () => {
-    const hour = currentTime.getHours();
-    if (hour < 12) return "Good morning!";
-    if (hour < 17) return "Good afternoon!";
-    return "Good evening!";
-  };
-
-  // Get user name
-  const firstName = currentUser?.firstName || "";
-  const lastName = currentUser?.lastName || "";
-  const fullName =
-    currentUser?.fullName ||
-    [firstName, lastName].filter(Boolean).join(" ") ||
-    "Admin";
-  const nameParts = fullName.split(" ");
-  const displayFirstName = nameParts[0] || "";
-  const displayLastName = nameParts.slice(1).join(" ") || "";
 
   // Get user role/title
   const getUserRoleDisplay = () => {
@@ -95,51 +73,11 @@ export function HeroSection() {
     <section className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
       <div className="col-span-2 flex flex-col gap-4">
         <StaggeredAnimation index={0} fadeDirection="down">
-          <Card className="relative overflow-visible col-span-2 min-h-52 flex-shrink-0">
-            <CardHeader>
-              <CardTitle>{getGreeting()}</CardTitle>
-              <CardDescription>
-                <div>
-                  {currentTime.toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </div>
-                <div>
-                  {currentTime.toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                    hour12: true,
-                  })}
-                </div>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex items-end h-full gap-4">
-              <div className="flex flex-col gap-0 h-full justify-end items-start">
-                <h1 className="text-3xl font-medium">
-                  {displayFirstName}{" "}
-                  <span className="font-black">{displayLastName}</span>
-                </h1>
-                <h2 className="text-muted-foreground">{userTitle}</h2>
-              </div>
-
-              {/* Profile Image - positioned to ignore card padding and bleed above */}
-              <div className="absolute -top-4 sm:-top-6 md:-top-3 bottom-0 right-0 w-36 sm:w-44 md:w-56 pointer-events-none">
-                <div className="relative h-full w-full">
-                  <Image
-                    src="/images/user/teacher-default.png"
-                    alt="User Profile"
-                    fill
-                    className="object-top object-contain drop-shadow-xl"
-                    priority
-                    style={{ transform: "scaleX(-1)" }}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <HeroCard
+            currentTime={currentTime}
+            userTitle={userTitle}
+            defaultName="Admin"
+          />
         </StaggeredAnimation>
 
         <StaggeredAnimation
