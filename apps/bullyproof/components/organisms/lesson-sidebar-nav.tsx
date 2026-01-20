@@ -7,6 +7,7 @@ import {
   PlayCircle,
   MessageSquare,
   History,
+  CheckCircle2,
   type LucideIcon,
 } from "lucide-react";
 import { NavMain } from "@/components/organisms/nav-main";
@@ -26,19 +27,23 @@ const iconMap: Record<string, LucideIcon> = {
   PlayCircle,
   MessageSquare,
   History,
+  CheckCircle2,
 };
 
 const navItemsConfig = [
   {
-    title: "Overview",
+    title: "Classes",
     url: "",
-    iconName: "BookOpen",
-    exact: true,
+    iconName: "CheckCircle2",
+    disabled: true,
+    disabledMessage: "Completed",
   },
   {
-    title: "Classes",
-    url: "/classes",
-    iconName: "Users",
+    title: "Topic",
+    url: "",
+    iconName: "CheckCircle2",
+    disabled: true,
+    disabledMessage: "Completed",
   },
   {
     title: "Prepare",
@@ -46,8 +51,8 @@ const navItemsConfig = [
     iconName: "ClipboardList",
   },
   {
-    title: "Deliver",
-    url: "/deliver",
+    title: "Run Lesson",
+    url: "/run-lesson",
     iconName: "PlayCircle",
   },
   {
@@ -75,11 +80,11 @@ export function LessonSidebarNav({
   // Check if current user is the lesson creator
   const currentUser = useMeStore((s) => s.currentUser);
   const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
-  const canDeliver = isLessonCreator;
+  const canRunLesson = isLessonCreator;
 
   const isCompleted = lessonData?.status === "completed";
-  const isPendingReview = lessonData?.status === "pending_review";
-  const canProvideFeedback = isCompleted || isPendingReview;
+  const isFeedback = lessonData?.status === "feedback";
+  const canProvideFeedback = isCompleted || isFeedback;
 
   // Debug logging (can be removed later)
   if (process.env.NODE_ENV === "development") {
@@ -87,32 +92,35 @@ export function LessonSidebarNav({
       lessonId,
       status: lessonData?.status,
       isCompleted,
-      isPendingReview,
+      isFeedback,
       canProvideFeedback,
       isLoading,
     });
   }
 
+  const baseUrl = `/schools/${schoolId}/lessons/${lessonId}`;
+
   const navItems = navItemsConfig.map((item) => ({
     title: item.title,
-    url: `/schools/${schoolId}/lessons/${lessonId}${item.url}`,
+    url: item.url ? `${baseUrl}${item.url}` : baseUrl,
     icon: iconMap[item.iconName],
     exact: item.exact,
-    // Disable Deliver if user is not the lesson creator
-    // Enable feedback button if lesson is pending_review or completed
+    // Disable Run Lesson if user is not the lesson creator
+    // Enable feedback button if lesson is feedback or completed
     disabled:
       item.disabled ||
-      (item.title === "Deliver" && !canDeliver) ||
+      (item.title === "Run Lesson" && !canRunLesson) ||
       (item.title === "Feedback" && !canProvideFeedback),
     // Show appropriate disabled messages
     disabledMessage:
-      item.title === "Deliver" && !canDeliver
+      item.disabledMessage ||
+      (item.title === "Run Lesson" && !canRunLesson
         ? "Unauthorized"
         : item.title === "Feedback" && !canProvideFeedback
           ? "Locked"
           : item.disabled
             ? "Under Construction"
-            : undefined,
+            : undefined),
   }));
 
   return <NavMain items={navItems} />;

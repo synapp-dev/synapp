@@ -23,6 +23,7 @@ import {
 import { NavMain } from "@/components/organisms/nav-main";
 import { NavUser } from "@/components/molecules/nav-user";
 import { SchoolSwitcher } from "@/components/organisms/school-switcher";
+import { SelectSchoolForLiveLessonsDialog } from "@/components/molecules/select-school-for-live-lessons-dialog";
 import {
   Sidebar,
   SidebarContent,
@@ -36,7 +37,7 @@ import Link from "next/link";
 import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useSchoolStore } from "@/stores/school-store";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useIsPlatformAdmin, useMeStore } from "@/entities/me/model/store";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
@@ -56,8 +57,6 @@ const data = {
       url: "/ap-certification",
       icon: BadgeCheck,
       isActive: false,
-      disabled: true,
-      disabledMessage: "Under Construction",
     },
     {
       title: "Welcome",
@@ -87,6 +86,18 @@ const data = {
       isActive: false,
     },
     {
+      title: "Teachers",
+      url: "/teachers",
+      icon: Users,
+      isActive: false,
+    },
+    {
+      title: "Classes",
+      url: "/classes",
+      icon: GraduationCap,
+      isActive: false,
+    },
+    {
       title: "Performance",
       url: "/performance",
       icon: TrendingUp,
@@ -101,25 +112,17 @@ const data = {
       disabled: true,
     },
   ],
-  navPeople: [
-    {
-      title: "Teachers",
-      url: "/teachers",
-      icon: Users,
-      isActive: false,
-    },
-    {
-      title: "Classes",
-      url: "/classes",
-      icon: GraduationCap,
-      isActive: false,
-    },
-  ],
   navCurriculum: [
     {
       title: "Lessons",
       url: "/lessons",
       icon: Presentation,
+      isActive: false,
+    },
+    {
+      title: "Content",
+      url: "/content",
+      icon: BookOpenText,
       isActive: false,
     },
     {
@@ -145,6 +148,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // On mobile, always render as expanded
   const displayState = isMobile ? "expanded" : state;
   const pathname = usePathname();
+  const router = useRouter();
   const isPlatformAdmin = useIsPlatformAdmin();
   const currentUser = useMeStore((s) => s.currentUser);
 
@@ -166,16 +170,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
     // If welcome is completed, show all items except Welcome
     // Filter out Admin menu if user is not a platform admin
-    // Filter out AP Certification if user is a platform admin
     return data.navBullyproof.filter((item) => {
       if (item.title === "Welcome") {
         return false; // Hide Welcome after completion
       }
       if (item.title === "Admin" && !isPlatformAdmin) {
         return false;
-      }
-      if (item.title === "AP Certification" && isPlatformAdmin) {
-        return false; // Hide AP Certification for platform admins
       }
       return true;
     });
@@ -252,9 +252,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const isLive = useLiveLessonStore((s) => s.isLive);
   const liveUrl = useLiveLessonStore((s) => s.getUrl());
+  const liveLessonCount = useLiveLessonStore((s) => s.liveLessonCount);
+  const needsSchoolSelection = useLiveLessonStore((s) => s.needsSchoolSelection);
   const fetchInProgressLesson = useLiveLessonStore(
     (s) => s.fetchInProgressLesson
   );
+  
+  const [showSchoolSelectionDialog, setShowSchoolSelectionDialog] = React.useState(false);
 
   // Set mounted to true after component mounts (client-side only)
   React.useEffect(() => {
@@ -303,6 +307,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     };
   }, [currentUser?.id, fetchInProgressLesson]);
 
+  const handleLiveLessonClick = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // If multiple schools, show dialog; otherwise navigate directly
+    if (needsSchoolSelection()) {
+      setShowSchoolSelectionDialog(true);
+    } else {
+      // Navigate directly - single school or single lesson
+      const url = liveUrl;
+      if (url) {
+        router.push(url);
+      }
+    }
+  }, [needsSchoolSelection, liveUrl, router]);
+
   const platformItemsWithLive = React.useMemo(() => {
     // Don't show live lesson if welcome is not completed
     if (!isWelcomeCompleted) {
@@ -316,12 +334,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     const items = [...platformItems];
     const dashboardIndex = items.findIndex((i) => i.title === "Dashboard");
     const liveItem = {
-      title: "Live Lesson",
+      title: liveLessonCount > 1 ? "Live Lessons" : "Live Lesson",
       url: liveUrl,
       icon: TvMinimalPlay,
       isActive: false,
       disableActiveStyle: true,
       liveStyle: true,
+      badge: liveLessonCount > 1 ? liveLessonCount : undefined,
+      onClick: needsSchoolSelection() ? handleLiveLessonClick : undefined,
     };
     if (dashboardIndex !== -1) {
       items.splice(dashboardIndex + 1, 0, liveItem);
@@ -329,7 +349,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items.unshift(liveItem);
     }
     return items;
-  }, [platformItems, isLive, liveUrl, isWelcomeCompleted, mounted]);
+  }, [platformItems, isLive, liveUrl, liveLessonCount, isWelcomeCompleted, mounted, needsSchoolSelection, handleLiveLessonClick]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -375,27 +395,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                         startIndex={0}
                       />
                     )}
-                    {/* navPeople: 2 items, has title - title at 3, items at 4-5 */}
-                    <NavMain
-                      items={withSlug(data.navPeople)}
-                      title="People"
-                      enableStaggeredAnimation
-                      startIndex={3}
-                    />
-                    {/* navCurriculum: 2 items, has title - title at 6, items at 7-8 */}
+                    {/* navCurriculum: 3 items, has title - title at 5, items at 6-8 */}
                     <NavMain
                       items={withSlug(data.navCurriculum)}
                       title="Bullyproof"
                       enableStaggeredAnimation
-                      startIndex={6}
+                      startIndex={5}
                     />
-                    {/* navData: filtered based on role - title at 10, item at 11 */}
+                    {/* navData: filtered based on role - title at 9, item at 10 */}
                     {filteredNavData.length > 0 && (
                       <NavMain
                         items={withSlug(filteredNavData)}
                         title="Data"
                         enableStaggeredAnimation
-                        startIndex={10}
+                        startIndex={9}
                       />
                     )}
                   </div>
@@ -409,6 +422,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser />
       </SidebarFooter>
       <SidebarRail />
+      <SelectSchoolForLiveLessonsDialog
+        open={showSchoolSelectionDialog}
+        onOpenChange={setShowSchoolSelectionDialog}
+      />
     </Sidebar>
   );
 }

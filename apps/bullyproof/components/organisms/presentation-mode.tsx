@@ -164,34 +164,75 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
     }
   }, [filteredCurrentSlideIndex, showCompletionSlide, filteredToOriginalIndexMap, updateSlide]);
 
-  // Mark lesson as pending_review when completion slide is shown
+  // Mark lesson as feedback when completion slide is shown
   useEffect(() => {
     if (showCompletionSlide && !isCompleted && !isCompleting) {
-      const markAsPendingReview = async () => {
+      const markAsFeedback = async () => {
         try {
           setIsCompleting(true);
           const result = await lessonsApi.put.update(lessonId, {
-            status: "pending_review",
+            status: "feedback",
           });
 
           if (result.error) {
             console.error(
-              "Failed to mark lesson as pending review:",
+              "Failed to mark lesson as feedback:",
               result.error
             );
           } else {
             setIsCompleted(true);
           }
         } catch (err) {
-          console.error("Error marking lesson as pending review:", err);
+          console.error("Error marking lesson as feedback:", err);
         } finally {
           setIsCompleting(false);
         }
       };
 
-      markAsPendingReview();
+      markAsFeedback();
     }
   }, [showCompletionSlide, isCompleted, isCompleting, lessonId]);
+
+  // Transition from ready to in_progress when moving from slide 1 to slide 2
+  const [hasTransitionedToInProgress, setHasTransitionedToInProgress] = useState(false);
+  useEffect(() => {
+    if (
+      !isLoading &&
+      !isLoadingLesson &&
+      lessonData &&
+      filteredCurrentSlideIndex === 1 &&
+      lessonData.status === "ready" &&
+      !hasTransitionedToInProgress
+    ) {
+      const transitionToInProgress = async () => {
+        try {
+          const result = await lessonsApi.put.update(lessonId, {
+            status: "in_progress",
+          });
+
+          if (result.error) {
+            console.error(
+              "Failed to transition lesson to in_progress:",
+              result.error
+            );
+          } else {
+            setHasTransitionedToInProgress(true);
+          }
+        } catch (err) {
+          console.error("Error transitioning lesson to in_progress:", err);
+        }
+      };
+
+      transitionToInProgress();
+    }
+  }, [
+    isLoading,
+    isLoadingLesson,
+    lessonData,
+    filteredCurrentSlideIndex,
+    hasTransitionedToInProgress,
+    lessonId,
+  ]);
 
   const handleClosePresentation = useCallback(() => {
     window.close();
@@ -471,7 +512,7 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-sm">
           <div className="text-center space-y-4 max-w-md px-6">
             <p className="text-destructive font-medium text-lg">
-              Only the teacher can deliver this lesson
+              Only the teacher can run this lesson
             </p>
             <p className="text-muted-foreground">
               Redirecting you back to the lesson page...

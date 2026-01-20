@@ -7,9 +7,13 @@ import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-
 import { useTopicsStore } from "@/entities/topics/model/store-enhanced";
 import {
   isYouTubeUrl,
-  convertToYouTubeEmbedUrl,
+  isVimeoUrl,
+  isVideoUrl,
+  getVideoEmbedUrl,
+  getVideoThumbnailUrl,
   getYouTubeThumbnailUrl,
-} from "@/utils/youtube";
+} from "@/utils/video";
+import { VimeoPlayer } from "./vimeo-player";
 import type { QuizData } from "./quiz-slide-editor";
 
 export type SlideKind = "text" | "image" | "video" | "quiz" | "test";
@@ -153,22 +157,22 @@ export function SlideRenderer({
     }
   }, [slide.kind, slide.id, slide.imageUrl, cachedUrl, loading]);
 
-  // Determine if video URL is YouTube and convert to embed URL if needed
+  // Determine if video URL is YouTube or Vimeo and convert to embed URL if needed
   const videoEmbedUrl = useMemo(() => {
     if (slide.kind !== "video" || !slide.videoUrl) {
       return null;
     }
 
-    if (isYouTubeUrl(slide.videoUrl)) {
-      return convertToYouTubeEmbedUrl(
+    if (isVideoUrl(slide.videoUrl)) {
+      return getVideoEmbedUrl(
         slide.videoUrl,
         slide.videoStartS,
         slide.videoEndS,
-        true // Hide YouTube controls for cleaner video playback
+        true // Hide YouTube controls for cleaner video playback (only applies to YouTube)
       );
     }
 
-    return null; // Not YouTube, will use video tag
+    return null; // Not YouTube or Vimeo, will use video tag
   }, [slide.kind, slide.videoUrl, slide.videoStartS, slide.videoEndS]);
 
   const renderContent = () => {
@@ -274,6 +278,30 @@ export function SlideRenderer({
             }
           }
 
+          // For Vimeo videos, use VimeoPlayer for thumbnail
+          if (isVimeoUrl(slide.videoUrl)) {
+            return (
+              <div className="flex items-center justify-center h-full w-full relative">
+                <VimeoPlayer
+                  videoUrl={slide.videoUrl}
+                  className="w-full h-full object-cover rounded-lg shadow-lg pointer-events-none"
+                />
+                {/* Play button overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors rounded-lg pointer-events-none z-10">
+                  <div className="bg-black/60 rounded-full p-3 backdrop-blur-sm">
+                    <svg
+                      className="w-8 h-8 text-white"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
           // For regular video files, show first frame with play button overlay
           return (
             <div className="flex items-center justify-center h-full w-full relative">
@@ -300,8 +328,21 @@ export function SlideRenderer({
           );
         }
 
-        // Use iframe for YouTube videos (full player)
-        if (videoEmbedUrl) {
+        // Use iframe for YouTube videos, VimeoPlayer component for Vimeo videos
+        if (isVimeoUrl(slide.videoUrl)) {
+          return (
+            <div className="flex items-center justify-center h-full w-full">
+              <VimeoPlayer
+                videoUrl={slide.videoUrl}
+                startTime={slide.videoStartS ?? undefined}
+                endTime={slide.videoEndS ?? undefined}
+                className="w-full h-full rounded-lg shadow-lg"
+              />
+            </div>
+          );
+        }
+
+        if (isYouTubeUrl(slide.videoUrl) && videoEmbedUrl) {
           return (
             <div className="flex items-center justify-center h-full w-full">
               <iframe

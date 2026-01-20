@@ -20,6 +20,7 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -46,6 +47,7 @@ function DisabledMenuItem({
   const isCollapsed = displayState === "collapsed";
   const isLocked = disabledMessage === "Locked";
   const isUnauthorized = disabledMessage === "Unauthorized";
+  const isCompleted = disabledMessage === "Completed";
 
   return (
     <SidebarMenuItem>
@@ -60,7 +62,17 @@ function DisabledMenuItem({
         }}
       >
         <div className="relative w-4 h-4 flex items-center justify-center overflow-hidden">
-          {isHovered && !isCollapsed ? (
+          {/* For completed items, always show the icon in green */}
+          {isCompleted ? (
+            Icon && (
+              <div
+                key="icon"
+                className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
+              >
+                <Icon className="w-4 h-4 text-green-600" />
+              </div>
+            )
+          ) : isHovered && !isCollapsed ? (
             <div
               key={isLocked ? "lock" : isUnauthorized ? "warning" : "hammer"}
               className="animate-slide-left-fade-in w-4 h-4 flex items-center justify-center"
@@ -97,6 +109,83 @@ function DisabledMenuItem({
   );
 }
 
+// Helper function to get button className based on item state
+function getButtonClassName(
+  liveStyle?: boolean,
+  itemActiveEffective?: boolean
+): string | undefined {
+  if (liveStyle) {
+    return "border border-orange-500/30 bg-orange-500/5 text-orange-700 font-medium hover:bg-orange-500/10";
+  }
+  if (itemActiveEffective) {
+    return "bg-[var(--brand-bullyproof-primary)] text-white font-semibold hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white";
+  }
+  return undefined;
+}
+
+// Component to render button content (icon, title, badge, etc.)
+function MenuButtonContent({
+  item,
+}: {
+  item: {
+    icon?: LucideIcon;
+    title: string;
+    liveStyle?: boolean;
+    badge?: number | string;
+    items?: unknown[];
+  };
+}) {
+  return (
+    <>
+      {item.icon && <item.icon />}
+      <span>{item.title}</span>
+      {item.liveStyle && (
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
+      )}
+      {item.badge !== undefined && (
+        <SidebarMenuBadge
+          className={item.liveStyle ? "ml-auto mr-1 bg-orange-500 text-white rounded-sm" : "ml-auto"}
+        >
+          {item.badge}
+        </SidebarMenuBadge>
+      )}
+      {item.items && (
+        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+      )}
+    </>
+  );
+}
+
+// Component to render title section
+function TitleSection({
+  title,
+  enableStaggeredAnimation,
+  startIndex,
+}: {
+  title: string;
+  enableStaggeredAnimation: boolean;
+  startIndex: number;
+}) {
+  const titleContent = (
+    <div className="flex items-center gap-2 mb-1 w-full max-w-fit">
+      <SidebarGroupLabel className="text-xs font-sans mb-1 bg-muted-foreground/10 h-fit w-fit text-muted-foreground py-0.5">
+        {title}
+      </SidebarGroupLabel>
+      <Separator className="mb-1 w-2/3" />
+    </div>
+  );
+
+  if (enableStaggeredAnimation) {
+    return (
+      <StaggeredAnimation index={startIndex} fadeDirection="left">
+        {titleContent}
+      </StaggeredAnimation>
+    );
+  }
+
+  return titleContent;
+}
+
 export function NavMain({
   items,
   title,
@@ -114,6 +203,8 @@ export function NavMain({
     // Special flags for custom rendering
     disableActiveStyle?: boolean;
     liveStyle?: boolean;
+    badge?: number | string; // Badge count or text
+    onClick?: (e: React.MouseEvent) => void; // Custom click handler (prevents default navigation)
     items?: {
       title: string;
       url: string;
@@ -145,24 +236,13 @@ export function NavMain({
 
   return (
     <SidebarGroup className="gap-0">
-      {title &&
-        (enableStaggeredAnimation ? (
-          <StaggeredAnimation index={startIndex} fadeDirection="left">
-            <div className="flex items-center gap-2 mb-1 w-full max-w-fit">
-              <SidebarGroupLabel className="text-xs font-sans mb-1 bg-muted-foreground/10 h-fit w-fit text-muted-foreground py-0.5">
-                {title}
-              </SidebarGroupLabel>
-              <Separator className="mb-1 w-2/3" />
-            </div>
-          </StaggeredAnimation>
-        ) : (
-          <div className="flex items-center gap-2 mb-1 w-full max-w-fit">
-            <SidebarGroupLabel className="text-xs font-sans mb-1 bg-muted-foreground/10 h-fit w-fit text-muted-foreground py-0.5">
-              {title}
-            </SidebarGroupLabel>
-            <Separator className="mb-1 w-2/3" />
-          </div>
-        ))}
+      {title && (
+        <TitleSection
+          title={title}
+          enableStaggeredAnimation={enableStaggeredAnimation}
+          startIndex={startIndex}
+        />
+      )}
       <SidebarMenu>
         {items.map((item, index) => {
           // Calculate the animation index: if there's a title, items start after it, otherwise use startIndex
@@ -191,28 +271,25 @@ export function NavMain({
             >
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
-                  <Link href={item.url} suppressHydrationWarning>
-                    <SidebarMenuButton
-                      tooltip={item.title}
-                      className={
-                        item.liveStyle
-                          ? "border border-orange-500/30 bg-orange-500/10 text-orange-700 font-medium hover:bg-orange-500/15"
-                          : itemActiveEffective
-                            ? "bg-[var(--brand-bullyproof-primary)] text-white font-semibold hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
-                            : undefined
-                      }
-                    >
-                      {item.icon && <item.icon />}
-
-                      <span>{item.title}</span>
-                      {item.liveStyle && (
-                        <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-orange-500 animate-pulse" />
-                      )}
-                      {item.items && (
-                        <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
-                      )}
-                    </SidebarMenuButton>
-                  </Link>
+                  {item.onClick ? (
+                    <div onClick={item.onClick}>
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        className={getButtonClassName(item.liveStyle, itemActiveEffective)}
+                      >
+                        <MenuButtonContent item={item} />
+                      </SidebarMenuButton>
+                    </div>
+                  ) : (
+                    <Link href={item.url} suppressHydrationWarning>
+                      <SidebarMenuButton
+                        tooltip={item.title}
+                        className={getButtonClassName(item.liveStyle, itemActiveEffective)}
+                      >
+                        <MenuButtonContent item={item} />
+                      </SidebarMenuButton>
+                    </Link>
+                  )}
                 </CollapsibleTrigger>
                 {item.items && (
                   <CollapsibleContent>

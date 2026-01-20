@@ -29,7 +29,7 @@ import {
   FileQuestion,
 } from "lucide-react";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { YouTubeVideoDialog } from "./youtube-video-dialog";
+import { VideoDialog } from "./video-dialog";
 
 interface ImageSelectorDialogProps {
   open: boolean;
@@ -38,7 +38,7 @@ interface ImageSelectorDialogProps {
   onSelectMultipleImages?: (
     images: Array<{ imageData: Blob; blobUrl: string }>
   ) => void;
-  onAddYouTubeVideo?: (videoUrl: string) => void;
+  onAddVideo?: (videoUrl: string) => void;
   onAddQuiz?: () => void;
   allowMultipleSelection?: boolean;
 }
@@ -220,7 +220,7 @@ export function ImageSelectorDialog({
   onOpenChange,
   onSelectImage,
   onSelectMultipleImages,
-  onAddYouTubeVideo,
+  onAddVideo,
   onAddQuiz,
   allowMultipleSelection = false,
 }: ImageSelectorDialogProps) {
@@ -741,12 +741,12 @@ export function ImageSelectorDialog({
                         }}
                       />
 
-                      {/* Add YouTube Video Card */}
-                      {onAddYouTubeVideo && (
+                      {/* Add Video Card */}
+                      {onAddVideo && (
                         <UploadCard
                           icon={Youtube}
                           title="Add Video"
-                          description="Link to a YouTube URL"
+                          description="Link to a YouTube or Vimeo URL"
                           onClick={() => setShowYouTubeDialog(true)}
                           disabled={isProcessingPdf}
                         />
@@ -927,12 +927,12 @@ export function ImageSelectorDialog({
             </div>
           )}
 
-          {/* YouTube Video Dialog */}
-          {onAddYouTubeVideo && (
-            <YouTubeVideoDialog
+          {/* Video Dialog */}
+          {onAddVideo && (
+            <VideoDialog
               open={showYouTubeDialog}
               onOpenChange={setShowYouTubeDialog}
-              onAddVideo={onAddYouTubeVideo}
+              onAddVideo={onAddVideo}
             />
           )}
 
