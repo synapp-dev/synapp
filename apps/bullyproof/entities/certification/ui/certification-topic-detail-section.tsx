@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type {
-  certificationTopics,
-  certificationSlides,
+  courseTopics,
+  courseTopicSlides,
 } from "@/server/db/schema";
 import {
   Card,
@@ -26,7 +26,6 @@ import {
   Plus,
   Trash2,
   Check,
-  FileQuestion,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import {
@@ -46,18 +45,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
-import {
-  QuizSlideEditor,
-  type QuizData,
-} from "@/components/organisms/quiz-slide-editor";
+import type { QuizData } from "@/components/organisms/quiz-slide-editor";
+import { renderQuestionWithUrlsAsHtml } from "@/utils/parse-question-urls";
 import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 
-type Topic = typeof certificationTopics.$inferSelect & {
-  slides?: Array<typeof certificationSlides.$inferSelect>;
+type Topic = typeof courseTopics.$inferSelect & {
+  slides?: Array<typeof courseTopicSlides.$inferSelect>;
 };
 
 interface CertificationTopicDetailSectionProps {
@@ -119,10 +116,10 @@ export function CertificationTopicDetailSection({
           const initialSlides = slidesResult.data
             .sort((a, b) => a.orderIndex - b.orderIndex)
             .map((slide) => {
-              // Extract signedUrl from API response and cache it
-              const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
-              if (slideWithUrl.signedUrl && slide.kind === "image") {
-                cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
+              // Extract signedImageUrl from API response and cache it
+              const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
+              if (slideWithUrl.signedImageUrl && slide.kind === "image") {
+                cacheStore.setSlideUrl(slide.id, slideWithUrl.signedImageUrl);
               }
               
               return {
@@ -230,21 +227,6 @@ export function CertificationTopicDetailSection({
           textHtml: null,
           quizData: null,
         };
-      } else if (newType === "quiz") {
-        return {
-          ...slide,
-          kind: "quiz" as const,
-          quizData: slide.quizData || {
-            question: "",
-            answers: [
-              { id: `answer_${Date.now()}_1`, text: "", isCorrect: false },
-              { id: `answer_${Date.now()}_2`, text: "", isCorrect: false },
-            ],
-          },
-          imageUrl: null,
-          videoUrl: null,
-          textHtml: null,
-        };
       }
       return slide;
     });
@@ -253,18 +235,6 @@ export function CertificationTopicDetailSection({
     setHasUnsavedChanges(true);
   };
 
-  const handleQuizDataChange = (quizData: QuizData | null) => {
-    if (!currentSlide) return;
-
-    const updatedSlides = localSlides.map((slide) =>
-      slide.id === currentSlide.id
-        ? { ...slide, quizData: quizData || null }
-        : slide
-    );
-
-    setLocalSlides(updatedSlides);
-    setHasUnsavedChanges(true);
-  };
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -504,13 +474,14 @@ export function CertificationTopicDetailSection({
                         orderIndex: currentSlide.orderIndex,
                         textHtml:
                           currentSlide.kind === "quiz"
-                            ? `<div><h3>${currentSlide.quizData?.question || "Question"}</h3><ul>${currentSlide.quizData?.answers.map((a) => `<li>${a.text}${a.isCorrect ? " ✓" : ""}</li>`).join("") || ""}</ul></div>`
+                            ? `<div><h3>${renderQuestionWithUrlsAsHtml(currentSlide.quizData?.question || "Question", currentSlide.quizData?.questionUrls)}</h3><ul>${currentSlide.quizData?.answers.map((a) => `<li>${a.text}${a.isCorrect ? " ✓" : ""}</li>`).join("") || ""}</ul></div>`
                             : currentSlide.textHtml,
                         imageUrl: currentSlide.imageUrl,
                         videoUrl: currentSlide.videoUrl,
                         videoStartS: currentSlide.videoStartS,
                         videoEndS: currentSlide.videoEndS,
                       }}
+                      isCertification={true}
                     />
                   )}
                 </div>
@@ -562,7 +533,7 @@ export function CertificationTopicDetailSection({
                         ) : currentSlide?.kind === "video" ? (
                           <VideoIcon className="h-4 w-4" />
                         ) : (
-                          <FileQuestion className="h-4 w-4" />
+                          <ImageIcon className="h-4 w-4" />
                         )}
                         <span className="capitalize">{currentSlide?.kind}</span>
                       </div>
@@ -578,12 +549,6 @@ export function CertificationTopicDetailSection({
                         <div className="flex items-center gap-2">
                           <VideoIcon className="h-4 w-4" />
                           Video
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="quiz">
-                        <div className="flex items-center gap-2">
-                          <FileQuestion className="h-4 w-4" />
-                          Quiz
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -630,13 +595,6 @@ export function CertificationTopicDetailSection({
                       placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..."
                     />
                   </div>
-                )}
-
-                {currentSlide?.kind === "quiz" && (
-                  <QuizSlideEditor
-                    quizData={currentSlide.quizData || null}
-                    onChange={handleQuizDataChange}
-                  />
                 )}
 
                 <div className="flex gap-2 pt-4">
