@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@workspace/ui/components/button";
@@ -486,19 +487,23 @@ export default function LessonsPage({
 
   if (!currentSchool) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">School not found</h1>
-          <p className="text-muted-foreground">
-            The school you're looking for doesn't exist.
-          </p>
+      <>
+        <PlatformAdminGuard />
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">School not found</h1>
+            <p className="text-muted-foreground">
+              The school you're looking for doesn't exist.
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
     <>
+      <PlatformAdminGuard />
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">

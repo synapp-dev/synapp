@@ -1,5 +1,6 @@
 "use client";
 
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -27,36 +28,44 @@ export default function LessonClassesPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-muted-foreground">Loading classes...</p>
+      <>
+        <PlatformAdminGuard />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Loading classes...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (isError || !lessonData) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-destructive font-medium">
-            {error?.message || "Failed to load lesson classes"}
-          </p>
-          <p className="text-muted-foreground mt-2">
-            {error?.message?.includes("Unauthorized")
-              ? "You don't have permission to view this lesson"
-              : "Please try again later"}
-          </p>
+      <>
+        <PlatformAdminGuard />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-destructive font-medium">
+              {error?.message || "Failed to load lesson classes"}
+            </p>
+            <p className="text-muted-foreground mt-2">
+              {error?.message?.includes("Unauthorized")
+                ? "You don't have permission to view this lesson"
+                : "Please try again later"}
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   const assignedClasses = lessonData.assignedClasses || [];
 
   return (
-    <div className="space-y-6">
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2 flex items-center gap-2">
@@ -113,5 +122,6 @@ export default function LessonClassesPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

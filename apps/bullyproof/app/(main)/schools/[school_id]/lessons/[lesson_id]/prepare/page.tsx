@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -293,7 +294,9 @@ export default function LessonPreparePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">Prepare Lesson</h1>
@@ -331,5 +334,6 @@ export default function LessonPreparePage() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

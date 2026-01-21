@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, use, useEffect } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -62,28 +63,34 @@ export default function LessonRunLessonPage({
   // Show loading state while checking permissions
   if (isLoadingLesson || !currentUser || !lessonData) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-muted-foreground">Loading lesson details...</p>
+      <>
+        <PlatformAdminGuard />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <p className="text-muted-foreground">Loading lesson details...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   // Show unauthorized message if not creator (will redirect, but show message briefly)
   if (!isLessonCreator) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-destructive font-medium">
-            Only the teacher can run this lesson
-          </p>
-          <p className="text-muted-foreground mt-2">
-            Redirecting...
-          </p>
+      <>
+        <PlatformAdminGuard />
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-destructive font-medium">
+              Only the teacher can run this lesson
+            </p>
+            <p className="text-muted-foreground mt-2">
+              Redirecting...
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -101,7 +108,9 @@ export default function LessonRunLessonPage({
   // };
 
   return (
-    <div className="space-y-6">
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
       {/* <div>
         <h1 className="text-3xl font-bold mb-2">Deliver Lesson</h1>
         <p className="text-muted-foreground">
@@ -248,5 +257,6 @@ export default function LessonRunLessonPage({
         </DialogContent>
       </Dialog> */}
     </div>
+    </>
   );
 }
