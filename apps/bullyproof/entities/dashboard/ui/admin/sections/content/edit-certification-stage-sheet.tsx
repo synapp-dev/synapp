@@ -23,9 +23,9 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Loader2, Edit, Trash2 } from "lucide-react";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { certificationStages } from "@/server/db/schema";
+import type { certificationCourses } from "@/server/db/schema";
 
-type Stage = typeof certificationStages.$inferSelect & {
+type Stage = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
 };
 
