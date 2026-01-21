@@ -36,7 +36,8 @@ export default function ContentTopicPage({
       <TopicDetailSectionReadonly
         stageSlug={stageSlug}
         topicSlug={topicSlug}
-      schoolId={schoolId}
-    />
+        schoolId={schoolId}
+      />
+    </>
   );
 }

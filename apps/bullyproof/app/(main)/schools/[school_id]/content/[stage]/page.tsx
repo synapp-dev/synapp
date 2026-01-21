@@ -36,8 +36,9 @@ export default function ContentStagePage({
       <StageDetailSection
         slug={stageSlug}
         readonly={true}
-      basePath={`/schools/${schoolId}/content`}
-      onBackClick={() => router.push(`/schools/${schoolId}/content`)}
-    />
+        basePath={`/schools/${schoolId}/content`}
+        onBackClick={() => router.push(`/schools/${schoolId}/content`)}
+      />
+    </>
   );
 }
