@@ -100,9 +100,10 @@ export function useUsers(filters?: {
   // Normalize filters for query key
   const normalizedFilters = filters
     ? (() => {
-        const filtered = Object.fromEntries(
-          Object.entries(filters).filter(([_, value]) => value !== undefined && value !== "")
-        );
+        const filtered: { search?: string; role?: string; schoolId?: string } = {};
+        if (filters.search) filtered.search = String(filters.search);
+        if (filters.role) filtered.role = String(filters.role);
+        if (filters.schoolId) filtered.schoolId = String(filters.schoolId);
         return Object.keys(filtered).length > 0 ? filtered : undefined;
       })()
     : undefined;
