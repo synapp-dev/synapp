@@ -30,7 +30,7 @@ const bulkClassesSchema = z.object({
     z.object({
       name: z.string().trim().min(1).max(200),
       code: z.string().trim().max(50).optional(),
-      studentCap: z.number().int().min(1).max(1000).optional(),
+      studentCap: z.number().int().min(0).max(1000).optional(),
       teacherUserIds: z.array(z.string().uuid()).optional().default([]),
       yearIds: z.array(z.string().uuid()).optional().default([]),
       startYear: z.string().datetime().optional(),
