@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, schoolSectors, schools, states, schoolLicences, schoolInvites, oauthAuthorizationsInAuth, oauthConsentsInAuth, certificationUserTopicProgress, certificationUserAnswers, certificationSlides, certificationStages, certificationTopics, certificationUserProgress, lessons, lessonFeedback, classes, topics, curriculumStages, schoolLevels, schoolYears, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSchoolPositions, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, teacherClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
+import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, schoolLicences, schoolInvites, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, classes, topics, curriculumStages, schoolLevels, schoolYears, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSchoolPositions, courseProgress, courseTopicQuizCompletions, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, teacherClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -21,6 +21,30 @@ export const samlProvidersInAuthRelations = relations(samlProvidersInAuth, ({one
 	}),
 }));
 
+export const courseTopicsRelations = relations(courseTopics, ({one, many}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [courseTopics.courseId],
+		references: [certificationCourses.id]
+	}),
+	slideViewingSessions: many(slideViewingSessions),
+	courseTopicQuizzes: many(courseTopicQuizzes),
+	courseTopicProgresses: many(courseTopicProgress),
+	courseTopicSlides: many(courseTopicSlides),
+	userSlideViews: many(userSlideViews),
+	quizAttempts: many(quizAttempts),
+	courseProgresses: many(courseProgress),
+	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
+}));
+
+export const certificationCoursesRelations = relations(certificationCourses, ({many}) => ({
+	courseTopics: many(courseTopics),
+	slideViewingSessions: many(slideViewingSessions),
+	courseTopicProgresses: many(courseTopicProgress),
+	userSlideViews: many(userSlideViews),
+	quizAttempts: many(quizAttempts),
+	courseProgresses: many(courseProgress),
+}));
+
 export const mfaFactorsInAuthRelations = relations(mfaFactorsInAuth, ({one, many}) => ({
 	usersInAuth: one(usersInAuth, {
 		fields: [mfaFactorsInAuth.userId],
@@ -35,17 +59,20 @@ export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
 	oneTimeTokensInAuths: many(oneTimeTokensInAuth),
 	userProfiles: many(userProfile),
 	sessionsInAuths: many(sessionsInAuth),
+	slideViewingSessions: many(slideViewingSessions),
 	oauthAuthorizationsInAuths: many(oauthAuthorizationsInAuth),
+	courseTopicProgresses: many(courseTopicProgress),
 	oauthConsentsInAuths: many(oauthConsentsInAuth),
-	certificationUserAnswers: many(certificationUserAnswers),
-	certificationUserProgresses: many(certificationUserProgress),
 	lessonFeedbacks: many(lessonFeedback),
+	userSlideViews: many(userSlideViews),
+	quizAttempts: many(quizAttempts),
 	lessons: many(lessons),
 	lessonLiveStates: many(lessonLiveState),
 	userRoles: many(userRoles),
 	lessonSessions: many(lessonSessions),
 	lessonEvents: many(lessonEvents),
-	certificationUserTopicProgresses: many(certificationUserTopicProgress),
+	courseProgresses: many(courseProgress),
+	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
 	teacherSlideNotes: many(teacherSlideNotes),
 }));
 
@@ -139,6 +166,62 @@ export const scopesRelations = relations(scopes, ({many}) => ({
 	roles: many(roles),
 }));
 
+export const slideViewingSessionsRelations = relations(slideViewingSessions, ({one}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [slideViewingSessions.courseId],
+		references: [certificationCourses.id]
+	}),
+	courseTopicSlide: one(courseTopicSlides, {
+		fields: [slideViewingSessions.slideId],
+		references: [courseTopicSlides.id]
+	}),
+	courseTopic: one(courseTopics, {
+		fields: [slideViewingSessions.topicId],
+		references: [courseTopics.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [slideViewingSessions.userId],
+		references: [usersInAuth.id]
+	}),
+}));
+
+export const courseTopicSlidesRelations = relations(courseTopicSlides, ({one, many}) => ({
+	slideViewingSessions: many(slideViewingSessions),
+	courseTopicProgresses: many(courseTopicProgress),
+	courseTopic: one(courseTopics, {
+		fields: [courseTopicSlides.topicId],
+		references: [courseTopics.id]
+	}),
+	userSlideViews: many(userSlideViews),
+}));
+
+export const quizAnswersRelations = relations(quizAnswers, ({one, many}) => ({
+	quizQuestion: one(quizQuestions, {
+		fields: [quizAnswers.questionId],
+		references: [quizQuestions.id]
+	}),
+	quizAttemptAnswers: many(quizAttemptAnswers),
+}));
+
+export const quizQuestionsRelations = relations(quizQuestions, ({one, many}) => ({
+	quizAnswers: many(quizAnswers),
+	courseTopicQuizz: one(courseTopicQuizzes, {
+		fields: [quizQuestions.quizId],
+		references: [courseTopicQuizzes.id]
+	}),
+	quizAttemptAnswers: many(quizAttemptAnswers),
+}));
+
+export const courseTopicQuizzesRelations = relations(courseTopicQuizzes, ({one, many}) => ({
+	courseTopic: one(courseTopics, {
+		fields: [courseTopicQuizzes.topicId],
+		references: [courseTopics.id]
+	}),
+	quizQuestions: many(quizQuestions),
+	quizAttempts: many(quizAttempts),
+	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
+}));
+
 export const schoolsRelations = relations(schools, ({one, many}) => ({
 	schoolSector: one(schoolSectors, {
 		fields: [schools.sectorId],
@@ -190,6 +273,26 @@ export const oauthAuthorizationsInAuthRelations = relations(oauthAuthorizationsI
 	}),
 }));
 
+export const courseTopicProgressRelations = relations(courseTopicProgress, ({one, many}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [courseTopicProgress.courseId],
+		references: [certificationCourses.id]
+	}),
+	courseTopicSlide: one(courseTopicSlides, {
+		fields: [courseTopicProgress.currentSlideId],
+		references: [courseTopicSlides.id]
+	}),
+	courseTopic: one(courseTopics, {
+		fields: [courseTopicProgress.topicId],
+		references: [courseTopics.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [courseTopicProgress.userId],
+		references: [usersInAuth.id]
+	}),
+	quizAttempts: many(quizAttempts),
+}));
+
 export const oauthConsentsInAuthRelations = relations(oauthConsentsInAuth, ({one}) => ({
 	oauthClientsInAuth: one(oauthClientsInAuth, {
 		fields: [oauthConsentsInAuth.clientId],
@@ -197,91 +300,6 @@ export const oauthConsentsInAuthRelations = relations(oauthConsentsInAuth, ({one
 	}),
 	usersInAuth: one(usersInAuth, {
 		fields: [oauthConsentsInAuth.userId],
-		references: [usersInAuth.id]
-	}),
-}));
-
-export const certificationUserAnswersRelations = relations(certificationUserAnswers, ({one}) => ({
-	certificationUserTopicProgress: one(certificationUserTopicProgress, {
-		fields: [certificationUserAnswers.attemptId],
-		references: [certificationUserTopicProgress.id]
-	}),
-	certificationSlide: one(certificationSlides, {
-		fields: [certificationUserAnswers.slideId],
-		references: [certificationSlides.id]
-	}),
-	certificationStage: one(certificationStages, {
-		fields: [certificationUserAnswers.stageId],
-		references: [certificationStages.id]
-	}),
-	certificationTopic: one(certificationTopics, {
-		fields: [certificationUserAnswers.topicId],
-		references: [certificationTopics.id]
-	}),
-	usersInAuth: one(usersInAuth, {
-		fields: [certificationUserAnswers.userId],
-		references: [usersInAuth.id]
-	}),
-}));
-
-export const certificationUserTopicProgressRelations = relations(certificationUserTopicProgress, ({one, many}) => ({
-	certificationUserAnswers: many(certificationUserAnswers),
-	certificationSlide: one(certificationSlides, {
-		fields: [certificationUserTopicProgress.currentSlideId],
-		references: [certificationSlides.id]
-	}),
-	certificationStage: one(certificationStages, {
-		fields: [certificationUserTopicProgress.stageId],
-		references: [certificationStages.id]
-	}),
-	certificationTopic: one(certificationTopics, {
-		fields: [certificationUserTopicProgress.topicId],
-		references: [certificationTopics.id]
-	}),
-	usersInAuth: one(usersInAuth, {
-		fields: [certificationUserTopicProgress.userId],
-		references: [usersInAuth.id]
-	}),
-}));
-
-export const certificationSlidesRelations = relations(certificationSlides, ({one, many}) => ({
-	certificationUserAnswers: many(certificationUserAnswers),
-	certificationUserTopicProgresses: many(certificationUserTopicProgress),
-	certificationTopic: one(certificationTopics, {
-		fields: [certificationSlides.topicId],
-		references: [certificationTopics.id]
-	}),
-}));
-
-export const certificationStagesRelations = relations(certificationStages, ({many}) => ({
-	certificationUserAnswers: many(certificationUserAnswers),
-	certificationUserProgresses: many(certificationUserProgress),
-	certificationUserTopicProgresses: many(certificationUserTopicProgress),
-	certificationTopics: many(certificationTopics),
-}));
-
-export const certificationTopicsRelations = relations(certificationTopics, ({one, many}) => ({
-	certificationUserAnswers: many(certificationUserAnswers),
-	certificationUserProgresses: many(certificationUserProgress),
-	certificationUserTopicProgresses: many(certificationUserTopicProgress),
-	certificationSlides: many(certificationSlides),
-	certificationStage: one(certificationStages, {
-		fields: [certificationTopics.stageId],
-		references: [certificationStages.id]
-	}),
-}));
-
-export const certificationUserProgressRelations = relations(certificationUserProgress, ({one}) => ({
-	certificationTopic: one(certificationTopics, {
-		fields: [certificationUserProgress.lastUpdatedTopicId],
-		references: [certificationTopics.id]
-	}),
-	certificationStage: one(certificationStages, {
-		fields: [certificationUserProgress.stageId],
-		references: [certificationStages.id]
-	}),
-	usersInAuth: one(usersInAuth, {
-		fields: [certificationUserProgress.userId],
 		references: [usersInAuth.id]
 	}),
 }));
@@ -316,6 +334,65 @@ export const lessonsRelations = relations(lessons, ({one, many}) => ({
 	lessonEvents: many(lessonEvents),
 	lessonClasses: many(lessonClasses),
 	lessonSlideNotes: many(lessonSlideNotes),
+}));
+
+export const userSlideViewsRelations = relations(userSlideViews, ({one}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [userSlideViews.courseId],
+		references: [certificationCourses.id]
+	}),
+	courseTopicSlide: one(courseTopicSlides, {
+		fields: [userSlideViews.slideId],
+		references: [courseTopicSlides.id]
+	}),
+	courseTopic: one(courseTopics, {
+		fields: [userSlideViews.topicId],
+		references: [courseTopics.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [userSlideViews.userId],
+		references: [usersInAuth.id]
+	}),
+}));
+
+export const quizAttemptsRelations = relations(quizAttempts, ({one, many}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [quizAttempts.courseId],
+		references: [certificationCourses.id]
+	}),
+	courseTopicQuizz: one(courseTopicQuizzes, {
+		fields: [quizAttempts.quizId],
+		references: [courseTopicQuizzes.id]
+	}),
+	courseTopic: one(courseTopics, {
+		fields: [quizAttempts.topicId],
+		references: [courseTopics.id]
+	}),
+	courseTopicProgress: one(courseTopicProgress, {
+		fields: [quizAttempts.topicProgressId],
+		references: [courseTopicProgress.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [quizAttempts.userId],
+		references: [usersInAuth.id]
+	}),
+	quizAttemptAnswers: many(quizAttemptAnswers),
+	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
+}));
+
+export const quizAttemptAnswersRelations = relations(quizAttemptAnswers, ({one}) => ({
+	quizAnswer: one(quizAnswers, {
+		fields: [quizAttemptAnswers.answerId],
+		references: [quizAnswers.id]
+	}),
+	quizAttempt: one(quizAttempts, {
+		fields: [quizAttemptAnswers.attemptId],
+		references: [quizAttempts.id]
+	}),
+	quizQuestion: one(quizQuestions, {
+		fields: [quizAttemptAnswers.questionId],
+		references: [quizQuestions.id]
+	}),
 }));
 
 export const classesRelations = relations(classes, ({one, many}) => ({
@@ -431,6 +508,40 @@ export const userSchoolPositionsRelations = relations(userSchoolPositions, ({one
 	userProfile: one(userProfile, {
 		fields: [userSchoolPositions.userId],
 		references: [userProfile.id]
+	}),
+}));
+
+export const courseProgressRelations = relations(courseProgress, ({one}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [courseProgress.courseId],
+		references: [certificationCourses.id]
+	}),
+	courseTopic: one(courseTopics, {
+		fields: [courseProgress.currentTopicId],
+		references: [courseTopics.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [courseProgress.userId],
+		references: [usersInAuth.id]
+	}),
+}));
+
+export const courseTopicQuizCompletionsRelations = relations(courseTopicQuizCompletions, ({one}) => ({
+	quizAttempt: one(quizAttempts, {
+		fields: [courseTopicQuizCompletions.passedAttemptId],
+		references: [quizAttempts.id]
+	}),
+	courseTopicQuizz: one(courseTopicQuizzes, {
+		fields: [courseTopicQuizCompletions.quizId],
+		references: [courseTopicQuizzes.id]
+	}),
+	courseTopic: one(courseTopics, {
+		fields: [courseTopicQuizCompletions.topicId],
+		references: [courseTopics.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [courseTopicQuizCompletions.userId],
+		references: [usersInAuth.id]
 	}),
 }));
 

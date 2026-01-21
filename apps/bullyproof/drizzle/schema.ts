@@ -1,4 +1,4 @@
-import { pgTable, pgSchema, uniqueIndex, index, foreignKey, check, uuid, text, timestamp, jsonb, boolean, varchar, unique, bigserial, smallint, json, inet, bigint, date, integer, pgPolicy, primaryKey, pgView, pgEnum } from "drizzle-orm/pg-core"
+import { pgTable, pgSchema, uniqueIndex, index, foreignKey, check, uuid, text, timestamp, jsonb, boolean, varchar, unique, pgPolicy, smallint, integer, bigserial, json, inet, bigint, date, primaryKey, pgView, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 export const auth = pgSchema("auth");
@@ -77,6 +77,38 @@ export const instancesInAuth = auth.table("instances", {
 export const schemaMigrationsInAuth = auth.table("schema_migrations", {
 	version: varchar({ length: 255 }).notNull(),
 });
+
+export const courseTopics = pgTable("course_topics", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	courseId: uuid("course_id").notNull(),
+	title: text().notNull(),
+	status: text().default('draft').notNull(),
+	courseOrder: smallint("course_order").notNull(),
+	isSequential: boolean("is_sequential").default(true).notNull(),
+	quizCompletionPercentage: integer("quiz_completion_percentage").default(100).notNull(),
+	officialNotes: text("official_notes"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	slug: text().notNull(),
+}, (table) => [
+	uniqueIndex("course_topics_course_slug_unique").using("btree", table.courseId.asc().nullsLast().op("uuid_ops"), table.slug.asc().nullsLast().op("text_ops")),
+	uniqueIndex("course_topics_course_title_unique").using("btree", sql`course_id`, sql`lower(title)`),
+	index("idx_course_topics_course_id").using("btree", table.courseId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topics_course_order").using("btree", table.courseId.asc().nullsLast().op("uuid_ops"), table.courseOrder.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topics_course_slug").using("btree", table.courseId.asc().nullsLast().op("uuid_ops"), table.slug.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topics_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "course_topics_course_id_fkey"
+		}).onDelete("restrict"),
+	unique("course_topics_course_order_unique").on(table.courseId, table.courseOrder),
+	pgPolicy("course_topics_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("course_topics_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("course_topics_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_topics_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("course_topics_quiz_completion_percentage_check", sql`(quiz_completion_percentage >= 0) AND (quiz_completion_percentage <= 100)`),
+	check("course_topics_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
+]);
 
 export const states = pgTable("states", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -417,6 +449,134 @@ export const roles = pgTable("roles", {
 	unique("roles_key_key").on(table.key),
 ]);
 
+export const slideViewingSessions = pgTable("slide_viewing_sessions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	slideId: uuid("slide_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	courseId: uuid("course_id").notNull(),
+	sessionStartedAt: timestamp("session_started_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	sessionEndedAt: timestamp("session_ended_at", { withTimezone: true, mode: 'string' }),
+	durationSeconds: integer("duration_seconds"),
+	isCompleted: boolean("is_completed").default(false).notNull(),
+	interactionCount: integer("interaction_count").default(0).notNull(),
+	lastActivityAt: timestamp("last_activity_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_slide_sessions_active").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.slideId.asc().nullsLast().op("uuid_ops")).where(sql`(session_ended_at IS NULL)`),
+	index("idx_slide_sessions_started").using("btree", table.sessionStartedAt.asc().nullsLast().op("timestamptz_ops")),
+	index("idx_slide_sessions_user_slide").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.slideId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "slide_viewing_sessions_course_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.slideId],
+			foreignColumns: [courseTopicSlides.id],
+			name: "slide_viewing_sessions_slide_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "slide_viewing_sessions_topic_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "slide_viewing_sessions_user_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("slide_viewing_sessions_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = user_id)` }),
+	pgPolicy("slide_viewing_sessions_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("slide_viewing_sessions_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("slide_viewing_sessions_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+]);
+
+export const quizAnswers = pgTable("quiz_answers", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	questionId: uuid("question_id").notNull(),
+	answerText: text("answer_text").notNull(),
+	isCorrect: boolean("is_correct").default(false).notNull(),
+	orderIndex: integer("order_index").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_quiz_answers_correct").using("btree", table.questionId.asc().nullsLast().op("bool_ops"), table.isCorrect.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_answers_question_id").using("btree", table.questionId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.questionId],
+			foreignColumns: [quizQuestions.id],
+			name: "quiz_answers_question_id_fkey"
+		}).onDelete("cascade"),
+	unique("quiz_answers_question_order_unique").on(table.questionId, table.orderIndex),
+	pgPolicy("quiz_answers_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("quiz_answers_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("quiz_answers_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("quiz_answers_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
+export const courseTopicQuizzes = pgTable("course_topic_quizzes", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	topicId: uuid("topic_id").notNull(),
+	title: text().notNull(),
+	description: text(),
+	passingScorePercentage: integer("passing_score_percentage").default(70).notNull(),
+	timeLimitMinutes: integer("time_limit_minutes"),
+	maxAttempts: integer("max_attempts"),
+	isRequired: boolean("is_required").default(true).notNull(),
+	sequenceType: text("sequence_type").default('sequential').notNull(),
+	sortOrder: integer("sort_order").default(0).notNull(),
+	status: text().default('draft').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_course_topic_quizzes_sequence").using("btree", table.topicId.asc().nullsLast().op("text_ops"), table.sequenceType.asc().nullsLast().op("uuid_ops"), table.sortOrder.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topic_quizzes_status").using("btree", table.status.asc().nullsLast().op("text_ops")),
+	index("idx_course_topic_quizzes_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "course_topic_quizzes_topic_id_fkey"
+		}).onDelete("cascade"),
+	unique("course_topic_quizzes_topic_sort_unique").on(table.topicId, table.sortOrder),
+	pgPolicy("course_topic_quizzes_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("course_topic_quizzes_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("course_topic_quizzes_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_topic_quizzes_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("course_topic_quizzes_passing_score_percentage_check", sql`(passing_score_percentage >= 0) AND (passing_score_percentage <= 100)`),
+	check("course_topic_quizzes_sequence_type_check", sql`sequence_type = ANY (ARRAY['sequential'::text, 'user_choice'::text])`),
+	check("course_topic_quizzes_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
+]);
+
+export const quizQuestions = pgTable("quiz_questions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	quizId: uuid("quiz_id").notNull(),
+	questionText: text("question_text").notNull(),
+	questionType: text("question_type").default('multiple_choice').notNull(),
+	allowMultipleSelections: boolean("allow_multiple_selections").default(false).notNull(),
+	explanation: text(),
+	points: integer().default(1).notNull(),
+	orderIndex: integer("order_index").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	questionUrls: jsonb("question_urls"),
+}, (table) => [
+	index("idx_quiz_questions_order").using("btree", table.quizId.asc().nullsLast().op("uuid_ops"), table.orderIndex.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_questions_quiz_id").using("btree", table.quizId.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_questions_text_search").using("gin", sql`to_tsvector('english'::regconfig, question_text)`),
+	foreignKey({
+			columns: [table.quizId],
+			foreignColumns: [courseTopicQuizzes.id],
+			name: "quiz_questions_quiz_id_fkey"
+		}).onDelete("cascade"),
+	unique("quiz_questions_quiz_order_unique").on(table.quizId, table.orderIndex),
+	pgPolicy("quiz_questions_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("quiz_questions_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("quiz_questions_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("quiz_questions_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("quiz_questions_question_type_check", sql`question_type = ANY (ARRAY['multiple_choice'::text, 'single_choice'::text, 'true_false'::text])`),
+]);
+
 export const schools = pgTable("schools", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	name: text().notNull(),
@@ -535,6 +695,55 @@ export const oauthAuthorizationsInAuth = auth.table("oauth_authorizations", {
 	check("oauth_authorizations_state_length", sql`char_length(state) <= 4096`),
 ]);
 
+export const courseTopicProgress = pgTable("course_topic_progress", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	courseId: uuid("course_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	attemptNumber: integer("attempt_number").default(1).notNull(),
+	currentSlideId: uuid("current_slide_id"),
+	currentSlideIndex: integer("current_slide_index"),
+	status: text().default('not_started').notNull(),
+	slidesCompletedAt: timestamp("slides_completed_at", { withTimezone: true, mode: 'string' }),
+	quizUnlockedAt: timestamp("quiz_unlocked_at", { withTimezone: true, mode: 'string' }),
+	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
+	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	slideProgress: jsonb("slide_progress").default({}).notNull(),
+}, (table) => [
+	index("idx_course_topic_progress_current_slide").using("btree", table.currentSlideId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topic_progress_slide_progress").using("gin", table.slideProgress.asc().nullsLast().op("jsonb_ops")),
+	index("idx_course_topic_progress_status").using("btree", table.status.asc().nullsLast().op("text_ops")).where(sql`(status = ANY (ARRAY['not_started'::text, 'viewing_slides'::text, 'quiz_unlocked'::text]))`),
+	index("idx_course_topic_progress_user_course").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.courseId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topic_progress_user_topic").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.topicId.asc().nullsLast().op("uuid_ops"), table.attemptNumber.desc().nullsFirst().op("uuid_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "course_topic_progress_course_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.currentSlideId],
+			foreignColumns: [courseTopicSlides.id],
+			name: "course_topic_progress_current_slide_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "course_topic_progress_topic_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "course_topic_progress_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("course_topic_progress_user_course_topic_attempt_unique").on(table.userId, table.courseId, table.topicId, table.attemptNumber),
+	pgPolicy("course_topic_progress_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(auth.uid() = user_id)`  }),
+	pgPolicy("course_topic_progress_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_topic_progress_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("course_topic_progress_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	check("course_topic_progress_status_check", sql`status = ANY (ARRAY['not_started'::text, 'viewing_slides'::text, 'quiz_unlocked'::text, 'completed'::text])`),
+]);
+
 export const oauthConsentsInAuth = auth.table("oauth_consents", {
 	id: uuid().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -561,86 +770,6 @@ export const oauthConsentsInAuth = auth.table("oauth_consents", {
 	check("oauth_consents_scopes_not_empty", sql`char_length(TRIM(BOTH FROM scopes)) > 0`),
 ]);
 
-export const certificationUserAnswers = pgTable("certification_user_answers", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
-	stageId: uuid("stage_id").notNull(),
-	topicId: uuid("topic_id").notNull(),
-	slideId: uuid("slide_id").notNull(),
-	answerId: text("answer_id"),
-	isCorrect: boolean("is_correct").notNull(),
-	timeTaken: integer("time_taken"),
-	answeredAt: timestamp("answered_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	attemptId: uuid("attempt_id"),
-}, (table) => [
-	index("idx_certification_user_answers_attempt").using("btree", table.attemptId.asc().nullsLast().op("uuid_ops")),
-	index("idx_certification_user_answers_slide").using("btree", table.slideId.asc().nullsLast().op("uuid_ops")),
-	index("idx_certification_user_answers_user_stage").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.stageId.asc().nullsLast().op("uuid_ops")),
-	foreignKey({
-			columns: [table.attemptId],
-			foreignColumns: [certificationUserTopicProgress.id],
-			name: "certification_user_answers_attempt_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.slideId],
-			foreignColumns: [certificationSlides.id],
-			name: "certification_user_answers_slide_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.stageId],
-			foreignColumns: [certificationStages.id],
-			name: "certification_user_answers_stage_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.topicId],
-			foreignColumns: [certificationTopics.id],
-			name: "certification_user_answers_topic_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
-			name: "certification_user_answers_user_id_fkey"
-		}).onDelete("cascade"),
-	pgPolicy("certification_user_answers_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("certification_user_answers_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_user_answers_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_user_answers_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
-]);
-
-export const certificationUserProgress = pgTable("certification_user_progress", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
-	stageId: uuid("stage_id").notNull(),
-	status: text().default('started').notNull(),
-	progressPercentage: integer("progress_percentage").default(0).notNull(),
-	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	lastUpdatedTopicId: uuid("last_updated_topic_id"),
-}, (table) => [
-	foreignKey({
-			columns: [table.lastUpdatedTopicId],
-			foreignColumns: [certificationTopics.id],
-			name: "certification_user_progress_last_topic_id_fkey"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.stageId],
-			foreignColumns: [certificationStages.id],
-			name: "certification_user_progress_stage_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
-			name: "certification_user_progress_user_id_fkey"
-		}).onDelete("cascade"),
-	unique("certification_user_progress_user_stage").on(table.userId, table.stageId),
-	pgPolicy("certification_user_progress_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("certification_user_progress_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_user_progress_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_user_progress_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
-	check("certification_user_progress_status_check", sql`status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text])`),
-]);
-
 export const lessonFeedback = pgTable("lesson_feedback", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	lessonId: uuid("lesson_id").notNull(),
@@ -665,6 +794,56 @@ export const lessonFeedback = pgTable("lesson_feedback", {
 	check("lesson_feedback_rating_check", sql`(rating >= 1) AND (rating <= 5)`),
 ]);
 
+export const certificationCourses = pgTable("certification_courses", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	code: text().notNull(),
+	name: text().notNull(),
+	sortIndex: smallint("sort_index").notNull(),
+	certificateType: text("certificate_type"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_certification_courses_sort_index").using("btree", table.sortIndex.asc().nullsLast().op("int2_ops")),
+	unique("certification_courses_code_key").on(table.code),
+	unique("certification_courses_name_key").on(table.name),
+	unique("certification_courses_sort_index_key").on(table.sortIndex),
+	pgPolicy("certification_courses_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("certification_courses_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("certification_courses_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("certification_courses_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("certification_courses_certificate_type_check", sql`certificate_type = ANY (ARRAY['none'::text, 'completion'::text, 'achievement'::text, 'custom'::text])`),
+]);
+
+export const courseTopicSlides = pgTable("course_topic_slides", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	topicId: uuid("topic_id").notNull(),
+	orderIndex: integer("order_index").notNull(),
+	kind: text().notNull(),
+	textHtml: text("text_html"),
+	imageUrl: text("image_url"),
+	videoUrl: text("video_url"),
+	videoStartS: integer("video_start_s"),
+	videoEndS: integer("video_end_s"),
+	officialNotes: text("official_notes"),
+	durationSec: integer("duration_sec"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_course_topic_slides_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topic_slides_topic_order").using("btree", table.topicId.asc().nullsLast().op("uuid_ops"), table.orderIndex.asc().nullsLast().op("int4_ops")),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "course_topic_slides_topic_id_fkey"
+		}).onDelete("cascade"),
+	unique("course_topic_slides_topic_order_unique").on(table.topicId, table.orderIndex),
+	pgPolicy("course_topic_slides_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("course_topic_slides_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("course_topic_slides_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_topic_slides_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("course_topic_slides_kind_check", sql`kind = ANY (ARRAY['image'::text, 'video'::text, 'text'::text])`),
+]);
+
 export const oauthClientStatesInAuth = auth.table("oauth_client_states", {
 	id: uuid().notNull(),
 	providerType: text("provider_type").notNull(),
@@ -672,6 +851,141 @@ export const oauthClientStatesInAuth = auth.table("oauth_client_states", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).notNull(),
 }, (table) => [
 	index("idx_oauth_client_states_created_at").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+]);
+
+export const userSlideViews = pgTable("user_slide_views", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	slideId: uuid("slide_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	courseId: uuid("course_id").notNull(),
+	firstViewedAt: timestamp("first_viewed_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	lastViewedAt: timestamp("last_viewed_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	totalTimeSeconds: integer("total_time_seconds").default(0).notNull(),
+	viewCount: integer("view_count").default(1).notNull(),
+}, (table) => [
+	index("idx_user_slide_views_slide").using("btree", table.slideId.asc().nullsLast().op("uuid_ops")),
+	index("idx_user_slide_views_user_topic").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.topicId.asc().nullsLast().op("uuid_ops")),
+	index("idx_user_slide_views_viewed_at").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.topicId.asc().nullsLast().op("timestamptz_ops"), table.lastViewedAt.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "user_slide_views_course_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.slideId],
+			foreignColumns: [courseTopicSlides.id],
+			name: "user_slide_views_slide_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "user_slide_views_topic_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "user_slide_views_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("user_slide_views_user_slide_unique").on(table.userId, table.slideId),
+	pgPolicy("user_slide_views_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(auth.uid() = user_id)`  }),
+	pgPolicy("user_slide_views_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("user_slide_views_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("user_slide_views_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+]);
+
+export const quizAttempts = pgTable("quiz_attempts", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	quizId: uuid("quiz_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	courseId: uuid("course_id").notNull(),
+	topicProgressId: uuid("topic_progress_id"),
+	attemptNumber: integer("attempt_number").default(1).notNull(),
+	totalQuestions: integer("total_questions").notNull(),
+	correctAnswers: integer("correct_answers").default(0).notNull(),
+	scorePercentage: integer("score_percentage"),
+	isPassed: boolean("is_passed"),
+	timeLimitStartedAt: timestamp("time_limit_started_at", { withTimezone: true, mode: 'string' }),
+	timeTakenSeconds: integer("time_taken_seconds"),
+	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
+}, (table) => [
+	index("idx_quiz_attempts_completed").using("btree", table.completedAt.asc().nullsLast().op("timestamptz_ops")).where(sql`(completed_at IS NOT NULL)`),
+	index("idx_quiz_attempts_course_topic_progress").using("btree", table.topicProgressId.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_attempts_in_progress").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.quizId.asc().nullsLast().op("uuid_ops")).where(sql`(completed_at IS NULL)`),
+	index("idx_quiz_attempts_quiz").using("btree", table.quizId.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_attempts_topic_passed").using("btree", table.topicId.asc().nullsLast().op("uuid_ops"), table.isPassed.asc().nullsLast().op("uuid_ops")).where(sql`(is_passed = true)`),
+	index("idx_quiz_attempts_user_quiz").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.quizId.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_attempts_user_topic").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.topicId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "quiz_attempts_course_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.quizId],
+			foreignColumns: [courseTopicQuizzes.id],
+			name: "quiz_attempts_quiz_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "quiz_attempts_topic_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicProgressId],
+			foreignColumns: [courseTopicProgress.id],
+			name: "quiz_attempts_topic_progress_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "quiz_attempts_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("quiz_attempts_user_quiz_attempt_unique").on(table.userId, table.quizId, table.attemptNumber),
+	pgPolicy("quiz_attempts_admin_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid)` }),
+	pgPolicy("quiz_attempts_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("quiz_attempts_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("quiz_attempts_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+]);
+
+export const quizAttemptAnswers = pgTable("quiz_attempt_answers", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	attemptId: uuid("attempt_id").notNull(),
+	questionId: uuid("question_id").notNull(),
+	answerId: uuid("answer_id").notNull(),
+	isCorrect: boolean("is_correct"),
+	timeTakenSeconds: integer("time_taken_seconds"),
+	answeredAt: timestamp("answered_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_quiz_attempt_answers_attempt").using("btree", table.attemptId.asc().nullsLast().op("uuid_ops")),
+	index("idx_quiz_attempt_answers_correct").using("btree", table.isCorrect.asc().nullsLast().op("bool_ops")),
+	index("idx_quiz_attempt_answers_pending").using("btree", table.attemptId.asc().nullsLast().op("uuid_ops"), table.questionId.asc().nullsLast().op("uuid_ops")).where(sql`(is_correct IS NULL)`),
+	index("idx_quiz_attempt_answers_question").using("btree", table.questionId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.answerId],
+			foreignColumns: [quizAnswers.id],
+			name: "quiz_attempt_answers_answer_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.attemptId],
+			foreignColumns: [quizAttempts.id],
+			name: "quiz_attempt_answers_attempt_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.questionId],
+			foreignColumns: [quizQuestions.id],
+			name: "quiz_attempt_answers_question_id_fkey"
+		}).onDelete("cascade"),
+	unique("quiz_attempt_answers_attempt_question_answer_unique").on(table.attemptId, table.questionId, table.answerId),
+	pgPolicy("quiz_attempt_answers_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = ( SELECT quiz_attempts.user_id
+   FROM quiz_attempts
+  WHERE (quiz_attempts.id = quiz_attempt_answers.attempt_id)))` }),
+	pgPolicy("quiz_attempt_answers_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("quiz_attempt_answers_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("quiz_attempt_answers_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 
 export const classes = pgTable("classes", {
@@ -942,125 +1256,6 @@ export const topicSlides = pgTable("topic_slides", {
 	check("topic_slides_payload_chk", sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (text_html IS NULL))`),
 ]);
 
-export const certificationStages = pgTable("certification_stages", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	code: text().notNull(),
-	name: text().notNull(),
-	sortIndex: smallint("sort_index").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	unique("certification_stages_code_key").on(table.code),
-	unique("certification_stages_name_key").on(table.name),
-	unique("certification_stages_sort_index_key").on(table.sortIndex),
-	pgPolicy("certification_stages_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-	pgPolicy("certification_stages_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_stages_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_stages_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-]);
-
-export const certificationUserTopicProgress = pgTable("certification_user_topic_progress", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
-	stageId: uuid("stage_id").notNull(),
-	topicId: uuid("topic_id").notNull(),
-	attemptNumber: integer("attempt_number").default(1).notNull(),
-	currentSlideId: uuid("current_slide_id"),
-	status: text().default('started').notNull(),
-	scorePercentage: integer("score_percentage"),
-	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
-	passedAt: timestamp("passed_at", { withTimezone: true, mode: 'string' }),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	slideProgress: jsonb("slide_progress").default({}).notNull(),
-}, (table) => [
-	index("idx_certification_user_topic_progress_current_slide").using("btree", table.currentSlideId.asc().nullsLast().op("uuid_ops")),
-	index("idx_certification_user_topic_progress_slide_progress").using("gin", table.slideProgress.asc().nullsLast().op("jsonb_ops")),
-	index("idx_certification_user_topic_progress_status").using("btree", table.status.asc().nullsLast().op("text_ops")).where(sql`(status = ANY (ARRAY['started'::text, 'in_progress'::text]))`),
-	index("idx_certification_user_topic_progress_user_stage").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.stageId.asc().nullsLast().op("uuid_ops")),
-	index("idx_certification_user_topic_progress_user_topic").using("btree", table.userId.asc().nullsLast().op("int4_ops"), table.topicId.asc().nullsLast().op("int4_ops"), table.attemptNumber.desc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.currentSlideId],
-			foreignColumns: [certificationSlides.id],
-			name: "certification_user_topic_progress_current_slide_id_fkey"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.stageId],
-			foreignColumns: [certificationStages.id],
-			name: "certification_user_topic_progress_stage_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.topicId],
-			foreignColumns: [certificationTopics.id],
-			name: "certification_user_topic_progress_topic_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
-			name: "certification_user_topic_progress_user_id_fkey"
-		}).onDelete("cascade"),
-	unique("certification_user_topic_progress_user_stage_topic_attempt").on(table.userId, table.stageId, table.topicId, table.attemptNumber),
-	pgPolicy("certification_user_topic_progress_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = user_id)` }),
-	pgPolicy("certification_user_topic_progress_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_user_topic_progress_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_user_topic_progress_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
-	check("certification_user_topic_progress_status_check", sql`status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text, 'passed'::text, 'failed'::text])`),
-]);
-
-export const certificationSlides = pgTable("certification_slides", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	topicId: uuid("topic_id").notNull(),
-	orderIndex: integer("order_index").notNull(),
-	kind: text().notNull(),
-	textHtml: text("text_html"),
-	imageUrl: text("image_url"),
-	videoUrl: text("video_url"),
-	videoStartS: integer("video_start_s"),
-	videoEndS: integer("video_end_s"),
-	officialNotes: text("official_notes"),
-	durationSec: integer("duration_sec"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	quizData: jsonb("quiz_data"),
-}, (table) => [
-	uniqueIndex("certification_slides_topic_order_uniq").using("btree", table.topicId.asc().nullsLast().op("int4_ops"), table.orderIndex.asc().nullsLast().op("uuid_ops")),
-	index("idx_certification_slides_topic_order").using("btree", table.topicId.asc().nullsLast().op("int4_ops"), table.orderIndex.asc().nullsLast().op("int4_ops")),
-	foreignKey({
-			columns: [table.topicId],
-			foreignColumns: [certificationTopics.id],
-			name: "certification_slides_topic_id_fkey"
-		}).onDelete("cascade"),
-	unique("certification_slides_unique_order").on(table.topicId, table.orderIndex),
-	pgPolicy("certification_slides_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-	pgPolicy("certification_slides_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_slides_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_slides_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	check("certification_slides_kind_check", sql`kind = ANY (ARRAY['image'::text, 'video'::text, 'quiz'::text, 'test'::text])`),
-	check("certification_slides_payload_chk", sql`((kind = 'image'::text) AND (image_url IS NOT NULL) AND (video_url IS NULL) AND (text_html IS NULL) AND (quiz_data IS NULL)) OR ((kind = 'video'::text) AND (video_url IS NOT NULL) AND (image_url IS NULL) AND (text_html IS NULL) AND (quiz_data IS NULL)) OR ((kind = 'quiz'::text) AND (quiz_data IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL) AND (text_html IS NULL)) OR ((kind = 'test'::text) AND (image_url IS NULL) AND (video_url IS NULL))`),
-]);
-
-export const certificationTopics = pgTable("certification_topics", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	stageId: uuid("stage_id").notNull(),
-	title: text().notNull(),
-	status: text().default('draft').notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	officialNotes: text("official_notes"),
-	stageOrder: smallint("stage_order"),
-}, (table) => [
-	uniqueIndex("ux_certification_topics_stage_title").using("btree", sql`stage_id`, sql`lower(title)`),
-	foreignKey({
-			columns: [table.stageId],
-			foreignColumns: [certificationStages.id],
-			name: "certification_topics_stage_id_fkey"
-		}).onDelete("restrict"),
-	pgPolicy("certification_topics_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-	pgPolicy("certification_topics_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_topics_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_topics_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	check("certification_topics_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
-]);
-
 export const userSchoolPositions = pgTable("user_school_positions", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -1081,6 +1276,86 @@ export const userSchoolPositions = pgTable("user_school_positions", {
 			foreignColumns: [userProfile.id],
 			name: "user_school_positions_user_id_fkey"
 		}).onDelete("cascade"),
+]);
+
+export const courseProgress = pgTable("course_progress", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	courseId: uuid("course_id").notNull(),
+	currentTopicId: uuid("current_topic_id"),
+	currentTopicOrder: integer("current_topic_order"),
+	lastCompletedTopicOrder: integer("last_completed_topic_order").default(0).notNull(),
+	totalTopics: integer("total_topics").notNull(),
+	completedTopics: integer("completed_topics").default(0).notNull(),
+	progressPercentage: integer("progress_percentage").default(0).notNull(),
+	status: text().default('not_started').notNull(),
+	certificateIssuedAt: timestamp("certificate_issued_at", { withTimezone: true, mode: 'string' }),
+	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }),
+	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_course_progress_status").using("btree", table.status.asc().nullsLast().op("text_ops")).where(sql`(status = ANY (ARRAY['not_started'::text, 'in_progress'::text]))`),
+	index("idx_course_progress_user_course").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.courseId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "course_progress_course_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.currentTopicId],
+			foreignColumns: [courseTopics.id],
+			name: "course_progress_current_topic_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "course_progress_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("course_progress_user_course_unique").on(table.userId, table.courseId),
+	pgPolicy("course_progress_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = user_id)` }),
+	pgPolicy("course_progress_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("course_progress_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_progress_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	check("course_progress_status_check", sql`status = ANY (ARRAY['not_started'::text, 'in_progress'::text, 'completed'::text])`),
+]);
+
+export const courseTopicQuizCompletions = pgTable("course_topic_quiz_completions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	quizId: uuid("quiz_id").notNull(),
+	passedAttemptId: uuid("passed_attempt_id"),
+	firstPassedAt: timestamp("first_passed_at", { withTimezone: true, mode: 'string' }).notNull(),
+	lastPassedAt: timestamp("last_passed_at", { withTimezone: true, mode: 'string' }).notNull(),
+	totalAttempts: integer("total_attempts").default(1).notNull(),
+}, (table) => [
+	index("idx_course_topic_quiz_completions_quiz").using("btree", table.quizId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_topic_quiz_completions_user_topic").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.topicId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.passedAttemptId],
+			foreignColumns: [quizAttempts.id],
+			name: "course_topic_quiz_completions_passed_attempt_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.quizId],
+			foreignColumns: [courseTopicQuizzes.id],
+			name: "course_topic_quiz_completions_quiz_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [courseTopics.id],
+			name: "course_topic_quiz_completions_topic_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "course_topic_quiz_completions_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("course_topic_quiz_completions_user_quiz_unique").on(table.userId, table.quizId),
+	pgPolicy("course_topic_quiz_completions_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(auth.uid() = user_id)`  }),
+	pgPolicy("course_topic_quiz_completions_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_topic_quiz_completions_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("course_topic_quiz_completions_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 
 export const schoolLevelAssignments = pgTable("school_level_assignments", {
@@ -1333,6 +1608,18 @@ export const vUserProfileExpanded = pgView("v_user_profile_expanded", {	id: uuid
 	schoolRoles: jsonb("school_roles"),
 }).with({ securityInvoker: true }).as(sql`SELECT up.id, up.first_name, up.last_name, TRIM(BOTH ' '::text FROM concat(up.first_name, ' ', up.last_name)) AS full_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'roleKey', r.key)) FILTER (WHERE ur.role_scope = 'school'::text), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);
 
+export const vUsersWithRolesAndSchools = pgView("v_users_with_roles_and_schools", {	id: uuid(),
+	firstName: text("first_name"),
+	lastName: text("last_name"),
+	email: text(),
+	avatarUrl: text("avatar_url"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	metadata: jsonb(),
+	platformRoles: text("platform_roles"),
+	schoolRoles: jsonb("school_roles"),
+}).with({"securityInvoker":true}).as(sql`SELECT up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'schoolName', s.name, 'roleKey', r.key, 'roleName', r.name)) FILTER (WHERE ur.role_scope = 'school'::text AND ur.school_id IS NOT NULL), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id LEFT JOIN schools s ON s.id = ur.school_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);
+
 export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
 	name: text(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
@@ -1344,4 +1631,50 @@ export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
 	activeLicence: boolean("active_licence"),
-}).with({ securityInvoker: true }).as(sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, (EXISTS ( SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status)) AS active_licence FROM schools s`);
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	staffCount: bigint("staff_count", { mode: "number" }),
+}).as(sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, (EXISTS ( SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status)) AS active_licence, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_STAFF'::text), 0::bigint) AS staff_count FROM schools s`);
+
+export const vQuizAttemptsEnriched = pgView("v_quiz_attempts_enriched", {	attemptId: uuid("attempt_id"),
+	userId: uuid("user_id"),
+	quizId: uuid("quiz_id"),
+	topicId: uuid("topic_id"),
+	courseId: uuid("course_id"),
+	attemptNumber: integer("attempt_number"),
+	totalQuestions: integer("total_questions"),
+	correctAnswers: integer("correct_answers"),
+	scorePercentage: integer("score_percentage"),
+	passingScorePercentage: integer("passing_score_percentage"),
+	isPassed: boolean("is_passed"),
+	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }),
+	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
+}).as(sql`SELECT qa.id AS attempt_id, qa.user_id, qa.quiz_id, qa.topic_id, qa.course_id, qa.attempt_number, qa.total_questions, qa.correct_answers, qa.score_percentage, ctq.passing_score_percentage, qa.is_passed, qa.started_at, qa.completed_at FROM quiz_attempts qa JOIN course_topic_quizzes ctq ON ctq.id = qa.quiz_id WHERE qa.completed_at IS NOT NULL`);
+
+export const vCourseTopicsEnriched = pgView("v_course_topics_enriched", {	topicId: uuid("topic_id"),
+	courseId: uuid("course_id"),
+	topicTitle: text("topic_title"),
+	courseOrder: smallint("course_order"),
+	topicStatus: text("topic_status"),
+	topicCreatedAt: timestamp("topic_created_at", { withTimezone: true, mode: 'string' }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	slideCount: bigint("slide_count", { mode: "number" }),
+	hasQuiz: boolean("has_quiz"),
+	quizCompleted: boolean("quiz_completed"),
+	quizScorePercentage: integer("quiz_score_percentage"),
+}).as(sql`SELECT ct.id AS topic_id, ct.course_id, ct.title AS topic_title, ct.course_order, ct.status AS topic_status, ct.created_at AS topic_created_at, COALESCE(slide_counts.slide_count, 0::bigint) AS slide_count, COALESCE(quiz_exists.has_quiz, false) AS has_quiz, COALESCE(user_quiz_status.quiz_completed, false) AS quiz_completed, user_quiz_status.quiz_score_percentage FROM course_topics ct LEFT JOIN ( SELECT course_topic_slides.topic_id, count(*) AS slide_count FROM course_topic_slides GROUP BY course_topic_slides.topic_id) slide_counts ON slide_counts.topic_id = ct.id LEFT JOIN ( SELECT DISTINCT ctq.topic_id, true AS has_quiz FROM course_topic_quizzes ctq JOIN quiz_questions qq ON qq.quiz_id = ctq.id GROUP BY ctq.topic_id HAVING count(qq.id) > 0) quiz_exists ON quiz_exists.topic_id = ct.id LEFT JOIN ( SELECT qa.topic_id, bool_or(qa.is_passed = true) AS quiz_completed, ( SELECT qa2.score_percentage FROM quiz_attempts qa2 WHERE qa2.topic_id = qa.topic_id AND qa2.user_id = auth.uid() AND (qa2.is_passed = true AND qa2.score_percentage IS NOT NULL OR NOT (EXISTS ( SELECT 1 FROM quiz_attempts qa3 WHERE qa3.topic_id = qa.topic_id AND qa3.user_id = auth.uid() AND qa3.is_passed = true)) AND qa2.score_percentage IS NOT NULL) ORDER BY ( CASE WHEN qa2.is_passed = true THEN 0 ELSE 1 END), qa2.completed_at DESC NULLS LAST, qa2.started_at DESC LIMIT 1) AS quiz_score_percentage FROM quiz_attempts qa WHERE qa.user_id = auth.uid() GROUP BY qa.topic_id) user_quiz_status ON user_quiz_status.topic_id = ct.id ORDER BY ct.course_id, ct.course_order`);
+
+export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
+	topicId: uuid("topic_id"),
+	title: text(),
+	description: text(),
+	passingScorePercentage: integer("passing_score_percentage"),
+	timeLimitMinutes: integer("time_limit_minutes"),
+	maxAttempts: integer("max_attempts"),
+	isRequired: boolean("is_required"),
+	sequenceType: text("sequence_type"),
+	sortOrder: integer("sort_order"),
+	status: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	questions: jsonb(),
+}).as(sql`SELECT id, topic_id, title, description, passing_score_percentage, time_limit_minutes, max_attempts, is_required, sequence_type, sort_order, status, created_at, updated_at, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qq.id, 'quiz_id', qq.quiz_id, 'question_text', qq.question_text, 'question_type', qq.question_type, 'allow_multiple_selections', qq.allow_multiple_selections, 'explanation', qq.explanation, 'points', qq.points, 'order_index', qq.order_index, 'question_urls', qq.question_urls, 'created_at', qq.created_at, 'updated_at', qq.updated_at, 'answers', COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qa.id, 'question_id', qa.question_id, 'answer_text', qa.answer_text, 'is_correct', qa.is_correct, 'order_index', qa.order_index, 'created_at', qa.created_at, 'updated_at', qa.updated_at) ORDER BY qa.order_index) AS jsonb_agg FROM quiz_answers qa WHERE qa.question_id = qq.id), '[]'::jsonb)) ORDER BY qq.order_index) AS jsonb_agg FROM quiz_questions qq WHERE qq.quiz_id = ctq.id), '[]'::jsonb) AS questions FROM course_topic_quizzes ctq`);
