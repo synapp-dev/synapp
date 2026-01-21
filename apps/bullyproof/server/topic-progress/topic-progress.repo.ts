@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { topicProgress, courseTopicSlides } from "@/server/db/schema";
+import { courseTopicProgress, courseTopicSlides } from "@/server/db/schema";
 import { eq, and, desc, max, sql } from "drizzle-orm";
 
 export const topicProgressRepo = {
@@ -10,15 +10,15 @@ export const topicProgressRepo = {
   ) => {
     const result = await db
       .select()
-      .from(topicProgress)
+      .from(courseTopicProgress)
       .where(
         and(
-          eq(topicProgress.userId, userId),
-          eq(topicProgress.courseId, courseId),
-          eq(topicProgress.topicId, topicId)
+          eq(courseTopicProgress.userId, userId),
+          eq(courseTopicProgress.courseId, courseId),
+          eq(courseTopicProgress.topicId, topicId)
         )
       )
-      .orderBy(desc(topicProgress.attemptNumber))
+      .orderBy(desc(courseTopicProgress.attemptNumber))
       .limit(1);
 
     return result[0] ?? null;
@@ -31,16 +31,16 @@ export const topicProgressRepo = {
   ) => {
     const result = await db
       .select()
-      .from(topicProgress)
+      .from(courseTopicProgress)
       .where(
         and(
-          eq(topicProgress.userId, userId),
-          eq(topicProgress.courseId, courseId),
-          eq(topicProgress.topicId, topicId),
+          eq(courseTopicProgress.userId, userId),
+          eq(courseTopicProgress.courseId, courseId),
+          eq(courseTopicProgress.topicId, topicId),
           sql`status IN ('not_started', 'viewing_slides', 'quiz_unlocked')`
         )
       )
-      .orderBy(desc(topicProgress.attemptNumber))
+      .orderBy(desc(courseTopicProgress.attemptNumber))
       .limit(1);
 
     return result[0] ?? null;
@@ -54,14 +54,14 @@ export const topicProgressRepo = {
   ) => {
     const maxAttemptResult = await db
       .select({
-        maxAttempt: max(topicProgress.attemptNumber),
+        maxAttempt: max(courseTopicProgress.attemptNumber),
       })
-      .from(topicProgress)
+      .from(courseTopicProgress)
       .where(
         and(
-          eq(topicProgress.userId, userId),
-          eq(topicProgress.courseId, courseId),
-          eq(topicProgress.topicId, topicId)
+          eq(courseTopicProgress.userId, userId),
+          eq(courseTopicProgress.courseId, courseId),
+          eq(courseTopicProgress.topicId, topicId)
         )
       );
 
@@ -80,7 +80,7 @@ export const topicProgressRepo = {
 
     try {
       const result = await db
-        .insert(topicProgress)
+        .insert(courseTopicProgress)
         .values({
           userId,
           courseId,
@@ -100,13 +100,13 @@ export const topicProgressRepo = {
         // Fetch and return the existing attempt
         const existingAttempt = await db
           .select()
-          .from(topicProgress)
+          .from(courseTopicProgress)
           .where(
             and(
-              eq(topicProgress.userId, userId),
-              eq(topicProgress.courseId, courseId),
-              eq(topicProgress.topicId, topicId),
-              eq(topicProgress.attemptNumber, nextAttemptNumber)
+              eq(courseTopicProgress.userId, userId),
+              eq(courseTopicProgress.courseId, courseId),
+              eq(courseTopicProgress.topicId, topicId),
+              eq(courseTopicProgress.attemptNumber, nextAttemptNumber)
             )
           )
           .limit(1);
@@ -131,14 +131,14 @@ export const topicProgressRepo = {
     const slideIndex = slide[0]?.orderIndex ?? null;
 
     return db
-      .update(topicProgress)
+      .update(courseTopicProgress)
       .set({
         currentSlideId: slideId,
         currentSlideIndex: slideIndex,
         status: sql`CASE WHEN status = 'not_started' THEN 'viewing_slides' ELSE status END`,
         updatedAt: sql`now()`,
       })
-      .where(eq(topicProgress.id, attemptId))
+      .where(eq(courseTopicProgress.id, attemptId))
       .returning();
   },
 
@@ -167,17 +167,17 @@ export const topicProgressRepo = {
     }
 
     return db
-      .update(topicProgress)
+      .update(courseTopicProgress)
       .set(updateData)
-      .where(eq(topicProgress.id, attemptId))
+      .where(eq(courseTopicProgress.id, attemptId))
       .returning();
   },
 
   markSlideViewed: async (attemptId: string, slideId: string) => {
     const attempt = await db
-      .select({ slideProgress: topicProgress.slideProgress })
-      .from(topicProgress)
-      .where(eq(topicProgress.id, attemptId))
+      .select({ slideProgress: courseTopicProgress.slideProgress })
+      .from(courseTopicProgress)
+      .where(eq(courseTopicProgress.id, attemptId))
       .limit(1);
 
     if (attempt.length === 0) {
@@ -191,12 +191,12 @@ export const topicProgressRepo = {
     };
 
     return db
-      .update(topicProgress)
+      .update(courseTopicProgress)
       .set({
         slideProgress: slideProgress,
         updatedAt: sql`now()`,
       })
-      .where(eq(topicProgress.id, attemptId))
+      .where(eq(courseTopicProgress.id, attemptId))
       .returning();
   },
 
@@ -207,11 +207,11 @@ export const topicProgressRepo = {
   ) => {
     const attempt = await db
       .select({
-        currentSlideIndex: topicProgress.currentSlideIndex,
-        slideProgress: topicProgress.slideProgress,
+        currentSlideIndex: courseTopicProgress.currentSlideIndex,
+        slideProgress: courseTopicProgress.slideProgress,
       })
-      .from(topicProgress)
-      .where(eq(topicProgress.id, attemptId))
+      .from(courseTopicProgress)
+      .where(eq(courseTopicProgress.id, attemptId))
       .limit(1);
 
     if (attempt.length === 0) return false;
@@ -232,19 +232,19 @@ export const topicProgressRepo = {
   getByCourse: (userId: string, courseId: string) =>
     db
       .select()
-      .from(topicProgress)
+      .from(courseTopicProgress)
       .where(
         and(
-          eq(topicProgress.userId, userId),
-          eq(topicProgress.courseId, courseId)
+          eq(courseTopicProgress.userId, userId),
+          eq(courseTopicProgress.courseId, courseId)
         )
       )
-      .orderBy(topicProgress.topicId, desc(topicProgress.attemptNumber)),
+      .orderBy(courseTopicProgress.topicId, desc(courseTopicProgress.attemptNumber)),
 
   getById: (attemptId: string) =>
     db
       .select()
-      .from(topicProgress)
-      .where(eq(topicProgress.id, attemptId))
+      .from(courseTopicProgress)
+      .where(eq(courseTopicProgress.id, attemptId))
       .limit(1),
 };

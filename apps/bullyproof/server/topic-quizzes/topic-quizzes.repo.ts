@@ -1,20 +1,20 @@
 import { db } from "@/server/db/drizzle";
-import { topicQuizzes, courseTopics } from "@/server/db/schema";
+import { courseTopicQuizzes, courseTopics } from "@/server/db/schema";
 import { eq, asc, sql, desc } from "drizzle-orm";
 
 export const topicQuizzesRepo = {
   getByTopicId: (topicId: string) =>
     db
       .select()
-      .from(topicQuizzes)
-      .where(eq(topicQuizzes.topicId, topicId))
-      .orderBy(asc(topicQuizzes.sortOrder)),
+      .from(courseTopicQuizzes)
+      .where(eq(courseTopicQuizzes.topicId, topicId))
+      .orderBy(asc(courseTopicQuizzes.sortOrder)),
 
   getById: (id: string) =>
     db
       .select()
-      .from(topicQuizzes)
-      .where(eq(topicQuizzes.id, id))
+      .from(courseTopicQuizzes)
+      .where(eq(courseTopicQuizzes.id, id))
       .limit(1),
 
   create: async (data: {
@@ -32,15 +32,15 @@ export const topicQuizzesRepo = {
     if (data.sortOrder === undefined || data.sortOrder === null) {
       const existingQuizzes = await db
         .select()
-        .from(topicQuizzes)
-        .where(eq(topicQuizzes.topicId, data.topicId))
-        .orderBy(desc(topicQuizzes.sortOrder));
+        .from(courseTopicQuizzes)
+        .where(eq(courseTopicQuizzes.topicId, data.topicId))
+        .orderBy(desc(courseTopicQuizzes.sortOrder));
 
       const maxOrder = existingQuizzes.length > 0 ? existingQuizzes[0].sortOrder : -1;
       data.sortOrder = maxOrder + 1;
     }
 
-    return db.insert(topicQuizzes).values({
+    return db.insert(courseTopicQuizzes).values({
       topicId: data.topicId,
       title: data.title,
       description: data.description ?? null,
@@ -68,14 +68,14 @@ export const topicQuizzesRepo = {
     }
   ) =>
     db
-      .update(topicQuizzes)
+      .update(courseTopicQuizzes)
       .set({
         ...data,
         updatedAt: sql`now()`,
       })
-      .where(eq(topicQuizzes.id, id))
+      .where(eq(courseTopicQuizzes.id, id))
       .returning(),
 
   delete: (id: string) =>
-    db.delete(topicQuizzes).where(eq(topicQuizzes.id, id)),
+    db.delete(courseTopicQuizzes).where(eq(courseTopicQuizzes.id, id)),
 };
