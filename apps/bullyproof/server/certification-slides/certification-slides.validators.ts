@@ -1,33 +1,16 @@
 import { z } from "zod";
 
-// Quiz data schema
-export const quizDataSchema = z.object({
-  question: z.string().min(1),
-  answers: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        text: z.string().min(1),
-        isCorrect: z.boolean(),
-      })
-    )
-    .min(2), // At least 2 answer options
-});
-
-export type QuizData = z.infer<typeof quizDataSchema>;
-
 // Schema for creating a certification slide
 export const createCertificationSlideSchema = z
   .object({
     topicId: z.string().trim().min(1).max(500),
     orderIndex: z.number().int().min(0),
-    kind: z.enum(["image", "video", "quiz", "test"]).default("image"),
+    kind: z.enum(["image", "video", "text"]).default("image"),
     imageUrl: z.union([z.string().url(), z.null()]).optional(),
     videoUrl: z.union([z.string().url(), z.null()]).optional(),
     textHtml: z.union([z.string(), z.null()]).optional(),
     videoStartS: z.union([z.number(), z.null()]).optional(),
     videoEndS: z.union([z.number(), z.null()]).optional(),
-    quizData: z.union([quizDataSchema, z.null()]).optional(),
   })
   .refine(
     (data) => {
@@ -36,8 +19,7 @@ export const createCertificationSlideSchema = z
           data.imageUrl !== null &&
           data.imageUrl !== undefined &&
           !data.videoUrl &&
-          !data.textHtml &&
-          !data.quizData
+          !data.textHtml
         );
       }
       if (data.kind === "video") {
@@ -45,17 +27,15 @@ export const createCertificationSlideSchema = z
           data.videoUrl !== null &&
           data.videoUrl !== undefined &&
           !data.imageUrl &&
-          !data.textHtml &&
-          !data.quizData
+          !data.textHtml
         );
       }
-      if (data.kind === "quiz") {
+      if (data.kind === "text") {
         return (
-          data.quizData !== null &&
-          data.quizData !== undefined &&
+          data.textHtml !== null &&
+          data.textHtml !== undefined &&
           !data.imageUrl &&
-          !data.videoUrl &&
-          !data.textHtml
+          !data.videoUrl
         );
       }
       return true;
@@ -72,25 +52,24 @@ export type CreateCertificationSlideParams = z.infer<
 // Schema for updating a certification slide
 export const updateCertificationSlideSchema = z
   .object({
-    kind: z.enum(["image", "video", "quiz", "test"]).optional(),
+    kind: z.enum(["image", "video", "text"]).optional(),
     imageUrl: z.union([z.string().url(), z.null()]).optional(),
     videoUrl: z.union([z.string().url(), z.null()]).optional(),
     textHtml: z.union([z.string(), z.null()]).optional(),
     videoStartS: z.union([z.number(), z.null()]).optional(),
     videoEndS: z.union([z.number(), z.null()]).optional(),
-    quizData: z.union([quizDataSchema, z.null()]).optional(),
     orderIndex: z.number().int().min(0).optional(),
   })
   .refine(
     (data) => {
       if (data.kind === "image") {
-        return !data.videoUrl && !data.textHtml && !data.quizData;
+        return !data.videoUrl && !data.textHtml;
       }
       if (data.kind === "video") {
-        return !data.imageUrl && !data.textHtml && !data.quizData;
+        return !data.imageUrl && !data.textHtml;
       }
-      if (data.kind === "quiz") {
-        return !data.imageUrl && !data.videoUrl && !data.textHtml;
+      if (data.kind === "text") {
+        return !data.imageUrl && !data.videoUrl;
       }
       return true;
     },
@@ -111,13 +90,12 @@ export const bulkSaveCertificationSlidesSchema = z.object({
       z.object({
         tempId: z.string().optional(), // For file mapping
         orderIndex: z.number().int().min(0),
-        kind: z.enum(["image", "video", "quiz", "test"]),
+        kind: z.enum(["image", "video", "text"]),
         imageUrl: z.union([z.string().url(), z.null()]).optional(),
         videoUrl: z.union([z.string().url(), z.null()]).optional(),
         textHtml: z.union([z.string(), z.null()]).optional(),
         videoStartS: z.union([z.number(), z.null()]).optional(),
         videoEndS: z.union([z.number(), z.null()]).optional(),
-        quizData: z.union([quizDataSchema, z.null()]).optional(),
       })
     )
     .optional(),
@@ -125,13 +103,12 @@ export const bulkSaveCertificationSlidesSchema = z.object({
     .array(
       z.object({
         id: z.string().trim().min(1).max(500),
-        kind: z.enum(["image", "video", "quiz", "test"]).optional(),
+        kind: z.enum(["image", "video", "text"]).optional(),
         imageUrl: z.union([z.string().url(), z.null()]).optional(),
         videoUrl: z.union([z.string().url(), z.null()]).optional(),
         textHtml: z.union([z.string(), z.null()]).optional(),
         videoStartS: z.union([z.number(), z.null()]).optional(),
         videoEndS: z.union([z.number(), z.null()]).optional(),
-        quizData: z.union([quizDataSchema, z.null()]).optional(),
       })
     )
     .optional(),

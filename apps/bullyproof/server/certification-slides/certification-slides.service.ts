@@ -11,7 +11,7 @@ import { certificationTopicsRepo } from "../certification-topics/certification-t
 import { getUserScopedRoles } from "../auth/rbac";
 import { createServerClient } from "@/utils/supabase/server";
 import { db } from "@/server/db/drizzle";
-import { certificationTopics, certificationStages } from "@/server/db/schema";
+import { courseTopics, certificationCourses } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 
 type AuthContext = {
@@ -48,7 +48,7 @@ export const certificationSlidesService = {
       return slides;
     }
     
-    // Get topic and stage info for file path construction
+    // Get topic and course info for file path construction
     const topicResult = await certificationTopicsRepo.getById(topicId);
     if (topicResult.length === 0) {
       return slides;
@@ -56,19 +56,19 @@ export const certificationSlidesService = {
     
     const topic = topicResult[0];
     
-    // Get stage info
-    const stageResult = await db
+    // Get course info
+    const courseResult = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.id, topic.stageId))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.id, topic.courseId))
       .limit(1);
     
-    if (stageResult.length === 0) {
+    if (courseResult.length === 0) {
       return slides;
     }
     
-    const stage = stageResult[0];
-    const stageCode = stage.code;
+    const course = courseResult[0];
+    const courseCode = course.code;
     
     // Generate signed URLs for image slides
     const supabase = await createServerClient();
@@ -87,15 +87,15 @@ export const certificationSlidesService = {
           }
         }
         
-        // Construct file path: slides/certification/{stageCode}/{topicId}/{slideId}.{extension}
+        // Construct file path: slides/certification/{courseCode}/{topicId}/{slideId}.{extension}
         // Using topic ID instead of order number makes paths stable when topics are reordered
         const fileName = `${slide.id}.${fileExtension}`;
-        const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
+        const filePath = `slides/certification/${courseCode}/${topicId}/${fileName}`;
         
         // Check if file exists in storage
         const { data: fileList, error: listError } = await supabase.storage
           .from("content")
-          .list(`slides/certification/${stageCode}/${topicId}/`);
+          .list(`slides/certification/${courseCode}/${topicId}/`);
         
         if (listError) {
           console.warn(
@@ -137,11 +137,6 @@ export const certificationSlidesService = {
       createCertificationSlideSchema.parse(params);
     await assertCanManageCertificationSlides(ctx);
 
-    // Ensure quizData is set for quiz slides
-    if (data.kind === "quiz" && !data.quizData) {
-      throw new Error("Quiz slides require quizData");
-    }
-
     const newSlide = await certificationSlidesRepo.createSlide(data);
 
     // Normalize slide order after creation
@@ -154,18 +149,6 @@ export const certificationSlidesService = {
     const data: UpdateCertificationSlideParams =
       updateCertificationSlideSchema.parse(params);
     await assertCanManageCertificationSlides(ctx);
-
-    // Ensure quizData is set if changing to quiz type
-    if (data.kind === "quiz" && !data.quizData) {
-      // If updating to quiz but no quizData provided, check if slide already has quizData
-      const existingSlide = await certificationSlidesRepo.getById(slideId);
-      if (existingSlide.length === 0) {
-        throw new Error("Slide not found");
-      }
-      if (!existingSlide[0].quizData) {
-        throw new Error("Quiz slides require quizData");
-      }
-    }
 
     const updated = await certificationSlidesRepo.updateSlide(slideId, data);
     if (updated.length === 0) {
@@ -223,8 +206,8 @@ export const certificationSlidesService = {
       throw new Error("Slide is not an image slide");
     }
 
-    // Get stage code (e.g., "C", "C1")
-    const stageCode = stage.code;
+    // Get course code (e.g., "C", "C1")
+    const courseCode = stage.code;
 
     // Extract file extension from stored imageUrl or use default
     // If imageUrl exists and has an extension, extract it
@@ -236,10 +219,10 @@ export const certificationSlidesService = {
       }
     }
 
-    // Construct file path: slides/certification/{stageCode}/{topicId}/{slideId}.{extension}
+    // Construct file path: slides/certification/{courseCode}/{topicId}/{slideId}.{extension}
     // Using topic ID instead of order number makes paths stable when topics are reordered
     const fileName = `${slideId}.${fileExtension}`;
-    const filePath = `slides/certification/${stageCode}/${topic.id}/${fileName}`;
+    const filePath = `slides/certification/${courseCode}/${topic.id}/${fileName}`;
 
     // Check if file exists in storage before generating signed URL
     const supabase = await createServerClient();
@@ -247,7 +230,7 @@ export const certificationSlidesService = {
     // First, check if the file exists by listing files in the directory
     const { data: fileList, error: listError } = await supabase.storage
       .from("content")
-      .list(`slides/certification/${stageCode}/${topic.id}/`);
+      .list(`slides/certification/${courseCode}/${topic.id}/`);
 
     // Check if the file exists in the list
     const fileExists =

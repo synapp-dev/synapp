@@ -1,8 +1,8 @@
 import { db } from "@/server/db/drizzle";
 import {
-  certificationSlides,
-  certificationTopics,
-  certificationStages,
+  courseTopicSlides,
+  courseTopics,
+  certificationCourses,
 } from "@/server/db/schema";
 import { eq, asc, sql, SQL, and, inArray } from "drizzle-orm";
 
@@ -10,15 +10,15 @@ export const certificationSlidesRepo = {
   getByTopicId: (topicId: string) =>
     db
       .select()
-      .from(certificationSlides)
-      .where(eq(certificationSlides.topicId, topicId))
-      .orderBy(asc(certificationSlides.orderIndex)),
+      .from(courseTopicSlides)
+      .where(eq(courseTopicSlides.topicId, topicId))
+      .orderBy(asc(courseTopicSlides.orderIndex)),
 
   getById: (id: string) =>
     db
       .select()
-      .from(certificationSlides)
-      .where(eq(certificationSlides.id, id))
+      .from(courseTopicSlides)
+      .where(eq(courseTopicSlides.id, id))
       .limit(1),
 
   createSlide: (data: {
@@ -31,7 +31,7 @@ export const certificationSlidesRepo = {
     videoStartS?: number | null;
     videoEndS?: number | null;
     quizData?: any | null;
-  }) => db.insert(certificationSlides).values(data).returning(),
+  }) => db.insert(courseTopicSlides).values(data).returning(),
 
   updateSlide: (
     id: string,
@@ -47,23 +47,23 @@ export const certificationSlidesRepo = {
     }
   ) =>
     db
-      .update(certificationSlides)
+      .update(courseTopicSlides)
       .set({
         ...data,
         updatedAt: sql`now()`,
       })
-      .where(eq(certificationSlides.id, id))
+      .where(eq(courseTopicSlides.id, id))
       .returning(),
 
   deleteSlide: (id: string) =>
-    db.delete(certificationSlides).where(eq(certificationSlides.id, id)),
+    db.delete(courseTopicSlides).where(eq(courseTopicSlides.id, id)),
 
   normalizeSlideOrder: async (topicId: string) => {
     const allSlides = await db
       .select()
-      .from(certificationSlides)
-      .where(eq(certificationSlides.topicId, topicId))
-      .orderBy(asc(certificationSlides.orderIndex));
+      .from(courseTopicSlides)
+      .where(eq(courseTopicSlides.topicId, topicId))
+      .orderBy(asc(courseTopicSlides.orderIndex));
 
     if (allSlides.length === 0) {
       return 0;
@@ -75,22 +75,22 @@ export const certificationSlidesRepo = {
     const tempOffset = Math.max(100000, maxOrderIndex + 100000);
     for (let i = 0; i < allSlides.length; i++) {
       await db
-        .update(certificationSlides)
+        .update(courseTopicSlides)
         .set({
           orderIndex: tempOffset + i,
           updatedAt: sql`now()`,
         })
-        .where(eq(certificationSlides.id, allSlides[i].id));
+        .where(eq(courseTopicSlides.id, allSlides[i].id));
     }
 
     for (let i = 0; i < allSlides.length; i++) {
       await db
-        .update(certificationSlides)
+        .update(courseTopicSlides)
         .set({
           orderIndex: i,
           updatedAt: sql`now()`,
         })
-        .where(eq(certificationSlides.id, allSlides[i].id));
+        .where(eq(courseTopicSlides.id, allSlides[i].id));
     }
 
     return allSlides.length;
@@ -107,8 +107,8 @@ export const certificationSlidesRepo = {
     // Get all slides for this topic to handle any not in slideIds array
     const allSlides = await db
       .select()
-      .from(certificationSlides)
-      .where(eq(certificationSlides.topicId, topicId));
+      .from(courseTopicSlides)
+      .where(eq(courseTopicSlides.topicId, topicId));
 
     const slidesNotInArray = allSlides.filter(
       (slide) => !slideIds.includes(slide.id)
@@ -128,23 +128,23 @@ export const certificationSlidesRepo = {
 
     for (let i = 0; i < allSlideIds.length; i++) {
       tempSqlChunks.push(
-        sql`WHEN ${certificationSlides.id} = ${allSlideIds[i]} THEN ${tempOffset + i}`
+        sql`WHEN ${courseTopicSlides.id} = ${allSlideIds[i]} THEN ${tempOffset + i}`
       );
     }
 
-    tempSqlChunks.push(sql`ELSE ${certificationSlides.orderIndex} END)`);
+    tempSqlChunks.push(sql`ELSE ${courseTopicSlides.orderIndex} END)`);
     const tempOrderIndexCase = sql.join(tempSqlChunks, sql.raw(" "));
 
     await db
-      .update(certificationSlides)
+      .update(courseTopicSlides)
       .set({
         orderIndex: tempOrderIndexCase,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          eq(certificationSlides.topicId, topicId),
-          inArray(certificationSlides.id, allSlideIds)
+          eq(courseTopicSlides.topicId, topicId),
+          inArray(courseTopicSlides.id, allSlideIds)
         )
       );
 
@@ -153,30 +153,30 @@ export const certificationSlidesRepo = {
 
     for (let i = 0; i < slideIds.length; i++) {
       finalSqlChunks.push(
-        sql`WHEN ${certificationSlides.id} = ${slideIds[i]} THEN ${i}`
+        sql`WHEN ${courseTopicSlides.id} = ${slideIds[i]} THEN ${i}`
       );
     }
 
     // Assign remaining slides (not in slideIds array) to positions after slideIds
     for (let i = 0; i < slidesNotInArray.length; i++) {
       finalSqlChunks.push(
-        sql`WHEN ${certificationSlides.id} = ${slidesNotInArray[i].id} THEN ${slideIds.length + i}`
+        sql`WHEN ${courseTopicSlides.id} = ${slidesNotInArray[i].id} THEN ${slideIds.length + i}`
       );
     }
 
-    finalSqlChunks.push(sql`ELSE ${certificationSlides.orderIndex} END)`);
+    finalSqlChunks.push(sql`ELSE ${courseTopicSlides.orderIndex} END)`);
     const finalOrderIndexCase = sql.join(finalSqlChunks, sql.raw(" "));
 
     await db
-      .update(certificationSlides)
+      .update(courseTopicSlides)
       .set({
         orderIndex: finalOrderIndexCase,
         updatedAt: sql`now()`,
       })
       .where(
         and(
-          eq(certificationSlides.topicId, topicId),
-          inArray(certificationSlides.id, allSlideIds)
+          eq(courseTopicSlides.topicId, topicId),
+          inArray(courseTopicSlides.id, allSlideIds)
         )
       );
   },
@@ -184,20 +184,20 @@ export const certificationSlidesRepo = {
   getSlideWithTopicAndStage: async (slideId: string) => {
     const result = await db
       .select({
-        slide: certificationSlides,
-        topic: certificationTopics,
-        stage: certificationStages,
+        slide: courseTopicSlides,
+        topic: courseTopics,
+        course: certificationCourses,
       })
-      .from(certificationSlides)
+      .from(courseTopicSlides)
       .innerJoin(
-        certificationTopics,
-        eq(certificationSlides.topicId, certificationTopics.id)
+        courseTopics,
+        eq(courseTopicSlides.topicId, courseTopics.id)
       )
       .innerJoin(
-        certificationStages,
-        eq(certificationTopics.stageId, certificationStages.id)
+        certificationCourses,
+        eq(courseTopics.courseId, certificationCourses.id)
       )
-      .where(eq(certificationSlides.id, slideId))
+      .where(eq(courseTopicSlides.id, slideId))
       .limit(1);
 
     if (result.length === 0) return null;
@@ -205,7 +205,7 @@ export const certificationSlidesRepo = {
     return {
       slide: result[0].slide,
       topic: result[0].topic,
-      stage: result[0].stage,
+      stage: result[0].course, // Keep as 'stage' for backward compatibility
     };
   },
 };
