@@ -10,13 +10,13 @@
  */
 
 import { db } from '../server/db/drizzle';
-import { certificationTopics, certificationSlides, certificationStages } from '../drizzle/schema';
+import { courseTopics, courseTopicSlides, certificationCourses } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
 interface TopicWithSlides {
   id: string;
-  stageId: string;
-  stageOrder: number | null;
+  courseId: string;
+  courseOrder: number | null;
   title: string;
   slides: Array<{
     id: string;
@@ -28,22 +28,22 @@ async function fixCertificationTopicOrder() {
   console.log('🔍 Starting certification topic order fix...\n');
 
   try {
-    // Get all stages
-    const stages = await db.select().from(certificationStages);
-    console.log(`Found ${stages.length} certification stages\n`);
+    // Get all courses
+    const courses = await db.select().from(certificationCourses);
+    console.log(`Found ${courses.length} certification courses\n`);
 
     let totalFixed = 0;
     let totalChecked = 0;
 
-    for (const stage of stages) {
-      console.log(`\n📋 Processing stage: ${stage.code} (${stage.name})`);
+    for (const course of courses) {
+      console.log(`\n📋 Processing course: ${course.code} (${course.name})`);
       
-      // Get all topics for this stage
+      // Get all topics for this course
       const topics = await db
         .select()
-        .from(certificationTopics)
-        .where(eq(certificationTopics.stageId, stage.id))
-        .orderBy(certificationTopics.stageOrder);
+        .from(courseTopics)
+        .where(eq(courseTopics.courseId, course.id))
+        .orderBy(courseTopics.courseOrder);
 
       console.log(`  Found ${topics.length} topics`);
 
@@ -53,11 +53,11 @@ async function fixCertificationTopicOrder() {
         // Get all slides for this topic
         const slides = await db
           .select({
-            id: certificationSlides.id,
-            imageUrl: certificationSlides.imageUrl,
+            id: courseTopicSlides.id,
+            imageUrl: courseTopicSlides.imageUrl,
           })
-          .from(certificationSlides)
-          .where(eq(certificationSlides.topicId, topic.id));
+          .from(courseTopicSlides)
+          .where(eq(courseTopicSlides.topicId, topic.id));
 
         // Extract topic numbers from imageUrl paths
         // Pattern: .../slides/certification/{stageCode}/t{topicNumber}/{fileName}
@@ -94,20 +94,20 @@ async function fixCertificationTopicOrder() {
           }
         }
 
-        const expectedStageOrder = mostCommonTopicNumber;
-        const currentStageOrder = topic.stageOrder;
+        const expectedCourseOrder = mostCommonTopicNumber;
+        const currentCourseOrder = topic.courseOrder;
 
-        if (currentStageOrder === expectedStageOrder) {
-          console.log(`  ✅ Topic "${topic.title}" (order ${currentStageOrder}) - Already correct`);
+        if (currentCourseOrder === expectedCourseOrder) {
+          console.log(`  ✅ Topic "${topic.title}" (order ${currentCourseOrder}) - Already correct`);
         } else {
-          console.log(`  🔧 Topic "${topic.title}" - Updating stageOrder from ${currentStageOrder} to ${expectedStageOrder}`);
-          console.log(`     Found ${topicNumbers.length} slides, ${maxCount} point to t${expectedStageOrder}/`);
+          console.log(`  🔧 Topic "${topic.title}" - Updating courseOrder from ${currentCourseOrder} to ${expectedCourseOrder}`);
+          console.log(`     Found ${topicNumbers.length} slides, ${maxCount} point to t${expectedCourseOrder}/`);
           
-          // Update the stageOrder
+          // Update the courseOrder
           await db
-            .update(certificationTopics)
-            .set({ stageOrder: expectedStageOrder })
-            .where(eq(certificationTopics.id, topic.id));
+            .update(courseTopics)
+            .set({ courseOrder: expectedCourseOrder })
+            .where(eq(courseTopics.id, topic.id));
           
           totalFixed++;
         }
