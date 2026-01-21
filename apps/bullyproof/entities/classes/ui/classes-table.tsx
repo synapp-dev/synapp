@@ -21,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Badge } from "@workspace/ui/components/badge";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { cn } from "@workspace/ui/lib/utils";
@@ -217,15 +216,15 @@ export function ClassesTable({
   }
 
   return (
-    <ScrollArea className="h-full w-full">
-      <div className="rounded-md border">
+    <div className="rounded-md border overflow-hidden flex flex-col max-h-[600px]">
+      <div className="overflow-auto">
         <Table>
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="bg-background">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -272,6 +271,6 @@ export function ClassesTable({
           </TableBody>
         </Table>
       </div>
-    </ScrollArea>
+    </div>
   );
 }

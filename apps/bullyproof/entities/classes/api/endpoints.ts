@@ -65,6 +65,43 @@ export const classesApi = {
         body: JSON.stringify(payload),
       });
     },
+    bulkUpdateYearLevels(payload: {
+      classIds: string[];
+      yearIds?: string[];
+      action?: "assign" | "replace";
+      startYear?: string;
+    }): Promise<ApiResult<{
+      success: boolean;
+      results: Array<{
+        classId: string;
+        className: string;
+        success: boolean;
+        message: string;
+      }>;
+      summary: {
+        total: number;
+        succeeded: number;
+        failed: number;
+      };
+    }>> {
+      return apiFetch<{
+        success: boolean;
+        results: Array<{
+          classId: string;
+          className: string;
+          success: boolean;
+          message: string;
+        }>;
+        summary: {
+          total: number;
+          succeeded: number;
+          failed: number;
+        };
+      }>("/classes/bulk-year-levels", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
   },
   delete: {
     delete(id: string): Promise<ApiResult<{ success: boolean }>> {
