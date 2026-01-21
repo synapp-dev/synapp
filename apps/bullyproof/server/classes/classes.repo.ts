@@ -134,7 +134,24 @@ export const classesRepo = {
       active?: boolean;
       startYear?: Date | string;
     }
-  ) => db.update(classes).set(data).where(eq(classes.id, id)).returning(),
+  ) => {
+    const { startYear, ...restData } = data;
+    const updateData: {
+      name?: string;
+      code?: string;
+      stream?: string;
+      room?: string;
+      studentCap?: number;
+      active?: boolean;
+      startYear?: string;
+    } = { ...restData };
+    if (startYear instanceof Date) {
+      updateData.startYear = startYear.toISOString();
+    } else if (startYear !== undefined) {
+      updateData.startYear = startYear;
+    }
+    return db.update(classes).set(updateData).where(eq(classes.id, id)).returning();
+  },
 
   delete: (id: string) => db.delete(classes).where(eq(classes.id, id)),
 
