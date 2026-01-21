@@ -17,6 +17,8 @@ import {
 import { rolesRepo } from "./roles.repo";
 import { getUserScopedRoles } from "../auth/rbac";
 import { db } from "@/server/db/drizzle";
+import { userProfile, userRoles } from "@/server/db/schema";
+import { eq, and, inArray, sql, ilike, or } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -128,5 +130,158 @@ export const rolesService = {
     await assertCanViewRoles(ctx);
 
     return await rolesRepo.getUsersByRole(roleId, schoolId);
+  },
+
+  async bulkAssignOrRemoveRoles(
+    ctx: AuthContext,
+    params: {
+      schoolId: string;
+      emails: string[];
+      roleIds: string[];
+      action: "assign" | "remove";
+    }
+  ) {
+    await assertCanManageRoles(ctx);
+
+    const results: Array<{
+      email: string;
+      success: boolean;
+      message: string;
+      skipped?: boolean;
+    }> = [];
+
+    // Normalize emails (lowercase, trim)
+    const normalizedEmails = params.emails.map((email) =>
+      email.trim().toLowerCase()
+    );
+
+    // Fetch users by email from userProfile
+    // Build OR conditions for email matching (case-insensitive)
+    const emailConditions = normalizedEmails.map((email) =>
+      ilike(userProfile.email, email)
+    );
+    
+    const users = emailConditions.length > 0
+      ? await db
+          .select({
+            id: userProfile.id,
+            email: userProfile.email,
+          })
+          .from(userProfile)
+          .where(or(...emailConditions))
+      : [];
+
+    // Create a map of email -> user id
+    const emailToUserId = new Map<string, string>();
+    users.forEach((user) => {
+      if (user.email) {
+        emailToUserId.set(user.email.toLowerCase(), user.id);
+      }
+    });
+
+    // Process each email
+    for (const email of normalizedEmails) {
+      const userId = emailToUserId.get(email);
+
+      // Check if email exists in user_profile
+      if (!userId) {
+        results.push({
+          email,
+          success: false,
+          message: "Email not found in database",
+        });
+        continue;
+      }
+
+      // Process each role for this user
+      let userSuccess = true;
+      const roleMessages: string[] = [];
+      let skippedCount = 0;
+
+      for (const roleId of params.roleIds) {
+        try {
+          if (params.action === "assign") {
+            // Check if role already exists
+            const existingRole = await rolesRepo.hasRole(
+              userId,
+              roleId,
+              params.schoolId
+            );
+
+            if (existingRole.length > 0) {
+              skippedCount++;
+              roleMessages.push("Role already assigned");
+              continue;
+            }
+
+            // Assign role
+            await rolesRepo.assignRole(
+              {
+                userId,
+                roleId,
+                schoolId: params.schoolId,
+                roleScope: "school",
+              },
+              undefined
+            );
+            roleMessages.push("Role assigned successfully");
+          } else {
+            // Check if role exists
+            const existingRole = await rolesRepo.hasRole(
+              userId,
+              roleId,
+              params.schoolId
+            );
+
+            if (existingRole.length === 0) {
+              skippedCount++;
+              roleMessages.push("Role not assigned");
+              continue;
+            }
+
+            // Remove role
+            await rolesRepo.removeRole(
+              userId,
+              roleId,
+              params.schoolId,
+              undefined
+            );
+            roleMessages.push("Role removed successfully");
+          }
+        } catch (error: any) {
+          userSuccess = false;
+          roleMessages.push(
+            error.message || "Failed to process role operation"
+          );
+        }
+      }
+
+      // Add result for this user
+      results.push({
+        email,
+        success: userSuccess,
+        skipped: skippedCount === params.roleIds.length,
+        message:
+          roleMessages.length > 0
+            ? roleMessages.join("; ")
+            : params.action === "assign"
+              ? "Roles assigned successfully"
+              : "Roles removed successfully",
+      });
+    }
+
+    // Calculate summary
+    const summary = {
+      total: results.length,
+      succeeded: results.filter((r) => r.success && !r.skipped).length,
+      failed: results.filter((r) => !r.success).length,
+      skipped: results.filter((r) => r.skipped).length,
+    };
+
+    return {
+      success: summary.failed === 0,
+      results,
+      summary,
+    };
   },
 };

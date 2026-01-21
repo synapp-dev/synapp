@@ -112,6 +112,27 @@ async function assertCanDeleteSchool(ctx: AuthContext) {
   throw new Error("Unauthorized to delete schools");
 }
 
+async function assertCanViewSchool(ctx: AuthContext, schoolId: string) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const roles = await getUserScopedRoles(ctx.userId);
+
+  // Platform admins can view any school
+  if (roles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+
+  // Users with any school role assigned to this school can view it
+  // This includes TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF, SCHOOL_LICENCE, etc.
+  if (roles.school.some((role) => role.schoolId === schoolId)) {
+    return;
+  }
+
+  throw new Error("Unauthorized to view school");
+}
+
 export const schoolService = {
   async listSchools(ctx: AuthContext, query: unknown) {
     await assertCanListSchools(ctx);
@@ -137,9 +158,18 @@ export const schoolService = {
     return rows;
   },
   async getSchoolBySlug(ctx: AuthContext, slug: string) {
-    await assertCanListSchools(ctx);
+    // First fetch the school by slug to get its ID
     const rows = await schoolRepo.getBySlug(slug);
-    return rows[0] ?? null;
+    const school = rows[0] ?? null;
+
+    if (!school) {
+      return null;
+    }
+
+    // Check if user has permission to view this specific school
+    await assertCanViewSchool(ctx, school.id);
+
+    return school;
   },
   async createSchool(ctx: AuthContext, params: unknown) {
     await assertCanCreateSchool(ctx);

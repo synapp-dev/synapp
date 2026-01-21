@@ -56,6 +56,10 @@ export const schoolRepo = {
           sql<number>`COALESCE(${vSchoolsStatistics.schoolLicenceCount}, 0)`.as(
             "school_licence_count"
           ),
+        staffCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.staffCount}, 0)`.as(
+            "staff_count"
+          ),
         activeLicence:
           sql<boolean>`COALESCE(${vSchoolsStatistics.activeLicence}, false)`.as(
             "active_licence"
