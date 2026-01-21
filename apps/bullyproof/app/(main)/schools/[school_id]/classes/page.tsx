@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useSchoolStore } from "@/stores/school-store";
 import { useClasses } from "@/entities/classes/model/store";
 import { useMeStore } from "@/entities/me/model/store";
@@ -233,19 +234,24 @@ export default function ClassesPage() {
 
   if (!currentSchool) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">School not found</h1>
-          <p className="text-muted-foreground">
-            The school you're looking for doesn't exist.
-          </p>
+      <>
+        <PlatformAdminGuard />
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">School not found</h1>
+            <p className="text-muted-foreground">
+              The school you're looking for doesn't exist.
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-2">
         <GraduationCap className="h-8 w-8" />
@@ -565,5 +571,6 @@ export default function ClassesPage() {
         </div>
       )}
     </div>
+    </>
   );
 }

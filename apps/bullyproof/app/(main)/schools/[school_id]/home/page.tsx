@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useSchoolStore } from "@/stores/school-store";
 import {
   meApi,
@@ -54,9 +55,9 @@ export default function HomePage({
 
   useEffect(() => {
     async function fetchData() {
-      const schoolIdentifier = currentSchool?.slug || currentSchool?.id;
+      const schoolId = currentSchool?.id;
 
-      if (!schoolIdentifier) {
+      if (!schoolId) {
         setLoading(false);
         return;
       }
@@ -64,38 +65,31 @@ export default function HomePage({
       try {
         setLoading(true);
 
-        // Fetch teachers
+        // Fetch teachers - use schoolId (UUID) directly, not slug
         const teachersResult = await meApi.get.listAllUsers({
-          schoolId: schoolIdentifier,
+          schoolId: schoolId,
           limit: 100,
         });
 
         if (!teachersResult.error && teachersResult.data) {
           // Filter to only show teachers and school admins (exclude SCHOOL_LICENCE users)
-          const schoolId = currentSchool?.id;
-          const filteredTeachers = schoolId
-            ? teachersResult.data.filter((user) => {
-                const schoolRoles = user.schoolRoles.filter(
-                  (role) => role.schoolId === schoolId
-                );
-                // Exclude SCHOOL_LICENCE users
-                const hasLicenceRole = schoolRoles.some(
-                  (role) => role.roleKey === "SCHOOL_LICENCE"
-                );
-                if (hasLicenceRole) return false;
-                // Include TEACHER and SCHOOL_ADMIN
-                return schoolRoles.some(
-                  (role) =>
-                    role.roleKey === "TEACHER" ||
-                    role.roleKey === "SCHOOL_ADMIN"
-                );
-              })
-            : teachersResult.data.filter((user) => {
-                // Exclude SCHOOL_LICENCE users even if no schoolId
-                return !user.schoolRoles.some(
-                  (role) => role.roleKey === "SCHOOL_LICENCE"
-                );
-              });
+          // Note: API returns { users: [...], totalCount: number }
+          const filteredTeachers = teachersResult.data.users.filter((user) => {
+            const schoolRoles = user.schoolRoles.filter(
+              (role) => role.schoolId === schoolId
+            );
+            // Exclude SCHOOL_LICENCE users
+            const hasLicenceRole = schoolRoles.some(
+              (role) => role.roleKey === "SCHOOL_LICENCE"
+            );
+            if (hasLicenceRole) return false;
+            // Include TEACHER and SCHOOL_ADMIN
+            return schoolRoles.some(
+              (role) =>
+                role.roleKey === "TEACHER" ||
+                role.roleKey === "SCHOOL_ADMIN"
+            );
+          });
 
           setTeachers(filteredTeachers);
 
@@ -255,7 +249,9 @@ export default function HomePage({
 
   if (loading) {
     return (
-      <div className="space-y-8">
+      <>
+        <PlatformAdminGuard />
+        <div className="space-y-8">
         {/* Hero Section Skeleton */}
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-8 border border-border">
           <Skeleton className="h-10 w-64 mb-2" />
@@ -308,17 +304,19 @@ export default function HomePage({
                 </div>
               ))}
             </div>
-          </div>
         </div>
       </div>
-    );
-  }
+    </div>
+    </>
+  );
+}
 
   const { stateText, sectorText, levelsText } = getSchoolMetadata();
   const metadataParts = [stateText, sectorText, levelsText].filter(Boolean);
 
   return (
     <>
+      <PlatformAdminGuard />
       <div className="space-y-8">
         {/* Hero Section */}
         {currentSchool && (

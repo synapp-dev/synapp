@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useRouter } from "next/navigation";
 import { StageDetailSection } from "@/entities/dashboard/ui/admin/sections/content/stage-detail-section";
 
@@ -21,13 +22,20 @@ export default function ContentStagePage({
   }, [params]);
 
   if (!schoolId || !stageSlug) {
-    return null;
+    return (
+      <>
+        <PlatformAdminGuard />
+        {null}
+      </>
+    );
   }
 
   return (
-    <StageDetailSection
-      slug={stageSlug}
-      readonly={true}
+    <>
+      <PlatformAdminGuard />
+      <StageDetailSection
+        slug={stageSlug}
+        readonly={true}
       basePath={`/schools/${schoolId}/content`}
       onBackClick={() => router.push(`/schools/${schoolId}/content`)}
     />

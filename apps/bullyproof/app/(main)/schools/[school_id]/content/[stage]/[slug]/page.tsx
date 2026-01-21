@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { TopicDetailSectionReadonly } from "@/entities/dashboard/ui/resources/sections/topic-detail-section-readonly";
 
 export default function ContentTopicPage({
@@ -21,13 +22,20 @@ export default function ContentTopicPage({
   }, [params]);
 
   if (!schoolId || !stageSlug || !topicSlug) {
-    return null;
+    return (
+      <>
+        <PlatformAdminGuard />
+        {null}
+      </>
+    );
   }
 
   return (
-    <TopicDetailSectionReadonly
-      stageSlug={stageSlug}
-      topicSlug={topicSlug}
+    <>
+      <PlatformAdminGuard />
+      <TopicDetailSectionReadonly
+        stageSlug={stageSlug}
+        topicSlug={topicSlug}
       schoolId={schoolId}
     />
   );
