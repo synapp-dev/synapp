@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { certificationApi } from "@/entities/certification/api/endpoints";
+import { useCertificationTopicsStore } from "@/entities/certification/model/topics-store";
 
 interface SlideUrlCache {
   url: string;
@@ -33,8 +34,8 @@ interface CertificationSlidesCacheState {
 // Cache expiry: 1 week in milliseconds (matching the signed URL expiry)
 const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const useCertificationSlidesCacheStore =
-  create<CertificationSlidesCacheState>((set, get) => ({
+export const useCertificationSlidesCacheStore = create<CertificationSlidesCacheState>(
+  (set, get) => ({
     cache: {},
     loading: {},
     errors: {},
@@ -43,6 +44,33 @@ export const useCertificationSlidesCacheStore =
       const state = get();
       const cached = state.cache[slideId];
       const now = Date.now();
+
+      // First check the certification topics store for cached URLs (from API responses with includeUrls)
+      // URLs are stored in topic.slides[slideId].signedUrl
+      if (!forceRefresh) {
+        const certificationTopicsStoreState = useCertificationTopicsStore.getState();
+        // Search through all topics to find the slide
+        for (const topic of Object.values(certificationTopicsStoreState.topics)) {
+          if (topic.slides) {
+            const slide = topic.slides.find((s) => s.id === slideId);
+            if (slide?.signedUrl) {
+              // Also cache it in this store for consistency
+              if (!cached || cached.url !== slide.signedUrl) {
+                set((s) => ({
+                  cache: {
+                    ...s.cache,
+                    [slideId]: {
+                      url: slide.signedUrl!,
+                      timestamp: now,
+                    },
+                  },
+                }));
+              }
+              return slide.signedUrl;
+            }
+          }
+        }
+      }
 
       // Return cached URL if it exists and is still valid (and not forcing refresh)
       if (!forceRefresh && cached && now - cached.timestamp < CACHE_EXPIRY_MS) {
@@ -162,5 +190,5 @@ export const useCertificationSlidesCacheStore =
         errors: { ...state.errors, [slideId]: null },
       }));
     },
-  }));
-
+  })
+);

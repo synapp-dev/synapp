@@ -1,25 +1,23 @@
 import { create } from "zustand";
 import type {
-  certificationTopics,
-  certificationSlides,
+  courseTopics,
+  topicSlides,
 } from "@/server/db/schema";
-import type { QuizData } from "@/components/organisms/quiz-slide-editor";
 import type { SlideData } from "@/components/organisms/slide-renderer";
 
-type Topic = typeof certificationTopics.$inferSelect;
-type Slide = typeof certificationSlides.$inferSelect;
+type Topic = typeof courseTopics.$inferSelect;
+type Slide = typeof topicSlides.$inferSelect;
 
-type ExtendedSlideData = SlideData & {
-  quizData?: QuizData | null;
-};
+type ExtendedSlideData = SlideData;
 
 type Attempt = {
   id: string;
   attemptNumber: number;
   currentSlideId: string | null;
-  status: string;
-  stageId?: string;
-  slideProgress?: Record<string, { viewed?: boolean; answered?: boolean; viewedAt?: string }>;
+  currentSlideIndex: number | null;
+  status: "not_started" | "viewing_slides" | "quiz_unlocked" | "completed";
+  courseId: string;
+  slideProgress?: Record<string, { viewed?: boolean; viewedAt?: string }>;
 };
 
 interface CertificationTopicState {
@@ -154,9 +152,9 @@ export const useCertificationTopicStore = create<CertificationTopicState>(
         const currentSlideId = allSlideIds[i];
         const previousProgress = slideProgress[previousSlideId];
 
-        // Unlock if previous slide is viewed (for content) or answered (for quiz)
+        // Unlock if previous slide is viewed
         if (previousProgress) {
-          if (previousProgress.viewed || previousProgress.answered) {
+          if (previousProgress.viewed) {
             unlockedSlides.push(currentSlideId);
           } else {
             // Stop at first locked slide
