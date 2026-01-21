@@ -432,7 +432,7 @@ export function ImportClassesDialog({
             // Validate student count if provided
             const isValid =
               !isIncomplete &&
-              (studentCount === undefined || (studentCount > 0 && studentCount <= 1000));
+              (studentCount === undefined || studentCount === 0 || (studentCount > 0 && studentCount <= 1000));
 
             const classNameLower = className.toLowerCase();
             if (className) {
@@ -468,11 +468,11 @@ export function ImportClassesDialog({
             const hasValidClassName = item.className.length > 0;
             const hasValidStudentCount =
               item.studentCount === undefined ||
+              item.studentCount === 0 ||
               (item.studentCount > 0 && item.studentCount <= 1000);
-            const hasYearLevels = item.selectedYearIds.length > 0;
             
-            item.isValid = hasValidClassName && hasValidStudentCount && hasYearLevels;
-            item.isIncomplete = !hasValidClassName || !hasYearLevels;
+            item.isValid = hasValidClassName && hasValidStudentCount;
+            item.isIncomplete = !hasValidClassName;
           });
 
           if (data.length === 0) {
@@ -566,7 +566,7 @@ export function ImportClassesDialog({
             // Validate student count if provided
             const isValid =
               !isIncomplete &&
-              (studentCount === undefined || (studentCount > 0 && studentCount <= 1000));
+              (studentCount === undefined || studentCount === 0 || (studentCount > 0 && studentCount <= 1000));
 
             const classNameLower = className.toLowerCase();
             if (className) {
@@ -602,11 +602,11 @@ export function ImportClassesDialog({
             const hasValidClassName = item.className.length > 0;
             const hasValidStudentCount =
               item.studentCount === undefined ||
+              item.studentCount === 0 ||
               (item.studentCount > 0 && item.studentCount <= 1000);
-            const hasYearLevels = item.selectedYearIds.length > 0;
             
-            item.isValid = hasValidClassName && hasValidStudentCount && hasYearLevels;
-            item.isIncomplete = !hasValidClassName || !hasYearLevels;
+            item.isValid = hasValidClassName && hasValidStudentCount;
+            item.isIncomplete = !hasValidClassName;
           });
 
           if (dataRows.length === 0) {
@@ -808,11 +808,11 @@ export function ImportClassesDialog({
           const hasValidClassName = updatedRow.className.length > 0;
           const hasValidStudentCount =
             studentCount === undefined ||
+            studentCount === 0 ||
             (studentCount > 0 && studentCount <= 1000);
-          const hasYearLevels = updatedRow.selectedYearIds.length > 0;
           
-          const isValid = hasValidClassName && hasValidStudentCount && hasYearLevels;
-          const isIncomplete = !hasValidClassName || !hasYearLevels;
+          const isValid = hasValidClassName && hasValidStudentCount;
+          const isIncomplete = !hasValidClassName;
 
           updatedRow.isValid = isValid;
           updatedRow.isIncomplete = isIncomplete;

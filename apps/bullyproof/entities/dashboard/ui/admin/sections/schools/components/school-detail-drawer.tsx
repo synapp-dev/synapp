@@ -103,6 +103,7 @@ import { userKeys } from "@/entities/users/model/keys";
 import { UsersTable } from "@/entities/users/ui/users-table";
 import { ClassesTable } from "@/entities/classes/ui/classes-table";
 import type { schoolYears } from "@/server/db/schema";
+import { BulkYearLevelDialog } from "./bulk-year-level-dialog";
 import {
   Popover,
   PopoverContent,
@@ -164,6 +165,7 @@ import { SchoolDetailHeader } from "./school-detail-header";
 import { SchoolDetailSidebar } from "./school-detail-sidebar";
 import { ImportUsersDialog } from "./import-users-dialog";
 import { ImportClassesDialog } from "./import-classes-dialog";
+import { BulkRoleDialog } from "./bulk-role-dialog";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import {
@@ -1110,6 +1112,7 @@ function SchoolDetailDrawerContent({
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
   const [importUsersDialogOpen, setImportUsersDialogOpen] = useState(false);
   const [importClassesDialogOpen, setImportClassesDialogOpen] = useState(false);
+  const [bulkRoleDialogOpen, setBulkRoleDialogOpen] = useState(false);
   const [addClassDialogOpen, setAddClassDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isConfirmDeleteDialogOpen, setIsConfirmDeleteDialogOpen] =
@@ -1128,6 +1131,9 @@ function SchoolDetailDrawerContent({
   const [deleteClassesError, setDeleteClassesError] = useState<string | null>(
     null
   );
+
+  // Bulk year level edit state
+  const [bulkYearLevelDialogOpen, setBulkYearLevelDialogOpen] = useState(false);
 
   // School deletion state
   const [isDeleteSchoolDialogOpen, setIsDeleteSchoolDialogOpen] =
@@ -1226,32 +1232,36 @@ function SchoolDetailDrawerContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, school?.id]);
 
+  // Fetch classes function - reusable for initial load and refetch after bulk edit
+  const fetchClasses = useCallback(async () => {
+    if (!school?.id) return;
+    
+    setLoadingClasses(true);
+    try {
+      const result = await classesApi.get.list({ schoolId: school.id });
+      if (!result.error && result.data) {
+        setClasses(result.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch classes:", error);
+    } finally {
+      setLoadingClasses(false);
+    }
+  }, [school?.id]);
+
   // Track previous classes section to prevent duplicate fetches
   const prevClassesSectionRef = useRef<string | null>(null);
   useEffect(() => {
     if (activeSection === "classes" && school?.id) {
       // Only fetch if we're switching TO the classes section (not already on it)
       if (prevClassesSectionRef.current !== "classes") {
-        setLoadingClasses(true);
-        classesApi.get
-          .list({ schoolId: school.id })
-          .then((result) => {
-            if (!result.error && result.data) {
-              setClasses(result.data);
-            }
-          })
-          .catch((error) => {
-            console.error("Failed to fetch classes:", error);
-          })
-          .finally(() => {
-            setLoadingClasses(false);
-          });
+        fetchClasses();
         prevClassesSectionRef.current = "classes";
       }
     } else {
       prevClassesSectionRef.current = activeSection;
     }
-  }, [activeSection, school?.id]);
+  }, [activeSection, school?.id, fetchClasses]);
 
   // Filter classes based on search and year level
   const filteredClasses = useMemo(() => {
@@ -1750,6 +1760,10 @@ function SchoolDetailDrawerContent({
     }
   };
 
+  const handleBulkRoleClick = () => {
+    setBulkRoleDialogOpen(true);
+  };
+
   if (!school) return null;
 
   const levelDisplay = formatSchoolLevel(school.levels);
@@ -2214,6 +2228,16 @@ function SchoolDetailDrawerContent({
                             <FileSpreadsheet className="h-4 w-4" />
                             Import Data
                           </Button>
+                          <Button
+                            onClick={handleBulkRoleClick}
+                            variant="outline"
+                            disabled={loadingUsers && users.length === 0}
+                            className="h-10 opacity-0 animate-slide-left-fade-in transition-colors"
+                            style={{ animationFillMode: "forwards" }}
+                          >
+                            <Shield className="h-4 w-4" />
+                            Bulk Edit
+                          </Button>
                         </>
                       )}
                     </div>
@@ -2375,6 +2399,21 @@ function SchoolDetailDrawerContent({
                             </span>
                             <Check className="h-4 w-4" />
                           </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setBulkYearLevelDialogOpen(true);
+                                }}
+                                className="group h-8 w-8 bg-primary/5 hover:bg-primary/10 border border-transparent hover:border-primary transition-all duration-200 ease-in-out"
+                              >
+                                <GraduationCap className="h-4 w-4 text-primary opacity-100" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Bulk Edit Year Levels</TooltipContent>
+                          </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -2578,16 +2617,28 @@ function SchoolDetailDrawerContent({
                               {Object.keys(classesRowSelection).length} of{" "}
                               {filteredClasses.length} row(s) selected.
                             </div>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => {
-                                setIsDeleteClassesDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete Selected
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setBulkYearLevelDialogOpen(true);
+                                }}
+                              >
+                                <GraduationCap className="h-4 w-4 mr-2" />
+                                Bulk Edit Year Levels
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => {
+                                  setIsDeleteClassesDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Selected
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </>
@@ -3195,6 +3246,23 @@ function SchoolDetailDrawerContent({
           await queryClient.invalidateQueries({ queryKey: userKeys.all });
 
           // Refresh school data to update counts (including schoolAdminCount)
+          onSchoolUpdate?.();
+        }}
+      />
+
+      {/* Bulk Role Dialog */}
+      <BulkRoleDialog
+        open={bulkRoleDialogOpen}
+        onOpenChange={setBulkRoleDialogOpen}
+        school={school}
+        onSuccess={async () => {
+          // Wait a bit to ensure database transactions are committed
+          await new Promise((resolve) => setTimeout(resolve, 500));
+
+          // Invalidate React Query cache for users - React Query will automatically refetch
+          await queryClient.invalidateQueries({ queryKey: userKeys.all });
+
+          // Refresh school data to update counts
           onSchoolUpdate?.();
         }}
       />
@@ -3953,7 +4021,7 @@ function SchoolDetailDrawerContent({
                   if (
                     !editingClass ||
                     !school ||
-                    !editClassName ||
+                    !editClassName.trim() ||
                     editSelectedYearIds.length === 0
                   )
                     return;
@@ -3973,7 +4041,7 @@ function SchoolDetailDrawerContent({
                     const result = await classesApi.put.update(
                       editingClass.id,
                       {
-                        name: editClassName,
+                        name: editClassName.trim(),
                         code: editClassCode.trim() || undefined,
                         studentCap,
                         active: editClassActive,
@@ -4023,7 +4091,7 @@ function SchoolDetailDrawerContent({
                 }}
                 disabled={
                   submitting ||
-                  !editClassName ||
+                  !editClassName.trim() ||
                   editSelectedYearIds.length === 0
                 }
               >
@@ -4604,6 +4672,26 @@ function SchoolDetailDrawerContent({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Year Level Dialog */}
+      <BulkYearLevelDialog
+        open={bulkYearLevelDialogOpen}
+        onOpenChange={setBulkYearLevelDialogOpen}
+        school={school}
+        selectedClassIds={Object.keys(classesRowSelection)
+          .filter((key) => classesRowSelection[key])
+          .map((rowIndex) => {
+            const classItem = filteredClasses[parseInt(rowIndex)];
+            return classItem?.id;
+          })
+          .filter((id): id is string => typeof id === "string")}
+        onSuccess={() => {
+          setBulkYearLevelDialogOpen(false);
+          setClassesRowSelection({});
+          // Refetch classes to show updated values
+          fetchClasses();
+        }}
+      />
     </Sheet>
   );
 }
