@@ -1,14 +1,6 @@
 import { db } from "@/server/db/drizzle";
-import { userProfile, userRoles, roles, schools } from "@/server/db/schema";
-import { eq, ilike, or, and, asc } from "drizzle-orm";
-import { schoolRepo } from "@/server/school/school.repo";
-
-// Helper function to check if a string is a valid UUID
-function isValidUUID(str: string): boolean {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
+import { vUsersWithRolesAndSchools } from "@/drizzle/schema";
+import { asc, sql, ilike, or, and } from "drizzle-orm";
 
 export const userRepo = {
   getAllUsersWithRolesAndSchools: async (params: {
@@ -18,153 +10,144 @@ export const userRepo = {
     role?: string;
     schoolId?: string;
   }) => {
-    const hasSearch =
-      typeof params.search === "string" && params.search.trim().length > 0;
-    const hasRoleFilter =
-      typeof params.role === "string" && params.role.trim().length > 0;
-    const hasSchoolFilter =
-      typeof params.schoolId === "string" && params.schoolId.trim().length > 0;
-
-    // Resolve schoolId if it's a slug (not a UUID)
-    let resolvedSchoolId: string | undefined = params.schoolId;
-    if (hasSchoolFilter && !isValidUUID(params.schoolId!)) {
-      // It's a slug, resolve it to an ID
-      const schoolResults = await schoolRepo.getBySlug(params.schoolId!);
-      if (schoolResults.length > 0) {
-        resolvedSchoolId = schoolResults[0].id;
-      } else {
-        // Slug not found, return empty results
-        return [];
-      }
-    }
-
-    // Base query to get all users with their roles and schools
-    const baseQuery = db
-      .select({
-        user: userProfile,
-        role: roles,
-        userRole: userRoles,
-        school: schools,
-      })
-      .from(userProfile)
-      .leftJoin(userRoles, eq(userProfile.id, userRoles.userId))
-      .leftJoin(roles, eq(userRoles.roleId, roles.id))
-      .leftJoin(schools, eq(userRoles.schoolId, schools.id));
-
-    // Build where conditions
+    // Build where conditions for filtering
     const whereConditions: any[] = [];
 
-    // Apply search filter if provided
-    if (hasSearch) {
-      const searchTerm = `%${params.search!.trim()}%`;
+    // Search filter: firstName, lastName, or email
+    if (params.search && params.search.trim().length > 0) {
+      const searchTerm = `%${params.search.trim()}%`;
       whereConditions.push(
         or(
-          ilike(userProfile.firstName, searchTerm),
-          ilike(userProfile.lastName, searchTerm),
-          ilike(userProfile.email, searchTerm)
+          ilike(vUsersWithRolesAndSchools.firstName, searchTerm),
+          ilike(vUsersWithRolesAndSchools.lastName, searchTerm),
+          ilike(vUsersWithRolesAndSchools.email, searchTerm)
         ) as any
       );
     }
 
-    // Apply role filter if provided
-    if (hasRoleFilter) {
-      whereConditions.push(eq(roles.key, params.role!.trim()));
+    // Role filter: check platformRoles array or schoolRoles JSONB
+    // Special case: "__NONE__" means users with no roles at all
+    if (params.role && params.role.trim().length > 0) {
+      const roleKey = params.role.trim();
+      if (roleKey === "__NONE__") {
+        // Filter for users with no platform roles and no school roles
+        // The view uses COALESCE so arrays are never NULL, just empty arrays
+        // array_length returns NULL for empty arrays, jsonb_array_length returns 0 for empty arrays
+        whereConditions.push(
+          sql`array_length(${vUsersWithRolesAndSchools.platformRoles}, 1) IS NULL AND jsonb_array_length(${vUsersWithRolesAndSchools.schoolRoles}) = 0`
+        );
+      } else {
+        // Normal role filter
+        whereConditions.push(
+          sql`(${vUsersWithRolesAndSchools.platformRoles} @> ARRAY[${roleKey}]::text[] OR EXISTS (
+            SELECT 1 FROM jsonb_array_elements(${vUsersWithRolesAndSchools.schoolRoles}) AS role
+            WHERE role->>'roleKey' = ${roleKey}
+          ))`
+        );
+      }
     }
 
-    // Apply school filter if provided (using resolved ID)
-    if (hasSchoolFilter && resolvedSchoolId) {
-      whereConditions.push(eq(userRoles.schoolId, resolvedSchoolId));
+    // School filter: check schoolRoles JSONB
+    if (params.schoolId && params.schoolId.trim().length > 0) {
+      const schoolId = params.schoolId.trim();
+      whereConditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM jsonb_array_elements(${vUsersWithRolesAndSchools.schoolRoles}) AS role
+          WHERE role->>'schoolId' = ${schoolId}
+        )`
+      );
     }
 
+    // Build base query
+    const baseQuery = db.select().from(vUsersWithRolesAndSchools);
     const queryWithFilters =
       whereConditions.length > 0
-        ? baseQuery.where(whereConditions.length === 1 ? whereConditions[0] : and(...whereConditions))
+        ? baseQuery.where(
+            whereConditions.length === 1
+              ? whereConditions[0]
+              : and(...whereConditions)
+          )
         : baseQuery;
 
-    // Order by user name and apply pagination
-    const rows = await queryWithFilters
-      .orderBy(asc(userProfile.firstName), asc(userProfile.lastName))
+    // Get total count with filters
+    const countQuery = db
+      .select({ count: sql<number>`count(*)` })
+      .from(vUsersWithRolesAndSchools);
+    const countQueryWithFilters =
+      whereConditions.length > 0
+        ? countQuery.where(
+            whereConditions.length === 1
+              ? whereConditions[0]
+              : and(...whereConditions)
+          )
+        : countQuery;
+    
+    const countResult = await countQueryWithFilters;
+    const totalCount = Number(countResult[0]?.count || 0);
+
+    // Get paginated users from the view with filters
+    const users = await queryWithFilters
+      .orderBy(
+        asc(vUsersWithRolesAndSchools.firstName),
+        asc(vUsersWithRolesAndSchools.lastName)
+      )
       .limit(params.limit)
       .offset(params.offset);
 
-    // Group results by user
-    const userMap = new Map<
-      string,
-      {
-        id: string;
-        firstName: string | null;
-        lastName: string | null;
-        email: string;
-        avatarUrl: string | null;
-        createdAt: string | null;
-        updatedAt: string | null;
-        metadata: any;
-        platformRoles: string[];
-        schoolRoles: Array<{
-          schoolId: string;
-          schoolName: string | null;
-          roleKey: string | null;
-          roleName: string | null;
-        }>;
-      }
-    >();
+    // Transform the results - the view returns platformRoles as text[] and schoolRoles as jsonb
+    const transformedUsers = users.map((user) => {
+      // Parse schoolRoles JSONB array
+      let schoolRoles: Array<{
+        schoolId: string;
+        schoolName: string | null;
+        roleKey: string | null;
+        roleName: string | null;
+      }> = [];
 
-    for (const row of rows) {
-      const userId = row.user.id;
-      if (!userMap.has(userId)) {
-        userMap.set(userId, {
-          id: row.user.id,
-          firstName: row.user.firstName,
-          lastName: row.user.lastName,
-          email: row.user.email,
-          avatarUrl: row.user.avatarUrl,
-          createdAt: row.user.createdAt,
-          updatedAt: row.user.updatedAt,
-          metadata: row.user.metadata,
-          platformRoles: [],
-          schoolRoles: [],
-        });
+      if (user.schoolRoles && typeof user.schoolRoles === "string") {
+        try {
+          const parsed = JSON.parse(user.schoolRoles);
+          schoolRoles = Array.isArray(parsed) ? parsed : [];
+        } catch {
+          schoolRoles = [];
+        }
+      } else if (Array.isArray(user.schoolRoles)) {
+        schoolRoles = user.schoolRoles;
       }
 
-      const userData = userMap.get(userId)!;
-
-      // Add platform roles
-      if (
-        row.role &&
-        row.userRole?.roleScope === "platform" &&
-        row.role.key &&
-        !userData.platformRoles.includes(row.role.key)
-      ) {
-        userData.platformRoles.push(row.role.key);
-      }
-
-      // Add school roles
-      if (
-        row.role &&
-        row.userRole?.roleScope === "school" &&
-        row.userRole.schoolId &&
-        row.school
-      ) {
-        const schoolRole = {
-          schoolId: row.userRole.schoolId,
-          schoolName: row.school.name,
-          roleKey: row.role.key || null,
-          roleName: row.role.name || null,
-        };
-
-        // Check if this school-role combination already exists
-        const exists = userData.schoolRoles.some(
-          (sr) =>
-            sr.schoolId === schoolRole.schoolId &&
-            sr.roleKey === schoolRole.roleKey
-        );
-
-        if (!exists) {
-          userData.schoolRoles.push(schoolRole);
+      // Parse platformRoles text array
+      let platformRoles: string[] = [];
+      if (Array.isArray(user.platformRoles)) {
+        platformRoles = user.platformRoles;
+      } else if (typeof user.platformRoles === "string") {
+        try {
+          platformRoles = JSON.parse(user.platformRoles);
+        } catch {
+          // Handle PostgreSQL array format
+          platformRoles = user.platformRoles
+            .replace(/[{}"]/g, "")
+            .split(",")
+            .filter((r) => r.trim().length > 0);
         }
       }
-    }
 
-    return Array.from(userMap.values());
+      return {
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        metadata: user.metadata,
+        platformRoles,
+        schoolRoles,
+      };
+    });
+
+    return {
+      users: transformedUsers,
+      totalCount,
+    };
   },
 };

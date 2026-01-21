@@ -22,10 +22,7 @@ type AuthContext = {
   roles?: string[];
 };
 
-async function assertCanListAllUsers(
-  ctx: AuthContext,
-  schoolId?: string
-) {
+async function assertCanListAllUsers(ctx: AuthContext, schoolId?: string) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
@@ -37,21 +34,11 @@ async function assertCanListAllUsers(
     return;
   }
 
-  // If a schoolId is provided, check if user has any role at that school
-  if (schoolId) {
-    const hasAccessToSchool = roles.school.some(
-      (role) =>
-        role.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim()
-    );
-
-    if (hasAccessToSchool) {
-      return;
-    }
-
-    throw new Error("Unauthorized to list users for this school");
+  // Users with any school role assigned to the requested school can view users in that school
+  if (schoolId && roles.school.some((role) => role.schoolId === schoolId)) {
+    return;
   }
 
-  // If no schoolId is provided, only platform admins can list all users
   throw new Error("Unauthorized to list all users");
 }
 
@@ -74,21 +61,26 @@ export const userService = {
   async listAllUsers(ctx: AuthContext, query: unknown) {
     const params: ListUsersParams = listUsersSchema.parse(query);
     
-    // Resolve schoolId if it's a slug (for permission check)
+    // Resolve schoolId if it's a slug (not a UUID)
     let resolvedSchoolId: string | undefined = params.schoolId;
     if (params.schoolId && !isValidUUID(params.schoolId)) {
-      // It's a slug, resolve it to UUID for permission check
+      // It's a slug, resolve it to an ID
       const schoolResults = await schoolRepo.getBySlug(params.schoolId);
       if (schoolResults.length > 0) {
         resolvedSchoolId = schoolResults[0].id;
       } else {
-        throw new Error("School not found");
+        // Slug not found, return empty results
+        return { users: [], totalCount: 0 };
       }
     }
-    
+
+    // Check permissions - platform admins or users with roles in the requested school
     await assertCanListAllUsers(ctx, resolvedSchoolId);
 
-    return await userRepo.getAllUsersWithRolesAndSchools(params);
+    return await userRepo.getAllUsersWithRolesAndSchools({
+      ...params,
+      schoolId: resolvedSchoolId,
+    });
   },
 
   async createUserWithMagicLink(

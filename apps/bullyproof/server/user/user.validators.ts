@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// Schema for listing users
+// Schema for listing users with pagination and filters
 export const listUsersSchema = z
   .object({
     limit: z
