@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { LibraryBig, FileText, Video, Lock } from "lucide-react";
 import {
   Card,
@@ -17,7 +18,9 @@ export default function ResourcesPage({
   params: Promise<{ school_id: string }>;
 }) {
   return (
-    <div className="space-y-6">
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
           <LibraryBig className="h-8 w-8" />
@@ -86,5 +89,6 @@ export default function ResourcesPage({
         </Card>
       </div>
     </div>
+    </>
   );
 }
