@@ -54,7 +54,7 @@ const data = {
     },
     {
       title: "AP Certification",
-      url: "/ap-certification",
+      url: "/courses/amayda-program",
       icon: BadgeCheck,
       isActive: false,
     },
@@ -238,8 +238,38 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Filter school navigation items based on teacher role
   const filteredNavSchoolMain = React.useMemo(
-    () => filterItems(data.navSchoolMain),
-    [filterItems]
+    () => {
+      const filtered = filterItems(data.navSchoolMain);
+      // Lock Home, Teachers, and Classes for non-platform admins
+      return filtered.map((item) => {
+        if ((item.title === "Home" || item.title === "Teachers" || item.title === "Classes") && !isPlatformAdmin) {
+          return {
+            ...item,
+            disabled: true,
+            disabledMessage: "Locked",
+          };
+        }
+        return item;
+      });
+    },
+    [filterItems, isPlatformAdmin]
+  );
+
+  // Lock curriculum items (Lessons, Content, Resources) for non-platform admins
+  const filteredNavCurriculum = React.useMemo(
+    () => {
+      return data.navCurriculum.map((item) => {
+        if (!isPlatformAdmin) {
+          return {
+            ...item,
+            disabled: true,
+            disabledMessage: "Locked",
+          };
+        }
+        return item;
+      });
+    },
+    [isPlatformAdmin]
   );
 
   const filteredNavData = React.useMemo(
@@ -397,7 +427,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     )}
                     {/* navCurriculum: 3 items, has title - title at 5, items at 6-8 */}
                     <NavMain
-                      items={withSlug(data.navCurriculum)}
+                      items={withSlug(filteredNavCurriculum)}
                       title="Bullyproof"
                       enableStaggeredAnimation
                       startIndex={5}

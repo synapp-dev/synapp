@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Plus, Trash2, CheckCircle2, Circle, Edit } from "lucide-react";
+import { extractUrlTags } from "@/utils/parse-question-urls";
 // Generate unique ID for answers
 const generateId = () =>
   `answer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -29,6 +30,7 @@ export type QuizData = {
     text: string;
     isCorrect: boolean;
   }>;
+  questionUrls?: Record<string, string> | null;
 };
 
 interface QuizSlideEditorProps {
@@ -45,6 +47,9 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
       { id: generateId(), text: "", isCorrect: false },
       { id: generateId(), text: "", isCorrect: false },
     ]
+  );
+  const [questionUrls, setQuestionUrls] = useState<Record<string, string>>(
+    quizData?.questionUrls || {}
   );
   const [showAnswersDialog, setShowAnswersDialog] = useState(false);
   const [tempAnswers, setTempAnswers] = useState<
@@ -72,6 +77,7 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
       // Only update if the content is actually different to avoid unnecessary re-renders
       const currentQuestion = question;
       const currentAnswers = answers;
+      const currentUrls = questionUrls;
       const newQuestion = quizData.question || "";
       const newAnswers =
         quizData.answers && quizData.answers.length > 0
@@ -80,13 +86,16 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
               { id: generateId(), text: "", isCorrect: false },
               { id: generateId(), text: "", isCorrect: false },
             ];
+      const newUrls = quizData.questionUrls || {};
 
       if (
         currentQuestion !== newQuestion ||
-        JSON.stringify(currentAnswers) !== JSON.stringify(newAnswers)
+        JSON.stringify(currentAnswers) !== JSON.stringify(newAnswers) ||
+        JSON.stringify(currentUrls) !== JSON.stringify(newUrls)
       ) {
         setQuestion(newQuestion);
         setAnswers(newAnswers);
+        setQuestionUrls(newUrls);
       }
     } else if (question !== "" || answers.length > 0) {
       // Only reset if we're not already in empty state
@@ -95,6 +104,7 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
         { id: generateId(), text: "", isCorrect: false },
         { id: generateId(), text: "", isCorrect: false },
       ]);
+      setQuestionUrls({});
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizData]);
@@ -119,14 +129,31 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
           text: a.text.trim(), // Trim answers but keep question spaces
           isCorrect: a.isCorrect,
         })),
+        questionUrls: Object.keys(questionUrls).length > 0 ? questionUrls : null,
       });
     } else {
       onChangeRef.current(null);
     }
-  }, [question, answers]);
+  }, [question, answers, questionUrls]);
 
   const handleQuestionChange = (value: string) => {
     setQuestion(value);
+    // Extract URL tags and update questionUrls state
+    const tags = extractUrlTags(value);
+    const newUrls: Record<string, string> = {};
+    tags.forEach((tag) => {
+      // Preserve existing URL if tag already exists
+      newUrls[tag] = questionUrls[tag] || "";
+    });
+    // Remove URLs for tags that no longer exist
+    setQuestionUrls(newUrls);
+  };
+
+  const handleUrlChange = (tagName: string, url: string) => {
+    setQuestionUrls((prev) => ({
+      ...prev,
+      [tagName]: url,
+    }));
   };
 
   const handleQuestionKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -236,6 +263,9 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
   const tempHasEnoughAnswers = tempValidAnswers.length >= 2;
   const tempHasReachedMaxAnswers = tempAnswers.length >= 4;
 
+  // Extract URL tags from question text
+  const urlTags = extractUrlTags(question);
+
   return (
     <>
       <div className="space-y-4">
@@ -247,9 +277,31 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
             value={question}
             onChange={(e) => handleQuestionChange(e.target.value)}
             onKeyDown={handleQuestionKeyDown}
-            placeholder="Enter the question..."
+            placeholder="Enter the question... Use [URL:name] for links"
             className="w-full"
           />
+          {urlTags.length > 0 && (
+            <div className="space-y-2 mt-2 p-3 bg-muted rounded-md">
+              <Label className="text-sm font-medium">
+                URL Links ({urlTags.length} {urlTags.length === 1 ? "tag" : "tags"} found)
+              </Label>
+              {urlTags.map((tag) => (
+                <div key={tag} className="space-y-1">
+                  <Label htmlFor={`url-${tag}`} className="text-xs text-muted-foreground">
+                    [URL:{tag}]
+                  </Label>
+                  <Input
+                    id={`url-${tag}`}
+                    type="url"
+                    value={questionUrls[tag] || ""}
+                    onChange={(e) => handleUrlChange(tag, e.target.value)}
+                    placeholder={`https://example.com/${tag}`}
+                    className="w-full"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">

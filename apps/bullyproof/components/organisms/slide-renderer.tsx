@@ -49,8 +49,6 @@ export function SlideRenderer({
   thumbnailOnly = false,
   isCertification = false,
 }: SlideRendererProps) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-
   // Use appropriate cache store based on context
   const topicGetSlideUrl = useTopicSlidesCacheStore(
     (state) => state.getSlideUrl
@@ -77,6 +75,32 @@ export function SlideRenderer({
   const cachedUrl = isCertification 
     ? certificationCachedUrl 
     : (newStoreCachedUrl || topicCachedUrl);
+
+  // Initialize imageUrl from cache immediately if available
+  const [imageUrl, setImageUrl] = useState<string | null>(() => {
+    // If we have a cached URL, use it immediately to avoid showing loader
+    if (slide.kind === "image" && slide.id && !slide.id.startsWith("temp_") && !slide.imageUrl?.startsWith("blob:")) {
+      if (isCertification) {
+        const certCache = useCertificationSlidesCacheStore.getState().cache[slide.id];
+        if (certCache?.url) {
+          return certCache.url;
+        }
+      } else {
+        // Check new store first
+        const topicsStoreState = useTopicsStore.getState();
+        const newStoreUrl = topicsStoreState.slideUrls[slide.id];
+        if (newStoreUrl && Date.now() - newStoreUrl.timestamp < 7 * 24 * 60 * 60 * 1000) {
+          return newStoreUrl.url;
+        }
+        // Fall back to old store
+        const topicCache = useTopicSlidesCacheStore.getState().cache[slide.id];
+        if (topicCache?.url) {
+          return topicCache.url;
+        }
+      }
+    }
+    return null;
+  });
 
   const topicLoading = useTopicSlidesCacheStore(
     (state) => state.loading[slide.id] ?? false
@@ -107,7 +131,13 @@ export function SlideRenderer({
 
       // Only fetch signed URL for existing slides with actual image URLs
       if (slide.imageUrl && !slide.imageUrl.startsWith("blob:")) {
-        // Check new store first (from API responses with includeUrls)
+        // Check cached URL first (from cache store, populated by batch fetch)
+        if (!forceRefresh && cachedUrl) {
+          setImageUrl(cachedUrl);
+          return;
+        }
+
+        // Check new store first (from API responses with includeUrls) - only for non-certification
         if (!isCertification && !forceRefresh) {
           const topicsStoreState = useTopicsStore.getState();
           const newStoreUrl = topicsStoreState.slideUrls[slide.id];
@@ -121,7 +151,7 @@ export function SlideRenderer({
           }
         }
 
-        // Fall back to old cache store if not in new store
+        // Fall back to fetching from API if not in cache
         let cancelled = false;
         getSlideUrl(slide.id, forceRefresh).then((url) => {
           if (!cancelled) {
@@ -140,7 +170,7 @@ export function SlideRenderer({
       // Reset state for non-image slides
       setImageUrl(null);
     }
-  }, [slide.kind, slide.id, slide.imageUrl, getSlideUrl, forceRefresh]);
+  }, [slide.kind, slide.id, slide.imageUrl, getSlideUrl, forceRefresh, cachedUrl, isCertification, topicCachedUrl]);
 
   // Also update immediately when cached URL changes (for instant updates after cache updates)
   useEffect(() => {
@@ -197,7 +227,7 @@ export function SlideRenderer({
 
         return (
           <div className="flex items-center justify-center h-full w-full">
-            {!isTempSlide && loading ? (
+            {!isTempSlide && loading && !cachedUrl ? (
               <div className="flex items-center justify-center">
                 <img
                   src="/images/bp-small-logo.svg"

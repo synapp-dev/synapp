@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { FileText } from "lucide-react";
 import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
-import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
+import { useCertificationSlideUrl as useCertificationSlideUrlFromStore } from "@/entities/certification/model/topics-store";
 
 export type TopicSlide = {
   id: string;
@@ -25,35 +25,10 @@ interface AnimatedThumbnailProps {
   isCertification?: boolean;
 }
 
-// Hook to get slide URL for certification slides
+// Hook to get slide URL for certification slides - uses store's nested slide structure
 function useCertificationSlideUrl(slideId: string | null | undefined) {
-  const cacheStore = useCertificationSlidesCacheStore();
-  const [url, setUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!slideId) {
-      setUrl(null);
-      return;
-    }
-
-    // Check cache first
-    const cached = cacheStore.cache[slideId];
-    if (cached) {
-      const now = Date.now();
-      const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-      if (now - cached.timestamp < CACHE_EXPIRY_MS) {
-        setUrl(cached.url);
-        return;
-      }
-    }
-
-    // Fetch if not cached
-    cacheStore.getSlideUrl(slideId).then((fetchedUrl) => {
-      setUrl(fetchedUrl);
-    });
-  }, [slideId, cacheStore]);
-
-  return url;
+  // Use the hook from the store which reads from nested slide structure
+  return useCertificationSlideUrlFromStore(slideId);
 }
 
 export function AnimatedThumbnail({
