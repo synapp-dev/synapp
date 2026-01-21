@@ -124,7 +124,7 @@ const LockedCard = ({
         </Card>
       </TooltipTrigger>
       <TooltipContent>
-        <p>Locked until term start</p>
+        <p>Unlocks in Term 1!</p>
       </TooltipContent>
     </Tooltip>
   );
