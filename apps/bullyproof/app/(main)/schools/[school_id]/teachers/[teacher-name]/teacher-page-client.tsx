@@ -363,7 +363,6 @@ export default function TeacherPageClient({
         </Card>
       </div>
     </div>
-    </>
   );
 }
 
