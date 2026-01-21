@@ -1,20 +1,26 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
-import { Card, CardContent } from "@workspace/ui/components/card";
-import { TopicDetailSection } from "@/entities/dashboard/ui/admin/sections/content/topic-detail-section";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { useParams, useRouter } from "next/navigation";
+import { Loader2, FileText, FileQuestion, Pencil } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import { Button } from "@workspace/ui/components/button";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { certificationTopics } from "@/server/db/schema";
+import type { courseTopics } from "@/server/db/schema";
+import { EditTopicSettingsDrawer } from "@/entities/certification/ui/edit-topic-settings-drawer";
+
+type Topic = typeof courseTopics.$inferSelect;
 
 export default function CertificationTopicPage() {
   const params = useParams();
+  const router = useRouter();
   const stageCode = params?.stage as string;
   const topicSlug = params?.topic as string;
-  const [topicId, setTopicId] = useState<string | null>(null);
+  const [topic, setTopic] = useState<Topic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isEditDrawerOpen, setIsEditDrawerOpen] = useState(false);
 
   useEffect(() => {
     const fetchTopic = async () => {
@@ -24,42 +30,20 @@ export default function CertificationTopicPage() {
         setIsLoading(true);
         setError(null);
 
-        // Parse topic order from slug (e.g., "T1" -> 1)
-        const topicOrderMatch = topicSlug.match(/^T(\d+)$/);
-        if (!topicOrderMatch) {
-          setError("Invalid topic slug format. Expected format: T1, T2, etc.");
-          return;
-        }
-
-        const topicOrder = parseInt(topicOrderMatch[1], 10);
-
-        // Fetch all topics for this stage
-        const topicsResult =
-          await certificationApi.topics.byStageCode(stageCode);
-        if (!topicsResult.data) {
-          setError(topicsResult.error?.message ?? "Failed to fetch topics");
-          return;
-        }
-
-        // Find the topic with matching stageOrder
-        // Sort by stageOrder to ensure we get the correct one
-        const sortedTopics = [...topicsResult.data].sort((a, b) => {
-          const orderA = a.stageOrder ?? 0;
-          const orderB = b.stageOrder ?? 0;
-          return orderA - orderB;
-        });
-
-        // Find topic with matching stageOrder (lowest index matching the order)
-        const foundTopic = sortedTopics.find(
-          (t) => (t.stageOrder ?? 0) === topicOrder
+        // Fetch topic by slug
+        const topicResult = await certificationApi.topics.bySlug(
+          stageCode,
+          topicSlug
         );
 
-        if (!foundTopic) {
-          setError(`Topic with order ${topicOrder} not found`);
+        if (!topicResult.data) {
+          setError(
+            topicResult.error?.message ?? "Topic not found"
+          );
           return;
         }
 
-        setTopicId(foundTopic.id);
+        setTopic(topicResult.data);
       } catch (err) {
         console.error("Failed to fetch topic:", err);
         setError(err instanceof Error ? err.message : "Failed to fetch topic");
@@ -79,7 +63,7 @@ export default function CertificationTopicPage() {
     );
   }
 
-  if (error || !topicId) {
+  if (error || !topic) {
     return (
       <Card>
         <CardContent className="pt-6">
@@ -91,11 +75,96 @@ export default function CertificationTopicPage() {
     );
   }
 
+  const handleNavigateToSlides = () => {
+    router.push(`/admin/content/certification/${stageCode}/${topicSlug}/slides`);
+  };
+
+  const handleNavigateToQuiz = () => {
+    router.push(`/admin/content/certification/${stageCode}/${topicSlug}/quiz`);
+  };
+
   return (
-    <TopicDetailSection
-      context="certification"
-      topicId={topicId}
-      stageCode={stageCode}
-    />
+    <>
+      <PlatformAdminGuard />
+      <div className="container mx-auto py-8 max-w-4xl">
+      {/* Topic Header */}
+      {topic && (
+        <div className="flex items-center justify-between pb-6 border-b mb-6">
+          <div className="flex items-center gap-2">
+            <FileText className="text-primary" />
+            <div
+              className="flex items-center gap-2 cursor-pointer group"
+              onClick={() => setIsEditDrawerOpen(true)}
+            >
+              <h1 className="text-3xl font-bold tracking-tight group-hover:text-primary transition-colors">
+                {topic.title}
+              </h1>
+              <Pencil className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Card>
+        <CardContent className="space-y-6 pt-6">
+          <p className="text-sm text-muted-foreground">
+            Choose how you want to manage this topic's content:
+          </p>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Button
+              onClick={handleNavigateToSlides}
+              variant="outline"
+              className="h-auto p-6 flex flex-col items-start gap-3 hover:bg-primary/5"
+            >
+              <div className="flex items-center gap-3">
+                <FileText className="h-6 w-6 text-primary" />
+                <span className="text-lg font-semibold">Slides</span>
+              </div>
+              <p className="text-sm text-muted-foreground text-left">
+                Manage image and video slides for this topic
+              </p>
+            </Button>
+
+            <Button
+              onClick={handleNavigateToQuiz}
+              variant="outline"
+              className="h-auto p-6 flex flex-col items-start gap-3 hover:bg-primary/5"
+            >
+              <div className="flex items-center gap-3">
+                <FileQuestion className="h-6 w-6 text-primary" />
+                <span className="text-lg font-semibold">Quiz</span>
+              </div>
+              <p className="text-sm text-muted-foreground text-left">
+                Manage quiz questions and answers for this topic
+              </p>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit Topic Settings Drawer */}
+      {topic && (
+        <EditTopicSettingsDrawer
+          open={isEditDrawerOpen}
+          onOpenChange={setIsEditDrawerOpen}
+          topic={topic}
+          onTopicUpdated={() => {
+            // Reload topic data
+            const reloadTopic = async () => {
+              const topicResult = await certificationApi.topics.bySlug(
+                stageCode,
+                topicSlug
+              );
+              if (topicResult.data) {
+                setTopic(topicResult.data);
+              }
+            };
+            reloadTopic();
+          }}
+        />
+      )}
+    </div>
+    </>
   );
 }

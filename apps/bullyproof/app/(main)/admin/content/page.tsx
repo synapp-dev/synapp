@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -13,14 +14,14 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { GraduationCap, BookOpenText, Loader2 } from "lucide-react";
 import { useStages } from "@/entities/stages/model/store";
-import { useCertificationStages } from "@/entities/certification/model/store";
+import { useCertificationCourses } from "@/entities/certification/model/store";
 
 export default function AdminContentPage() {
   const router = useRouter();
   
   // Use cached React Query hooks instead of manual fetching
   const { stages: curriculumStages, isLoading: isLoadingCurriculum, refetch: refetchCurriculum } = useStages();
-  const { stages: certificationStages, isLoading: isLoadingCertification, refetch: refetchCertification } = useCertificationStages();
+  const { courses: certificationCourses, isLoading: isLoadingCertification, refetch: refetchCertification } = useCertificationCourses();
 
   // Trigger background refetch on mount to ensure complete data
   // This ensures that even if we navigated from a page that only cached
@@ -33,7 +34,9 @@ export default function AdminContentPage() {
   }, [refetchCurriculum, refetchCertification]);
 
   return (
-    <div className="space-y-6">
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold tracking-tight">
           Content Management
@@ -63,31 +66,31 @@ export default function AdminContentPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              {isLoadingCertification && certificationStages.length === 0 ? (
+              {isLoadingCertification && certificationCourses.length === 0 ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Loading stages...</span>
+                  <span>Loading courses...</span>
                 </div>
-              ) : certificationStages.length > 0 ? (
+              ) : certificationCourses.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {certificationStages.map((stage) => (
+                  {certificationCourses.map((course) => (
                     <Link
-                      key={stage.id}
-                      href={`/admin/content/certification/${stage.code}`}
+                      key={course.id}
+                      href={`/admin/content/certification/${course.code}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Badge
                         variant="secondary"
                         className="cursor-pointer hover:bg-blue-100 hover:text-blue-700 px-3 py-1.5 text-sm font-medium"
                       >
-                        {stage.name}
+                        {course.name}
                       </Badge>
                     </Link>
                   ))}
                 </div>
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No certification stages found
+                  No certification courses found
                 </p>
               )}
             </div>
@@ -145,5 +148,6 @@ export default function AdminContentPage() {
         </Card>
       </div>
     </div>
+    </>
   );
 }

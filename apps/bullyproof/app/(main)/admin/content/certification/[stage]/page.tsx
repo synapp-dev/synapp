@@ -1,4 +1,4 @@
-import { CertificationStageDetailSection } from "@/entities/dashboard/ui/admin/sections/content/certification-stage-detail-section";
+import { CertificationCourseDetailSection } from "@/entities/dashboard/ui/admin/sections/content/certification-stage-detail-section";
 import { generateMetadataFromSegment } from "@/utils/metadata";
 import { Metadata } from "next";
 
@@ -18,7 +18,7 @@ export default async function CertificationStagePage({
 }) {
   const { stage } = await params;
   return (
-    <CertificationStageDetailSection
+    <CertificationCourseDetailSection
       slug={stage}
       readonly={false}
       basePath="/admin/content/certification"
