@@ -74,7 +74,7 @@ async function fixCertificationTopicOrder() {
         }
 
         if (topicNumbers.length === 0) {
-          console.log(`  ⚠️  Topic "${topic.title}" (order ${topic.stageOrder}) - No slides with imageUrl found, skipping`);
+          console.log(`  ⚠️  Topic "${topic.title}" (order ${topic.courseOrder}) - No slides with imageUrl found, skipping`);
           continue;
         }
 
