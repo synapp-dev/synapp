@@ -47,6 +47,45 @@ export const rolesApi = {
         body: JSON.stringify(payload),
       });
     },
+    bulkManageRoles(payload: {
+      schoolId: string;
+      emails: string[];
+      roleIds: string[];
+      action: "assign" | "remove";
+    }): Promise<ApiResult<{
+      success: boolean;
+      results: Array<{
+        email: string;
+        success: boolean;
+        message: string;
+        skipped?: boolean;
+      }>;
+      summary: {
+        total: number;
+        succeeded: number;
+        failed: number;
+        skipped: number;
+      };
+    }>> {
+      return apiFetch<{
+        success: boolean;
+        results: Array<{
+          email: string;
+          success: boolean;
+          message: string;
+          skipped?: boolean;
+        }>;
+        summary: {
+          total: number;
+          succeeded: number;
+          failed: number;
+          skipped: number;
+        };
+      }>("/user-roles/bulk", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+    },
   },
   put: {
     update(

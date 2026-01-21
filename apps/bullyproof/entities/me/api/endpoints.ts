@@ -84,7 +84,7 @@ export const meApi = {
       search?: string;
       role?: string;
       schoolId?: string;
-    }): Promise<ApiResult<UserWithRolesAndSchools[]>> {
+    }): Promise<ApiResult<{ users: UserWithRolesAndSchools[]; totalCount: number }>> {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
@@ -93,7 +93,7 @@ export const meApi = {
       if (params?.schoolId) searchParams.set("schoolId", params.schoolId);
 
       const query = searchParams.toString();
-      return apiFetch<UserWithRolesAndSchools[]>(
+      return apiFetch<{ users: UserWithRolesAndSchools[]; totalCount: number }>(
         `/users${query ? `?${query}` : ""}`
       );
     },
