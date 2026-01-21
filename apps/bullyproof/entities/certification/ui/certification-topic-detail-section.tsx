@@ -131,7 +131,7 @@ export function CertificationTopicDetailSection({
                 videoUrl: slide.videoUrl ?? null,
                 videoStartS: slide.videoStartS ?? null,
                 videoEndS: slide.videoEndS ?? null,
-                quizData: slide.quizData as QuizData | null,
+                quizData: (slide as any).quizData as QuizData | null,
               };
             });
           setLocalSlides(initialSlides);
