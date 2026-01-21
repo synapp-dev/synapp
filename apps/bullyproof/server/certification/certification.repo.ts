@@ -1,42 +1,42 @@
 import { db } from "@/server/db/drizzle";
-import { certificationStages } from "@/server/db/schema";
+import { certificationCourses } from "@/server/db/schema";
 import { eq, asc, sql, desc } from "drizzle-orm";
 
 export const certificationRepo = {
   getStages: () =>
     db
       .select()
-      .from(certificationStages)
-      .orderBy(asc(certificationStages.sortIndex)),
+      .from(certificationCourses)
+      .orderBy(asc(certificationCourses.sortIndex)),
 
   getStageById: (id: string) =>
     db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.id, id))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.id, id))
       .limit(1),
 
   getStageByCode: (code: string) =>
     db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.code, code))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.code, code))
       .limit(1),
 
   getStageWithTopics: async (stageId: string) => {
     const stage = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.id, stageId))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.id, stageId))
       .limit(1);
 
     if (stage.length === 0) return null;
 
-    // Get topic count for this stage using raw SQL since certification_topics is not in schema yet
+    // Get topic count for this course using courseTopics table
     const topicCountResult = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(sql`certification_topics`)
-      .where(sql`stage_id = ${stageId}`);
+      .from(sql`course_topics`)
+      .where(sql`course_id = ${stageId}`);
 
     const firstResult = topicCountResult?.[0] as { count: number } | undefined;
     const topicCount = firstResult ? Number(firstResult.count ?? 0) : 0;
@@ -50,17 +50,17 @@ export const certificationRepo = {
   getStageByCodeWithTopics: async (code: string) => {
     const stage = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.code, code))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.code, code))
       .limit(1);
 
     if (stage.length === 0) return null;
 
-    // Get topic count for this stage using raw SQL since certification_topics is not in schema yet
+    // Get topic count for this course using courseTopics table
     const topicCountResult = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(sql`certification_topics`)
-      .where(sql`stage_id = ${stage[0].id}`);
+      .from(sql`course_topics`)
+      .where(sql`course_id = ${stage[0].id}`);
 
     const firstResult = topicCountResult?.[0] as { count: number } | undefined;
     const topicCount = firstResult ? Number(firstResult.count ?? 0) : 0;
@@ -73,9 +73,9 @@ export const certificationRepo = {
 
   getMaxSortIndex: async () => {
     const existingStages = await db
-      .select({ sortIndex: certificationStages.sortIndex })
-      .from(certificationStages)
-      .orderBy(desc(certificationStages.sortIndex))
+      .select({ sortIndex: certificationCourses.sortIndex })
+      .from(certificationCourses)
+      .orderBy(desc(certificationCourses.sortIndex))
       .limit(1);
 
     return existingStages.length > 0 ? existingStages[0].sortIndex : -1;
@@ -94,7 +94,7 @@ export const certificationRepo = {
     }
 
     const [stage] = await db
-      .insert(certificationStages)
+      .insert(certificationCourses)
       .values({
         code: data.code,
         name: data.name,
@@ -112,8 +112,8 @@ export const certificationRepo = {
     // Check if stage exists
     const existingStage = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.id, stageId))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.id, stageId))
       .limit(1);
 
     if (existingStage.length === 0) {
@@ -130,14 +130,14 @@ export const certificationRepo = {
     updateData.updatedAt = sql`now()`;
 
     await db
-      .update(certificationStages)
+      .update(certificationCourses)
       .set(updateData)
-      .where(eq(certificationStages.id, stageId));
+      .where(eq(certificationCourses.id, stageId));
 
     const [updatedStage] = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.id, stageId))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.id, stageId))
       .limit(1);
 
     return updatedStage;
@@ -147,8 +147,8 @@ export const certificationRepo = {
     // Check if stage exists
     const existingStage = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.id, stageId))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.id, stageId))
       .limit(1);
 
     if (existingStage.length === 0) {
@@ -156,7 +156,7 @@ export const certificationRepo = {
     }
 
     // Delete the stage (cascade will handle related data deletion)
-    await db.delete(certificationStages).where(eq(certificationStages.id, stageId));
+    await db.delete(certificationCourses).where(eq(certificationCourses.id, stageId));
 
     return { success: true };
   },
