@@ -18,7 +18,7 @@ import {
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { BookOpen } from "lucide-react";
-import type { curriculumStages, certificationStages, topics, certificationTopics } from "@/server/db/schema";
+import type { curriculumStages, certificationCourses, topics, courseTopics } from "@/server/db/schema";
 import {
   useTopicsByStage,
   useTopicsStore,
@@ -43,7 +43,7 @@ type CurriculumStage = typeof curriculumStages.$inferSelect & {
   }>;
 };
 
-type CertificationStage = typeof certificationStages.$inferSelect & {
+type CertificationStage = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
 };
 
@@ -52,7 +52,7 @@ type Stage = CurriculumStage | CertificationStage;
 
 // Topic types
 type CurriculumTopic = typeof topics.$inferSelect;
-type CertificationTopic = typeof certificationTopics.$inferSelect;
+type CertificationTopic = typeof courseTopics.$inferSelect;
 
 // Generic topic type that works for both
 type TopicWithImage = (CurriculumTopic | CertificationTopic) & {
@@ -61,6 +61,7 @@ type TopicWithImage = (CurriculumTopic | CertificationTopic) & {
     kind: string;
     orderIndex: number;
     signedUrl?: string | null;
+    signedImageUrl?: string | null; // API may return this instead of signedUrl
   }>;
   imageSlideId?: string | null;
   stageOrder?: number | null;
@@ -89,24 +90,31 @@ function TopicImageThumbnail({
 
   // Access appropriate store based on type
   const { slideUrls: curriculumSlideUrls } = useTopicsStore();
-  const { slideUrls: certificationSlideUrls } = useCertificationTopicsStore();
-  const storeSlideUrls = type === "certification" ? certificationSlideUrls : curriculumSlideUrls;
+  // Note: certification topics store doesn't have slideUrls - URLs are in topic.slides[].signedUrl
+  const storeSlideUrls = type === "certification" ? undefined : curriculumSlideUrls;
 
   // Get URLs for all image slides
   const slideUrls = useMemo(() => {
     return imageSlides
       .map((slide) => {
-        // Prefer direct signedUrl from API
-        if (slide.signedUrl) {
-          return slide.signedUrl;
+        if (!slide || !slide.id) return null;
+        
+        // Prefer direct signedUrl or signedImageUrl from API (works for both curriculum and certification)
+        // API may return signedImageUrl for certification topics
+        const directUrl = slide.signedUrl || (slide as any).signedImageUrl;
+        if (directUrl) {
+          return directUrl;
         }
-        // Fall back to cached URL from store
-        const cached = storeSlideUrls[slide.id];
-        if (cached) {
-          // Check if expired (1 week)
-          const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-          if (Date.now() - cached.timestamp <= CACHE_EXPIRY_MS) {
-            return cached.url;
+        
+        // Fall back to cached URL from store (only for curriculum topics)
+        if (storeSlideUrls) {
+          const cached = storeSlideUrls[slide.id];
+          if (cached) {
+            // Check if expired (1 week)
+            const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+            if (Date.now() - cached.timestamp <= CACHE_EXPIRY_MS) {
+              return cached.url;
+            }
           }
         }
         return null;
@@ -264,13 +272,25 @@ function StageCard({ stage, index, onStageClick, basePath, type = "curriculum" }
 
   const handleTopicClick = (topic: TopicWithImage, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      if (basePath) {
-        router.push(`${basePath}/${stage.code}/T${topic.stageOrder}`);
-      } else if (onStageClick) {
-        // If no basePath, navigate to stage first
-        onStageClick(stage);
+    if (basePath) {
+      if (type === "certification") {
+        // For certification topics, use slug if available, otherwise fallback to courseOrder
+        const certTopic = topic as CertificationTopic & { slug?: string; courseOrder?: number | null };
+        if (certTopic.slug) {
+          router.push(`${basePath}/${stage.code}/${certTopic.slug}`);
+        } else if (certTopic.courseOrder !== null && certTopic.courseOrder !== undefined) {
+          // Fallback to courseOrder for backward compatibility
+          router.push(`${basePath}/${stage.code}/T${certTopic.courseOrder}`);
+        }
+      } else {
+        // For curriculum topics, use stageOrder
+        if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
+          router.push(`${basePath}/${stage.code}/T${topic.stageOrder}`);
+        }
       }
+    } else if (onStageClick) {
+      // If no basePath, navigate to stage first
+      onStageClick(stage);
     }
   };
 
