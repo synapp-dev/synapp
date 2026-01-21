@@ -27,6 +27,7 @@ export const classesRepo = {
         studentCap: classes.studentCap,
         active: classes.active,
         createdAt: classes.createdAt,
+        startYear: classes.startYear,
         yearCodes: sql<string[]>`COALESCE(
           array_agg(${schoolYears.code} ORDER BY ${schoolYears.sortIndex}) 
           FILTER (WHERE ${schoolYears.code} IS NOT NULL),
@@ -51,7 +52,8 @@ export const classesRepo = {
         classes.room,
         classes.studentCap,
         classes.active,
-        classes.createdAt
+        classes.createdAt,
+        classes.startYear
       )
       .orderBy(asc(classes.name));
 
@@ -130,6 +132,7 @@ export const classesRepo = {
       room?: string;
       studentCap?: number;
       active?: boolean;
+      startYear?: Date | string;
     }
   ) => db.update(classes).set(data).where(eq(classes.id, id)).returning(),
 

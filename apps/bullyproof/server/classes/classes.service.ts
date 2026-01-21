@@ -181,4 +181,167 @@ export const classesService = {
     await classesRepo.deleteBatch(ids);
     return { success: true, deletedCount: ids.length };
   },
+
+  async bulkUpdateYearLevels(
+    ctx: AuthContext,
+    params: {
+      classIds: string[];
+      yearIds?: string[];
+      action?: "assign" | "replace";
+      startYear?: string;
+    }
+  ) {
+    const { classIds, yearIds = [], action = "assign", startYear } = params;
+
+    if (classIds.length === 0) {
+      return {
+        success: true,
+        results: [],
+        summary: { total: 0, succeeded: 0, failed: 0 },
+      };
+    }
+
+    if (yearIds.length === 0 && !startYear) {
+      throw new Error(
+        "At least one year level or running year must be provided"
+      );
+    }
+
+    // Get all classes to verify permissions and get class names
+    const existingClasses = await Promise.all(
+      classIds.map((id) => classesRepo.getById(id))
+    );
+
+    // Group by schoolId to check permissions efficiently
+    const schoolIds = new Set<string>();
+    for (const classResult of existingClasses) {
+      if (classResult[0]) {
+        schoolIds.add(classResult[0].schoolId);
+      }
+    }
+
+    // Check permissions for all schools
+    for (const schoolId of schoolIds) {
+      await assertCanManageClasses(ctx, schoolId);
+    }
+
+    // Process each class
+    const results: Array<{
+      classId: string;
+      className: string;
+      success: boolean;
+      message: string;
+    }> = [];
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < classIds.length; i++) {
+      const classId = classIds[i];
+      const classResult = existingClasses[i];
+
+      if (!classResult[0]) {
+        results.push({
+          classId,
+          className: "Unknown",
+          success: false,
+          message: "Class not found",
+        });
+        failed++;
+        continue;
+      }
+
+      const className = classResult[0].name;
+
+      try {
+        const messages: string[] = [];
+
+        // Handle year level updates if provided
+        if (yearIds.length > 0) {
+          if (action === "replace") {
+            // Remove all existing year levels, then assign new ones
+            await classesRepo.removeYears(classId);
+            await classesRepo.assignYears(classId, yearIds);
+            messages.push("Year levels replaced");
+          } else {
+            // Assign: Add new year levels without removing existing ones
+            // First get existing year IDs to avoid duplicates
+            const classWithYears = await classesRepo.getWithYears(classId);
+            const existingYearIds =
+              classWithYears?.years?.map((y: any) => y.yearId) || [];
+            const newYearIds = yearIds.filter(
+              (id) => !existingYearIds.includes(id)
+            );
+
+            if (newYearIds.length > 0) {
+              await classesRepo.assignYears(classId, newYearIds);
+              messages.push("Year levels assigned");
+            } else {
+              messages.push("Year levels already assigned");
+            }
+          }
+        }
+
+        // Handle running year update if provided (separate operation)
+        if (startYear) {
+          // startYear is an ISO datetime string from the API (e.g., "2026-01-01T00:00:00.000Z")
+          // Validate it's a valid date string
+          if (typeof startYear !== "string") {
+            throw new Error(`startYear must be a string, got: ${typeof startYear}`);
+          }
+          
+          const dateObj = new Date(startYear);
+          if (isNaN(dateObj.getTime())) {
+            throw new Error(`Invalid startYear date string: ${startYear}`);
+          }
+          
+          // Ensure the string is in ISO format for PostgreSQL timestamptz
+          // Drizzle with mode: 'string' expects a valid ISO 8601 string
+          const isoString = dateObj.toISOString();
+          
+          await classesRepo.update(classId, { startYear: isoString });
+          const year = dateObj.getFullYear();
+          messages.push(`Running year set to ${year}`);
+        }
+
+        // Build success message
+        if (messages.length === 0) {
+          // This shouldn't happen due to validation, but handle it gracefully
+          results.push({
+            classId,
+            className,
+            success: false,
+            message: "No updates provided",
+          });
+          failed++;
+        } else {
+          results.push({
+            classId,
+            className,
+            success: true,
+            message: messages.join(", ") + " successfully",
+          });
+          succeeded++;
+        }
+      } catch (error: any) {
+        results.push({
+          classId,
+          className,
+          success: false,
+          message: error.message || "Failed to update year levels",
+        });
+        failed++;
+      }
+    }
+
+    return {
+      success: failed === 0,
+      results,
+      summary: {
+        total: classIds.length,
+        succeeded,
+        failed,
+      },
+    };
+  },
 };
