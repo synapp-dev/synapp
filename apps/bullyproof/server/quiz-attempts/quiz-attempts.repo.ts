@@ -111,9 +111,12 @@ export const quizAttemptsRepo = {
     // Recalculate correct answers count
     const correctCountResult = await db
       .select({ count: count() })
-      .from(sql`quiz_attempt_answers`)
+      .from(quizAttemptAnswers)
       .where(
-        sql`attempt_id = ${attemptId} AND is_correct = true`
+        and(
+          eq(quizAttemptAnswers.attemptId, attemptId),
+          eq(quizAttemptAnswers.isCorrect, true)
+        )
       );
 
     const correctAnswers = correctCountResult[0]?.count ?? 0;
@@ -122,7 +125,6 @@ export const quizAttemptsRepo = {
       .update(quizAttempts)
       .set({
         correctAnswers,
-        updatedAt: sql`now()`,
       })
       .where(eq(quizAttempts.id, attemptId))
       .returning();
