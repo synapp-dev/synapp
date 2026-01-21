@@ -1704,7 +1704,7 @@ function SchoolDetailDrawerContent({
         .then((result) => {
           if (!result.error && result.data) {
             // Find user with SCHOOL_LICENCE role for this school
-            const licenceUser = result.data.find((user) =>
+            const licenceUser = result.data.users.find((user) =>
               user.schoolRoles.some(
                 (role) =>
                   role.schoolId === school.id &&
