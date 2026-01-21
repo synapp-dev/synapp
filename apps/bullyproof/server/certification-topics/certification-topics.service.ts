@@ -18,7 +18,7 @@ import { certificationSlidesService } from "../certification-slides/certificatio
 import { getUserScopedRoles } from "../auth/rbac";
 import { createServerClient } from "@/utils/supabase/server";
 import { db } from "@/server/db/drizzle";
-import { certificationStages } from "@/server/db/schema";
+import { certificationCourses } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
@@ -116,7 +116,13 @@ export const certificationTopicsService = {
     const data: CreateTopicParams = createTopicSchema.parse(params);
     await assertCanManageCertificationTopics(ctx);
 
-    const result = await certificationTopicsRepo.create(data);
+    // Map stageId/stageOrder to courseId/courseOrder for the repo
+    const result = await certificationTopicsRepo.create({
+      courseId: data.stageId, // stageId is actually courseId
+      title: data.title,
+      officialNotes: data.officialNotes,
+      courseOrder: data.stageOrder ?? undefined, // stageOrder is actually courseOrder
+    });
     return result[0];
   },
 
@@ -124,8 +130,12 @@ export const certificationTopicsService = {
     const data: UpdateTopicParams = updateTopicSchema.parse(params);
     await assertCanManageCertificationTopics(ctx);
 
-    const { id, ...updateData } = data;
-    const result = await certificationTopicsRepo.update(id, updateData);
+    const { id, stageOrder, ...updateData } = data;
+    // Map stageOrder to courseOrder for the repo
+    const result = await certificationTopicsRepo.update(id, {
+      ...updateData,
+      courseOrder: stageOrder ?? undefined,
+    });
     return result[0];
   },
 
@@ -145,6 +155,7 @@ export const certificationTopicsService = {
     // Note: Since we now use topic IDs in file paths instead of order numbers,
     // we don't need to rename storage directories when topics are reordered.
     // The paths are stable and never change.
+    // Map stageId to courseId for the repo
     await certificationTopicsRepo.reorderTopics(data.stageId, data.topicIds);
 
     return { success: true };

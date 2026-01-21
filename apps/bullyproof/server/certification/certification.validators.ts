@@ -28,8 +28,7 @@ export const createStageSchema = z.object({
     .string()
     .trim()
     .min(1)
-    .max(50)
-    .regex(/^C[0-9]*$/, "Code must match pattern C[0-9]* (e.g., C, C1, C2)"),
+    .max(50),
   name: z.string().trim().min(1).max(500),
   sortIndex: z.coerce.number().int().min(0).max(32767).optional(),
 });

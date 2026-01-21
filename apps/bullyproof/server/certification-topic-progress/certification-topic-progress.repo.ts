@@ -1,7 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import {
   certificationUserTopicProgress,
-  certificationSlides,
 } from "@/server/db/schema";
 import { eq, and, desc, max, sql } from "drizzle-orm";
 
