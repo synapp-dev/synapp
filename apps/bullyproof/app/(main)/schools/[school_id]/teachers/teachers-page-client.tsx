@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, Fragment } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -64,10 +65,10 @@ export default function TeachersPageClient() {
 
   useEffect(() => {
     async function fetchUsers() {
-      // Use slug from store (API will resolve it to ID)
-      const schoolIdentifier = currentSchool?.slug || currentSchool?.id;
+      // Use schoolId (UUID) directly, not slug
+      const schoolId = currentSchool?.id;
 
-      if (!schoolIdentifier) {
+      if (!schoolId) {
         setLoading(false);
         return;
       }
@@ -75,12 +76,13 @@ export default function TeachersPageClient() {
       try {
         setLoading(true);
         const result = await meApi.get.listAllUsers({
-          schoolId: schoolIdentifier, // Can be UUID or slug - API will handle it
+          schoolId: schoolId,
           limit: 100, // Max allowed by API
         });
 
         if (!result.error && result.data) {
-          setUsers(result.data);
+          // Note: API returns { users: [...], totalCount: number }
+          setUsers(result.data.users);
         } else if (result.error) {
           console.error("Failed to fetch users:", result.error);
         }
@@ -92,7 +94,7 @@ export default function TeachersPageClient() {
     }
 
     fetchUsers();
-  }, [currentSchool?.slug, currentSchool?.id]);
+  }, [currentSchool?.id]);
 
   // Filter users to only show those with TEACHER or SCHOOL_ADMIN roles (exclude SCHOOL_LICENCE only users)
   const usersWithValidRoles = useMemo(() => {
@@ -369,11 +371,13 @@ export default function TeachersPageClient() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-2">
-        <Users className="h-8 w-8" />
-        <h1 className="text-3xl font-bold">Teachers</h1>
+    <>
+      <PlatformAdminGuard />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center gap-2">
+          <Users className="h-8 w-8" />
+          <h1 className="text-3xl font-bold">Teachers</h1>
       </div>
 
       {/* Search and Filter */}
@@ -473,5 +477,6 @@ export default function TeachersPageClient() {
         </div>
       )}
     </div>
+    </>
   );
 }

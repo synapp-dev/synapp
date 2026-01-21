@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -66,9 +67,9 @@ export default function TeacherPageClient({
 
   useEffect(() => {
     async function fetchTeacherData() {
-      const schoolIdentifier = currentSchool?.slug || currentSchool?.id;
+      const schoolId = currentSchool?.id;
       
-      if (!schoolIdentifier) {
+      if (!schoolId) {
         setLoading(false);
         return;
       }
@@ -76,9 +77,9 @@ export default function TeacherPageClient({
       try {
         setLoading(true);
         
-        // Fetch all users for the school
+        // Fetch all users for the school - use schoolId (UUID) directly, not slug
         const usersResult = await meApi.get.listAllUsers({
-          schoolId: schoolIdentifier,
+          schoolId: schoolId,
           limit: 100,
         });
 
@@ -89,7 +90,8 @@ export default function TeacherPageClient({
         }
 
         // Find teacher by matching name (slug converted back to name)
-        const foundTeacher = usersResult.data.find((user) => {
+        // Note: API returns { users: [...], totalCount: number }
+        const foundTeacher = usersResult.data.users.find((user) => {
           const firstName = user.firstName || "";
           const lastName = user.lastName || "";
           const fullName = `${firstName} ${lastName}`.trim();
@@ -175,24 +177,30 @@ export default function TeacherPageClient({
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="text-center py-12">
-          <p className="text-muted-foreground">Loading teacher profile...</p>
+      <>
+        <PlatformAdminGuard />
+        <div className="space-y-6">
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading teacher profile...</p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
   if (!teacher) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Teacher not found</h1>
-          <p className="text-muted-foreground">
-            The teacher you're looking for doesn't exist.
-          </p>
+      <>
+        <PlatformAdminGuard />
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">Teacher not found</h1>
+            <p className="text-muted-foreground">
+              The teacher you're looking for doesn't exist.
+            </p>
+          </div>
         </div>
-      </div>
+      </>
     );
   }
 
@@ -355,6 +363,7 @@ export default function TeacherPageClient({
         </Card>
       </div>
     </div>
+    </>
   );
 }
 
