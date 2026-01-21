@@ -70,6 +70,6 @@ export const SCHOOL_TUTORIALS: TutorialConfig[] = [
     title: "Welcome to the AP Certification",
     description:
       "Welcome to the AP certification. This course will better equip you with the knowledge and skills needed to effectively address and prevent bullying in educational settings. Through comprehensive modules and interactive content, you'll learn evidence-based strategies and best practices.",
-    routePattern: /^\/ap-certification(\/.*)?$/,
+    routePattern: /^\/courses\/[^/]+(\/.*)?$/,
   },
 ];
