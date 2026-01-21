@@ -1,7 +1,8 @@
 import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { useState, useEffect, useMemo } from "react";
-import { Calendar as CalendarIcon, BookOpen, School } from "lucide-react";
+import { Calendar as CalendarIcon, BookOpen, School, ChevronRight, ChevronsRight } from "lucide-react";
+import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { useMeStore } from "@/entities/me/model/store";
@@ -10,6 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { cn } from "@workspace/ui/lib/utils";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useMySchoolsQuery, type School as SchoolType } from "@/entities/me/model/useMySchoolsQuery";
 import {
   Dialog,
@@ -143,21 +145,6 @@ export function TeacherHeroSection() {
   // Get user role/title
   const userTitle = "Teacher";
 
-  // Handle prepare new lesson click
-  const handlePrepareNewLesson = () => {
-    if (schools.length === 0) {
-      // No schools available
-      return;
-    } else if (schools.length === 1) {
-      // Single school - navigate directly
-      const schoolSlug = schools[0].slug;
-      router.push(`/schools/${schoolSlug}/lessons?wizardOpen=true&step=0`);
-    } else {
-      // Multiple schools - show dialog
-      setIsSchoolDialogOpen(true);
-    }
-  };
-
   // Handle school selection from dialog
   const handleSchoolSelect = (schoolSlug: string) => {
     setIsSchoolDialogOpen(false);
@@ -180,12 +167,24 @@ export function TeacherHeroSection() {
           fadeDirection="up"
           className="flex-1 min-h-0"
         >
-          <Card 
-            className="h-full flex flex-col items-center justify-center p-6 cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={handlePrepareNewLesson}
-          >
-            <p className="text-lg font-medium">Prepare New Lesson</p>
-          </Card>
+          <Link href="/courses/amayda-program">
+            <Card 
+              className="group rotating-gradient-bg h-full flex flex-row items-center justify-center gap-3 p-4 cursor-pointer transition-all hover:brightness-110 hover:scale-[1.02] hover:shadow-lg"
+              style={{
+                boxShadow: '0 0 20px rgba(3, 132, 147, 0.3)',
+              }}
+            >
+              <Image
+                src="/images/ap-teacher-icon.svg"
+                alt="AP Logo"
+                width={48}
+                height={48}
+                className="shrink-0 group-hover:animate-shake-twice"
+              />
+              <p className="text-3xl font-normal text-white">Get <span className="font-black">AP Certified!</span> </p>
+              <ChevronsRight className="size-8 animate-bounce-right text-white shrink-0" />
+            </Card>
+          </Link>
         </StaggeredAnimation>
       </div>
 
@@ -241,14 +240,41 @@ export function TeacherHeroSection() {
               </div>
 
               {isLoadingLessons ? (
-                <div className="w-full border-dashed rounded-lg bg-muted flex items-center px-4 py-3">
-                  <p className="text-sm text-muted-foreground">Loading lessons...</p>
+                <div className="flex flex-col gap-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="w-full border-2 border-dashed border-muted-foreground rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Solid circle */}
+                        <div className="w-6 h-6 rounded-full bg-muted-foreground mt-1 shrink-0" />
+                        {/* Dotted boxes */}
+                        <div className="flex-1 space-y-2">
+                          <div className="h-4 border-2 border-dashed border-muted-foreground rounded-md w-3/4" />
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 border-2 border-dashed border-muted-foreground rounded-md w-1/3" />
+                            <div className="w-2 h-2 rounded-full bg-muted-foreground" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 mt-2">
+                            <div className="h-6 border-2 border-dashed border-muted-foreground rounded-md" />
+                            <div className="h-6 border-2 border-dashed border-muted-foreground rounded-md" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : selectedDateLessons.length === 0 ? (
-                <div className="w-full border-dashed rounded-lg bg-muted flex items-center px-4 py-3">
-                  <p className="text-sm text-muted-foreground">
-                    No events currently scheduled
-                  </p>
+                <div className="flex flex-col gap-4">
+                  {/* Main card with text */}
+                  <div className="w-full border-2 border-dotted rounded-lg bg-muted/30 flex items-center px-4 py-3">
+                    <p className="text-sm text-muted-foreground">
+                      Your lessons will appear here!
+                    </p>
+                  </div>
+                  {/* Gradient cards underneath */}
+                  <div className="w-full border-2 border-dotted rounded-lg bg-muted/5 opacity-50 flex items-center px-4 py-6" />
+                  <div className="w-full border-2 border-dotted rounded-lg bg-muted/5 opacity-50 flex items-center px-4 py-6" />
+                  {/* <div className="w-full border-2 border-dotted rounded-lg bg-muted/10 flex items-center px-4 py-6" /> */}
+                  {/* <div className="w-full border-2 border-dotted rounded-lg bg-muted/5 flex items-center px-4 py-6" /> */}
                 </div>
               ) : (
                 <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-2">
@@ -352,11 +378,16 @@ export function TeacherHeroSection() {
                 <>
                   {[1, 2, 3].map((i) => (
                     <Card key={i} className="px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-muted shrink-0" />
-                        <div className="flex flex-col gap-1 flex-1">
-                          <Skeleton className="h-4 w-3/4" />
-                          <Skeleton className="h-3 w-1/2" />
+                      <div className="flex items-center gap-3">
+                        {/* Solid circle */}
+                        <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
+                        {/* Dotted box grid */}
+                        <div className="flex flex-col gap-2 flex-1">
+                          <div className="h-4 border-2 border-dashed border-muted-foreground rounded-md w-3/4" />
+                          <div className="flex items-center gap-2">
+                            <div className="h-3 border-2 border-dashed border-muted-foreground rounded-md w-1/2" />
+                            <div className="w-3 h-3 rounded-full bg-muted-foreground" />
+                          </div>
                         </div>
                       </div>
                     </Card>
