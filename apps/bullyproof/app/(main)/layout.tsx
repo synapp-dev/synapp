@@ -2,6 +2,7 @@
 
 import { MeLoader } from "@/components/molecules/me-loader";
 import { TutorialGuard } from "@/components/molecules/tutorial-guard";
+import { DashboardTutorialGuard } from "@/components/molecules/dashboard-tutorial-guard";
 import { TeacherClassesGuard } from "@/components/molecules/teacher-classes-guard";
 import { SchoolPageTutorialGuard } from "@/components/molecules/school-page-tutorial-guard";
 import { AppHeader } from "@/components/organisms/app-header";
@@ -19,6 +20,7 @@ export default function MainLayout({
     <ResponsiveSidebarProvider>
       <MeLoader />
       <TutorialGuard />
+      <DashboardTutorialGuard />
       <TeacherClassesGuard />
       <SchoolPageTutorialGuard />
       <AppSidebar />

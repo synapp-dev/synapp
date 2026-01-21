@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { useUsers, useAllUsers, useRoles } from "@/entities/users/model/store";
@@ -63,10 +63,13 @@ import { apiFetch } from "@/lib/api/fetcher.client";
 function AdminUsersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState(
+  // Initialize search query from URL, but don't re-initialize on every URL change
+  const [searchQuery, setSearchQuery] = useState(() => 
     searchParams?.get("search") || ""
   );
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(() =>
+    searchParams?.get("search") || ""
+  );
   const [selectedUser, setSelectedUser] =
     useState<UserWithRolesAndSchools | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -82,10 +85,21 @@ function AdminUsersPageContent() {
   const schoolFilter = searchParams?.get("schoolId") || "";
   const userIdFromUrl = searchParams?.get("id") || null;
   const isAddUserDialogOpen = searchParams?.get("dialog") === "add-new-user";
+  
+  // Pagination state from URL params
+  const pageSizeParam = searchParams?.get("pageSize") || "50";
+  const pageSize = pageSizeParam === "all" ? -1 : (() => {
+    const parsed = parseInt(pageSizeParam, 10);
+    return parsed >= 1 && parsed <= 100 ? parsed : 50;
+  })();
+  const pageIndexParam = parseInt(searchParams?.get("page") || "0", 10);
+  const pageIndex = pageIndexParam >= 0 ? pageIndexParam : 0;
+  const offset = pageSize === -1 ? 0 : pageIndex * pageSize;
 
-  // Use React Query hooks for data fetching
+  // Use React Query hooks for data fetching with filters
   const {
     users,
+    totalCount,
     isLoading: isLoadingUsers,
     error: queryError,
     refetch: refetchUsers,
@@ -93,6 +107,8 @@ function AdminUsersPageContent() {
     search: debouncedSearchQuery || undefined,
     role: roleFilter || undefined,
     schoolId: schoolFilter || undefined,
+    limit: pageSize,
+    offset: offset,
   });
 
   const {
@@ -163,15 +179,15 @@ function AdminUsersPageContent() {
 
   // Extract schools from CURRENT filtered users (for enabling/disabling)
   const currentAvailableSchools = Array.from(
-    new Map(
+    new Map<string, { id: string; name: string }>(
       users
         .flatMap((user) => user.schoolRoles)
         .filter((sr) => sr.schoolId && sr.schoolName)
-        .map((sr) => [sr.schoolId, { id: sr.schoolId, name: sr.schoolName! }])
+        .map((sr) => [sr.schoolId, { id: sr.schoolId, name: sr.schoolName! }] as [string, { id: string; name: string }])
     ).values()
   );
 
-  const currentAvailableSchoolIds = new Set(
+  const currentAvailableSchoolIds = new Set<string>(
     currentAvailableSchools.map((s) => s.id)
   );
 
@@ -205,21 +221,47 @@ function AdminUsersPageContent() {
     ).length;
   };
 
-  // Debounce search query updates (500ms)
+  // Track previous search value to detect actual changes
+  const prevSearchQueryRef = React.useRef<string>(searchQuery);
+  
+  // Sync searchQuery from URL when it changes externally (e.g., browser back/forward)
+  // But only if it's different from current state to avoid loops
+  const urlSearch = searchParams?.get("search") || "";
   useEffect(() => {
+    if (urlSearch !== searchQuery && urlSearch !== debouncedSearchQuery) {
+      setSearchQuery(urlSearch);
+      setDebouncedSearchQuery(urlSearch);
+      prevSearchQueryRef.current = urlSearch;
+    }
+  }, [urlSearch]);
+
+  // Debounce search query updates (500ms)
+  // Only runs when user types in the search box, not when URL changes from pagination
+  useEffect(() => {
+    // Skip if searchQuery hasn't actually changed (avoid unnecessary updates)
+    if (prevSearchQueryRef.current === searchQuery) {
+      return;
+    }
+    
     const timer = setTimeout(() => {
+      prevSearchQueryRef.current = searchQuery;
       setDebouncedSearchQuery(searchQuery);
-      const params = new URLSearchParams(searchParams?.toString() || "");
+      // Get fresh searchParams at execution time to preserve current URL state
+      const currentParams = new URLSearchParams(window.location.search);
+      
       if (searchQuery.trim()) {
-        params.set("search", searchQuery.trim());
+        currentParams.set("search", searchQuery.trim());
       } else {
-        params.delete("search");
+        currentParams.delete("search");
       }
-      router.replace(`/admin/users?${params.toString()}`, { scroll: false });
+      
+      // Reset to page 0 when search changes (user typed something new)
+      currentParams.set("page", "0");
+      router.replace(`/admin/users?${currentParams.toString()}`, { scroll: false });
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, router, searchParams]);
+  }, [searchQuery, router]);
 
   const handleRoleFilterChange = (value: string) => {
     const params = new URLSearchParams(searchParams?.toString() || "");
@@ -228,6 +270,8 @@ function AdminUsersPageContent() {
     } else {
       params.delete("role");
     }
+    // Reset to page 0 when filters change
+    params.set("page", "0");
     router.push(`/admin/users?${params.toString()}`, { scroll: false });
   };
 
@@ -237,6 +281,26 @@ function AdminUsersPageContent() {
       params.set("schoolId", value);
     } else {
       params.delete("schoolId");
+    }
+    // Reset to page 0 when filters change
+    params.set("page", "0");
+    router.push(`/admin/users?${params.toString()}`, { scroll: false });
+  };
+  
+  const handlePageChange = (newPageIndex: number) => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    params.set("page", newPageIndex.toString());
+    router.push(`/admin/users?${params.toString()}`, { scroll: false });
+  };
+  
+  const handlePageSizeChange = (newPageSize: number) => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (newPageSize === -1) {
+      params.set("pageSize", "all");
+      params.delete("page"); // Remove page param when showing all
+    } else {
+      params.set("pageSize", newPageSize.toString());
+      params.set("page", "0"); // Reset to first page when page size changes
     }
     router.push(`/admin/users?${params.toString()}`, { scroll: false });
   };
@@ -250,7 +314,16 @@ function AdminUsersPageContent() {
     setSearchQuery("");
     setDebouncedSearchQuery(""); // Immediately clear debounced query to trigger refetch
     const params = new URLSearchParams();
-    router.replace("/admin/users", { scroll: false });
+    // Preserve pagination params when clearing filters
+    if (pageSize === -1) {
+      params.set("pageSize", "all");
+    } else if (pageSize !== 50) {
+      params.set("pageSize", pageSize.toString());
+      params.set("page", "0");
+    } else {
+      params.set("page", "0");
+    }
+    router.replace(`/admin/users?${params.toString()}`, { scroll: false });
     // Trigger refetch to ensure data updates
     setTimeout(() => {
       refetchUsers();
@@ -470,6 +543,7 @@ function AdminUsersPageContent() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="__NONE__">None</SelectItem>
                 {availableRoles.length > 0 ? (
                   availableRoles.map((role) => {
                     const roleKey = role.key || "";
@@ -607,6 +681,11 @@ function AdminUsersPageContent() {
             error={error}
             onRowSelectionChange={setRowSelection}
             showSelection={true}
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
           />
         )}
       </div>
