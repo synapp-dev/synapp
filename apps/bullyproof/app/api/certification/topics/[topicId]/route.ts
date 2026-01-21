@@ -21,7 +21,7 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
-import { certificationTopicsService } from "@/server/certification-topics/certification-topics.service";
+import { courseTopicsService } from "@/server/course-topics/course-topics.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
@@ -48,7 +48,7 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const query = Object.fromEntries(searchParams.entries());
     
-    const topic = await certificationTopicsService.getTopicById(
+    const topic = await courseTopicsService.getTopicById(
       { userId },
       topicId,
       query
@@ -91,7 +91,7 @@ export async function PUT(
     const { topicId } = await params;
     const body = await request.json();
 
-    const updatedTopic = await certificationTopicsService.updateTopic(
+    const updatedTopic = await courseTopicsService.updateTopic(
       { userId },
       { id: topicId, ...body }
     );
@@ -132,7 +132,7 @@ export async function DELETE(
     }
 
     const { topicId } = await params;
-    await certificationTopicsService.deleteTopic({ userId }, { id: topicId });
+    await courseTopicsService.deleteTopic({ userId }, { id: topicId });
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {

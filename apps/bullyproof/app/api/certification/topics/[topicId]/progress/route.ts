@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
-import { certificationTopicProgressRepo } from "@/server/certification-topic-progress/certification-topic-progress.repo";
-import { certificationAnswersRepo } from "@/server/certification-answers/certification-answers.repo";
-import { certificationSlidesRepo } from "@/server/certification-slides/certification-slides.repo";
-import { certificationRepo } from "@/server/certification/certification.repo";
-import { certificationTopics } from "@/server/db/schema";
+import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
+import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic-slides.repo";
+import { userSlideViewsRepo } from "@/server/user-slide-views/user-slide-views.repo";
+import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
+import { quizQuestionsRepo } from "@/server/quiz-questions/quiz-questions.repo";
+import { courseTopicsRepo } from "@/server/course-topics/course-topics.repo";
+import { courseTopics } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
+
+// Helper function to check if topic has valid quizzes (quizzes with questions)
+async function topicHasValidQuizzes(topicId: string): Promise<boolean> {
+  const quizzes = await courseTopicQuizzesRepo.getByTopicId(topicId);
+  if (quizzes.length === 0) return false;
+  
+  for (const quiz of quizzes) {
+    const questions = await quizQuestionsRepo.getByQuizId(quiz.id);
+    if (questions.length > 0) return true;
+  }
+  return false;
+}
 
 export async function GET(
   request: NextRequest,
@@ -24,23 +38,23 @@ export async function GET(
 
     const { topicId } = await params;
 
-    // Get topic to find stageId
+    // Get topic to find courseId
     const topic = await db
       .select()
-      .from(certificationTopics)
-      .where(eq(certificationTopics.id, topicId))
+      .from(courseTopics)
+      .where(eq(courseTopics.id, topicId))
       .limit(1);
 
     if (!topic[0]) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
-    const stageId = topic[0].stageId;
+    const courseId = topic[0].courseId;
 
     // Get latest attempt
-    const latestAttempt = await certificationTopicProgressRepo.getLatestAttempt(
+    const latestAttempt = await courseTopicProgressRepo.getLatestAttempt(
       user.id,
-      stageId,
+      courseId,
       topicId
     );
 
@@ -72,50 +86,53 @@ export async function POST(
     const body = await request.json();
     const { currentSlideId } = body;
 
-    // Get topic to find stageId
+    // Get topic to find courseId
     const topic = await db
       .select()
-      .from(certificationTopics)
-      .where(eq(certificationTopics.id, topicId))
+      .from(courseTopics)
+      .where(eq(courseTopics.id, topicId))
       .limit(1);
 
     if (!topic[0]) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
-    const stageId = topic[0].stageId;
+    const courseId = topic[0].courseId;
 
     // Check for in-progress attempt
-    let attempt = await certificationTopicProgressRepo.getInProgressAttempt(
+    let attempt = await courseTopicProgressRepo.getInProgressAttempt(
       user.id,
-      stageId,
+      courseId,
       topicId
     );
 
     // If no in-progress attempt, create a new one
     if (!attempt) {
-      attempt = await certificationTopicProgressRepo.createAttempt(
+      attempt = await courseTopicProgressRepo.createAttempt(
         user.id,
-        stageId,
+        courseId,
         topicId,
         currentSlideId
       );
 
       // Mark first slide as viewed if provided
       if (currentSlideId) {
-        await certificationTopicProgressRepo.markSlideViewed(
-          attempt.id,
-          currentSlideId
-        );
+        await courseTopicProgressRepo.markSlideViewed(attempt.id, currentSlideId);
+        await userSlideViewsRepo.markSlideViewed({
+          userId: user.id,
+          slideId: currentSlideId,
+          topicId,
+          courseId,
+        });
       }
     } else if (currentSlideId) {
       // Get all slides for this topic to validate access
-      const slides = await certificationSlidesRepo.getByTopicId(topicId);
+      const slides = await courseTopicSlidesRepo.getByTopicId(topicId);
       const slideIds = slides.map((s) => s.id);
 
       // Check if slide is unlocked (allow if topic is completed for review)
       if (attempt.status !== "completed") {
-        const isUnlocked = await certificationTopicProgressRepo.isSlideUnlocked(
+        const isUnlocked = await courseTopicProgressRepo.isSlideUnlocked(
           attempt.id,
           currentSlideId,
           slideIds
@@ -130,16 +147,46 @@ export async function POST(
       }
 
       // Mark slide as viewed when navigating to it
-      await certificationTopicProgressRepo.markSlideViewed(
-        attempt.id,
-        currentSlideId
-      );
+      await courseTopicProgressRepo.markSlideViewed(attempt.id, currentSlideId);
+      await userSlideViewsRepo.markSlideViewed({
+        userId: user.id,
+        slideId: currentSlideId,
+        topicId,
+        courseId,
+      });
 
-      const updated = await certificationTopicProgressRepo.updateCurrentSlide(
+      const updated = await courseTopicProgressRepo.updateCurrentSlide(
         attempt.id,
         currentSlideId
       );
       attempt = updated[0] ?? attempt;
+
+      // Check if all slides have been viewed - unlock quiz or complete topic
+      const viewedSlides = await userSlideViewsRepo.getAllSlidesViewed(
+        user.id,
+        topicId
+      );
+      const allSlidesViewed = viewedSlides.length === slideIds.length;
+
+      if (allSlidesViewed && attempt.status === "viewing_slides") {
+        // Check if topic has valid quizzes (quizzes with questions)
+        const hasValidQuizzes = await topicHasValidQuizzes(topicId);
+        
+        if (hasValidQuizzes) {
+          // Topic has quizzes with questions - unlock quiz
+          await courseTopicProgressRepo.updateStatus(attempt.id, "quiz_unlocked", {
+            slidesCompletedAt: new Date(),
+            quizUnlockedAt: new Date(),
+          });
+        } else {
+          // Topic has no quizzes or quizzes have no questions - complete topic
+          await courseTopicProgressRepo.updateStatus(attempt.id, "completed", {
+            slidesCompletedAt: new Date(),
+            completedAt: new Date(),
+          });
+        }
+        attempt = (await courseTopicProgressRepo.getById(attempt.id))[0] ?? attempt;
+      }
     }
 
     return NextResponse.json({ attempt });
@@ -168,25 +215,25 @@ export async function PATCH(
 
     const { topicId } = await params;
     const body = await request.json();
-    const { currentSlideId, status, scorePercentage } = body;
+    const { currentSlideId, status } = body;
 
-    // Get topic to find stageId
+    // Get topic to find courseId
     const topic = await db
       .select()
-      .from(certificationTopics)
-      .where(eq(certificationTopics.id, topicId))
+      .from(courseTopics)
+      .where(eq(courseTopics.id, topicId))
       .limit(1);
 
     if (!topic[0]) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
-    const stageId = topic[0].stageId;
+    const courseId = topic[0].courseId;
 
     // Get latest attempt
-    const latestAttempt = await certificationTopicProgressRepo.getLatestAttempt(
+    const latestAttempt = await courseTopicProgressRepo.getLatestAttempt(
       user.id,
-      stageId,
+      courseId,
       topicId
     );
 
@@ -200,12 +247,12 @@ export async function PATCH(
     // Update current slide if provided
     if (currentSlideId) {
       // Get all slides for this topic to validate access
-      const slides = await certificationSlidesRepo.getByTopicId(topicId);
+      const slides = await courseTopicSlidesRepo.getByTopicId(topicId);
       const slideIds = slides.map((s) => s.id);
 
       // Check if slide is unlocked (allow if topic is completed for review)
       if (latestAttempt.status !== "completed") {
-        const isUnlocked = await certificationTopicProgressRepo.isSlideUnlocked(
+        const isUnlocked = await courseTopicProgressRepo.isSlideUnlocked(
           latestAttempt.id,
           currentSlideId,
           slideIds
@@ -220,12 +267,18 @@ export async function PATCH(
       }
 
       // Mark slide as viewed when navigating to it
-      await certificationTopicProgressRepo.markSlideViewed(
+      await courseTopicProgressRepo.markSlideViewed(
         latestAttempt.id,
         currentSlideId
       );
+      await userSlideViewsRepo.markSlideViewed({
+        userId: user.id,
+        slideId: currentSlideId,
+        topicId,
+        courseId,
+      });
 
-      await certificationTopicProgressRepo.updateCurrentSlide(
+      await courseTopicProgressRepo.updateCurrentSlide(
         latestAttempt.id,
         currentSlideId
       );
@@ -233,65 +286,13 @@ export async function PATCH(
 
     // Update status if provided
     if (status) {
-      let calculatedScore = scorePercentage;
-
-      // If completing and no score provided, calculate it from quiz answers
-      if (status === "completed" && calculatedScore === undefined) {
-        try {
-          // Get all answers for this attempt
-          const answers = await certificationAnswersRepo.getByAttempt(
-            latestAttempt.id
-          );
-
-          // Get all slides for this topic to count quiz slides
-          const slides = await certificationSlidesRepo.getByTopicId(topicId);
-          const quizSlides = slides.filter((slide) => slide.kind === "quiz");
-
-          if (quizSlides.length > 0) {
-            // Count correct answers (only count one answer per quiz slide - the latest)
-            const slideAnswers = new Map<string, boolean>();
-            answers.forEach((answer) => {
-              // Keep the latest answer for each slide
-              if (!slideAnswers.has(answer.slideId)) {
-                slideAnswers.set(answer.slideId, answer.isCorrect);
-              }
-            });
-
-            // Count correct answers for quiz slides only
-            let correctCount = 0;
-            quizSlides.forEach((slide) => {
-              const isCorrect = slideAnswers.get(slide.id);
-              if (isCorrect === true) {
-                correctCount++;
-              }
-            });
-
-            // Calculate percentage
-            calculatedScore = Math.round(
-              (correctCount / quizSlides.length) * 100
-            );
-          } else {
-            // No quiz slides, set score to null
-            calculatedScore = null;
-          }
-        } catch (error) {
-          console.error("Error calculating score:", error);
-          // If calculation fails, set score to null
-          calculatedScore = null;
-        }
-      }
-
-      await certificationTopicProgressRepo.updateStatus(
-        latestAttempt.id,
-        status,
-        calculatedScore
-      );
+      await courseTopicProgressRepo.updateStatus(latestAttempt.id, status, {
+        completedAt: status === "completed" ? new Date() : null,
+      });
     }
 
     // Return updated attempt
-    const updated = await certificationTopicProgressRepo.getById(
-      latestAttempt.id
-    );
+    const updated = await courseTopicProgressRepo.getById(latestAttempt.id);
 
     return NextResponse.json({ attempt: updated[0] });
   } catch (error) {
@@ -302,4 +303,3 @@ export async function PATCH(
     );
   }
 }
-

@@ -20,7 +20,8 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
-import { certificationSlidesService } from "@/server/certification-slides/certification-slides.service";
+import { topicSlidesService } from "@/server/topic-slides/topic-slides.service";
+import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
@@ -44,7 +45,7 @@ export async function GET(
     }
 
     const { slideId } = await params;
-    const slides = await certificationSlidesService.getSlidesByTopicId(
+    const slides = await topicSlidesService.getSlidesByTopicId(
       { userId },
       (await params).topicId
     );
@@ -87,11 +88,23 @@ export async function PUT(
     const { slideId } = await params;
     const body = await request.json();
 
-    const slide = await certificationSlidesService.updateSlide(
-      { userId },
-      slideId,
-      body
-    );
+    // Remove quiz/test support
+    if (body.kind && !["image", "video", "text"].includes(body.kind)) {
+      return NextResponse.json(
+        { error: "Invalid slide kind. Only 'image', 'video', or 'text' are allowed." },
+        { status: 400 }
+      );
+    }
+
+    const slide = await topicSlidesRepo.updateSlide(slideId, {
+      kind: body.kind,
+      imageUrl: body.imageUrl ?? null,
+      videoUrl: body.videoUrl ?? null,
+      textHtml: body.textHtml ?? null,
+      videoStartS: body.videoStartS ?? null,
+      videoEndS: body.videoEndS ?? null,
+      orderIndex: body.orderIndex,
+    });
 
     return NextResponse.json(slide, { status: 200 });
   } catch (e: any) {
@@ -124,7 +137,7 @@ export async function DELETE(
     }
 
     const { slideId } = await params;
-    await certificationSlidesService.deleteSlide({ userId }, slideId);
+    await topicSlidesRepo.deleteSlide(slideId);
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {

@@ -15,7 +15,7 @@
  * - operations: JSON string with structure:
  *   {
  *     topicId: string;
- *     creates: Array<{ orderIndex: number; kind: "image" | "video" | "quiz" | "test"; ... }>;
+ *     creates: Array<{ orderIndex: number; kind: "image" | "video" | "text"; ... }>;
  *     updates: Array<{ id: string; kind?: string; ... }>;
  *     deletes: string[];
  *     reorder: string[];
@@ -30,16 +30,16 @@
  */
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { certificationSlidesRepo } from "@/server/certification-slides/certification-slides.repo";
-import { certificationTopicsRepo } from "@/server/certification-topics/certification-topics.repo";
+import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic-slides.repo";
+import { courseTopicsRepo } from "@/server/course-topics/course-topics.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 import { getUserScopedRoles } from "@/server/auth/rbac";
 import { db } from "@/server/db/drizzle";
 import {
-  certificationStages,
-  certificationTopics,
-  certificationSlides,
+  certificationCourses,
+  courseTopics,
+  courseTopicSlides,
 } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
@@ -88,35 +88,48 @@ export async function POST(
 
     const supabase = await createServerClient();
 
+    // Get course code early for file cleanup
+    const topicForCourse = await db
+      .select({
+        course: certificationCourses,
+        topic: courseTopics,
+      })
+      .from(courseTopics)
+      .innerJoin(
+        certificationCourses,
+        eq(courseTopics.courseId, certificationCourses.id)
+      )
+      .where(eq(courseTopics.id, topicId))
+      .limit(1);
+
+    if (topicForCourse.length === 0) {
+      return NextResponse.json({ error: "Topic not found" }, { status: 404 });
+    }
+
+    const courseCode = topicForCourse[0].course.code;
+
     // Step 1: Delete slides first (with file cleanup)
     const deletedSlideIds = new Set<string>();
     if (deletes && Array.isArray(deletes) && deletes.length > 0) {
       // Get slide data for file cleanup
       const slidesToDelete = await Promise.all(
-        deletes.map((slideId) =>
-          certificationSlidesRepo
-            .getSlideWithTopicAndStage(slideId)
-            .catch(() => null)
-        )
+        deletes.map(async (slideId) => {
+          const slide = await courseTopicSlidesRepo.getById(slideId);
+          return slide.length > 0 ? slide[0] : null;
+        })
       );
 
       for (let i = 0; i < deletes.length; i++) {
         const slideId = deletes[i];
-        const slideData = slidesToDelete[i];
+        const slide = slidesToDelete[i];
 
         // Delete file if it exists
-        if (
-          slideData?.slide.imageUrl &&
-          slideData.stage &&
-          slideData.topic.id
-        ) {
+        if (slide?.imageUrl) {
           try {
-            const stageCode = slideData.stage.code; // e.g., "C", "C1"
-            const topicId = slideData.topic.id;
             const fileExtension =
-              slideData.slide.imageUrl.split(".").pop()?.split("?")[0] || "jpg";
+              slide.imageUrl.split(".").pop()?.split("?")[0] || "jpg";
             const fileName = `${slideId}.${fileExtension}`;
-            const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
+            const filePath = `slides/certification/${courseCode}/${topicId}/${fileName}`;
 
             await supabase.storage.from("content").remove([filePath]);
           } catch (error) {
@@ -124,43 +137,23 @@ export async function POST(
           }
         }
 
-        await certificationSlidesRepo.deleteSlide(slideId);
+        await courseTopicSlidesRepo.deleteSlide(slideId);
         deletedSlideIds.add(slideId);
       }
     }
 
     // Step 2: Get current topic data for orderIndex calculation (after deletions)
-    const currentSlides = await certificationSlidesRepo.getByTopicId(topicId);
+    const currentSlides = await courseTopicSlidesRepo.getByTopicId(topicId);
     const maxOrderIndex =
       currentSlides.length > 0
         ? Math.max(...currentSlides.map((s) => s.orderIndex))
         : -1;
 
-    // Get topic and stage info early (needed for file uploads)
-    const topic = await certificationTopicsRepo.getById(topicId);
+    // Get topic info (course code already retrieved above)
+    const topic = await courseTopicsRepo.getById(topicId);
     if (topic.length === 0) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
-
-    // Get stage code for file path
-    const stageResult = await db
-      .select({
-        stage: certificationStages,
-        topic: certificationTopics,
-      })
-      .from(certificationTopics)
-      .innerJoin(
-        certificationStages,
-        eq(certificationTopics.stageId, certificationStages.id)
-      )
-      .where(eq(certificationTopics.id, topicId))
-      .limit(1);
-
-    if (stageResult.length === 0) {
-      return NextResponse.json({ error: "Stage not found" }, { status: 404 });
-    }
-
-    const stageCode = stageResult[0].stage.code; // e.g., "C", "C1"
 
     // Step 3: Create new slides
     // Use temporary high orderIndex values to avoid unique constraint violations
@@ -199,7 +192,7 @@ export async function POST(
             const tempUuid = randomUUID();
             const fileExtension = file.name.split(".").pop() || "jpg";
             const tempFileName = `temp_${tempUuid}.${fileExtension}`;
-            const tempFilePath = `slides/certification/${stageCode}/${topicId}/${tempFileName}`;
+            const tempFilePath = `slides/certification/${courseCode}/${topicId}/${tempFileName}`;
 
             const arrayBuffer = await file.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
@@ -260,18 +253,15 @@ export async function POST(
               : slideData.kind === "quiz"
                 ? null
                 : slideData.imageUrl || null,
-          videoUrl:
-            slideData.kind === "quiz" ? null : slideData.videoUrl || null,
-          textHtml:
-            slideData.kind === "quiz" ? null : slideData.textHtml || null,
+          videoUrl: slideData.videoUrl || null,
+          textHtml: slideData.textHtml || null,
           videoStartS: slideData.videoStartS || null,
           videoEndS: slideData.videoEndS || null,
-          quizData: slideData.quizData || null,
         };
 
         try {
           const result =
-            await certificationSlidesRepo.createSlide(createPayload);
+            await courseTopicSlidesRepo.createSlide(createPayload);
           if (result?.[0]?.id) {
             const slideId = result[0].id;
             createdSlideIds.push(slideId);
@@ -289,7 +279,7 @@ export async function POST(
               const fileExtension =
                 tempFileData.path.split(".").pop()?.split("?")[0] || "jpg";
               const finalFileName = `${slideId}.${fileExtension}`;
-              const finalFilePath = `slides/certification/${stageCode}/${topicId}/${finalFileName}`;
+              const finalFilePath = `slides/certification/${courseCode}/${topicId}/${finalFileName}`;
 
               // Copy the file to the final location
               const { data: downloadedFile, error: downloadError } =
@@ -321,7 +311,7 @@ export async function POST(
                     .getPublicUrl(finalFilePath);
 
                   if (publicUrl) {
-                    await certificationSlidesRepo.updateSlide(slideId, {
+                    await courseTopicSlidesRepo.updateSlide(slideId, {
                       imageUrl: publicUrl,
                     });
                     uploadedUrls[slideId] = publicUrl;
@@ -361,7 +351,7 @@ export async function POST(
         if (slideId && !uploadedUrls[slideId]) {
           const fileExtension = file.name.split(".").pop() || "jpg";
           const fileName = `${slideId}.${fileExtension}`;
-          const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
+          const filePath = `slides/certification/${courseCode}/${topicId}/${fileName}`;
 
           const arrayBuffer = await file.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
@@ -394,9 +384,9 @@ export async function POST(
           if (publicUrl) {
             uploadedUrls[slideId] = publicUrl;
             // Update the slide with the imageUrl (only for image slides)
-            const slideResult = await certificationSlidesRepo.getById(slideId);
+            const slideResult = await courseTopicSlidesRepo.getById(slideId);
             if (slideResult.length > 0 && slideResult[0].kind === "image") {
-              await certificationSlidesRepo.updateSlide(slideId, {
+              await courseTopicSlidesRepo.updateSlide(slideId, {
                 imageUrl: publicUrl,
               });
             }
@@ -414,7 +404,7 @@ export async function POST(
         const file = value;
         const fileExtension = file.name.split(".").pop() || "jpg";
         const fileName = `${slideId}.${fileExtension}`;
-        const filePath = `slides/certification/${stageCode}/${topicId}/${fileName}`;
+        const filePath = `slides/certification/${courseCode}/${topicId}/${fileName}`;
 
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
@@ -458,18 +448,16 @@ export async function POST(
         delete updateData.orderIndex;
 
         // If there's an uploaded file for this slide, use its URL
-        // But only for image slides (quiz slides cannot have imageUrl)
+        // But only for image slides
         if (uploadedUrls[slideData.id] && slideData.kind === "image") {
           updateData.imageUrl = uploadedUrls[slideData.id];
-        } else if (slideData.kind === "quiz") {
-          // Ensure quiz slides have null imageUrl and videoUrl (database constraint)
-          updateData.imageUrl = null;
-          updateData.videoUrl = null;
-          updateData.textHtml = null;
         }
 
+        // Remove quizData if present (no longer supported)
+        delete updateData.quizData;
+
         try {
-          await certificationSlidesRepo.updateSlide(slideData.id, updateData);
+          await courseTopicSlidesRepo.updateSlide(slideData.id, updateData);
         } catch (error: any) {
           console.error(`Failed to update slide ${slideData.id}:`, error);
           throw error;
@@ -537,12 +525,12 @@ export async function POST(
         // Get current slides after creates/deletes to validate ownership
         // Use a targeted query to check only the slides in finalOrder
         const slidesToValidate = await db
-          .select({ id: certificationSlides.id })
-          .from(certificationSlides)
+          .select({ id: courseTopicSlides.id })
+          .from(courseTopicSlides)
           .where(
             and(
-              eq(certificationSlides.topicId, topicId),
-              inArray(certificationSlides.id, finalOrder)
+              eq(courseTopicSlides.topicId, topicId),
+              inArray(courseTopicSlides.id, finalOrder)
             )
           );
 
@@ -571,7 +559,7 @@ export async function POST(
         );
 
         try {
-          await certificationSlidesRepo.reorderSlides(topicId, finalOrder);
+          await courseTopicSlidesRepo.bulkUpdateOrder(topicId, finalOrder);
         } catch (error: any) {
           console.error("Failed to reorder slides:", error);
           throw error;
@@ -580,14 +568,14 @@ export async function POST(
     } else {
       // Normalize order if no explicit reorder provided
       // This will ensure all slides (including new ones) are sequentially ordered
-      await certificationSlidesRepo.normalizeSlideOrder(topicId);
+      await courseTopicSlidesRepo.normalizeSlideOrder(topicId);
     }
 
     // Step 6: Fetch final topic data with slides
-    const finalSlides = await certificationSlidesRepo.getByTopicId(topicId);
+    const finalSlides = await courseTopicSlidesRepo.getByTopicId(topicId);
 
     // Fetch full topic data to include title and other fields
-    const fullTopic = await certificationTopicsRepo.getById(topicId);
+    const fullTopic = await courseTopicsRepo.getById(topicId);
     const topicData = fullTopic.length > 0 ? fullTopic[0] : null;
 
     return NextResponse.json(

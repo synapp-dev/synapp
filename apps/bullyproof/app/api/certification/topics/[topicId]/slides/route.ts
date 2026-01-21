@@ -18,7 +18,8 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
-import { certificationSlidesService } from "@/server/certification-slides/certification-slides.service";
+import { topicSlidesService } from "@/server/topic-slides/topic-slides.service";
+import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic-slides.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
@@ -42,7 +43,7 @@ export async function GET(
     }
 
     const { topicId } = await params;
-    const slides = await certificationSlidesService.getSlidesByTopicId(
+    const slides = await topicSlidesService.getSlidesByTopicId(
       { userId },
       topicId
     );
@@ -80,10 +81,24 @@ export async function POST(
     const { topicId } = await params;
     const body = await request.json();
 
-    const slide = await certificationSlidesService.createSlide(
-      { userId },
-      { ...body, topicId }
-    );
+    // Remove quiz/test support - only image, video, text allowed
+    if (body.kind && !["image", "video", "text"].includes(body.kind)) {
+      return NextResponse.json(
+        { error: "Invalid slide kind. Only 'image', 'video', or 'text' are allowed." },
+        { status: 400 }
+      );
+    }
+
+    const slide = await courseTopicSlidesRepo.createSlide({
+      topicId,
+      orderIndex: body.orderIndex,
+      kind: body.kind || "image",
+      imageUrl: body.imageUrl ?? null,
+      videoUrl: body.videoUrl ?? null,
+      textHtml: body.textHtml ?? null,
+      videoStartS: body.videoStartS ?? null,
+      videoEndS: body.videoEndS ?? null,
+    });
 
     return NextResponse.json(slide, { status: 201 });
   } catch (e: any) {

@@ -17,7 +17,7 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
-import { certificationTopicsService } from "@/server/certification-topics/certification-topics.service";
+import { courseTopicsService } from "@/server/course-topics/course-topics.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const newTopic = await certificationTopicsService.createTopic({ userId }, body);
+    const newTopic = await courseTopicsService.createTopic({ userId }, body);
     return NextResponse.json(newTopic, { status: 201 });
   } catch (e: any) {
     console.error(e);

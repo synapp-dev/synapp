@@ -1,35 +1,35 @@
 /**
- * Certification Stage Progress API route handler.
+ * Certification Course Progress API route handler.
  *
- * Exposes HTTP endpoints for fetching all topic progress for a certification stage.
+ * Exposes HTTP endpoints for fetching all topic progress for a certification course.
  *
  * Authentication:
  * - Requires a valid user derived from the request (401 if missing).
  * - All authenticated users can read their own progress data.
  *
  * Endpoints:
- * - GET /api/certification/stages/by-code/[code]/progress - Get all topic progress for a stage
+ * - GET /api/certification/courses/by-code/[code]/progress - Get all topic progress for a course
  *
  * Responses:
  * - 200 OK: Returns array of topic progress data.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
- * - 404 Not Found: `{ error: string }` when stage is not found.
+ * - 404 Not Found: `{ error: string }` when course is not found.
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
-import { certificationTopicProgressRepo } from "@/server/certification-topic-progress/certification-topic-progress.repo";
-import { certificationStages } from "@/server/db/schema";
+import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
+import { certificationCourses } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
 /**
- * Handle GET /api/certification/stages/by-code/[code]/progress
+ * Handle GET /api/certification/courses/by-code/[code]/progress
  *
- * Returns all topic progress for a specific certification stage by code.
+ * Returns all topic progress for a specific certification course by code.
  *
  * @param request The incoming HTTP request.
- * @param params The route parameters containing the stage code.
+ * @param params The route parameters containing the course code.
  * @returns A JSON `NextResponse` with the progress data or an error payload.
  */
 export async function GET(
@@ -48,24 +48,24 @@ export async function GET(
 
     const { code } = await params;
 
-    // Get stage by code to get stageId
-    const stage = await db
+    // Get course by code to get courseId
+    const course = await db
       .select()
-      .from(certificationStages)
-      .where(eq(certificationStages.code, code))
+      .from(certificationCourses)
+      .where(eq(certificationCourses.code, code))
       .limit(1);
 
-    if (!stage[0]) {
-      return NextResponse.json({ error: "Stage not found" }, { status: 404 });
+    if (!course[0]) {
+      return NextResponse.json({ error: "Course not found" }, { status: 404 });
     }
 
-    const stageId = stage[0].id;
+    const courseId = course[0].id;
 
-    // Get all topic progress for this user/stage
+    // Get all topic progress for this user/course
     // This returns all attempts, but we only want the latest for each topic
-    const allProgress = await certificationTopicProgressRepo.getByStage(
+    const allProgress = await courseTopicProgressRepo.getByCourse(
       user.id,
-      stageId
+      courseId
     );
 
     // Group by topicId and keep only the latest attempt for each topic
@@ -82,7 +82,7 @@ export async function GET(
 
     return NextResponse.json({ progress: latestProgress }, { status: 200 });
   } catch (e: any) {
-    console.error("Error fetching stage progress:", e);
+    console.error("Error fetching course progress:", e);
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status: 500 }

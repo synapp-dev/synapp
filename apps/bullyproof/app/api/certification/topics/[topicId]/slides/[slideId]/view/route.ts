@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
-import { certificationTopicProgressRepo } from "@/server/certification-topic-progress/certification-topic-progress.repo";
-import { certificationTopics } from "@/server/db/schema";
+import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
+import { userSlideViewsRepo } from "@/server/user-slide-views/user-slide-views.repo";
+import { courseTopics } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
@@ -21,23 +22,23 @@ export async function POST(
 
     const { topicId, slideId } = await params;
 
-    // Get topic to find stageId
+    // Get topic to find courseId
     const topic = await db
       .select()
-      .from(certificationTopics)
-      .where(eq(certificationTopics.id, topicId))
+      .from(courseTopics)
+      .where(eq(courseTopics.id, topicId))
       .limit(1);
 
     if (!topic[0]) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
-    const stageId = topic[0].stageId;
+    const courseId = topic[0].courseId;
 
     // Get latest attempt
-    const latestAttempt = await certificationTopicProgressRepo.getLatestAttempt(
+    const latestAttempt = await courseTopicProgressRepo.getLatestAttempt(
       user.id,
-      stageId,
+      courseId,
       topicId
     );
 
@@ -49,10 +50,13 @@ export async function POST(
     }
 
     // Mark slide as viewed
-    await certificationTopicProgressRepo.markSlideViewed(
-      latestAttempt.id,
-      slideId
-    );
+    await courseTopicProgressRepo.markSlideViewed(latestAttempt.id, slideId);
+    await userSlideViewsRepo.markSlideViewed({
+      userId: user.id,
+      slideId,
+      topicId,
+      courseId,
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
