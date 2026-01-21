@@ -22,12 +22,21 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
+import { CornerDownRight, ChevronDown } from "lucide-react";
 
 // Helper function to check if a string is a UUID
 function isUUID(str: string): boolean {
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
+}
+
+// Helper function to truncate breadcrumb labels longer than 25 characters
+function truncateBreadcrumbLabel(label: string): string {
+  if (label.length <= 25) {
+    return label;
+  }
+  return label.slice(0, 22) + "...";
 }
 
 export function Breadcrumb() {
@@ -83,7 +92,7 @@ export function Breadcrumb() {
     if (isSchoolRoute && i === 1 && segment && currentSchool) {
       // Replace school slug with actual school name
       breadcrumbItems.push({
-        label: currentSchool.name,
+        label: truncateBreadcrumbLabel(currentSchool.name),
         href: currentPath,
         isLast: i === pathSegments.length - 1,
       });
@@ -96,22 +105,30 @@ export function Breadcrumb() {
       });
     } else {
       // Format the segment: split by hyphens, capitalize each word, join with spaces
-      const label = segment
-        ? segment
-            .split("-")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ")
-        : "";
+      // Special cases for course routes
+      let label = "";
+      if (segment === "courses") {
+        label = "Courses";
+      } else if (segment === "ap-certification") {
+        label = "AP Certification";
+      } else {
+        label = segment
+          ? segment
+              .split("-")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ")
+          : "";
+      }
       breadcrumbItems.push({
-        label,
+        label: truncateBreadcrumbLabel(label),
         href: currentPath,
         isLast: i === pathSegments.length - 1,
       });
     }
   }
 
-  // Determine if we should collapse middle items (when there are 3+ items)
-  const shouldCollapse = breadcrumbItems.length > 2;
+  // Determine if we should collapse middle items (when there are 5+ items)
+  const shouldCollapse = breadcrumbItems.length > 4;
   const firstItem = breadcrumbItems[0];
   const lastItem = breadcrumbItems[breadcrumbItems.length - 1];
   const middleItems = shouldCollapse ? breadcrumbItems.slice(1, -1) : [];
@@ -143,25 +160,7 @@ export function Breadcrumb() {
           </>
         )}
 
-        {/* Middle items - visible only at xl breakpoint and above when collapsing */}
-        {shouldCollapse && middleItems.length > 0 && (
-          <>
-            {middleItems.map((item) => (
-              <React.Fragment key={item.href}>
-                <BreadcrumbItem className="hidden xl:inline-flex">
-                  <BreadcrumbLink asChild>
-                    <Link href={item.href} className="text-lg font-semibold">
-                      {item.label}
-                    </Link>
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden xl:inline-flex" />
-              </React.Fragment>
-            ))}
-          </>
-        )}
-
-        {/* Show all items when not collapsing (2 or fewer items) - visible only on md and above */}
+        {/* Show all items when not collapsing (4 or fewer items) - visible only on md and above */}
         {!shouldCollapse &&
           breadcrumbItems.slice(1).map((item) => (
             <React.Fragment key={item.href}>
@@ -184,32 +183,38 @@ export function Breadcrumb() {
             </React.Fragment>
           ))}
 
-        {/* Ellipsis dropdown for middle items - visible only below xl breakpoint when collapsing, but hidden below md */}
+        {/* Ellipsis dropdown for middle items - visible on md and above when collapsing */}
         {shouldCollapse && middleItems.length > 0 && isMounted && (
           <>
-            <BreadcrumbItem className="hidden md:inline-flex xl:hidden">
+            <BreadcrumbItem className="hidden md:inline-flex">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="text-lg font-semibold hover:text-foreground transition-colors"
+                    className="text-lg font-semibold hover:text-foreground transition-colors flex items-center gap-1"
                     aria-label="Show more breadcrumb items"
                   >
                     <BreadcrumbEllipsis />
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  {middleItems.map((item) => (
+                  {middleItems.map((item, index) => (
                     <DropdownMenuItem key={item.href} asChild>
-                      <Link href={item.href} className="text-lg font-semibold">
-                        {item.label}
+                      <Link
+                        href={item.href}
+                        className="text-lg font-semibold flex items-center gap-2"
+                        style={{ paddingLeft: `${(index + 1) * 1.25}rem` }}
+                      >
+                        <CornerDownRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{item.label}</span>
                       </Link>
                     </DropdownMenuItem>
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
             </BreadcrumbItem>
-            <BreadcrumbSeparator className="hidden md:inline-flex xl:hidden" />
+            <BreadcrumbSeparator className="hidden md:inline-flex" />
           </>
         )}
 
@@ -230,17 +235,23 @@ export function Breadcrumb() {
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="text-lg font-semibold hover:text-foreground transition-colors"
+                    className="text-lg font-semibold hover:text-foreground transition-colors flex items-center gap-1"
                     aria-label="Show more breadcrumb items"
                   >
                     <BreadcrumbEllipsis />
+                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
-                  {allItemsBeforeLast.map((item) => (
+                  {allItemsBeforeLast.map((item, index) => (
                     <DropdownMenuItem key={item.href} asChild>
-                      <Link href={item.href} className="text-lg font-semibold">
-                        {item.label}
+                      <Link
+                        href={item.href}
+                        className="text-lg font-semibold flex items-center gap-2"
+                        style={{ paddingLeft: `${(index + 1) * 1.25}rem` }}
+                      >
+                        <CornerDownRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <span>{item.label}</span>
                       </Link>
                     </DropdownMenuItem>
                   ))}

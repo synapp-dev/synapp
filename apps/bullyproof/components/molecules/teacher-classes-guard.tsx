@@ -14,6 +14,7 @@ import { AddClassesDialog } from "./add-classes-dialog";
  * Shows the dialog if:
  * - User is a teacher
  * - Welcome tutorial is completed
+ * - Dashboard dialog has been dismissed
  * - User has no classes in teacher_classes table
  * - Dialog hasn't been dismissed in metadata
  */
@@ -28,6 +29,13 @@ export function TeacherClassesGuard() {
     if (!currentUser?.metadata) return false;
     const metadata = currentUser.metadata as any;
     return metadata?.tutorials?.welcome?.completed === true;
+  }, [currentUser]);
+
+  // Check if dashboard dialog has been dismissed
+  const isDashboardDialogDismissed = useMemo(() => {
+    if (!currentUser?.metadata) return false;
+    const metadata = currentUser.metadata as any;
+    return metadata?.dialogs?.dashboard?.dismissed === true;
   }, [currentUser]);
 
   // Query to check if user has teacher classes
@@ -65,6 +73,11 @@ export function TeacherClassesGuard() {
       return;
     }
 
+    // Don't show dialog if dashboard dialog hasn't been dismissed yet
+    if (!isDashboardDialogDismissed) {
+      return;
+    }
+
     // Check if user has classes
     const hasClasses = teacherClassesData?.hasClasses ?? false;
     if (hasClasses) {
@@ -86,6 +99,7 @@ export function TeacherClassesGuard() {
     isLoadingClasses,
     isTeacher,
     isWelcomeCompleted,
+    isDashboardDialogDismissed,
     teacherClassesData,
   ]);
 
@@ -95,6 +109,11 @@ export function TeacherClassesGuard() {
 
   // Don't render dialog if welcome tutorial is not completed
   if (!isWelcomeCompleted) {
+    return null;
+  }
+
+  // Don't render dialog if dashboard dialog hasn't been dismissed yet
+  if (!isDashboardDialogDismissed) {
     return null;
   }
 

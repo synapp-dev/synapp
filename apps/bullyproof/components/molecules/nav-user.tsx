@@ -98,13 +98,13 @@ export function NavUser() {
 
             {/* <DropdownMenuSeparator /> */}
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled>
                 <Cpu />
                 About
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled>
                 <Settings />
                 Settings
               </DropdownMenuItem>
