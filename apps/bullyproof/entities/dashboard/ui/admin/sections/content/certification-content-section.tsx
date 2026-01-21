@@ -2,18 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { certificationStages } from "@/server/db/schema";
+import type { certificationCourses } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, Plus } from "lucide-react";
-import { AddCertificationStageSheet } from "./add-certification-stage-sheet";
+import { AddCertificationCourseSheet } from "./add-certification-course-sheet";
 import {
-  useCertificationStages,
-  useInvalidateCertificationStage,
+  useCertificationCourses,
+  useInvalidateCertificationCourse,
 } from "@/entities/certification/model/store";
 import { StageCards } from "@/entities/curriculum/ui/stage-cards";
 
-type Stage = typeof certificationStages.$inferSelect & {
+type Course = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
 };
 
@@ -36,24 +36,24 @@ export function CertificationContentSection({
 }: CertificationContentSectionProps) {
   const router = useRouter();
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
-  const { stages, isLoading, error, refetch } = useCertificationStages();
-  const { invalidateAllStages } = useInvalidateCertificationStage();
+  const { courses, isLoading, error, refetch } = useCertificationCourses();
+  const { invalidateAllCourses } = useInvalidateCertificationCourse();
 
   // Trigger background refetch on mount to ensure complete data
   useEffect(() => {
     refetch();
   }, [refetch]);
 
-  const handleStageClick = (stage: Stage) => {
-    router.push(`${basePath}/${stage.code}`);
+  const handleStageClick = (course: Course) => {
+    router.push(`${basePath}/${course.code}`);
   };
 
   const handleAddNewClick = () => {
     setIsAddSheetOpen(true);
   };
 
-  const handleStageCreated = () => {
-    invalidateAllStages();
+  const handleCourseCreated = () => {
+    invalidateAllCourses();
     refetch();
   };
 
@@ -70,7 +70,7 @@ export function CertificationContentSection({
     ? 'There are no certification stages available. Click "Add new stage" to create one.'
     : "There are no certification courses available at this time.";
 
-  if (isLoading && stages.length === 0) {
+  if (isLoading && courses.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
@@ -113,14 +113,14 @@ export function CertificationContentSection({
             </Button>
           )}
         </div>
-        {stages.length === 0 ? (
+        {courses.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <p className="font-medium mb-2">{emptyText}</p>
             <p className="text-sm">{emptyDescription}</p>
           </div>
         ) : (
           <StageCards
-            stages={stages}
+            stages={courses}
             onStageClick={handleStageClick}
             basePath={basePath}
             type="certification"
@@ -128,10 +128,10 @@ export function CertificationContentSection({
         )}
       </div>
       {isAdmin && (
-        <AddCertificationStageSheet
+        <AddCertificationCourseSheet
           open={isAddSheetOpen}
           onOpenChange={setIsAddSheetOpen}
-          onStageCreated={handleStageCreated}
+          onCourseCreated={handleCourseCreated}
         />
       )}
     </>

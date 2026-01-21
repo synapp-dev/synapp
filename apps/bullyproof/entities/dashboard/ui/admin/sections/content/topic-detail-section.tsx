@@ -27,16 +27,9 @@ import { CSS } from "@dnd-kit/utilities";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { topics, topicSlides } from "@/server/db/schema";
-import type {
-  certificationTopics,
-  certificationSlides,
-} from "@/server/db/schema";
-import {
-  QuizSlideEditor,
-  type QuizData,
-} from "@/components/organisms/quiz-slide-editor";
-import { FileQuestion, MessageCircleQuestion } from "lucide-react";
+import type { topics, topicSlides, courseTopics } from "@/server/db/schema";
+import type { QuizData } from "@/components/organisms/quiz-slide-editor";
+import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
 import {
   Card,
   CardContent,
@@ -127,8 +120,8 @@ type Topic = typeof topics.$inferSelect & {
   slides?: Array<typeof topicSlides.$inferSelect>;
 };
 
-type CertificationTopic = typeof certificationTopics.$inferSelect & {
-  slides?: Array<typeof certificationSlides.$inferSelect>;
+type CertificationTopic = typeof courseTopics.$inferSelect & {
+  slides?: Array<typeof topicSlides.$inferSelect>;
 };
 
 type TopicContext = "curriculum" | "certification";
@@ -286,24 +279,13 @@ function SortableSlideItem({
           </div>
         )}
         <div className="w-full h-full relative">
-          {slide.kind === "quiz" ? (
-            <div className="w-full h-full flex items-center justify-center bg-muted pb-4">
-              <div className="flex items-center gap-2">
-                <MessageCircleQuestion className="h-6 w-6 text-muted-foreground" />
-                <span className="text-base font-medium text-muted-foreground">
-                  Quiz
-                </span>
-              </div>
-            </div>
-          ) : (
-            <SlideRenderer
-              key={`${slide.id}-${slideRefreshKey}`}
-              slide={slide}
-              className="w-full h-full"
-              thumbnailOnly={true}
-              isCertification={isCertification}
-            />
-          )}
+          <SlideRenderer
+            key={`${slide.id}-${slideRefreshKey}`}
+            slide={slide}
+            className="w-full h-full"
+            thumbnailOnly={true}
+            isCertification={isCertification}
+          />
         </div>
         <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
           Slide {slide.orderIndex + 1}
@@ -363,6 +345,7 @@ interface TopicDetailSectionProps {
   // For certification
   topicId?: string;
   stageCode?: string; // For certification, needed for file paths
+  excludeQuizSlides?: boolean; // Filter out quiz slides (for slides-only page)
 }
 
 export function TopicDetailSection({
@@ -371,6 +354,7 @@ export function TopicDetailSection({
   topicSlug,
   topicId,
   stageCode,
+  excludeQuizSlides = false,
 }: TopicDetailSectionProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -682,10 +666,10 @@ export function TopicDetailSection({
             const allSlides: ExtendedSlideData[] = slidesResult.data
               .sort((a, b) => a.orderIndex - b.orderIndex)
               .map((slide) => {
-                // Extract signedUrl from API response and cache it
-                const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
-                if (slideWithUrl.signedUrl && slide.kind === "image") {
-                  cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
+                // Extract signedImageUrl from API response and cache it
+                const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
+                if (slideWithUrl.signedImageUrl && slide.kind === "image") {
+                  cacheStore.setSlideUrl(slide.id, slideWithUrl.signedImageUrl);
                 }
                 
                 return {
@@ -726,8 +710,19 @@ export function TopicDetailSection({
               empty: allSlides.length - validSlides.length,
             });
             
+            // Filter out quiz slides if excludeQuizSlides is true
+            let filteredSlides = validSlides;
+            if (excludeQuizSlides) {
+              filteredSlides = validSlides.filter((slide) => slide.kind !== "quiz");
+              console.log("[topic-detail] [CERTIFICATION] Filtered out quiz slides:", {
+                before: validSlides.length,
+                after: filteredSlides.length,
+                quizCount: validSlides.length - filteredSlides.length,
+              });
+            }
+            
             // Reorder slides to have sequential orderIndex after filtering
-            const initialSlides = validSlides.map((slide, index) => ({
+            const initialSlides = filteredSlides.map((slide, index) => ({
               ...slide,
               orderIndex: index,
             }));
@@ -1027,29 +1022,7 @@ export function TopicDetailSection({
 
   const handleTypeChange = (newType: string) => {
     if (newType !== currentSlide?.kind) {
-      if (newType === "quiz" && isCertification) {
-        // Quiz type change - no confirmation needed, just update
-        if (!currentSlide) return;
-        const updatedSlides: ExtendedSlideData[] = localSlides.map((slide) => {
-          if (slide.id !== currentSlide.id) return slide;
-          return {
-            ...slide,
-            kind: "quiz" as const,
-            quizData: slide.quizData || {
-              question: "",
-              answers: [
-                { id: `answer_${Date.now()}_1`, text: "", isCorrect: false },
-                { id: `answer_${Date.now()}_2`, text: "", isCorrect: false },
-              ],
-            },
-            imageUrl: null,
-            videoUrl: null,
-            textHtml: null,
-          };
-        });
-        setLocalSlides(updatedSlides);
-        setHasUnsavedChanges(true);
-      } else if (newType === "image" || newType === "video") {
+      if (newType === "image" || newType === "video") {
         // Change type immediately in local state - no dialog needed
         if (!currentSlide) return;
         const updatedSlides = localSlides.map((slide) => {
@@ -1611,56 +1584,6 @@ export function TopicDetailSection({
     setSlideRefreshKey((prev) => prev + 1);
   };
 
-  // Handle inserting a quiz slide at a specific position
-  const handleInsertQuiz = (insertAfterIndex: number) => {
-    if (!topic || !isCertification) return;
-
-    // Generate temporary ID for new slide
-    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Create new quiz slide with default quiz data
-    const newSlide: ExtendedSlideData = {
-      id: tempId,
-      kind: "quiz" as const,
-      orderIndex: insertAfterIndex + 1, // Will be reordered below
-      textHtml: null,
-      imageUrl: null,
-      videoUrl: null,
-      videoStartS: null,
-      videoEndS: null,
-      effectiveNotes: null,
-      quizData: {
-        question: "",
-        answers: [
-          { id: `answer_${Date.now()}_1`, text: "", isCorrect: false },
-          { id: `answer_${Date.now()}_2`, text: "", isCorrect: false },
-        ],
-      },
-    };
-
-    // Insert slide at correct position (after insertAfterIndex)
-    const updatedSlides = [...localSlides];
-    updatedSlides.splice(insertAfterIndex + 1, 0, newSlide);
-
-    // Reorder all slides to have sequential orderIndex
-    const reorderedSlides = updatedSlides.map((slide, index) => ({
-      ...slide,
-      orderIndex: index,
-    }));
-
-    setLocalSlides(reorderedSlides);
-    setHasUnsavedChanges(true);
-
-    // Navigate to the newly created slide
-    const newSlideIndex = reorderedSlides.findIndex((s) => s.id === tempId);
-    if (newSlideIndex !== -1) {
-      setCurrentSlideIndex(newSlideIndex);
-    }
-
-    setHoveredSlideIndex(null);
-    setSlideRefreshKey((prev) => prev + 1);
-  };
-
   // Handle deleting the current slide (local state only)
   const handleDeleteSlide = () => {
     if (!currentSlide) return;
@@ -1695,27 +1618,10 @@ export function TopicDetailSection({
       const hasFileUpload = pendingFileUploads.has(slide.id);
       const hasImageUrl = !!slide.imageUrl;
       const hasVideoUrl = !!slide.videoUrl;
-      const hasQuizData =
-        isCertification &&
-        extendedSlide.kind === "quiz" &&
-        extendedSlide.quizData;
       const hasTextHtml =
         !isCertification && slide.kind === "text" && slide.textHtml;
 
-      if (slide.kind === "quiz" && isCertification) {
-        // Quiz slides need valid quiz data
-        if (
-          !hasQuizData ||
-          !extendedSlide.quizData?.question ||
-          extendedSlide.quizData.answers.length < 2
-        ) {
-          return {
-            isValid: false,
-            message:
-              "Quiz slides must have a question and at least 2 answer options.",
-          };
-        }
-      } else if (slide.kind === "text" && !isCertification) {
+      if (slide.kind === "text" && !isCertification) {
         // Text slides need textHtml
         if (!hasTextHtml) {
           return {
@@ -1943,7 +1849,7 @@ export function TopicDetailSection({
       if (isCertification) {
         // For certification, use stageCode prop or extract from topic
         stageCodeForPath = stageCode || (topic as any).stage?.code || "C";
-        topicNumber = (topic as CertificationTopic).stageOrder;
+        topicNumber = (topic as CertificationTopic).courseOrder;
       } else {
         // For curriculum, extract stage number from stage.code (e.g., "S1" -> 1)
         const stageNumberMatch = (stage as any).code.match(/^S(\d+)$/);
@@ -2921,8 +2827,15 @@ export function TopicDetailSection({
           </div>
           <div className="flex items-center gap-2">
             {stage && <Badge variant="secondary">{stage.name}</Badge>}
-            {topic.stageOrder !== null && (
-              <Badge variant="outline">Topic {topic.stageOrder}</Badge>
+            {(isCertification
+              ? (topic as CertificationTopic).courseOrder !== null
+              : (topic as Topic).stageOrder !== null) && (
+              <Badge variant="outline">
+                Topic{" "}
+                {isCertification
+                  ? (topic as CertificationTopic).courseOrder! - 1
+                  : (topic as Topic).stageOrder}
+              </Badge>
             )}
             {topic.status && (
               <Badge
@@ -3062,8 +2975,12 @@ export function TopicDetailSection({
                       {/* Question - Centered and Bold */}
                       <div className="text-center">
                         <h2 className="text-2xl font-bold">
-                          {(currentSlide as ExtendedSlideData).quizData
-                            ?.question || "Question"}
+                          {(currentSlide as ExtendedSlideData).quizData?.question
+                            ? renderQuestionWithUrls(
+                                (currentSlide as ExtendedSlideData).quizData!.question,
+                                (currentSlide as ExtendedSlideData).quizData!.questionUrls
+                              )
+                            : "Question"}
                         </h2>
                       </div>
                       {/* Answers - Single Column Grid with Radio Buttons */}
@@ -3150,8 +3067,7 @@ export function TopicDetailSection({
                     className="mt-0 flex-1 flex flex-col"
                   >
                     <div className="space-y-4 flex-shrink-0">
-                      {(isImageOrVideo ||
-                        (isCertification && currentSlide.kind === "quiz")) && (
+                      {isImageOrVideo && (
                         <div className="space-y-2">
                           <Label>Slide Type</Label>
                           <Select
@@ -3164,8 +3080,6 @@ export function TopicDetailSection({
                                   <ImageIcon className="h-4 w-4" />
                                 ) : currentSlide.kind === "video" ? (
                                   <VideoIcon className="h-4 w-4" />
-                                ) : currentSlide.kind === "quiz" ? (
-                                  <FileQuestion className="h-4 w-4" />
                                 ) : (
                                   <FileText className="h-4 w-4" />
                                 )}
@@ -3195,38 +3109,8 @@ export function TopicDetailSection({
                                   Video
                                 </div>
                               </SelectItem>
-                              {isCertification && (
-                                <SelectItem value="quiz">
-                                  <div className="flex items-center gap-2">
-                                    <FileQuestion className="h-4 w-4" />
-                                    Quiz
-                                  </div>
-                                </SelectItem>
-                              )}
                             </SelectContent>
                           </Select>
-                        </div>
-                      )}
-
-                      {/* Quiz Editor */}
-                      {isCertification && currentSlide.kind === "quiz" && (
-                        <div className="space-y-4 flex-shrink-0">
-                          <QuizSlideEditor
-                            quizData={
-                              (currentSlide as ExtendedSlideData).quizData ||
-                              null
-                            }
-                            onChange={(quizData) => {
-                              if (!currentSlide) return;
-                              const updatedSlides = localSlides.map((slide) =>
-                                slide.id === currentSlide.id
-                                  ? { ...slide, quizData: quizData || null }
-                                  : slide
-                              );
-                              setLocalSlides(updatedSlides);
-                              setHasUnsavedChanges(true);
-                            }}
-                          />
                         </div>
                       )}
 
@@ -3482,23 +3366,12 @@ export function TopicDetailSection({
                           }}
                         >
                           <div className="w-full h-full relative">
-                            {draggedSlide.kind === "quiz" ? (
-                              <div className="w-full h-full flex items-center justify-center bg-muted pb-4">
-                                <div className="flex items-center gap-2">
-                                  <MessageCircleQuestion className="h-6 w-6 text-muted-foreground" />
-                                  <span className="text-base font-medium text-muted-foreground">
-                                    Quiz
-                                  </span>
-                                </div>
-                              </div>
-                            ) : (
-                              <SlideRenderer
-                                slide={draggedSlide}
-                                className="w-full h-full"
-                                thumbnailOnly={true}
-                                isCertification={isCertification}
-                              />
-                            )}
+                            <SlideRenderer
+                              slide={draggedSlide}
+                              className="w-full h-full"
+                              thumbnailOnly={true}
+                              isCertification={isCertification}
+                            />
                           </div>
                           <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
                             Slide {draggedSlide.orderIndex + 1}
@@ -3692,15 +3565,6 @@ export function TopicDetailSection({
           insertAfterIndexForDialog !== null
             ? (videoUrl) => {
                 handleInsertVideo(videoUrl, insertAfterIndexForDialog);
-                setShowImageSelectorDialog(false);
-                setInsertAfterIndexForDialog(null);
-              }
-            : undefined
-        }
-        onAddQuiz={
-          isCertification && insertAfterIndexForDialog !== null
-            ? () => {
-                handleInsertQuiz(insertAfterIndexForDialog);
                 setShowImageSelectorDialog(false);
                 setInsertAfterIndexForDialog(null);
               }

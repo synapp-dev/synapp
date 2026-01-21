@@ -23,15 +23,15 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import { useCertificationStages } from "@/entities/certification/model/store";
+import { useCertificationCourses } from "@/entities/certification/model/store";
 import {
-  useCertificationTopicsByStageCode,
+  useCertificationTopicsByCourseCode,
   useInvalidateCertificationTopics,
 } from "@/entities/certification/model/topics-store";
 import type {
-  certificationStages,
-  certificationTopics,
-  certificationSlides,
+  certificationCourses,
+  courseTopics,
+  topicSlides,
 } from "@/server/db/schema";
 import {
   Card,
@@ -62,7 +62,7 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import Marquee from "react-fast-marquee";
-import { EditCertificationStageSheet } from "./edit-certification-stage-sheet";
+import { EditCertificationCourseSheet } from "./edit-certification-course-sheet";
 import { AddCertificationTopicDrawer } from "./add-certification-topic-drawer";
 import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer";
 import {
@@ -78,13 +78,13 @@ import {
   type TopicSlide,
 } from "@/components/organisms/animated-thumbnail";
 
-type Stage = typeof certificationStages.$inferSelect & {
+type Course = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
 };
 
-type Topic = typeof certificationTopics.$inferSelect & {
+type Topic = typeof courseTopics.$inferSelect & {
   slides?: Array<
-    typeof certificationSlides.$inferSelect & { signedUrl?: string | null }
+    typeof topicSlides.$inferSelect & { signedUrl?: string | null }
   >;
 };
 
@@ -121,7 +121,7 @@ function getSlideStatsForCard(topic: TopicWithSlides) {
   };
 }
 
-interface CertificationStageDetailSectionProps {
+interface CertificationCourseDetailSectionProps {
   slug: string;
   readonly?: boolean;
   basePath?: string;
@@ -562,9 +562,9 @@ function CertificationTopicCard({
           ) : (
             // Normal mode: show order number in blue bold text and topic title
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              {topic.stageOrder !== null && (
+              {topic.courseOrder !== null && (
                 <span className="text-blue-500 font-bold text-xs flex-shrink-0">
-                  {topic.stageOrder}
+                  {topic.courseOrder - 1}
                 </span>
               )}
               <div
@@ -661,12 +661,12 @@ function CertificationTopicCard({
   );
 }
 
-export function CertificationStageDetailSection({
+export function CertificationCourseDetailSection({
   slug,
   readonly = false,
   basePath = "/admin/content/certification",
   onBackClick,
-}: CertificationStageDetailSectionProps) {
+}: CertificationCourseDetailSectionProps) {
   const router = useRouter();
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
   const [isAddTopicDrawerOpen, setIsAddTopicDrawerOpen] = useState(false);
@@ -683,17 +683,17 @@ export function CertificationStageDetailSection({
     isLoading: isLoadingTopics,
     error: topicsQueryError,
     refetch: refetchTopics,
-  } = useCertificationTopicsByStageCode(slug, {
+  } = useCertificationTopicsByCourseCode(slug, {
     includeSlides: true,
     includeUrls: true,
   });
 
-  // Fetch stage separately (can also be converted to React Query later)
-  const [stage, setStage] = useState<Stage | null>(null);
-  const [isLoadingStage, setIsLoadingStage] = useState(true);
+  // Fetch course separately (can also be converted to React Query later)
+  const [course, setCourse] = useState<Course | null>(null);
+  const [isLoadingCourse, setIsLoadingCourse] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { invalidateTopicsByStageCode } = useInvalidateCertificationTopics();
+  const { invalidateTopicsByCourseCode } = useInvalidateCertificationTopics();
 
   // Drag and drop state
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -723,29 +723,29 @@ export function CertificationStageDetailSection({
     })
   );
 
-  // Fetch stage
+  // Fetch course
   useEffect(() => {
-    const fetchStage = async () => {
+    const fetchCourse = async () => {
       try {
-        setIsLoadingStage(true);
+        setIsLoadingCourse(true);
         setError(null);
 
-        const stageResult = await certificationApi.stages.byCode(slug);
-        if (!stageResult.data) {
+        const courseResult = await certificationApi.courses.byCode(slug);
+        if (!courseResult.data) {
           setError(
-            stageResult.error?.message ?? "Failed to fetch certification stage"
+            courseResult.error?.message ?? "Failed to fetch certification course"
           );
           return;
         }
-        setStage(stageResult.data);
+        setCourse(courseResult.data);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
-        setIsLoadingStage(false);
+        setIsLoadingCourse(false);
       }
     };
 
-    fetchStage();
+    fetchCourse();
   }, [slug]);
 
   // Sync localTopics with cached topics when they change (but not when we're reordering)
@@ -758,7 +758,7 @@ export function CertificationStageDetailSection({
   // Set error from topics query if any - only after loading completes
   useEffect(() => {
     // Don't set errors while still loading
-    if (isLoadingStage || isLoadingTopics) {
+    if (isLoadingCourse || isLoadingTopics) {
       return;
     }
     
@@ -769,9 +769,9 @@ export function CertificationStageDetailSection({
           : "Failed to fetch topics"
       );
     }
-  }, [topicsQueryError, isLoadingStage, isLoadingTopics]);
+  }, [topicsQueryError, isLoadingCourse, isLoadingTopics]);
 
-  const isLoading = isLoadingStage || isLoadingTopics;
+  const isLoading = isLoadingCourse || isLoadingTopics;
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -816,10 +816,10 @@ export function CertificationStageDetailSection({
     // Reorder topics using arrayMove
     const newTopics = arrayMove(localTopics, activeIndex, overIndex);
 
-    // Update stageOrder for all topics
+    // Update courseOrder for all topics
     const reorderedTopics = newTopics.map((topic, index) => ({
       ...topic,
-      stageOrder: index + 1,
+      courseOrder: index + 1,
     }));
 
     setLocalTopics(reorderedTopics);
@@ -853,12 +853,12 @@ export function CertificationStageDetailSection({
   const handleTopicAdded = (newTopic: TopicWithSlides) => {
     const maxOrder =
       localTopics.length > 0
-        ? Math.max(...localTopics.map((t) => t.stageOrder || 0))
+        ? Math.max(...localTopics.map((t) => t.courseOrder || 0))
         : 0;
 
     const topicWithOrder = {
       ...newTopic,
-      stageOrder: maxOrder + 1,
+      courseOrder: maxOrder + 1,
       slides: [],
     };
 
@@ -867,7 +867,7 @@ export function CertificationStageDetailSection({
   };
 
   const handleSaveChanges = async () => {
-    if (!stage?.id || isSaving) return;
+    if (!course?.id || isSaving) return;
 
     setIsSaving(true);
     try {
@@ -881,7 +881,7 @@ export function CertificationStageDetailSection({
       const createdTopics: TopicWithSlides[] = [];
       for (const newTopic of newTopics) {
         const result = await certificationApi.topics.create({
-          stageId: stage.id,
+          courseId: course.id,
           title: newTopic.title,
           officialNotes: newTopic.officialNotes || null,
         });
@@ -897,15 +897,15 @@ export function CertificationStageDetailSection({
       // Reorder all topics
       const topicIds = allTopics
         .sort((a, b) => {
-          const aOrder = a.stageOrder || 0;
-          const bOrder = b.stageOrder || 0;
+          const aOrder = a.courseOrder || 0;
+          const bOrder = b.courseOrder || 0;
           return aOrder - bOrder;
         })
         .map((t) => t.id);
 
       if (topicIds.length > 0) {
         const reorderResult = await certificationApi.topics.reorder({
-          stageId: stage.id,
+          courseId: course.id,
           topicIds,
         });
 
@@ -917,7 +917,7 @@ export function CertificationStageDetailSection({
       }
 
       // Invalidate and refetch topics with slides using React Query
-      invalidateTopicsByStageCode(slug);
+      invalidateTopicsByCourseCode(slug);
       await refetchTopics();
 
       setHasUnsavedChanges(false);
@@ -931,22 +931,31 @@ export function CertificationStageDetailSection({
 
   const handleTopicClick = (topic: TopicWithSlides, e?: React.MouseEvent) => {
     if (activeId || topic.id.startsWith("temp_")) return;
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
+    if (topic.slug) {
+      router.push(`${basePath}/${slug}/${topic.slug}`);
+    } else if (topic.courseOrder !== null && topic.courseOrder !== undefined) {
+      // Fallback to courseOrder for backward compatibility
+      router.push(`${basePath}/${slug}/T${topic.courseOrder}`);
     }
   };
 
   const handleAddSlideBefore = (topic: TopicWithSlides) => {
     // Navigate to topic page - the topic editor should handle adding slide at position 0
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
+    if (topic.slug) {
+      router.push(`${basePath}/${slug}/${topic.slug}`);
+    } else if (topic.courseOrder !== null && topic.courseOrder !== undefined) {
+      // Fallback to courseOrder for backward compatibility
+      router.push(`${basePath}/${slug}/T${topic.courseOrder}`);
     }
   };
 
   const handleAddSlideAfter = (topic: TopicWithSlides) => {
     // Navigate to topic page - the topic editor should handle adding slide at the end
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
+    if (topic.slug) {
+      router.push(`${basePath}/${slug}/${topic.slug}`);
+    } else if (topic.courseOrder !== null && topic.courseOrder !== undefined) {
+      // Fallback to courseOrder for backward compatibility
+      router.push(`${basePath}/${slug}/T${topic.courseOrder}`);
     }
   };
 
@@ -989,7 +998,7 @@ export function CertificationStageDetailSection({
 
   const handleTopicUpdated = async () => {
     // Invalidate and refetch topics with slides using React Query
-    invalidateTopicsByStageCode(slug);
+    invalidateTopicsByCourseCode(slug);
     await refetchTopics();
     setEditingTopic(null);
   };
@@ -1002,7 +1011,7 @@ export function CertificationStageDetailSection({
   const displayTopics = hasUnsavedChanges ? localTopics : cachedTopics;
 
   // Show skeleton loaders only if we have no cached data
-  const showSkeletons = isLoading && !stage;
+  const showSkeletons = isLoading && !course;
 
   // Only show errors after loading completes
   if (error && !isLoading) {
@@ -1025,7 +1034,7 @@ export function CertificationStageDetailSection({
         <Card>
           <CardContent className="pt-6">
             <div className="text-center text-destructive">
-              <p className="font-medium">Error loading certification stage</p>
+              <p className="font-medium">Error loading certification course</p>
               <p className="text-sm text-muted-foreground mt-2">{error}</p>
             </div>
           </CardContent>
@@ -1051,8 +1060,8 @@ export function CertificationStageDetailSection({
     );
   }
 
-  // Only check for missing stage after loading completes
-  if (!stage && !isLoading) {
+  // Only check for missing course after loading completes
+  if (!course && !isLoading) {
     return (
       <div className="space-y-4">
         <Button
@@ -1067,14 +1076,14 @@ export function CertificationStageDetailSection({
           className="mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Stages
+          Back to Courses
         </Button>
         <Card>
           <CardContent className="pt-6">
             <div className="text-center text-muted-foreground">
-              <p className="font-medium">Stage not found</p>
+              <p className="font-medium">Course not found</p>
               <p className="text-sm mt-2">
-                The certification stage you're looking for doesn't exist.
+                The certification course you're looking for doesn't exist.
               </p>
             </div>
           </CardContent>
@@ -1085,7 +1094,7 @@ export function CertificationStageDetailSection({
 
   return (
     <div className="space-y-2">
-      {/* Stage Header - Sticky */}
+      {/* Course Header - Sticky */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-2">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-6 flex-wrap">
@@ -1106,7 +1115,7 @@ export function CertificationStageDetailSection({
             <div className="flex items-center gap-2">
               <BookOpen className="h-6 w-6 text-primary flex-shrink-0" />
               <h1 className="text-3xl font-bold tracking-tight">
-                {stage.name}
+                {course.name}
               </h1>
             </div>
             {!readonly && (
@@ -1116,7 +1125,7 @@ export function CertificationStageDetailSection({
                 onClick={() => setIsEditSheetOpen(true)}
               >
                 <Edit className="h-4 w-4 mr-2" />
-                Edit Stage
+                Edit Course
               </Button>
             )}
           </div>
@@ -1157,7 +1166,7 @@ export function CertificationStageDetailSection({
               </div>
             ) : displayTopics.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                <p className="text-sm">No topics found for this stage.</p>
+                <p className="text-sm">No topics found for this course.</p>
                 {!readonly && (
                   <Button
                     className="mt-4"
@@ -1461,20 +1470,20 @@ export function CertificationStageDetailSection({
         </ScrollArea>
       </div>
 
-      {/* Edit Stage Sheet */}
-      {stage && (
-        <EditCertificationStageSheet
+      {/* Edit Course Sheet */}
+      {course && (
+        <EditCertificationCourseSheet
           open={isEditSheetOpen}
           onOpenChange={setIsEditSheetOpen}
-          stage={stage}
-          onStageUpdated={() => {
-            certificationApi.stages.byCode(slug).then((result) => {
+          course={course}
+          onCourseUpdated={() => {
+            certificationApi.courses.byCode(slug).then((result) => {
               if (result.data) {
-                setStage(result.data);
+                setCourse(result.data);
               }
             });
           }}
-          onStageDeleted={() => {
+          onCourseDeleted={() => {
             if (onBackClick) {
               onBackClick();
             } else {
@@ -1485,11 +1494,11 @@ export function CertificationStageDetailSection({
       )}
 
       {/* Add Topic Drawer */}
-      {stage && (
+      {course && (
         <AddCertificationTopicDrawer
           open={isAddTopicDrawerOpen}
           onOpenChange={setIsAddTopicDrawerOpen}
-          stageId={stage.id}
+          courseId={course.id}
           onTopicAdded={handleTopicAdded}
         />
       )}

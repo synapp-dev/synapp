@@ -18,13 +18,13 @@ import { certificationApi } from "@/entities/certification/api/endpoints";
 interface AddCertificationTopicDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  stageId: string;
+  courseId: string;
   onTopicAdded: (topic: {
     id: string;
     title: string;
     officialNotes: string | null;
-    stageId: string;
-    stageOrder: number | null;
+    courseId: string;
+    courseOrder: number | null;
     status: string;
     createdAt: string;
     slides?: any[];
@@ -34,7 +34,7 @@ interface AddCertificationTopicDrawerProps {
 export function AddCertificationTopicDrawer({
   open,
   onOpenChange,
-  stageId,
+  courseId,
   onTopicAdded,
 }: AddCertificationTopicDrawerProps) {
   const [title, setTitle] = useState("");
@@ -55,7 +55,7 @@ export function AddCertificationTopicDrawer({
 
     try {
       const result = await certificationApi.topics.create({
-        stageId,
+        courseId,
         title: title.trim(),
         officialNotes: officialNotes.trim() || null,
       });
@@ -71,8 +71,8 @@ export function AddCertificationTopicDrawer({
           id: result.data.id,
           title: result.data.title,
           officialNotes: result.data.officialNotes || null,
-          stageId,
-          stageOrder: result.data.stageOrder || null,
+          courseId,
+          courseOrder: result.data.courseOrder || null,
           status: result.data.status || "draft",
           createdAt: result.data.createdAt,
           slides: [],
@@ -108,7 +108,7 @@ export function AddCertificationTopicDrawer({
           <SheetHeader className="mb-6">
             <SheetTitle>Add New Certification Topic</SheetTitle>
             <SheetDescription>
-              Create a new topic for this certification stage. You can add slides after saving.
+              Create a new topic for this certification course. You can add slides after saving.
             </SheetDescription>
           </SheetHeader>
 

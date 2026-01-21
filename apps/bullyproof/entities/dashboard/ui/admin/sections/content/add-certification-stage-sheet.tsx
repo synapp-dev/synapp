@@ -45,12 +45,7 @@ export function AddCertificationStageSheet({
     if (!code.trim()) {
       return { isValid: false, message: "Code is required" };
     }
-    if (!/^C[0-9]*$/.test(code.trim())) {
-      return {
-        isValid: false,
-        message: "Code must match pattern C[0-9]* (e.g., C, C1, C2, C10)",
-      };
-    }
+    // Removed pattern validation - code can be any string (used as URL slug)
     if (!name.trim()) {
       return { isValid: false, message: "Name is required" };
     }
@@ -134,14 +129,13 @@ export function AddCertificationStageSheet({
                 </Label>
                 <Input
                   id="code"
-                  placeholder="e.g., C, C1, C2, C10"
+                  placeholder="e.g., introduction-to-bullying, advanced-certification"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   disabled={isSubmitting}
-                  pattern="^C[0-9]*$"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Must match pattern C[0-9]* (e.g., C, C1, C2, C10)
+                  A unique identifier used in URLs (e.g., introduction-to-bullying)
                 </p>
               </div>
 

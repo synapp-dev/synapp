@@ -30,9 +30,9 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { certificationTopics } from "@/server/db/schema";
+import type { courseTopics } from "@/server/db/schema";
 
-type Topic = typeof certificationTopics.$inferSelect & {
+type Topic = typeof courseTopics.$inferSelect & {
   slides?: any[];
 };
 
