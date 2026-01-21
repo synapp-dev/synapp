@@ -34,7 +34,7 @@ interface TopicsState {
 // Cache expiry: 1 week in milliseconds (matching the signed URL expiry)
 const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
-export const useTopicsStore = create<TopicsState>((set, get) => ({
+export const useCurriculumTopicsStore = create<TopicsState>((set, get) => ({
   topics: {},
   topicsByStage: {},
   slideUrls: {},
@@ -199,13 +199,16 @@ export const useTopicsStore = create<TopicsState>((set, get) => ({
   clearTopics: () => set({ topics: {}, topicsByStage: {}, slideUrls: {} }),
 }));
 
+// Legacy export for backward compatibility
+export const useTopicsStore = useCurriculumTopicsStore;
+
 // React Query hooks for topics
 export function useTopicsByStage(
   stageId: string | null | undefined,
   options?: { includeSlides?: boolean; includeUrls?: boolean }
 ) {
   const queryClient = useQueryClient();
-  const { topics, topicsByStage, setTopicsForStage } = useTopicsStore();
+  const { topics, topicsByStage, setTopicsForStage } = useCurriculumTopicsStore();
 
   const query = useQuery({
     queryKey: ["topics", stageId, options?.includeSlides, options?.includeUrls],
@@ -268,7 +271,7 @@ export function useTopic(
   options?: { includeSlides?: boolean; includeUrls?: boolean }
 ) {
   const queryClient = useQueryClient();
-  const { topics, setTopic } = useTopicsStore();
+  const { topics, setTopic } = useCurriculumTopicsStore();
 
   const query = useQuery({
     queryKey: ["topics", "by-id", topicId, options?.includeSlides, options?.includeUrls],
@@ -311,7 +314,7 @@ export function useTopic(
 
 // Helper function to get cached slide URL
 export function useSlideUrl(slideId: string | null | undefined) {
-  const { slideUrls } = useTopicsStore();
+  const { slideUrls } = useCurriculumTopicsStore();
   
   if (!slideId) return null;
   

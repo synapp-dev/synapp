@@ -24,8 +24,25 @@ import {
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Badge } from "@workspace/ui/components/badge";
 import { Checkbox } from "@workspace/ui/components/checkbox";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@workspace/ui/components/pagination";
 import { cn } from "@workspace/ui/lib/utils";
-import { ShieldCheck, Users as UsersIcon, FileBadge2 } from "lucide-react";
+import { ShieldCheck, Users as UsersIcon, FileBadge2, Loader2 } from "lucide-react";
 import type { roles } from "@/server/db/schema";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { columns } from "@/app/(main)/admin/users/components/users-table-columns";
@@ -42,6 +59,11 @@ interface UsersTableProps {
   onRowSelectionChange?: (selection: Record<string, boolean>) => void;
   schoolId?: string; // Optional: when provided, filters roles to this school only
   showSelection?: boolean; // Whether to show selection checkboxes
+  pageIndex?: number;
+  pageSize?: number;
+  totalCount?: number;
+  onPageChange?: (pageIndex: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 export function UsersTable({
@@ -53,6 +75,11 @@ export function UsersTable({
   onRowSelectionChange,
   schoolId,
   showSelection = false,
+  pageIndex = 0,
+  pageSize = 50,
+  totalCount = 0,
+  onPageChange,
+  onPageSizeChange,
 }: UsersTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -439,7 +466,6 @@ export function UsersTable({
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onColumnVisibilityChange: setColumnVisibility,
@@ -449,91 +475,333 @@ export function UsersTable({
       setRowSelection(newSelection);
       onRowSelectionChange?.(newSelection);
     },
+    // Disable client-side pagination since we're doing server-side pagination
+    manualPagination: true,
+    pageCount: -1, // Unknown page count
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
-    },
-    initialState: {
       pagination: {
-        pageSize: 10000, // Show all rows by default
+        pageIndex,
+        pageSize,
       },
     },
   });
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-32 text-destructive">
-        {error}
-      </div>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-32">
-        <div className="text-muted-foreground">Loading users...</div>
-      </div>
-    );
-  }
+  // Calculate pagination info
+  const isShowingAll = pageSize === -1;
+  const safeTotalCount = totalCount || 0;
+  const startRow = isShowingAll ? 1 : pageIndex * pageSize + 1;
+  const endRow = isShowingAll 
+    ? safeTotalCount 
+    : Math.min(startRow + users.length - 1, safeTotalCount);
+  const totalPages = isShowingAll ? 1 : Math.max(1, Math.ceil(safeTotalCount / pageSize));
+  const hasNextPage = !isShowingAll && pageIndex < totalPages - 1;
+  const hasPreviousPage = !isShowingAll && pageIndex > 0;
 
   return (
-    <ScrollArea className="h-full w-full">
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                    </TableHead>
-                  );
+    <div className="w-full h-full flex flex-col">
+      <div className="rounded-md border flex flex-col overflow-hidden flex-1 min-h-0">
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 border-b overflow-hidden bg-background">
+          <div className="overflow-x-auto">
+            <Table className="w-full table-fixed">
+              <colgroup>
+                {table.getHeaderGroups()[0]?.headers.map((header) => {
+                  let width = "auto";
+                  const columnId = header.column.id;
+                  if (columnId === "select") {
+                    width = "40px";
+                  } else if (columnId === "name") {
+                    width = "25%";
+                  } else if (columnId === "roles") {
+                    width = "60%";
+                  } else if (columnId === "createdAt") {
+                    width = "15%";
+                  }
+                  return <col key={header.id} style={{ width }} />;
                 })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                  className={cn(
-                    onUserClick && "cursor-pointer hover:bg-muted/50"
+              </colgroup>
+              <TableHeader>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => {
+                      return (
+                        <TableHead key={header.id}>
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                        </TableHead>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+            </Table>
+          </div>
+        </div>
+        
+        {/* Scrollable Body */}
+        <div className="flex-1 h-full relative min-h-0">
+          <ScrollArea className="h-full w-full">
+            <div className="pb-3">
+              <Table className="w-full table-fixed">
+                <colgroup>
+                  {table.getHeaderGroups()[0]?.headers.map((header) => {
+                    let width = "auto";
+                    const columnId = header.column.id;
+                    if (columnId === "select") {
+                      width = "40px";
+                    } else if (columnId === "name") {
+                      width = "25%";
+                    } else if (columnId === "roles") {
+                      width = "60%";
+                    } else if (columnId === "createdAt") {
+                      width = "15%";
+                    }
+                    return <col key={header.id} style={{ width }} />;
+                  })}
+                </colgroup>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    <>
+                      {table.getRowModel().rows.map((row) => (
+                        <TableRow
+                          key={row.id}
+                          data-state={row.getIsSelected() && "selected"}
+                          className={cn(
+                            onUserClick && "cursor-pointer hover:bg-muted/50"
+                          )}
+                          onClick={() => onUserClick?.(row.original)}
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      ))}
+                      {/* Spacer row to ensure last row is fully visible */}
+                      <TableRow className="h-8 pointer-events-none">
+                        <TableCell
+                          colSpan={enhancedColumns.length}
+                          className="p-0"
+                        />
+                      </TableRow>
+                    </>
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={enhancedColumns.length}
+                        className="h-24 text-center"
+                      >
+                        No users found.
+                      </TableCell>
+                    </TableRow>
                   )}
-                  onClick={() => onUserClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={enhancedColumns.length}
-                  className="h-24 text-center"
-                >
-                  No users found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+                </TableBody>
+              </Table>
+            </div>
+          </ScrollArea>
+        </div>
       </div>
-    </ScrollArea>
+      
+      {/* Fixed Pagination Controls */}
+      {(onPageChange || onPageSizeChange) && (
+        <div className="flex-shrink-0 flex items-center justify-between px-2 py-4 border-t bg-background">
+          {/* Left side: Info */}
+          <div className="flex items-center gap-4">
+            <p className="text-sm text-muted-foreground whitespace-nowrap min-w-[140px]">
+              {isLoading 
+                ? "Loading..."
+                : isShowingAll 
+                  ? `Showing all ${safeTotalCount} users`
+                  : `Showing ${users.length > 0 ? startRow : 0} to ${endRow} of ${safeTotalCount}`
+              }
+            </p>
+          </div>
+          {/* Right side: Rows per page and Pagination controls */}
+          <div className="flex items-center gap-4">
+            {onPageSizeChange && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground whitespace-nowrap">Rows per page:</span>
+                <Select
+                  value={pageSize === -1 ? "all" : pageSize.toString()}
+                  onValueChange={(value) => {
+                    if (value === "all") {
+                      onPageSizeChange(-1);
+                    } else {
+                      onPageSizeChange(parseInt(value, 10));
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  <SelectTrigger className="h-8 w-[80px]" disabled={isLoading}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="all">All</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {/* Pagination controls */}
+            {onPageChange && pageSize !== -1 && (
+              <Pagination className="!mx-0 !w-auto !justify-end">
+                <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (!isLoading && hasPreviousPage) {
+                        onPageChange(pageIndex - 1);
+                      }
+                    }}
+                    className={cn(
+                      (isLoading || !hasPreviousPage) && "pointer-events-none opacity-50"
+                    )}
+                    aria-disabled={isLoading || !hasPreviousPage}
+                  />
+                </PaginationItem>
+                {/* Show first page if not near it */}
+                {pageIndex > 2 && (
+                  <>
+                    <PaginationItem>
+                      <PaginationLink
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (!isLoading) {
+                            onPageChange(0);
+                          }
+                        }}
+                        className={cn(
+                          isLoading && "pointer-events-none opacity-50"
+                        )}
+                        aria-disabled={isLoading}
+                      >
+                        1
+                      </PaginationLink>
+                    </PaginationItem>
+                    {pageIndex > 3 && (
+                      <PaginationItem>
+                        <PaginationEllipsis />
+                      </PaginationItem>
+                    )}
+                  </>
+                )}
+                {/* Show previous page if not first */}
+                {pageIndex > 0 && (
+                  <PaginationItem>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (!isLoading) {
+                          onPageChange(pageIndex - 1);
+                        }
+                      }}
+                      className={cn(
+                        isLoading && "pointer-events-none opacity-50"
+                      )}
+                      aria-disabled={isLoading}
+                    >
+                      {pageIndex}
+                    </PaginationLink>
+                  </PaginationItem>
+                )}
+                {/* Current page */}
+                <PaginationItem>
+                  <PaginationLink
+                    href="#"
+                    isActive
+                    className={cn(
+                      isLoading && "pointer-events-none opacity-50"
+                    )}
+                  >
+                    {pageIndex + 1}
+                  </PaginationLink>
+                </PaginationItem>
+                {/* Show next page if available */}
+                {hasNextPage && pageIndex + 1 < totalPages - 1 && (
+                  <PaginationItem>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (!isLoading) {
+                          onPageChange(pageIndex + 1);
+                        }
+                      }}
+                      className={cn(
+                        isLoading && "pointer-events-none opacity-50"
+                      )}
+                      aria-disabled={isLoading}
+                    >
+                      {pageIndex + 2}
+                    </PaginationLink>
+                  </PaginationItem>
+                )}
+                {/* Show ellipsis if there are more pages before last */}
+                {pageIndex + 1 < totalPages - 2 && (
+                  <PaginationItem>
+                    <PaginationEllipsis />
+                  </PaginationItem>
+                )}
+                {/* Show last page if not already shown */}
+                {totalPages > 1 && pageIndex + 1 < totalPages - 1 && (
+                  <PaginationItem>
+                    <PaginationLink
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (!isLoading) {
+                          onPageChange(totalPages - 1);
+                        }
+                      }}
+                      className={cn(
+                        isLoading && "pointer-events-none opacity-50"
+                      )}
+                      aria-disabled={isLoading}
+                    >
+                      {totalPages}
+                    </PaginationLink>
+                  </PaginationItem>
+                )}
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (!isLoading && hasNextPage) {
+                        onPageChange(pageIndex + 1);
+                      }
+                    }}
+                    className={cn(
+                      (isLoading || !hasNextPage) && "pointer-events-none opacity-50"
+                    )}
+                    aria-disabled={isLoading || !hasNextPage}
+                  />
+                </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -81,16 +81,23 @@ export const useUsersStore = create<UsersState>((set) => ({
   setRoles: (roles) => set({ roles }),
 }));
 
-// React Query hooks for users
+// React Query hooks for users with pagination and filters
 export function useUsers(filters?: {
   search?: string;
   role?: string;
   schoolId?: string;
+  limit?: number;
+  offset?: number;
 }) {
   const queryClient = useQueryClient();
   const { users, userIds, setUsers } = useUsersStore();
-
-  // Normalize filters: remove undefined and empty string values to ensure consistent query keys
+  
+  // Extract pagination params with defaults
+  const limit = filters?.limit ?? 50;
+  const offset = filters?.offset ?? 0;
+  const fetchAll = limit === -1;
+  
+  // Normalize filters for query key
   const normalizedFilters = filters
     ? (() => {
         const filtered = Object.fromEntries(
@@ -99,44 +106,85 @@ export function useUsers(filters?: {
         return Object.keys(filtered).length > 0 ? filtered : undefined;
       })()
     : undefined;
-  
-  const hasFilters = !!normalizedFilters;
-  
+
   const query = useQuery({
-    queryKey: userKeys.list(normalizedFilters),
+    queryKey: [...userKeys.list(normalizedFilters), { limit, offset, fetchAll }],
     queryFn: async () => {
-      const result = await meApi.get.listAllUsers({
-        limit: 100,
-        offset: 0,
-        search: normalizedFilters?.search,
-        role: normalizedFilters?.role,
-        schoolId: normalizedFilters?.schoolId,
-      });
-      if (result.error) {
-        throw new Error(result.error.message || "Failed to fetch users");
-      }
-      if (result.data) {
+      // If fetching all, make multiple requests in batches of 100
+      if (fetchAll) {
+        const allUsers: UserWithRolesAndSchools[] = [];
+        let currentOffset = 0;
+        const batchSize = 100;
+        let hasMore = true;
+        let totalCount = 0;
+
+        while (hasMore) {
+          const result = await meApi.get.listAllUsers({
+            limit: batchSize,
+            offset: currentOffset,
+            search: normalizedFilters?.search,
+            role: normalizedFilters?.role,
+            schoolId: normalizedFilters?.schoolId,
+          });
+          
+          if (result.error) {
+            throw new Error(result.error.message || "Failed to fetch users");
+          }
+          
+          if (result.data) {
+            // Get totalCount from first request
+            if (currentOffset === 0) {
+              totalCount = result.data.totalCount;
+            }
+            
+            if (result.data.users.length > 0) {
+              allUsers.push(...result.data.users);
+              // If we got less than batchSize, we've reached the end
+              if (result.data.users.length < batchSize) {
+                hasMore = false;
+              } else {
+                currentOffset += batchSize;
+              }
+            } else {
+              hasMore = false;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+        
         // Update Zustand store with normalized data
-        setUsers(result.data);
-        return result.data;
+        setUsers(allUsers);
+        return { users: allUsers, totalCount };
+      } else {
+        // Normal paginated request
+        const result = await meApi.get.listAllUsers({
+          limit,
+          offset,
+          search: normalizedFilters?.search,
+          role: normalizedFilters?.role,
+          schoolId: normalizedFilters?.schoolId,
+        });
+        if (result.error) {
+          throw new Error(result.error.message || "Failed to fetch users");
+        }
+        if (result.data) {
+          // Update Zustand store with normalized data
+          setUsers(result.data.users);
+          return result.data;
+        }
+        return { users: [], totalCount: 0 };
       }
-      return [];
     },
-    staleTime: hasFilters ? 0 : 2 * 60 * 1000, // Always refetch filtered queries, cache unfiltered for 2 minutes
+    staleTime: normalizedFilters ? 0 : 2 * 60 * 1000, // No cache when filtering, cache for 2 minutes otherwise
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: true, // Always refetch when component mounts
-    // Only use initialData if there are no filters (to avoid stale filtered data)
-    initialData: hasFilters
-      ? undefined
-      : () => {
-          const zustandUsers = userIds.map((id) => users[id]).filter(Boolean);
-          return zustandUsers.length > 0 ? zustandUsers : undefined;
-        },
   });
 
   return {
     ...query,
-    users: query.data || [],
+    users: query.data?.users || [],
+    totalCount: query.data?.totalCount || 0,
   };
 }
 
@@ -145,7 +193,7 @@ export function useAllUsers() {
   const queryClient = useQueryClient();
   const { allUsers, allUserIds, setAllUsers } = useUsersStore();
 
-  const query = useQuery({
+  const query = useQuery<UserWithRolesAndSchools[]>({
     queryKey: [...userKeys.lists(), "all"],
     queryFn: async () => {
       const result = await meApi.get.listAllUsers({
@@ -156,8 +204,8 @@ export function useAllUsers() {
         throw new Error(result.error.message || "Failed to fetch all users");
       }
       if (result.data) {
-        setAllUsers(result.data);
-        return result.data;
+        setAllUsers(result.data.users);
+        return result.data.users;
       }
       return [];
     },
