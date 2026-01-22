@@ -1,6 +1,7 @@
 import { db } from "@/server/db/drizzle";
 import { courseTopicQuizzes, courseTopics } from "@/server/db/schema";
-import { eq, asc, sql, desc } from "drizzle-orm";
+import { eq, asc, sql, desc, and } from "drizzle-orm";
+import { createSlug } from "@/utils/slug";
 
 export const topicQuizzesRepo = {
   getByTopicId: (topicId: string) =>
@@ -40,6 +41,32 @@ export const topicQuizzesRepo = {
       data.sortOrder = maxOrder + 1;
     }
 
+    // Generate slug from title, handling collisions
+    let baseSlug = createSlug(data.title);
+    let finalSlug = baseSlug;
+    let counter = 1;
+
+    // Check for slug collisions within the same topic
+    while (true) {
+      const existing = await db
+        .select()
+        .from(courseTopicQuizzes)
+        .where(
+          and(
+            eq(courseTopicQuizzes.topicId, data.topicId),
+            eq(courseTopicQuizzes.slug, finalSlug)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        break;
+      }
+
+      counter++;
+      finalSlug = `${baseSlug}-${counter}`;
+    }
+
     return db.insert(courseTopicQuizzes).values({
       topicId: data.topicId,
       title: data.title,
@@ -50,6 +77,7 @@ export const topicQuizzesRepo = {
       isRequired: data.isRequired ?? true,
       sequenceType: data.sequenceType ?? "sequential",
       sortOrder: data.sortOrder,
+      slug: finalSlug,
     }).returning();
   },
 
