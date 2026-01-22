@@ -194,6 +194,26 @@ export const certificationApi = {
         `/certification/topics/by-slug/${encodeURIComponent(courseCode)}/${encodeURIComponent(slug)}${query ? `?${query}` : ""}`
       );
     },
+    bySlugWithCourse(
+      courseSlug: string,
+      topicSlug: string
+    ): Promise<ApiResult<{
+      topic: Topic;
+      slides: Slide[];
+      attempt: any | null;
+      isUnlocked: boolean;
+      unlockReason?: string;
+    }>> {
+      return apiFetch<{
+        topic: Topic;
+        slides: Slide[];
+        attempt: any | null;
+        isUnlocked: boolean;
+        unlockReason?: string;
+      }>(
+        `/certification/topics/by-slug-with-course/${encodeURIComponent(topicSlug)}?course=${encodeURIComponent(courseSlug)}`
+      );
+    },
     // Legacy byStageCode endpoint for backward compatibility (deprecated)
     byStageCode(
       code: string,
@@ -340,6 +360,11 @@ export const certificationApi = {
           }
         );
       },
+      withProgress(topicId: string): Promise<ApiResult<{ slides: Slide[]; attempt: any | null }>> {
+        return apiFetch<{ slides: Slide[]; attempt: any | null }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/slides-with-progress`
+        );
+      },
     },
     progress: {
       get(topicId: string): Promise<ApiResult<{ attempt: any }>> {
@@ -389,6 +414,23 @@ export const certificationApi = {
           }
         );
       },
+      complete(
+        topicId: string,
+        payload: { currentSlideId?: string }
+      ): Promise<ApiResult<{ attempt: any; hasQuiz: boolean }>> {
+        return apiFetch<{ attempt: any; hasQuiz: boolean }>(
+          `/certification/topics/${encodeURIComponent(topicId)}/progress/complete`,
+          {
+            method: "POST",
+            body: JSON.stringify(payload),
+          }
+        );
+      },
+      getQuizInProgress(topicId: string): Promise<ApiResult<any | null>> {
+        return apiFetch<any | null>(
+          `/certification/topics/${encodeURIComponent(topicId)}/quiz-in-progress`
+        );
+      },
     },
   },
   quizzes: {
@@ -400,6 +442,22 @@ export const certificationApi = {
     byId(quizId: string): Promise<ApiResult<Quiz>> {
       return apiFetch<Quiz>(
         `/certification/quizzes/${encodeURIComponent(quizId)}`
+      );
+    },
+    bySlugs(
+      courseSlug: string,
+      topicSlug: string,
+      quizSlug: string
+    ): Promise<ApiResult<{
+      quiz: any;
+      attempt: any | null;
+      existingAnswers: any[];
+      earliestUnansweredQuestionIndex: number;
+      course: any;
+      topic: any;
+    }>> {
+      return apiFetch<any>(
+        `/certification/quizzes/by-slugs?course=${encodeURIComponent(courseSlug)}&topic=${encodeURIComponent(topicSlug)}&quiz=${encodeURIComponent(quizSlug)}`
       );
     },
     create(data: {
@@ -582,27 +640,13 @@ export const certificationApi = {
         },
         submit(quizId: string, attemptId: string, data: {
           questionId: string;
-          answerId: string;
+          answerIds: string[]; // Array of answer IDs (supports single and multiple choice)
           timeTakenSeconds?: number;
         }): Promise<ApiResult<any>> {
           return apiFetch<any>(
             `/certification/quizzes/${encodeURIComponent(quizId)}/attempts/${encodeURIComponent(attemptId)}/answers`,
             {
               method: "POST",
-              body: JSON.stringify(data),
-            }
-          );
-        },
-        update(quizId: string, attemptId: string, data: {
-          questionId: string;
-          answerId: string;
-          oldAnswerId?: string;
-          timeTakenSeconds?: number;
-        }): Promise<ApiResult<any>> {
-          return apiFetch<any>(
-            `/certification/quizzes/${encodeURIComponent(quizId)}/attempts/${encodeURIComponent(attemptId)}/answers`,
-            {
-              method: "PUT",
               body: JSON.stringify(data),
             }
           );
