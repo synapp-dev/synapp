@@ -50,14 +50,14 @@ export function renderQuestionWithUrls(
     const url = questionUrls[tagName];
 
     if (url) {
-      // Create a clickable link
+      // Create a clickable link with blue styling
       parts.push(
         <Link
           key={`link-${match.index}`}
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-primary underline hover:text-primary/80"
+          className="text-blue-600 underline hover:text-blue-800"
         >
           {tagName}
         </Link>
