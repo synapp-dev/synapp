@@ -51,11 +51,22 @@ export const useIsPlatformAdmin = () => {
 export const useIsTeacher = () => {
   const currentUser = useMeStore((s) => s.currentUser);
   // Check both platform roles and school roles for TEACHER
-  const hasPlatformTeacherRole =
-    currentUser?.platformRoles?.includes("TEACHER") ?? false;
+  
   const schoolRoles = currentUser?.schoolRoles;
   const hasSchoolTeacherRole = Array.isArray(schoolRoles)
     ? schoolRoles.some((role: any) => role.roleKey === "TEACHER")
     : false;
-  return hasPlatformTeacherRole || hasSchoolTeacherRole;
+  return hasSchoolTeacherRole;
 };
+
+export const useIsSchoolStaff = () => {
+  const currentUser = useMeStore((s) => s.currentUser);
+  // Check both platform roles and school roles for SCHOOL_STAFF
+  
+  const schoolRoles = currentUser?.schoolRoles;
+  const hasSchoolStaffRole = Array.isArray(schoolRoles)
+    ? schoolRoles.some((role: any) => role.roleKey === "SCHOOL_STAFF")
+    : false;
+  return hasSchoolStaffRole;
+};
+
