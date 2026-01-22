@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useMeStore, useIsTeacher } from "@/entities/me/model/store";
+import { useMeStore, useIsTeacher, useIsPlatformAdmin } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { useQuery } from "@tanstack/react-query";
 import { meApi } from "@/entities/me/api/endpoints";
@@ -13,6 +13,7 @@ import { AddClassesDialog } from "./add-classes-dialog";
  * Client-side guard that checks if a teacher user should see the "Add Your Classes" dialog.
  * Shows the dialog if:
  * - User is a teacher
+ * - Classes feature is enabled in sidebar (user is platform admin)
  * - Welcome tutorial is completed
  * - Dashboard dialog has been dismissed
  * - User has no classes in teacher_classes table
@@ -22,6 +23,7 @@ export function TeacherClassesGuard() {
   const currentUser = useMeStore((s) => s.currentUser);
   const { isLoading } = useCurrentUser();
   const isTeacher = useIsTeacher();
+  const isPlatformAdmin = useIsPlatformAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Check if welcome tutorial is completed
@@ -68,6 +70,12 @@ export function TeacherClassesGuard() {
       return;
     }
 
+    // Don't show dialog if Classes is disabled in sidebar (i.e., user is not platform admin)
+    // Classes feature is disabled in sidebar when !isPlatformAdmin
+    if (!isPlatformAdmin) {
+      return;
+    }
+
     // Don't show dialog if welcome tutorial is not completed
     if (!isWelcomeCompleted) {
       return;
@@ -98,12 +106,19 @@ export function TeacherClassesGuard() {
     isLoading,
     isLoadingClasses,
     isTeacher,
+    isPlatformAdmin,
     isWelcomeCompleted,
     isDashboardDialogDismissed,
     teacherClassesData,
   ]);
 
   if (!isTeacher) {
+    return null;
+  }
+
+  // Don't render dialog if Classes is disabled in sidebar (i.e., user is not platform admin)
+  // Classes feature is disabled in sidebar when !isPlatformAdmin
+  if (!isPlatformAdmin) {
     return null;
   }
 
