@@ -1,4 +1,8 @@
 import { create } from "zustand";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { certificationApi } from "@/entities/certification/api/endpoints";
+import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import type {
   courseTopics,
   topicSlides,
@@ -196,4 +200,108 @@ export const useCertificationTopicStore = create<CertificationTopicState>(
       }),
   })
 );
+
+// React Query hook for fetching slides with progress
+export function useCertificationTopicSlidesWithProgress(
+  topicId: string | null | undefined
+) {
+  const { slides, attempts, setSlides, setAttempt } = useCertificationTopicStore();
+
+  const query = useQuery({
+    queryKey: ["certification", "topics", topicId, "slides-with-progress"],
+    queryFn: async () => {
+      if (!topicId) return null;
+
+      const result = await certificationApi.topics.slides.withProgress(topicId);
+
+      if (result.error) {
+        throw new Error(
+          result.error.message || "Failed to fetch slides with progress"
+        );
+      }
+
+      if (result.data) {
+        const { slides: slidesData, attempt } = result.data;
+        const cacheStore = useCertificationSlidesCacheStore.getState();
+
+        // Process slides to match ExtendedSlideData format and cache signed URLs
+        const processedSlides: ExtendedSlideData[] = slidesData
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((slide) => {
+            const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
+            // Cache signed URLs for image slides
+            if (slideWithUrl.signedUrl && slide.kind === "image") {
+              cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
+            }
+
+            return {
+              id: slide.id,
+              kind: slide.kind as SlideData["kind"],
+              orderIndex: slide.orderIndex,
+              textHtml: slide.textHtml ?? null,
+              imageUrl: slide.imageUrl ?? null,
+              videoUrl: slide.videoUrl ?? null,
+              videoStartS: slide.videoStartS ?? null,
+              videoEndS: slide.videoEndS ?? null,
+              effectiveNotes: (slide as any).officialNotes ?? null,
+            };
+          });
+
+        // Update Zustand store
+        setSlides(topicId, processedSlides);
+        if (attempt) {
+          setAttempt(topicId, attempt as Attempt);
+        }
+
+        return {
+          slides: processedSlides,
+          attempt: attempt as Attempt | null,
+        };
+      }
+
+      return null;
+    },
+    enabled: !!topicId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+    // Use initialData from Zustand store for instant display
+    initialData: () => {
+      if (!topicId) return null;
+      const cachedSlides = slides[topicId];
+      const cachedAttempt = attempts[topicId];
+      if (cachedSlides && cachedSlides.length > 0) {
+        return {
+          slides: cachedSlides,
+          attempt: cachedAttempt || null,
+        };
+      }
+      return undefined;
+    },
+  });
+
+  // Use React Query's cached data (which includes initialData) for immediate display
+  // Fallback to Zustand store if React Query doesn't have data yet
+  const cachedData = useMemo(() => {
+    if (query.data) {
+      return query.data;
+    }
+    if (topicId) {
+      const cachedSlides = slides[topicId];
+      const cachedAttempt = attempts[topicId];
+      if (cachedSlides && cachedSlides.length > 0) {
+        return {
+          slides: cachedSlides,
+          attempt: cachedAttempt || null,
+        };
+      }
+    }
+    return null;
+  }, [query.data, topicId, slides, attempts]);
+
+  return {
+    ...query,
+    slides: cachedData?.slides || [],
+    attempt: cachedData?.attempt || null,
+  };
+}
 
