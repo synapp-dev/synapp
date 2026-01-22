@@ -47,6 +47,7 @@ import type {
 import { useMeStore } from "@/entities/me/model/store";
 import { StarRating } from "@/components/atoms/star-rating";
 import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
+import { Separator } from "@workspace/ui/components/separator";
 
 type Course = typeof certificationCourses.$inferSelect;
 type Topic = typeof courseTopics.$inferSelect;
@@ -437,15 +438,16 @@ function QuizPageContent() {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       {/* Header */}
       <div className="mb-6">
-        <Button
-          onClick={handleBackToOverview}
-          variant="ghost"
-          size="sm"
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Quiz Overview
-        </Button>
+      
+        <div className="mb-4 flex flex-row items-center gap-3">
+          <p className="text-sm text-muted-foreground">
+            {course?.name ?? "Course"}
+          </p>
+          <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
+          <p className="text-sm text-muted-foreground">
+            {topic?.title ?? "Topic"}
+          </p>
+        </div>
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold">{quiz.title}</h1>
@@ -457,13 +459,16 @@ function QuizPageContent() {
             Question {currentQuestionIndex + 1} of {questions.length}
           </Badge>
         </div>
-        <Progress value={progress} className="h-2" />
-        <div className="flex items-center justify-between mt-2 text-sm text-muted-foreground">
-          <span>Passing score: {quiz.passingScorePercentage}%</span>
-          {quiz.timeLimitMinutes && (
+        <Progress 
+          value={progress} 
+          className="h-2" 
+          indicatorStyle={{ backgroundColor: 'var(--brand-bullyproof-primary)' }}
+        />
+        {quiz.timeLimitMinutes && (
+          <div className="flex items-center justify-end mt-2 text-sm text-muted-foreground">
             <span>Time limit: {quiz.timeLimitMinutes} minutes</span>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Question Card */}
@@ -499,6 +504,7 @@ function QuizPageContent() {
                 const isSubmitted = submittedAnswers.has(currentQuestion.id);
                 const isSubmitting = submittingQuestions.has(currentQuestion.id);
                 const isDisabled = (isSubmitted && isSelected) || isSubmitting;
+                const isSaving = isSubmitting && isSelected;
                 
                 return (
                   <div
@@ -507,6 +513,8 @@ function QuizPageContent() {
                       isDisabled 
                         ? "opacity-60 cursor-not-allowed" 
                         : "hover:bg-accent cursor-pointer"
+                    } ${isSaving ? "animate-pulse" : ""} ${
+                      isSelected ? "border-[var(--brand-bullyproof-primary)]" : ""
                     }`}
                     onClick={() => {
                       if (!isDisabled) {
@@ -518,14 +526,16 @@ function QuizPageContent() {
                       value={answer.id} 
                       id={answer.id}
                       disabled={isDisabled}
+                      className={isSelected ? "[&_svg]:fill-[var(--brand-bullyproof-primary)]" : ""}
                     />
                     <Label
                       htmlFor={answer.id}
+                      key={`${answer.id}-${isSaving ? 'saving' : 'normal'}`}
                       className={`flex-1 ${
                         isDisabled ? "cursor-not-allowed" : "cursor-pointer"
-                      } font-normal`}
+                      } ${isSelected ? "font-bold" : "font-normal"} animate-slide-left-fade-in`}
                     >
-                      {answer.answerText}
+                      {isSaving ? "Saving answer..." : answer.answerText}
                     </Label>
                   </div>
                 );
@@ -545,6 +555,7 @@ function QuizPageContent() {
                   currentAnswers.length === 1 &&
                   (currentQuestion.allowMultipleSelections ?? false)
                 );
+                const isSaving = isSubmitting && isSelected;
                 
                 return (
                   <div
@@ -553,6 +564,8 @@ function QuizPageContent() {
                       isDisabled 
                         ? "opacity-60 cursor-not-allowed" 
                         : "hover:bg-accent cursor-pointer"
+                    } ${isSaving ? "animate-pulse" : ""} ${
+                      isSelected ? "border-[var(--brand-bullyproof-primary)]" : ""
                     }`}
                     onClick={() => {
                       if (!isDisabled) {
@@ -577,14 +590,16 @@ function QuizPageContent() {
                         }
                       }}
                       id={answer.id}
+                      className={isSelected ? "data-[state=checked]:bg-[var(--brand-bullyproof-primary)] data-[state=checked]:border-[var(--brand-bullyproof-primary)]" : ""}
                     />
                     <Label
                       htmlFor={answer.id}
+                      key={`${answer.id}-${isSaving ? 'saving' : 'normal'}`}
                       className={`flex-1 ${
                         isDisabled ? "cursor-not-allowed" : "cursor-pointer"
-                      } font-normal`}
+                      } ${isSelected ? "font-bold" : "font-normal"} animate-slide-left-fade-in`}
                     >
-                      {answer.answerText}
+                      {isSaving ? "Saving answer..." : answer.answerText}
                     </Label>
                   </div>
                 );
@@ -622,9 +637,10 @@ function QuizPageContent() {
                 onClick={handleNextQuestion}
                 disabled={!isAnswered}
                 size="lg"
+                className={`bg-[var(--brand-bullyproof-primary)] hover:bg-[var(--brand-bullyproof-primary)]/90 text-white`}
               >
                 Next
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ChevronsRight className={`h-4 w-4 ${isAnswered ? "animate-bounce-right-subtle" : ""}`} />
               </Button>
             )}
           </div>

@@ -28,6 +28,8 @@ import {
   ChevronRight,
   TrendingUp,
   Award,
+  BookOpen,
+  ClipboardList,
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { PolarGrid, PolarRadiusAxis, RadialBar, RadialBarChart, Label } from "recharts";
@@ -51,7 +53,6 @@ import { useCertificationTopicsReactive, useCertificationSlideUrl } from "@/enti
 import { useCertificationCourseByCode } from "@/entities/certification/model/store";
 import Image from "next/image";
 import { StarRating } from "@/components/atoms/star-rating";
-import CountUp from "react-countup";
 import { TopicCertificate } from "@/components/molecules/topic-certificate";
 
 type Course = typeof certificationCourses.$inferSelect & {
@@ -140,10 +141,6 @@ export default function CoursePage() {
     completion: number;
     fill: string;
   }>>([]);
-  
-  // Overall course progress percentage
-  const [overallProgress, setOverallProgress] = useState(0);
-  const [showProgressAnimation, setShowProgressAnimation] = useState(false);
 
   // Calculate current topic and slide URL BEFORE early returns to ensure consistent hook ordering
   const currentTopic = topicsList.find((topic) => {
@@ -317,8 +314,6 @@ export default function CoursePage() {
       setAnimatedProgress([]);
       setCertificationProgress(0);
       setAnimatedRadialChartData([]);
-      setOverallProgress(0);
-      setShowProgressAnimation(false);
       return;
     }
 
@@ -430,28 +425,9 @@ export default function CoursePage() {
       );
     };
 
-    // Calculate overall course progress percentage
-    const overallPercentage = topicsList.length > 0
-      ? Math.round(
-          targetCompletions.reduce((sum, completion) => sum + completion, 0) /
-            topicsList.length
-        )
-      : 0;
-
     // Start animation after a short delay
     setTimeout(() => {
       animateBar(0);
-      
-      // Show and animate overall progress after all bars finish
-      const totalAnimationTime = animationDuration * topicsList.length + delayBetweenBars * (topicsList.length - 1);
-      setTimeout(() => {
-        setShowProgressAnimation(true);
-        animateValue(
-          overallPercentage,
-          (value) => setOverallProgress(value),
-          animationDuration
-        );
-      }, totalAnimationTime + 200);
     }, 100);
   }, [topicsList, topicProgress, currentTopic, isLoadingTopics, isLoadingProgress, animateValue, topicStatuses, calculateTopicCompletion]);
 
@@ -618,7 +594,7 @@ export default function CoursePage() {
         if (status === "completed") {
           fillColor = "rgb(59 130 246)"; // blue-500
         } else if (status === "current") {
-          fillColor = "rgb(34 197 94)"; // green-500
+          fillColor = "var(--brand-bullyproof-primary)"; // Bullyproof primary
         } else if (status === "retry_available") {
           fillColor = "var(--brand-bullyproof-secondary)"; // Bullyproof secondary
         }
@@ -644,7 +620,7 @@ export default function CoursePage() {
       if (status === "completed") {
         fillColor = "rgb(59 130 246)"; // blue-500
       } else if (status === "current") {
-        fillColor = "rgb(34 197 94)"; // green-500
+        fillColor = "var(--brand-bullyproof-primary)"; // Bullyproof primary
       } else if (status === "retry_available") {
         fillColor = "var(--brand-bullyproof-secondary)"; // Bullyproof secondary
       }
@@ -743,7 +719,7 @@ export default function CoursePage() {
             className="lg:w-2/3"
           />
         ) : currentTopic ? (
-          <Card className="lg:w-2/3 flex flex-row overflow-hidden p-0">
+          <Card className="lg:w-2/3 flex flex-row overflow-hidden h-full gap-0 py-0">
             {/* Thumbnail - Left side */}
             {currentTopicImageUrl ? (
               <div className="flex-shrink-0 h-full aspect-video relative bg-muted/30 border-r overflow-hidden">
@@ -752,7 +728,7 @@ export default function CoursePage() {
                   alt={currentTopic.title}
                   fill
                   className="object-contain"
-                  sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  // sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 />
               </div>
             ) : (
@@ -762,19 +738,20 @@ export default function CoursePage() {
             )}
             
             {/* Content - Right side */}
-            <div className="flex-1 flex flex-col min-w-0">
-              <CardHeader className="p-4 pb-3 flex-shrink-0">
-                <div className="flex items-start gap-2 flex-wrap">
+            <div className="flex-1 flex flex-col min-w-0 h-full justify-between py-4">
+              <CardHeader className="pb-3 flex-shrink-0">
+                <div className="flex flex-col items-start gap-2 flex-wrap">
                   <Badge
                     variant="secondary"
                     className="text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
                   >
-                    T{currentTopicNumber}
+                    Topic {currentTopicNumber}
                   </Badge>
-                  <CardTitle className="text-lg line-clamp-2 flex-1 min-w-0">{currentTopic.title}</CardTitle>
+                  <CardTitle className="text-xl line-clamp-2 flex-1 min-w-0">{currentTopic.title}</CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="p-4 pt-0 pb-3 flex-shrink-0 space-y-2">
+              
+              <CardFooter className="pt-0 flex-shrink-0 flex justify-between">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-muted-foreground">{totalSlides} {totalSlides === 1 ? 'slide' : 'slides'}</span>
                   {currentTopic.hasQuiz && (
@@ -790,8 +767,6 @@ export default function CoursePage() {
                     </>
                   )}
                 </div>
-              </CardContent>
-              <CardFooter className="p-4 pt-0 mt-auto flex-shrink-0 flex justify-end">
                 {currentTopicProgress?.status === "quiz_unlocked"
                   ? (() => {
                       // Check if there's an in-progress quiz attempt
@@ -882,7 +857,7 @@ export default function CoursePage() {
                         })()
                       : (
                           <Button
-                            className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                            className="max-w-1/2 w-full bg-[var(--brand-bullyproof-primary)] text-white gap-1 hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
                             size="default"
                             onClick={() => {
                               const topicSlug = createSlug(currentTopic.title);
@@ -890,12 +865,13 @@ export default function CoursePage() {
                             }}
                           >
                             {isTopicStarted(currentTopicProgress) ? "Continue Topic" : "Begin"}
+                            <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
                           </Button>
                         )
                     : quizStatus === "passed"
                       ? (
                           <Button
-                            className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                            className="w-fit bg-[var(--brand-bullyproof-primary)] text-white gap-1 hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
                             size="default"
                             onClick={() => {
                               const topicSlug = createSlug(currentTopic.title);
@@ -903,11 +879,12 @@ export default function CoursePage() {
                             }}
                           >
                             Review slides
+                            <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
                           </Button>
                         )
                       : (
                           <Button
-                            className="w-full bg-[var(--brand-bullyproof-secondary)] text-white hover:bg-[var(--brand-bullyproof-secondary)]/90 hover:text-white"
+                            className="w-fit bg-[var(--brand-bullyproof-secondary)] text-white gap-1 hover:bg-[var(--brand-bullyproof-secondary)]/90 hover:text-white"
                             size="default"
                             onClick={async () => {
                               const topicSlug = createSlug(currentTopic.title);
@@ -936,7 +913,7 @@ export default function CoursePage() {
       </div>
 
       {/* Separator between top section and progress section */}
-      <Separator />
+      <Separator  className="my-4"/>
 
       {/* Topic Timeline - Full Width */}
       {isLoadingTopics ? (
@@ -989,183 +966,172 @@ export default function CoursePage() {
           </div>
           
           <Card className="relative overflow-visible mt-4">
-            {/* Gradient overlay on card */}
-            <div 
-              className="absolute top-0 left-0 right-0 h-48 pointer-events-none z-0 rounded-t-lg"
-              style={{
-                background: "linear-gradient(to bottom, var(--brand-bullyproof-primary), transparent)",
-              }}
-            />
+            {/* Gradient overlay on card - Hidden when certification is complete */}
+            {!isCertificationComplete && (
+              <div 
+                className="absolute top-0 left-0 right-0 h-48 pointer-events-none z-0 rounded-t-lg"
+                style={{
+                  background: "linear-gradient(to bottom, var(--brand-bullyproof-primary), transparent)",
+                }}
+              />
+            )}
           <CardContent className="overflow-visible pt-4">
-            {/* Progress Bar Section - At Top */}
-            {isLoadingTopics || isLoadingProgress ? (
-              <div className="mb-6">
-                <div className="flex gap-2 items-end">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Skeleton key={index} className="flex-1 h-[10px] rounded-md" />
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="mb-6 overflow-visible">
-                {/* Topic Progress Bars */}
-                <div className="flex gap-2 items-end overflow-visible">
-                  {topicsList.map((topic, index) => {
-                    const topicNum = topic.courseOrder ?? index + 1;
-                    const progress = topicProgress.get(topic.id);
-                    const status = topicStatuses[index];
-                    const isCompleted = status === "completed";
-                    const isCurrent = status === "current";
-                    const isRetryAvailable = status === "retry_available";
-                    const isLocked = status === "locked";
-                    const currentIndex = topicsList.findIndex((t, i) => topicStatuses[i] === "current");
-                    const isNextAfterCurrent = index === currentIndex + 1 && currentIndex !== -1;
-                    
-                    const animatedValue = animatedProgress[index] ?? 0;
-                    const progressValue = isCompleted ? animatedValue : isCurrent ? 0 : 0;
-
-                    return (
-                      <div
-                        key={topic.id}
-                        className={cn(
-                          "flex-1 flex flex-col gap-1 group relative transition-all duration-300",
-                          isCurrent && "translate-y-[-10px]",
-                          "hover:translate-y-[-15px]"
-                        )}
-                        style={{
-                          animation: isCurrent ? "float-gentle 3s ease-in-out infinite" : undefined,
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isCurrent) {
-                            e.currentTarget.style.animation = "float-gentle 3s ease-in-out infinite";
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isCurrent) {
-                            e.currentTarget.style.animation = "";
-                          }
-                        }}
-                      >
-                        {/* T Badge - Above for non-active, below for active */}
-                        {!isCurrent && !isNextAfterCurrent && (
-                          <div className="flex justify-center">
-                            <Badge
-                              variant="secondary"
-                              className={cn(
-                                "text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm transition-all duration-200",
-                                "opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0"
-                              )}
-                            >
-                              T{topicNum}
-                            </Badge>
-                          </div>
-                        )}
+            {/* Progress Bar Section - At Top - Hidden when certification is complete */}
+            {!isCertificationComplete && (
+              <>
+                {isLoadingTopics || isLoadingProgress ? (
+                  <div className="mb-6">
+                    <div className="flex gap-2 items-end">
+                      {Array.from({ length: 5 }).map((_, index) => (
+                        <Skeleton key={index} className="flex-1 h-[10px] rounded-md" />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-6 overflow-visible">
+                    {/* Topic Progress Bars */}
+                    <div className="flex gap-2 items-end overflow-visible">
+                      {topicsList.map((topic, index) => {
+                        const topicNum = topic.courseOrder ?? index + 1;
+                        const progress = topicProgress.get(topic.id);
+                        const status = topicStatuses[index];
+                        const isCompleted = status === "completed";
+                        const isCurrent = status === "current";
+                        const isRetryAvailable = status === "retry_available";
+                        const isLocked = status === "locked";
+                        const currentIndex = topicsList.findIndex((t, i) => topicStatuses[i] === "current");
+                        const isNextAfterCurrent = index === currentIndex + 1 && currentIndex !== -1;
                         
-                        {/* BP Man Image - Only on active progress bar */}
-                        {isCurrent && (
-                          <div className="relative w-full mb-1 overflow-visible" style={{ height: 'auto' }}>
-                            {/* BP Man - Fixed position, bleeding over top */}
-                            <div className="inline-block -mt-8">
-                              <Image
-                                src="/images/bp-man/bp-man-cape.svg"
-                                alt="BP Man"
-                                width={100}
-                                height={100}
-                                className="w-full h-auto"
-                                style={{
-                                  animation: "float-gentle 3s ease-in-out infinite",
-                                }}
-                              />
-                            </div>
-                            {/* Percentage Display - Absolutely positioned to the right of BP man, bleeding over top */}
-                            {showProgressAnimation && (
-                              <div className="absolute bottom-2 left-[150px] flex flex-col items-center">
-                                <div className="text-7xl font-bold text-background leading-none flex items-start justify-start gap-1">
-                                  <CountUp
-                                    start={100}
-                                    end={overallProgress}
-                                    duration={1.5}
-                                    decimals={0}
+                        const animatedValue = animatedProgress[index] ?? 0;
+                        const progressValue = isCompleted ? animatedValue : isCurrent ? 0 : 0;
+
+                        return (
+                          <div
+                            key={topic.id}
+                            className={cn(
+                              "flex-1 flex flex-col gap-1 group relative transition-all duration-300",
+                              isCurrent && "translate-y-[-10px]",
+                              "hover:translate-y-[-15px]"
+                            )}
+                            style={{
+                              animation: isCurrent ? "float-gentle 3s ease-in-out infinite" : undefined,
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isCurrent) {
+                                e.currentTarget.style.animation = "float-gentle 3s ease-in-out infinite";
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isCurrent) {
+                                e.currentTarget.style.animation = "";
+                              }
+                            }}
+                          >
+                            {/* Topic Badge - Above for non-active, below for active */}
+                            {!isCurrent && !isNextAfterCurrent && (
+                              <div className="flex justify-center">
+                                <Badge
+                                  variant="secondary"
+                                  className={cn(
+                                    "text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm transition-all duration-200",
+                                    "opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0"
+                                  )}
+                                >
+                                  Topic {topicNum}
+                                </Badge>
+                              </div>
+                            )}
+                            
+                            {/* BP Man Image - Only on active progress bar */}
+                            {isCurrent && (
+                              <div className="relative w-full mb-1 overflow-visible" style={{ height: 'auto' }}>
+                                {/* BP Man - Fixed position, bleeding over top */}
+                                <div className="inline-block -mt-8">
+                                  <Image
+                                    src="/images/bp-man/bp-man-cape.svg"
+                                    alt="BP Man"
+                                    width={100}
+                                    height={100}
+                                    className="w-full h-auto"
+                                    style={{
+                                      animation: "float-gentle 3s ease-in-out infinite",
+                                    }}
                                   />
-                                  <span className="text-2xl mt-1">%</span>
-                                </div>
-                                <div className="text-xs text-background/75 font-medium mt-0.5">
-                                  Complete
                                 </div>
                               </div>
                             )}
+                            
+                            {/* Progress Bar */}
+                            <div className="relative">
+                              <Progress
+                                value={progressValue}
+                                className={cn(
+                                  "h-[10px] w-full",
+                                  isCurrent && "ring-2 ring-[var(--brand-bullyproof-primary)] ring-offset-1 rounded-md",
+                                  isRetryAvailable && "ring-2 ring-[var(--brand-bullyproof-secondary)] ring-offset-1 rounded-md"
+                                )}
+                                indicatorStyle={{
+                                  backgroundColor: isCompleted 
+                                    ? "rgb(59 130 246)" // blue-500
+                                    : isCurrent 
+                                    ? "var(--brand-bullyproof-primary)" // Bullyproof primary
+                                    : isRetryAvailable
+                                    ? "var(--brand-bullyproof-secondary)" // Bullyproof secondary
+                                    : "hsl(var(--muted))",
+                                }}
+                              />
+                            </div>
+                            
+                            {/* Topic Badge - Below for active */}
+                            {isCurrent && (
+                              <div className="flex justify-center mt-1">
+                                <Badge
+                                  variant="secondary"
+                                  className="text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm opacity-100 animate-pulse"
+                                >
+                                  Topic {topicNum}
+                                </Badge>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        );
+                      })}
+                      
+                      {/* Certificate Progress Bar - Last */}
+                      <div className="flex-1 flex flex-col gap-1 group relative transition-all duration-300 hover:translate-y-[-15px]">
+                        {/* Certificate Icon */}
+                        <div className="flex justify-center mb-2">
+                          <Image 
+                            src="/images/ap-badge.svg"
+                            alt="AP Logo"
+                            width={82}
+                            height={82}
+                            className="animate-bounce-slow"
+                           
+                          />
+                        </div>
                         
                         {/* Progress Bar */}
                         <div className="relative">
                           <Progress
-                            value={progressValue}
-                            className={cn(
-                              "h-[10px] w-full",
-                              isCurrent && "ring-2 ring-green-500 ring-offset-1 rounded-md",
-                              isRetryAvailable && "ring-2 ring-[var(--brand-bullyproof-secondary)] ring-offset-1 rounded-md"
-                            )}
+                            value={isCertificationComplete ? certificationProgress : 0}
+                            className="h-[10px] w-full"
                             indicatorStyle={{
-                              backgroundColor: isCompleted 
+                              backgroundColor: isCertificationComplete 
                                 ? "rgb(59 130 246)" // blue-500
-                                : isCurrent 
-                                ? "rgb(34 197 94)" // green-500
-                                : isRetryAvailable
-                                ? "var(--brand-bullyproof-secondary)" // Bullyproof secondary
                                 : "hsl(var(--muted))",
                             }}
                           />
                         </div>
-                        
-                        {/* T Badge - Below for active */}
-                        {isCurrent && (
-                          <div className="flex justify-center mt-1">
-                            <Badge
-                              variant="secondary"
-                              className="text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm opacity-100 animate-pulse"
-                            >
-                              T{topicNum}
-                            </Badge>
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                  
-                  {/* Certificate Progress Bar - Last */}
-                  <div className="flex-1 flex flex-col gap-1 group relative transition-all duration-300 hover:translate-y-[-15px]">
-                    {/* Certificate Icon */}
-                    <div className="flex justify-center mb-2">
-                      <Image 
-                        src="/images/ap-badge.svg"
-                        alt="AP Logo"
-                        width={82}
-                        height={82}
-                        className="animate-bounce-slow"
-                       
-                      />
-                    </div>
-                    
-                    {/* Progress Bar */}
-                    <div className="relative">
-                      <Progress
-                        value={isCertificationComplete ? certificationProgress : 0}
-                        className="h-[10px] w-full"
-                        indicatorStyle={{
-                          backgroundColor: isCertificationComplete 
-                            ? "rgb(59 130 246)" // blue-500
-                            : "hsl(var(--muted))",
-                        }}
-                      />
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
+                )}
 
-            {/* Separator between progress bar and timeline */}
-            <Separator className="mb-6" />
+                {/* Separator between progress bar and timeline */}
+                <Separator className="mb-6" />
+              </>
+            )}
 
             <div className="space-y-3">
               {topicsList.map((topic, index) => {
@@ -1182,6 +1148,26 @@ export default function CoursePage() {
                 const topicStarted = isTopicStarted(progress);
                 const isCompleted = status === "completed";
                 const isCurrent = status === "current";
+
+                // Calculate slides viewed for this topic
+                let slidesViewed = 0;
+                if (progress?.slideProgress) {
+                  const slideProgressData = progress.slideProgress as Record<string, any>;
+                  slidesViewed = Object.keys(slideProgressData).filter(
+                    (slideId) => slideProgressData[slideId]?.viewed || slideProgressData[slideId]?.answered
+                  ).length;
+                }
+
+                // Determine quiz status using the same logic as top section
+                let quizStatus: "not_attempted" | "passed" | "retry_available" = "not_attempted";
+                if (progress && progress.scorePercentage !== null && progress.scorePercentage !== undefined) {
+                  quizStatus =
+                    progress.status === "passed" || progress.scorePercentage >= 60
+                      ? "passed"
+                      : "retry_available";
+                } else {
+                  quizStatus = "not_attempted";
+                }
 
                 const handleCardClick = () => {
                   // Don't allow clicking on locked topics
@@ -1255,24 +1241,27 @@ export default function CoursePage() {
                 const isLocked = status === "locked";
                 const isRetryAvailable = status === "retry_available";
 
+                // Calculate previous topic number for locked topics
+                const previousTopicNumber = topicNumber > 1 ? topicNumber - 1 : 1;
+
                 return (
                   <div
                     key={topic.id}
-                    onClick={handleCardClick}
+                    onClick={isCompleted ? undefined : handleCardClick}
                     className={cn(
-                      "flex items-center gap-4 px-3 py-0 rounded-lg border transition-all duration-300",
-                      isCompleted && "group border-muted hover:border-blue-500 hover:border-2 hover:bg-blue-500/10 cursor-pointer",
-                      isCurrent && "border-green-500 border-2 bg-green-500/5 hover:bg-green-500/10 cursor-pointer",
+                      "flex items-center gap-4 px-5 py-0 rounded-lg border transition-all duration-300",
+                      isCompleted && "border-muted",
+                      isCurrent && "border-[var(--brand-bullyproof-primary)] border-2 bg-[var(--brand-bullyproof-primary)]/5 hover:bg-[var(--brand-bullyproof-primary)]/10 cursor-pointer",
                       isRetryAvailable && "border-[var(--brand-bullyproof-secondary)] border-2 bg-[var(--brand-bullyproof-secondary)]/5 hover:bg-[var(--brand-bullyproof-secondary)]/10 cursor-pointer",
-                      isLocked && "cursor-not-allowed opacity-60"
+                      isLocked && "group cursor-not-allowed opacity-60"
                     )}
                   >
                     <div className="flex-shrink-0 py-3">
                       {isCompleted && (
-                        <CheckCircle2 className="h-5 w-5 text-foreground group-hover:text-blue-500 transition-colors" />
+                        <CheckCircle2 className="h-5 w-5 text-foreground transition-colors" />
                       )}
                       {isCurrent && (
-                        <PlayCircle className="h-5 w-5 text-primary" />
+                        <PlayCircle className="h-5 w-5 text-[var(--brand-bullyproof-primary)]" />
                       )}
                       {isRetryAvailable && (
                         <PlayCircle className="h-5 w-5 text-[var(--brand-bullyproof-secondary)]" />
@@ -1283,7 +1272,7 @@ export default function CoursePage() {
                     </div>
                     {/* Thumbnail */}
                     {imageSlidesList.length > 0 && (
-                      <div className="relative w-24 self-stretch flex-shrink-0 overflow-hidden rounded-md bg-muted">
+                      <div className="relative w-40 aspect-video flex-shrink-0 overflow-hidden rounded-md bg-muted h-full">
                         <AnimatedThumbnail
                           imageSlidesList={imageSlidesList}
                           topicTitle={topic.title}
@@ -1293,91 +1282,235 @@ export default function CoursePage() {
                         />
                       </div>
                     )}
-                    <div className="flex-1 py-3">
-                      <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex-1 flex items-center justify-between gap-4 py-3">
+                      {/* Left side - Topic info */}
+                      <div className="flex flex-col gap-2 flex-1 min-w-0">
+                        {/* Topic Number Badge - Top */}
                         <Badge
                           variant="secondary"
-                          className="text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
+                          className="text-xs font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0 w-fit"
                         >
-                          T{topicNumber}
+                          Topic {topicNumber}
                         </Badge>
+                        
+                        {/* Title */}
                         <p className={cn(
-                          "text-lg font-semibold transition-colors",
+                          "text-lg font-semibold transition-colors max-w-3/4",
                           isLocked && "text-muted-foreground"
                         )}>
-                          {topic.title}
-                        </p>
-                        {slideCount > 0 && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
-                          >
-                            {slideCount} {slideCount === 1 ? "slide" : "slides"}
-                          </Badge>
-                        )}
-                        {hasQuiz && (
-                          <Badge
-                            variant="outline"
-                            className="text-xs border-purple-700 bg-purple-500/5 text-purple-700 dark:text-purple-400 flex items-center gap-0.5 px-1.5 py-0 h-5"
-                          >
-                            <FileQuestion className="h-3 w-3" />
-                            Quiz
-                          </Badge>
-                        )}
-                      </div>
-                      {progress && hasQuiz && progress.scorePercentage !== null && (
-                        <div className="flex items-center gap-2 mt-1">
-                          {isAdmin && (
-                            <span className="text-sm text-muted-foreground">
-                              Attempt {progress.attemptNumber} •
-                            </span>
+                          {isLocked && topicNumber > 1 ? (
+                            <>
+                              <span className="group-hover:hidden">
+                                {topic.title}
+                              </span>
+                              <span className="hidden group-hover:inline">
+                                Complete Topic {previousTopicNumber}
+                              </span>
+                            </>
+                          ) : (
+                            topic.title
                           )}
-                          <StarRating
-                            correctAnswers={Math.round((progress.scorePercentage / 100) * 5)}
-                            totalQuestions={5}
-                            passingThreshold={60}
-                          />
+                        </p>
+                        
+                        {/* Slides and Quiz Badges */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {slideCount > 0 && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
+                            >
+                              {slideCount} {slideCount === 1 ? "slide" : "slides"}
+                            </Badge>
+                          )}
+                          {hasQuiz && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-purple-700 bg-purple-500/5 text-purple-700 dark:text-purple-400 flex items-center rounded-sm gap-0.5 px-1.5 py-0 h-5"
+                            >
+                              <FileQuestion className="h-3 w-3" />
+                              Quiz
+                            </Badge>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    {isCompleted && (
-                      <div className="flex items-center gap-2 flex-shrink-0 my-3">
-                        <Button
-                          variant="ghost"
-                          size="lg"
-                          onClick={handleReviewClick}
-                        >
-                          Review slides
-                        </Button>
+                      </div>
+                      
+                      {/* Middle - Star Rating */}
+                      <div className="flex items-center gap-2 flex-shrink-0">
                         {hasQuiz && (
-                          <Button
-                            variant="ghost"
-                            size="lg"
-                            onClick={handleQuizClick}
-                          >
-                            Take Quiz
-                          </Button>
+                          <>
+                            {isAdmin && progress && progress.scorePercentage !== null && (
+                              <span className="text-sm text-muted-foreground">
+                                Attempt {progress.attemptNumber} •
+                              </span>
+                            )}
+                            <StarRating
+                              correctAnswers={
+                                isLocked 
+                                  ? 0 
+                                  : progress && progress.scorePercentage !== null
+                                    ? Math.round((progress.scorePercentage / 100) * 5)
+                                    : 0
+                              }
+                              totalQuestions={5}
+                              passingThreshold={60}
+                            />
+                          </>
                         )}
                       </div>
-                    )}
-                    {isCurrent && (
-                      <Button
-                        className="flex-shrink-0 my-3 bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
-                        size="lg"
-                        onClick={handleContinueClick}
-                      >
-                        {progress?.status === "quiz_unlocked" ? (
-                          <span className="flex items-center gap-2">
-                            Continue Quiz
-                            <ChevronRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
-                          </span>
-                        ) : topicStarted ? (
-                          "Continue"
-                        ) : (
-                          "Begin"
-                        )}
-                      </Button>
-                    )}
+                      
+                      {/* Right side - Action buttons */}
+                      {(isCompleted || isLocked) && (() => {
+                        // Determine if slides should be "Review" (after quiz unlocked/passed) or "View" (before)
+                        const isQuizUnlockedOrPassed = progress?.status === "quiz_unlocked" || 
+                                                       quizStatus === "passed" || 
+                                                       (hasQuiz && slidesViewed === slideCount);
+                        const slidesButtonText = isQuizUnlockedOrPassed ? "Review Slides" : "View Slides";
+                        
+                        return (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {hasQuiz && (
+                              <Button
+                                variant="ghost"
+                                size="lg"
+                                onClick={isLocked ? undefined : handleQuizClick}
+                                disabled={isLocked}
+                                className="flex items-center gap-2"
+                              >
+                                <ClipboardList className="h-4 w-4" />
+                                {isLocked || !progress || progress.scorePercentage === null ? "Take Quiz" : "Retake Quiz"}
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="lg"
+                              onClick={isLocked ? undefined : handleReviewClick}
+                              disabled={isLocked}
+                              className="flex items-center gap-2"
+                            >
+                              <BookOpen className="h-4 w-4" />
+                              {slidesButtonText}
+                            </Button>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                    {isCurrent && (() => {
+                      // Determine which button should be active
+                      const isQuizActive = progress?.status === "quiz_unlocked" || 
+                                          (quizStatus === "not_attempted" && slidesViewed === slideCount && hasQuiz) ||
+                                          quizStatus === "retry_available";
+                      const isSlidesActive = !isQuizActive;
+                      
+                      // Check if quiz should be disabled (still viewing slides, not unlocked yet)
+                      const isQuizDisabled = hasQuiz && 
+                                            progress?.status !== "quiz_unlocked" && 
+                                            slidesViewed < slideCount;
+                      
+                      // Check for in-progress quiz attempt
+                      const hasInProgressAttempt = inProgressQuizAttempts.has(topic.id) && 
+                        inProgressQuizAttempts.get(topic.id) !== null;
+                      
+                      return (
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* Quiz Button - only show if topic has quiz */}
+                          {hasQuiz && (
+                            <Button
+                              variant={isQuizActive ? "default" : "ghost"}
+                              size="lg"
+                              disabled={isQuizDisabled}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (isQuizDisabled) return;
+                                
+                                const topicSlug = createSlug(topic.title);
+                                
+                                if (hasInProgressAttempt) {
+                                  const inProgressAttempt = inProgressQuizAttempts.get(topic.id);
+                                  if (inProgressAttempt?.quizId) {
+                                    // Fetch quiz to get title for slug
+                                    try {
+                                      const quizResult = await certificationApi.quizzes.byId(inProgressAttempt.quizId);
+                                      if (quizResult.data) {
+                                        const quizSlug = createSlug(quizResult.data.title);
+                                        router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${quizSlug}`);
+                                      } else {
+                                        router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                      }
+                                    } catch (err) {
+                                      console.error("Failed to fetch quiz:", err);
+                                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                    }
+                                  } else {
+                                    router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                  }
+                                } else if (quizStatus === "retry_available") {
+                                  // For retry, fetch first quiz ID
+                                  try {
+                                    const quizzesResult = await certificationApi.quizzes.list(topic.id);
+                                    if (quizzesResult.data && quizzesResult.data.length > 0) {
+                                      const firstQuiz = quizzesResult.data[0];
+                                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${firstQuiz.id}`);
+                                    } else {
+                                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                    }
+                                  } catch (err) {
+                                    console.error("Failed to fetch quizzes:", err);
+                                  }
+                                } else {
+                                  router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                }
+                              }}
+                              className={cn(
+                                "flex items-center gap-2",
+                                isQuizActive && "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                              )}
+                            >
+                              <ClipboardList className="h-4 w-4" />
+                              {quizStatus === "retry_available" 
+                                ? "Retake Quiz"
+                                : progress?.status === "quiz_unlocked"
+                                  ? (hasInProgressAttempt ? "Continue Quiz" : "Start Quiz")
+                                  : "Take Quiz"
+                              }
+                              {isQuizActive && (
+                                <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
+                              )}
+                            </Button>
+                          )}
+                          
+                          {/* Review/View Slides Button - always last */}
+                          {(() => {
+                            // Determine if slides should be "Review" (after quiz unlocked/passed) or "View" (before)
+                            const isQuizUnlockedOrPassed = progress?.status === "quiz_unlocked" || 
+                                                           quizStatus === "passed" || 
+                                                           (hasQuiz && slidesViewed === slideCount);
+                            const slidesButtonText = isQuizUnlockedOrPassed ? "Review Slides" : "View Slides";
+                            
+                            return (
+                              <Button
+                                variant={isSlidesActive ? "default" : "ghost"}
+                                size="lg"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const topicSlug = createSlug(topic.title);
+                                  router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
+                                }}
+                                className={cn(
+                                  "flex items-center gap-2",
+                                  isSlidesActive && "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                                )}
+                              >
+                                <BookOpen className="h-4 w-4" />
+                                {slidesButtonText}
+                                {isSlidesActive && (
+                                  <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
+                                )}
+                              </Button>
+                            );
+                          })()}
+                        </div>
+                      );
+                    })()}
                     {isRetryAvailable && (
                       <Button
                         variant="default"
@@ -1395,7 +1528,7 @@ export default function CoursePage() {
                             console.error("Failed to fetch quizzes:", err);
                           }
                         }}
-                        className="flex-shrink-0 my-3 bg-[var(--brand-bullyproof-secondary)] text-white hover:bg-[var(--brand-bullyproof-secondary)]/90 hover:text-white"
+                        className="flex-shrink-0 bg-[var(--brand-bullyproof-secondary)] text-white hover:bg-[var(--brand-bullyproof-secondary)]/90 hover:text-white"
                       >
                         Retake Quiz
                       </Button>

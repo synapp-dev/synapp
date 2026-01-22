@@ -171,7 +171,7 @@ function QuizOverviewPageContent() {
           <CardFooter>
             <Button onClick={handleBackToCourse} variant="outline">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Course
+              Course Home
             </Button>
           </CardFooter>
         </Card>
@@ -180,7 +180,7 @@ function QuizOverviewPageContent() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-2xl">
       {/* Header */}
       <div className="mb-6">
         <Button
@@ -190,14 +190,14 @@ function QuizOverviewPageContent() {
           className="mb-4"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Course
+          Course Home
         </Button>
-        <h1 className="text-3xl font-bold mb-2">
+        <h2 className="text-xl font-semibold mb-1 text-muted-foreground">
+          {course?.name ?? "Course"}
+        </h2>
+        <h1 className="text-3xl font-bold">
           {topic?.title ?? "Topic Quizzes"}
         </h1>
-        <p className="text-muted-foreground">
-          {course?.name ?? "Course"} • {quizzes.length} {quizzes.length === 1 ? "quiz" : "quizzes"} available
-        </p>
       </div>
 
       {/* Quizzes List */}
@@ -223,7 +223,7 @@ function QuizOverviewPageContent() {
       ) : (
         <div className="space-y-4">
           {quizzes.map((quiz) => (
-            <Card key={quiz.id} className="hover:shadow-md transition-shadow">
+            <Card key={quiz.id} className="hover:shadow-md transition-shadow max-w-md mx-auto">
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
@@ -255,30 +255,19 @@ function QuizOverviewPageContent() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <FileQuestion className="h-4 w-4" />
-                    <span>{quiz.questionCount} {quiz.questionCount === 1 ? "question" : "questions"}</span>
+                <div className="space-y-4 text-sm text-muted-foreground">
+                  <p>
+                    This quiz will test your knowledge of the slides you just read.
+                  </p>
+                  <p>
+                    There will be <span className="font-bold">{quiz.questionCount}</span> {quiz.questionCount === 1 ? "question" : "questions"} in total.
+                  </p>
+                  <p>
+                    You must get a score of <span className="font-bold">{quiz.passingScorePercentage}%</span> or more in order to progress to the next topic.
+                  </p>
+                  <div className="pt-2">
+                    <p>You may retake the test as many times as you wish.</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <span>Passing score: {quiz.passingScorePercentage}%</span>
-                  </div>
-                  {quiz.timeLimitMinutes && (
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>Time limit: {quiz.timeLimitMinutes} minutes</span>
-                    </div>
-                  )}
-                  {quiz.latestScore !== null && quiz.latestScore !== undefined && (
-                    <div className="flex items-center gap-1">
-                      <span>Latest score:</span>
-                      <StarRating
-                        correctAnswers={Math.round((quiz.latestScore / 100) * quiz.questionCount)}
-                        totalQuestions={quiz.questionCount}
-                        passingThreshold={quiz.passingScorePercentage}
-                      />
-                    </div>
-                  )}
                 </div>
               </CardContent>
               <CardFooter>

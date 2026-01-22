@@ -15,6 +15,9 @@ import {
   AlertTriangle,
   Maximize,
   Minimize,
+  ChevronsRight,
+  ChevronLeft,
+  PartyPopper,
 } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
@@ -79,6 +82,7 @@ function CourseTopicSlidesPageContent() {
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
   const router = useRouter();
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const redirectCountdownRef = useRef<NodeJS.Timeout | null>(null);
@@ -280,6 +284,23 @@ function CourseTopicSlidesPageContent() {
   const handleNextSlide = useCallback(async () => {
     // Check if we're on the last slide
     if (currentSlideIndex >= 0 && currentSlideIndex === slides.length - 1) {
+      // Exit fullscreen if in fullscreen mode
+      if (isFullscreen && document.fullscreenElement) {
+        try {
+          await document.exitFullscreen();
+          setIsFullscreen(false);
+          // Remove fullscreen query param
+          const currentUrl = new URL(window.location.href);
+          currentUrl.searchParams.delete("fullscreen");
+          router.replace(currentUrl.pathname + currentUrl.search, { scroll: false });
+        } catch (error) {
+          console.error("Error exiting fullscreen:", error);
+        }
+      }
+
+      // Set finishing state to disable button and show "Finishing..." text
+      setIsFinishing(true);
+
       // Call complete endpoint
       if (currentSlideId && foundTopicId && topic && currentAttempt && currentAttempt.status !== "completed") {
         setIsLoadingQuiz(true);
@@ -304,9 +325,11 @@ function CourseTopicSlidesPageContent() {
           setShowCompletionModal(true);
         } finally {
           setIsLoadingQuiz(false);
+          setIsFinishing(false);
         }
       } else {
         setShowCompletionModal(true);
+        setIsFinishing(false);
       }
       return;
     }
@@ -324,6 +347,8 @@ function CourseTopicSlidesPageContent() {
     currentSlideId,
     foundTopicId,
     setAttempt,
+    isFullscreen,
+    router,
   ]);
 
   const handlePrevSlide = useCallback(() => {
@@ -808,12 +833,16 @@ function CourseTopicSlidesPageContent() {
                     variant="ghost"
                     size="sm"
                     onClick={handleNextSlide}
-                    className="text-foreground hover:bg-foreground/20 flex items-center gap-2"
+                    disabled={isFinishing}
+                    className={cn(
+                      "text-foreground hover:bg-foreground/20 flex items-center gap-2",
+                      isFinishing && "animate-pulse"
+                    )}
                   >
                     <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                       →
                     </kbd>
-                    <span className="text-sm">{isLastSlide ? "Finish" : "Next"}</span>
+                    <span className="text-sm">{isFinishing ? "Finishing..." : isLastSlide ? "Finish" : "Next"}</span>
                   </Button>
                 </div>
               </div>
@@ -925,12 +954,16 @@ function CourseTopicSlidesPageContent() {
                     variant="ghost"
                     size="sm"
                     onClick={handleNextSlide}
-                    className="text-foreground hover:bg-foreground/20 flex items-center gap-2 h-full"
+                    disabled={isFinishing}
+                    className={cn(
+                      "text-foreground hover:bg-foreground/20 flex items-center gap-2 h-full",
+                      isFinishing && "animate-pulse"
+                    )}
                   >
                     <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                       →
                     </kbd>
-                    <span className="text-base">{isLastSlide ? "Finish" : "Next"}</span>
+                    <span className="text-base">{isFinishing ? "Finishing..." : isLastSlide ? "Finish" : "Next"}</span>
                   </Button>
                 </div>
               </div>
@@ -991,21 +1024,24 @@ function CourseTopicSlidesPageContent() {
 
       {/* Completion Modal */}
       {isMounted && (
-        <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
-          <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <Dialog 
+          open={showCompletionModal} 
+          onOpenChange={(open) => {
+            setShowCompletionModal(open);
+            if (!open) {
+              setIsFinishing(false);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-xs" showCloseButton={false}>
           <DialogHeader>
             <div className="flex flex-col items-center gap-4 mb-4">
-              <div className="rounded-full bg-primary/10 p-3">
-                <CheckCircle2 className="h-8 w-8 text-primary" />
+              <div className="rounded-full bg-[var(--brand-bullyproof-primary)]/10 p-3">
+                <PartyPopper className="h-8 w-8 text-[var(--brand-bullyproof-primary)]" />
               </div>
-              <DialogTitle className="text-2xl text-center">
+              <DialogTitle className="text-2xl text-center text-[var(--brand-bullyproof-primary)]">
                 Congratulations!
               </DialogTitle>
-              {topic?.title && (
-                <p className="text-lg font-semibold text-center">
-                  {topic.title}
-                </p>
-              )}
               <DialogDescription className="text-center text-base">
                 {hasQuizzes === null
                   ? isLoadingQuiz
@@ -1023,7 +1059,7 @@ function CourseTopicSlidesPageContent() {
                 onClick={handleTakeQuiz}
                 disabled={isLoadingQuiz}
                 size="lg"
-                className="w-full"
+                className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white gap-1"
               >
                 {isLoadingQuiz ? (
                   <>
@@ -1031,7 +1067,10 @@ function CourseTopicSlidesPageContent() {
                     Loading...
                   </>
                 ) : (
-                  "Take Quiz"
+                  <>
+                    Take Quiz
+                    <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
+                  </>
                 )}
               </Button>
             )}
@@ -1039,10 +1078,23 @@ function CourseTopicSlidesPageContent() {
               onClick={handleLater}
               variant={hasQuizzes === true ? "ghost" : "default"}
               size="lg"
-              className="w-full"
+              className={cn(
+                "w-full gap-1",
+                hasQuizzes === false && "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+              )}
               disabled={isLoadingQuiz}
             >
-              {hasQuizzes === true ? "Later" : "Return to Course"}
+              {hasQuizzes === true ? (
+                <>
+                  <ChevronLeft className="h-4 w-4" />
+                  Course Home
+                </>
+              ) : (
+                <>
+                  Return to Course
+                  <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>
