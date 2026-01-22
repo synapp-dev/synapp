@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { QuestionDefinition } from "@/types/course-ratings";
 
 // Schema for getting certification courses
 export const getCoursesSchema = z.object({
@@ -46,6 +47,17 @@ export const createCourseSchema = z.object({
 
 export type CreateCourseParams = z.infer<typeof createCourseSchema>;
 
+// Schema for question definition validation
+const questionDefinitionSchema = z.object({
+  id: z.string().min(1),
+  type: z.enum(["text", "rating", "multiple_choice"]),
+  label: z.string().min(1),
+  required: z.boolean(),
+  options: z.array(z.string()).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+});
+
 // Schema for updating a certification course
 export const updateCourseSchema = z.object({
   id: z.string().uuid(),
@@ -55,6 +67,7 @@ export const updateCourseSchema = z.object({
     .enum(["none", "completion", "achievement", "custom"])
     .nullable()
     .optional(),
+  ratingQuestions: z.array(questionDefinitionSchema).optional().nullable(),
 });
 
 export type UpdateCourseParams = z.infer<typeof updateCourseSchema>;

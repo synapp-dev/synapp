@@ -146,6 +146,15 @@ export const certificationCoursesRepo = {
       name?: string;
       sortIndex?: number;
       certificateType?: "none" | "completion" | "achievement" | "custom" | null;
+      ratingQuestions?: Array<{
+        id: string;
+        type: "text" | "rating" | "multiple_choice";
+        label: string;
+        required: boolean;
+        options?: string[];
+        min?: number;
+        max?: number;
+      }> | null;
     }
   ) => {
     // Check if course exists
@@ -163,6 +172,7 @@ export const certificationCoursesRepo = {
       name?: string;
       sortIndex?: number;
       certificateType?: string | null;
+      ratingQuestions?: any;
       updatedAt?: any;
     } = {};
     if (data.name !== undefined) {
@@ -174,7 +184,12 @@ export const certificationCoursesRepo = {
     if (data.certificateType !== undefined) {
       updateData.certificateType = data.certificateType;
     }
+    if (data.ratingQuestions !== undefined) {
+      updateData.ratingQuestions = data.ratingQuestions;
+    }
     updateData.updatedAt = sql`now()`;
+
+    console.log("[CertificationCoursesRepo] Updating course with:", updateData);
 
     await db
       .update(certificationCourses)
@@ -186,6 +201,9 @@ export const certificationCoursesRepo = {
       .from(certificationCourses)
       .where(eq(certificationCourses.id, courseId))
       .limit(1);
+
+    console.log("[CertificationCoursesRepo] Updated course:", updatedCourse);
+    console.log("[CertificationCoursesRepo] ratingQuestions:", updatedCourse?.ratingQuestions);
 
     return updatedCourse;
   },

@@ -62,7 +62,10 @@ export const certificationCoursesService = {
     const courses = await certificationCoursesRepo.getCourseById(id);
     if (courses.length === 0) return null;
 
-    return await certificationCoursesRepo.getCourseWithTopics(id);
+    const course = await certificationCoursesRepo.getCourseWithTopics(id);
+    console.log("[CertificationCoursesService] getCourseById result:", course);
+    console.log("[CertificationCoursesService] ratingQuestions:", course?.ratingQuestions);
+    return course;
   },
 
   async getCourseByCode(ctx: AuthContext, params: unknown) {
@@ -95,6 +98,7 @@ export const certificationCoursesService = {
       name: data.name,
       sortIndex: data.sortIndex,
       certificateType: data.certificateType,
+      ratingQuestions: data.ratingQuestions,
     });
     return updatedCourse;
   },
