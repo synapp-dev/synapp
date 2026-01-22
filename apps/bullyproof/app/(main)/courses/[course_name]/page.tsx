@@ -979,13 +979,13 @@ export default function CoursePage() {
           </CardContent>
         </Card>
       ) : topicsList.length > 0 ? (
-        <div className="space-y-2">
+        <div className="">
           {/* My Progress Badge/Heading - Above Card */}
           <div className="flex items-center gap-2">
-            <Badge className="flex items-center gap-2 px-3 py-1.5 text-base font-semibold">
-              <TrendingUp className="h-5 w-5" />
+            <div className="flex items-center gap-2 px-4 py-1.5 text-base font-semibold">
+              <TrendingUp className="size-5" />
               My Progress
-            </Badge>
+            </div>
           </div>
           
           <Card className="relative overflow-visible mt-4">
