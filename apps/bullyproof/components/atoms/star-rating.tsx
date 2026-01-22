@@ -7,6 +7,7 @@ interface StarRatingProps {
   passingThreshold: number; // percentage (0-100)
   maxStars?: number; // default 5
   className?: string;
+  size?: string; // default "h-4 w-4"
 }
 
 export function StarRating({
@@ -15,6 +16,7 @@ export function StarRating({
   passingThreshold,
   maxStars = 5,
   className,
+  size = "h-4 w-4",
 }: StarRatingProps) {
   // Calculate filled stars: round to nearest integer
   const filledStars = Math.round((correctAnswers / totalQuestions) * maxStars);
@@ -34,13 +36,13 @@ export function StarRating({
       {Array.from({ length: filledStars }).map((_, index) => (
         <Star
           key={`filled-${index}`}
-          className={cn("h-4 w-4 fill-current", starColor)}
+          className={cn(size, "fill-current", starColor)}
         />
       ))}
       {Array.from({ length: outlineStars }).map((_, index) => (
         <Star
           key={`outline-${index}`}
-          className={cn("h-4 w-4 fill-none", outlineColor)}
+          className={cn(size, "fill-none", outlineColor)}
         />
       ))}
     </div>
