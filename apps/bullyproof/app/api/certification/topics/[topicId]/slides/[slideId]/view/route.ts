@@ -35,22 +35,16 @@ export async function POST(
 
     const courseId = topic[0].courseId;
 
-    // Get latest attempt
-    const latestAttempt = await courseTopicProgressRepo.getLatestAttempt(
+    // Get or create progress (lazy creation when user views slides)
+    const progress = await courseTopicProgressRepo.getOrCreateProgress(
       user.id,
       courseId,
-      topicId
+      topicId,
+      slideId
     );
 
-    if (!latestAttempt) {
-      return NextResponse.json(
-        { error: "No attempt found" },
-        { status: 404 }
-      );
-    }
-
     // Mark slide as viewed
-    await courseTopicProgressRepo.markSlideViewed(latestAttempt.id, slideId);
+    await courseTopicProgressRepo.markSlideViewed(progress.id, slideId);
     await userSlideViewsRepo.markSlideViewed({
       userId: user.id,
       slideId,

@@ -3,23 +3,9 @@ import { createServerClient } from "@/utils/supabase/server";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
 import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic-slides.repo";
 import { userSlideViewsRepo } from "@/server/user-slide-views/user-slide-views.repo";
-import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
-import { quizQuestionsRepo } from "@/server/quiz-questions/quiz-questions.repo";
 import { courseTopics, courseTopicProgress } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
-
-// Helper function to check if topic has valid quizzes (quizzes with questions)
-async function topicHasValidQuizzes(topicId: string): Promise<boolean> {
-  const quizzes = await courseTopicQuizzesRepo.getByTopicId(topicId);
-  if (quizzes.length === 0) return false;
-  
-  for (const quiz of quizzes) {
-    const questions = await quizQuestionsRepo.getByQuizId(quiz.id);
-    if (questions.length > 0) return true;
-  }
-  return false;
-}
 
 export async function POST(
   request: NextRequest,
@@ -59,22 +45,13 @@ export async function POST(
 
     const courseId = topic[0].courseId;
 
-    // Get or create attempt
-    let attempt = await courseTopicProgressRepo.getLatestAttempt(
+    // Get or create progress (lazy creation when user navigates slides)
+    const progress = await courseTopicProgressRepo.getOrCreateProgress(
       user.id,
       courseId,
-      topicId
+      topicId,
+      currentSlideId || null
     );
-
-    if (!attempt) {
-      // Create new attempt if none exists
-      attempt = await courseTopicProgressRepo.createAttempt(
-        user.id,
-        courseId,
-        topicId,
-        currentSlideId || null
-      );
-    }
 
     // Deduplicate viewed slide IDs
     const uniqueViewedSlideIds = Array.from(new Set(viewedSlideIds));
@@ -84,20 +61,20 @@ export async function POST(
     const slideIds = slides.map((s) => s.id);
 
     // Validate slides before marking (but account for slides being marked in this batch)
-    if (uniqueViewedSlideIds.length > 0 && attempt.status !== "completed") {
-      // Get current attempt state for validation
-      const attemptForValidation = await db
+    if (uniqueViewedSlideIds.length > 0 && progress.status !== "completed") {
+      // Get current progress state for validation
+      const progressForValidation = await db
         .select({
           currentSlideIndex: courseTopicProgress.currentSlideIndex,
           slideProgress: courseTopicProgress.slideProgress,
         })
         .from(courseTopicProgress)
-        .where(eq(courseTopicProgress.id, attempt.id))
+        .where(eq(courseTopicProgress.id, progress.id))
         .limit(1);
 
-      if (attemptForValidation.length > 0) {
-        const slideProgress = (attemptForValidation[0].slideProgress as Record<string, any>) || {};
-        const currentIndex = attemptForValidation[0].currentSlideIndex ?? -1;
+      if (progressForValidation.length > 0) {
+        const slideProgress = (progressForValidation[0].slideProgress as Record<string, any>) || {};
+        const currentIndex = progressForValidation[0].currentSlideIndex ?? -1;
         const viewedSlideIdsSet = new Set(uniqueViewedSlideIds);
 
         // Validate each slide is either already viewed, or is the next in sequence
@@ -141,8 +118,8 @@ export async function POST(
     // Mark all viewed slides in batch (idempotent - won't create duplicates)
     if (uniqueViewedSlideIds.length > 0) {
       for (const slideIdToMark of uniqueViewedSlideIds) {
-        // Mark in attempt's slideProgress JSONB
-        await courseTopicProgressRepo.markSlideViewed(attempt.id, slideIdToMark);
+        // Mark in progress's slideProgress JSONB
+        await courseTopicProgressRepo.markSlideViewed(progress.id, slideIdToMark);
         
         // Mark in user_slide_views table (idempotent - updates existing or creates new)
         await userSlideViewsRepo.markSlideViewed({
@@ -152,20 +129,14 @@ export async function POST(
           courseId,
         });
       }
-
-      // Refresh attempt to get updated slideProgress
-      const refreshedAttempt = await courseTopicProgressRepo.getById(attempt.id);
-      if (refreshedAttempt[0]) {
-        attempt = refreshedAttempt[0];
-      }
     }
 
     // Update current slide position if provided
     if (currentSlideId) {
       // Validate current slide is unlocked (if not completed)
-      if (attempt.status !== "completed") {
+      if (progress.status !== "completed") {
         const isUnlocked = await courseTopicProgressRepo.isSlideUnlocked(
-          attempt.id,
+          progress.id,
           currentSlideId,
           slideIds
         );
@@ -181,41 +152,13 @@ export async function POST(
       }
 
       await courseTopicProgressRepo.updateCurrentSlide(
-        attempt.id,
+        progress.id,
         currentSlideId
       );
     }
 
-    // Check if all slides have been viewed - unlock quiz or complete topic
-    if (attempt.status === "viewing_slides") {
-      const viewedSlides = await userSlideViewsRepo.getAllSlidesViewed(
-        user.id,
-        topicId
-      );
-      const slides = await courseTopicSlidesRepo.getByTopicId(topicId);
-      const slideIds = slides.map((s) => s.id);
-      const allSlidesViewed = viewedSlides.length === slideIds.length;
-
-      if (allSlidesViewed) {
-        // Check if topic has valid quizzes (quizzes with questions)
-        const hasValidQuizzes = await topicHasValidQuizzes(topicId);
-        
-        if (hasValidQuizzes) {
-          // Topic has quizzes with questions - unlock quiz
-          await courseTopicProgressRepo.updateStatus(attempt.id, "quiz_unlocked", {
-            quizUnlockedAt: new Date().toISOString() as any,
-          });
-        } else {
-          // Topic has no quizzes or quizzes have no questions - complete topic
-          await courseTopicProgressRepo.updateStatus(attempt.id, "completed", {
-            completedAt: new Date(),
-          });
-        }
-      }
-    }
-
-    // Return updated attempt
-    const updated = await courseTopicProgressRepo.getById(attempt.id);
+    // Return updated progress
+    const updated = await courseTopicProgressRepo.getById(progress.id);
 
     return NextResponse.json({ attempt: updated[0] });
   } catch (error) {

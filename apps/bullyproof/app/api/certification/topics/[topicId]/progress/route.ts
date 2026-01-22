@@ -99,24 +99,21 @@ export async function POST(
 
     const courseId = topic[0].courseId;
 
-    // Check for in-progress attempt
-    let attempt = await courseTopicProgressRepo.getInProgressAttempt(
+    // Get or create progress (lazy creation when user navigates slides)
+    let attempt = await courseTopicProgressRepo.getOrCreateProgress(
       user.id,
       courseId,
-      topicId
+      topicId,
+      currentSlideId
     );
 
-    // If no in-progress attempt, create a new one
-    if (!attempt) {
-      attempt = await courseTopicProgressRepo.createAttempt(
-        user.id,
-        courseId,
-        topicId,
-        currentSlideId
-      );
+    // If currentSlideId is provided, handle slide navigation
+    if (currentSlideId) {
+      // Check if this is a newly created attempt (no currentSlideId set yet)
+      const isNewAttempt = !attempt.currentSlideId;
 
-      // Mark first slide as viewed if provided
-      if (currentSlideId) {
+      if (isNewAttempt) {
+        // New attempt - just mark slide as viewed (already set as currentSlideId in getOrCreateProgress)
         await courseTopicProgressRepo.markSlideViewed(attempt.id, currentSlideId);
         await userSlideViewsRepo.markSlideViewed({
           userId: user.id,
@@ -124,68 +121,41 @@ export async function POST(
           topicId,
           courseId,
         });
-      }
-    } else if (currentSlideId) {
-      // Get all slides for this topic to validate access
-      const slides = await courseTopicSlidesRepo.getByTopicId(topicId);
-      const slideIds = slides.map((s) => s.id);
+      } else {
+        // Existing attempt - validate access and update
+        const slides = await courseTopicSlidesRepo.getByTopicId(topicId);
+        const slideIds = slides.map((s) => s.id);
 
-      // Check if slide is unlocked (allow if topic is completed for review)
-      if (attempt.status !== "completed") {
-        const isUnlocked = await courseTopicProgressRepo.isSlideUnlocked(
-          attempt.id,
-          currentSlideId,
-          slideIds
-        );
-
-        if (!isUnlocked) {
-          return NextResponse.json(
-            { error: "Slide is locked. Complete previous slides first." },
-            { status: 403 }
+        // Check if slide is unlocked (allow if topic is completed for review)
+        if (attempt.status !== "completed") {
+          const isUnlocked = await courseTopicProgressRepo.isSlideUnlocked(
+            attempt.id,
+            currentSlideId,
+            slideIds
           );
+
+          if (!isUnlocked) {
+            return NextResponse.json(
+              { error: "Slide is locked. Complete previous slides first." },
+              { status: 403 }
+            );
+          }
         }
-      }
 
-      // Mark slide as viewed when navigating to it
-      await courseTopicProgressRepo.markSlideViewed(attempt.id, currentSlideId);
-      await userSlideViewsRepo.markSlideViewed({
-        userId: user.id,
-        slideId: currentSlideId,
-        topicId,
-        courseId,
-      });
+        // Mark slide as viewed when navigating to it
+        await courseTopicProgressRepo.markSlideViewed(attempt.id, currentSlideId);
+        await userSlideViewsRepo.markSlideViewed({
+          userId: user.id,
+          slideId: currentSlideId,
+          topicId,
+          courseId,
+        });
 
-      const updated = await courseTopicProgressRepo.updateCurrentSlide(
-        attempt.id,
-        currentSlideId
-      );
-      attempt = updated[0] ?? attempt;
-
-      // Check if all slides have been viewed - unlock quiz or complete topic
-      const viewedSlides = await userSlideViewsRepo.getAllSlidesViewed(
-        user.id,
-        topicId
-      );
-      const allSlidesViewed = viewedSlides.length === slideIds.length;
-
-      if (allSlidesViewed && attempt.status === "viewing_slides") {
-        // Check if topic has valid quizzes (quizzes with questions)
-        const hasValidQuizzes = await topicHasValidQuizzes(topicId);
-        
-        if (hasValidQuizzes) {
-          // Topic has quizzes with questions - unlock quiz
-          await courseTopicProgressRepo.updateStatus(attempt.id, "quiz_unlocked", {
-            slidesCompletedAt: new Date(),
-            quizUnlockedAt: new Date(),
-          });
-        } else {
-          // Topic has no quizzes or quizzes have no questions - complete topic
-          await courseTopicProgressRepo.updateStatus(attempt.id, "completed", {
-            slidesCompletedAt: new Date(),
-            completedAt: new Date(),
-          });
-        }
-        attempt = (await courseTopicProgressRepo.getById(attempt.id))[0] ?? attempt;
+        const updated = await courseTopicProgressRepo.updateCurrentSlide(
+          attempt.id,
+          currentSlideId
+        );
+        attempt = updated[0] ?? attempt;
       }
     }
 
@@ -210,12 +180,20 @@ export async function PATCH(
     } = await supabase.auth.getUser();
 
     if (!user) {
+      console.log("[PATCH /progress] 401 Unauthorized - No user");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { topicId } = await params;
     const body = await request.json();
     const { currentSlideId, status } = body;
+
+    console.log("[PATCH /progress] Request:", {
+      userId: user.id,
+      topicId,
+      currentSlideId,
+      status,
+    });
 
     // Get topic to find courseId
     const topic = await db
@@ -225,6 +203,7 @@ export async function PATCH(
       .limit(1);
 
     if (!topic[0]) {
+      console.log("[PATCH /progress] 404 Topic not found:", topicId);
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
@@ -238,35 +217,29 @@ export async function PATCH(
     );
 
     if (!latestAttempt) {
+      console.log("[PATCH /progress] 404 No attempt found:", {
+        userId: user.id,
+        courseId,
+        topicId,
+      });
       return NextResponse.json(
         { error: "No attempt found" },
         { status: 404 }
       );
     }
 
+    console.log("[PATCH /progress] Latest attempt:", {
+      attemptId: latestAttempt.id,
+      status: latestAttempt.status,
+      currentSlideId: latestAttempt.currentSlideId,
+      currentSlideIndex: latestAttempt.currentSlideIndex,
+    });
+
     // Update current slide if provided
+    // Note: PATCH is used for page exit updates, so we skip unlock validation
+    // to allow saving the user's current position regardless of sequence
     if (currentSlideId) {
-      // Get all slides for this topic to validate access
-      const slides = await courseTopicSlidesRepo.getByTopicId(topicId);
-      const slideIds = slides.map((s) => s.id);
-
-      // Check if slide is unlocked (allow if topic is completed for review)
-      if (latestAttempt.status !== "completed") {
-        const isUnlocked = await courseTopicProgressRepo.isSlideUnlocked(
-          latestAttempt.id,
-          currentSlideId,
-          slideIds
-        );
-
-        if (!isUnlocked) {
-          return NextResponse.json(
-            { error: "Slide is locked. Complete previous slides first." },
-            { status: 403 }
-          );
-        }
-      }
-
-      // Mark slide as viewed when navigating to it
+      // Mark slide as viewed when updating current slide
       await courseTopicProgressRepo.markSlideViewed(
         latestAttempt.id,
         currentSlideId
@@ -282,6 +255,11 @@ export async function PATCH(
         latestAttempt.id,
         currentSlideId
       );
+      console.log("[PATCH /progress] Updated current slide:", {
+        attemptId: latestAttempt.id,
+        currentSlideId,
+        previousSlideIndex: latestAttempt.currentSlideIndex,
+      });
     }
 
     // Update status if provided
@@ -289,14 +267,24 @@ export async function PATCH(
       await courseTopicProgressRepo.updateStatus(latestAttempt.id, status, {
         completedAt: status === "completed" ? new Date() : null,
       });
+      console.log("[PATCH /progress] Updated status:", {
+        attemptId: latestAttempt.id,
+        status,
+      });
     }
 
     // Return updated attempt
     const updated = await courseTopicProgressRepo.getById(latestAttempt.id);
 
+    console.log("[PATCH /progress] Success:", {
+      attemptId: updated[0]?.id,
+      currentSlideId: updated[0]?.currentSlideId,
+      status: updated[0]?.status,
+    });
+
     return NextResponse.json({ attempt: updated[0] });
   } catch (error) {
-    console.error("Error updating topic progress:", error);
+    console.error("[PATCH /progress] Error updating topic progress:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
