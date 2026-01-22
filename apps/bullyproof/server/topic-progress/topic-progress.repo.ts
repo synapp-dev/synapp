@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { courseTopicProgress, courseTopicSlides } from "@/server/db/schema";
-import { eq, and, desc, max, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 export const topicProgressRepo = {
   getLatestAttempt: async (
@@ -18,7 +18,6 @@ export const topicProgressRepo = {
           eq(courseTopicProgress.topicId, topicId)
         )
       )
-      .orderBy(desc(courseTopicProgress.attemptNumber))
       .limit(1);
 
     return result[0] ?? null;
@@ -40,7 +39,6 @@ export const topicProgressRepo = {
           sql`status IN ('not_started', 'viewing_slides', 'quiz_unlocked')`
         )
       )
-      .orderBy(desc(courseTopicProgress.attemptNumber))
       .limit(1);
 
     return result[0] ?? null;
@@ -52,21 +50,6 @@ export const topicProgressRepo = {
     topicId: string,
     currentSlideId?: string
   ) => {
-    const maxAttemptResult = await db
-      .select({
-        maxAttempt: max(courseTopicProgress.attemptNumber),
-      })
-      .from(courseTopicProgress)
-      .where(
-        and(
-          eq(courseTopicProgress.userId, userId),
-          eq(courseTopicProgress.courseId, courseId),
-          eq(courseTopicProgress.topicId, topicId)
-        )
-      );
-
-    const nextAttemptNumber = (maxAttemptResult[0]?.maxAttempt ?? 0) + 1;
-
     // Get slide order index if slideId provided
     let currentSlideIndex: number | null = null;
     if (currentSlideId) {
@@ -85,7 +68,6 @@ export const topicProgressRepo = {
           userId,
           courseId,
           topicId,
-          attemptNumber: nextAttemptNumber,
           currentSlideId: currentSlideId ?? null,
           currentSlideIndex,
           status: "viewing_slides",
@@ -105,8 +87,7 @@ export const topicProgressRepo = {
             and(
               eq(courseTopicProgress.userId, userId),
               eq(courseTopicProgress.courseId, courseId),
-              eq(courseTopicProgress.topicId, topicId),
-              eq(courseTopicProgress.attemptNumber, nextAttemptNumber)
+              eq(courseTopicProgress.topicId, topicId)
             )
           )
           .limit(1);
@@ -239,7 +220,7 @@ export const topicProgressRepo = {
           eq(courseTopicProgress.courseId, courseId)
         )
       )
-      .orderBy(courseTopicProgress.topicId, desc(courseTopicProgress.attemptNumber)),
+      .orderBy(courseTopicProgress.topicId),
 
   getById: (attemptId: string) =>
     db
