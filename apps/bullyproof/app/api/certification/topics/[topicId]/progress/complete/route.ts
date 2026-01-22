@@ -4,6 +4,8 @@ import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-t
 import { userSlideViewsRepo } from "@/server/user-slide-views/user-slide-views.repo";
 import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
 import { quizQuestionsRepo } from "@/server/quiz-questions/quiz-questions.repo";
+import { courseProgressRepo } from "@/server/course-progress/course-progress.repo";
+import { shouldShowRatingModal } from "@/server/course-ratings/course-ratings.utils";
 import { courseTopics } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
@@ -87,15 +89,37 @@ export async function POST(
         slidesCompletedAt: now,
         completedAt: now,
       });
+
+      // Update course-level progress to check if course is now completed
+      try {
+        await courseProgressRepo.updateProgress(user.id, courseId);
+      } catch (progressError: any) {
+        // Log but don't fail - topic completion should succeed even if progress update fails
+        console.error("Failed to update course progress:", progressError);
+      }
     }
 
     // Get updated attempt
     const updated = await courseTopicProgressRepo.getById(attempt.id);
     const finalAttempt = updated[0] ?? attempt;
 
+    // Check if we should show the rating modal (only if topic is completed and it's the last topic)
+    let shouldShowRating = false;
+    if (finalAttempt.status === "completed") {
+      shouldShowRating = await shouldShowRatingModal(
+        user.id,
+        courseId,
+        topicId
+      );
+      console.log(`[Rating] Topic ${topicId} completed. shouldShowRating: ${shouldShowRating}, status: ${finalAttempt.status}, hasQuizzes: ${hasValidQuizzes}`);
+    } else {
+      console.log(`[Rating] Topic ${topicId} not completed yet. status: ${finalAttempt.status}, hasQuizzes: ${hasValidQuizzes}`);
+    }
+
     return NextResponse.json({
       attempt: finalAttempt,
       hasQuiz: hasValidQuizzes,
+      shouldShowRating,
     });
   } catch (error) {
     console.error("Error completing topic slides:", error);

@@ -22,6 +22,7 @@ import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
 import { courseTopicQuizCompletionsRepo } from "@/server/course-topic-quiz-completions/course-topic-quiz-completions.repo";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
 import { courseProgressRepo } from "@/server/course-progress/course-progress.repo";
+import { shouldShowRatingModal } from "@/server/course-ratings/course-ratings.utils";
 import { createServerClient } from "@/utils/supabase/server";
 
 export async function POST(
@@ -54,6 +55,9 @@ export async function POST(
     const scoredAttempt = await quizAttemptsRepo.calculateScore(attemptId);
     const finalAttempt = scoredAttempt[0];
 
+    let shouldShowRating = false;
+    let topicWasCompleted = false;
+
     // If passed, mark quiz as completed
     // Note: We wrap this in try-catch to ensure quiz submission always returns result
     // even if progress tracking fails
@@ -79,6 +83,7 @@ export async function POST(
           await courseTopicProgressRepo.updateStatus(topicProgress.id, "completed", {
             completedAt: new Date(),
           });
+          topicWasCompleted = true;
 
           // Update course-level progress
           // Wrap in try-catch to prevent progress update errors from blocking quiz submission
@@ -88,6 +93,8 @@ export async function POST(
             // Log but don't fail - quiz submission should succeed even if progress update fails
             console.error("Failed to update course progress:", progressError);
           }
+        } else if (topicProgress && topicProgress.status === "completed") {
+          topicWasCompleted = true;
         }
       } catch (completionError: any) {
         // Log but don't fail - quiz submission should succeed even if completion tracking fails
@@ -95,8 +102,25 @@ export async function POST(
       }
     }
 
+    // Check if we should show the rating modal (only if topic was completed and it's the last topic)
+    if (topicWasCompleted) {
+      try {
+        shouldShowRating = await shouldShowRatingModal(
+          user.id,
+          finalAttempt.courseId,
+          finalAttempt.topicId
+        );
+      } catch (ratingError: any) {
+        // Log but don't fail - quiz submission should succeed even if rating check fails
+        console.error("Failed to check if should show rating:", ratingError);
+      }
+    }
+
     // Always return the quiz attempt result, regardless of progress tracking success/failure
-    return NextResponse.json(finalAttempt, { status: 200 });
+    return NextResponse.json(
+      { ...finalAttempt, shouldShowRating },
+      { status: 200 }
+    );
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
