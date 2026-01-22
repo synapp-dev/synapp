@@ -796,26 +796,6 @@ export const lessonFeedback = pgTable("lesson_feedback", {
 	check("lesson_feedback_rating_check", sql`(rating >= 1) AND (rating <= 5)`),
 ]);
 
-export const certificationCourses = pgTable("certification_courses", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	code: text().notNull(),
-	name: text().notNull(),
-	sortIndex: smallint("sort_index").notNull(),
-	certificateType: text("certificate_type"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("idx_certification_courses_sort_index").using("btree", table.sortIndex.asc().nullsLast().op("int2_ops")),
-	unique("certification_courses_code_key").on(table.code),
-	unique("certification_courses_name_key").on(table.name),
-	unique("certification_courses_sort_index_key").on(table.sortIndex),
-	pgPolicy("certification_courses_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
-	pgPolicy("certification_courses_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("certification_courses_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("certification_courses_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	check("certification_courses_certificate_type_check", sql`certificate_type = ANY (ARRAY['none'::text, 'completion'::text, 'achievement'::text, 'custom'::text])`),
-]);
-
 export const courseTopicSlides = pgTable("course_topic_slides", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	topicId: uuid("topic_id").notNull(),
@@ -952,11 +932,33 @@ export const quizAttempts = pgTable("quiz_attempts", {
 	pgPolicy("quiz_attempts_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 ]);
 
+export const certificationCourses = pgTable("certification_courses", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	code: text().notNull(),
+	name: text().notNull(),
+	sortIndex: smallint("sort_index").notNull(),
+	certificateType: text("certificate_type"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	ratingQuestions: jsonb("rating_questions"),
+}, (table) => [
+	index("idx_certification_courses_rating_questions").using("gin", table.ratingQuestions.asc().nullsLast().op("jsonb_ops")),
+	index("idx_certification_courses_sort_index").using("btree", table.sortIndex.asc().nullsLast().op("int2_ops")),
+	unique("certification_courses_code_key").on(table.code),
+	unique("certification_courses_name_key").on(table.name),
+	unique("certification_courses_sort_index_key").on(table.sortIndex),
+	pgPolicy("certification_courses_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("certification_courses_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("certification_courses_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("certification_courses_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("certification_courses_certificate_type_check", sql`certificate_type = ANY (ARRAY['none'::text, 'completion'::text, 'achievement'::text, 'custom'::text])`),
+]);
+
 export const quizAttemptAnswers = pgTable("quiz_attempt_answers", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	attemptId: uuid("attempt_id").notNull(),
 	questionId: uuid("question_id").notNull(),
-	answerId: uuid("answer_id"), // Nullable - set to first answer ID for indexing, but not required
+	answerId: uuid("answer_id").notNull(),
 	isCorrect: boolean("is_correct"),
 	timeTakenSeconds: integer("time_taken_seconds"),
 	answeredAt: timestamp("answered_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -1362,6 +1364,38 @@ export const courseTopicQuizCompletions = pgTable("course_topic_quiz_completions
 	pgPolicy("course_topic_quiz_completions_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 	pgPolicy("course_topic_quiz_completions_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	pgPolicy("course_topic_quiz_completions_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+]);
+
+export const courseRatings = pgTable("course_ratings", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	courseId: uuid("course_id").notNull(),
+	rating: integer().notNull(),
+	comment: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	questionMetadata: jsonb("question_metadata"),
+}, (table) => [
+	index("idx_course_ratings_course_id").using("btree", table.courseId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_ratings_question_metadata").using("gin", table.questionMetadata.asc().nullsLast().op("jsonb_ops")),
+	index("idx_course_ratings_user_course").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.courseId.asc().nullsLast().op("uuid_ops")),
+	index("idx_course_ratings_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.courseId],
+			foreignColumns: [certificationCourses.id],
+			name: "course_ratings_course_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "course_ratings_user_id_fkey"
+		}).onDelete("cascade"),
+	unique("course_ratings_user_course_unique").on(table.userId, table.courseId),
+	pgPolicy("course_ratings_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(auth.uid() = user_id)`  }),
+	pgPolicy("course_ratings_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("course_ratings_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("course_ratings_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("course_ratings_rating_check", sql`(rating >= 1) AND (rating <= 5)`),
 ]);
 
 export const schoolLevelAssignments = pgTable("school_level_assignments", {

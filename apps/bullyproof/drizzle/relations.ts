@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, schoolLicences, schoolInvites, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, classes, topics, curriculumStages, schoolLevels, schoolYears, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSchoolPositions, courseProgress, courseTopicQuizCompletions, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, teacherClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
+import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, schoolLicences, schoolInvites, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, classes, topics, curriculumStages, schoolLevels, schoolYears, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, teacherClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -43,6 +43,7 @@ export const certificationCoursesRelations = relations(certificationCourses, ({m
 	userSlideViews: many(userSlideViews),
 	quizAttempts: many(quizAttempts),
 	courseProgresses: many(courseProgress),
+	courseRatings: many(courseRatings),
 }));
 
 export const mfaFactorsInAuthRelations = relations(mfaFactorsInAuth, ({one, many}) => ({
@@ -73,6 +74,7 @@ export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
 	lessonEvents: many(lessonEvents),
 	courseProgresses: many(courseProgress),
 	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
+	courseRatings: many(courseRatings),
 	teacherSlideNotes: many(teacherSlideNotes),
 }));
 
@@ -541,6 +543,17 @@ export const courseTopicQuizCompletionsRelations = relations(courseTopicQuizComp
 	}),
 	usersInAuth: one(usersInAuth, {
 		fields: [courseTopicQuizCompletions.userId],
+		references: [usersInAuth.id]
+	}),
+}));
+
+export const courseRatingsRelations = relations(courseRatings, ({one}) => ({
+	certificationCourse: one(certificationCourses, {
+		fields: [courseRatings.courseId],
+		references: [certificationCourses.id]
+	}),
+	usersInAuth: one(usersInAuth, {
+		fields: [courseRatings.userId],
 		references: [usersInAuth.id]
 	}),
 }));
