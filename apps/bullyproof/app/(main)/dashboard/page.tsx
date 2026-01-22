@@ -2,13 +2,14 @@
 
 import { AdminDashboard } from "@/entities/dashboard/ui/admin/admin-dashboard";
 import { TeacherDashboard } from "@/entities/dashboard/ui/teacher/teacher-dashboard";
-import { useIsPlatformAdmin, useIsTeacher } from "@/entities/me/model/store";
+import { useIsPlatformAdmin, useIsSchoolStaff, useIsTeacher } from "@/entities/me/model/store";
 import { usePageTitle } from "@/hooks/use-page-title";
 
 export default function DashboardPage() {
   usePageTitle(["dashboard"]);
   const isPlatformAdmin = useIsPlatformAdmin();
   const isTeacher = useIsTeacher();
+  const isSchoolStaff = useIsSchoolStaff();
 
   // Render admin dashboard if user is a platform admin
   if (isPlatformAdmin) {
@@ -16,7 +17,7 @@ export default function DashboardPage() {
   }
 
   // Render teacher dashboard if user is a teacher
-  if (isTeacher) {
+  if (isTeacher || isSchoolStaff) {
     return <TeacherDashboard />;
   }
 
