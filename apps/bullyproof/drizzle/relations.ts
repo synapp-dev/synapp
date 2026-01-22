@@ -213,11 +213,11 @@ export const quizQuestionsRelations = relations(quizQuestions, ({one, many}) => 
 }));
 
 export const courseTopicQuizzesRelations = relations(courseTopicQuizzes, ({one, many}) => ({
+	quizQuestions: many(quizQuestions),
 	courseTopic: one(courseTopics, {
 		fields: [courseTopicQuizzes.topicId],
 		references: [courseTopics.id]
 	}),
-	quizQuestions: many(quizQuestions),
 	quizAttempts: many(quizAttempts),
 	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
 }));
