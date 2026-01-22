@@ -75,6 +75,32 @@ export const certificationApi = {
         );
       },
     },
+    ratings: {
+      submit(
+        courseId: string,
+        data: { rating: number; comment?: string | null }
+      ): Promise<ApiResult<{ id: string; rating: number; comment: string | null; createdAt: string; updatedAt: string }>> {
+        return apiFetch<{ id: string; rating: number; comment: string | null; createdAt: string; updatedAt: string }>(
+          `/certification/courses/${encodeURIComponent(courseId)}/ratings`,
+          {
+            method: "POST",
+            body: JSON.stringify(data),
+          }
+        );
+      },
+      check(
+        courseId: string
+      ): Promise<ApiResult<{ hasRated: boolean; rating?: { id: string; rating: number; comment: string | null; createdAt: string } }>> {
+        return apiFetch<{ hasRated: boolean; rating?: { id: string; rating: number; comment: string | null; createdAt: string } }>(
+          `/certification/courses/${encodeURIComponent(courseId)}/ratings/check`
+        );
+      },
+    },
+    unrated(): Promise<ApiResult<Array<{ id: string; name: string; completedAt: string | null }>>> {
+      return apiFetch<Array<{ id: string; name: string; completedAt: string | null }>>(
+        "/certification/courses/unrated"
+      );
+    },
     create(data: {
       code: string;
       name: string;
@@ -92,6 +118,15 @@ export const certificationApi = {
         name?: string;
         sortIndex?: number;
         certificateType?: "none" | "completion" | "achievement" | "custom" | null;
+        ratingQuestions?: Array<{
+          id: string;
+          type: "text" | "rating" | "multiple_choice";
+          label: string;
+          required: boolean;
+          options?: string[];
+          min?: number;
+          max?: number;
+        }> | null;
       }
     ): Promise<ApiResult<Course>> {
       return apiFetch<Course>(`/certification/courses/${encodeURIComponent(id)}`, {
