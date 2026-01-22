@@ -43,6 +43,18 @@ export const quizAttemptsRepo = {
     courseId: string;
     topicProgressId?: string | null;
   }) => {
+    // CRITICAL: Check for in-progress attempts first - never create a new attempt if one exists
+    const inProgress = await quizAttemptsRepo.getInProgressAttempt(
+      data.userId,
+      data.quizId
+    );
+
+    if (inProgress) {
+      throw new Error(
+        "An in-progress quiz attempt already exists. Please resume the existing attempt."
+      );
+    }
+
     // Get total questions count
     const questionsResult = await db
       .select({ count: count() })
@@ -51,21 +63,6 @@ export const quizAttemptsRepo = {
 
     const totalQuestions = questionsResult[0]?.count ?? 0;
 
-    // Get next attempt number
-    const maxAttemptResult = await db
-      .select({
-        maxAttempt: max(quizAttempts.attemptNumber),
-      })
-      .from(quizAttempts)
-      .where(
-        and(
-          eq(quizAttempts.userId, data.userId),
-          eq(quizAttempts.quizId, data.quizId)
-        )
-      );
-
-    const nextAttemptNumber = (maxAttemptResult[0]?.maxAttempt ?? 0) + 1;
-
     // Get quiz to check if time limit exists
     const quiz = await db
       .select()
@@ -73,22 +70,123 @@ export const quizAttemptsRepo = {
       .where(eq(courseTopicQuizzes.id, data.quizId))
       .limit(1);
 
-    const result = await db
-      .insert(quizAttempts)
-      .values({
-        userId: data.userId,
-        quizId: data.quizId,
-        topicId: data.topicId,
-        courseId: data.courseId,
-        topicProgressId: data.topicProgressId ?? null,
-        attemptNumber: nextAttemptNumber,
-        totalQuestions,
-        correctAnswers: 0,
-        timeLimitStartedAt: quiz[0]?.timeLimitMinutes ? sql`now()` : null,
-      })
-      .returning();
+    // Retry logic to handle race conditions when multiple requests try to create attempts simultaneously
+    const maxRetries = 10;
+    for (let retry = 0; retry < maxRetries; retry++) {
+      // Get ALL existing attempt numbers (both completed and in-progress)
+      // This ensures we don't create duplicate attempt numbers
+      const allAttemptsResult = await db
+        .select({
+          attemptNumber: quizAttempts.attemptNumber,
+        })
+        .from(quizAttempts)
+        .where(
+          and(
+            eq(quizAttempts.userId, data.userId),
+            eq(quizAttempts.quizId, data.quizId)
+          )
+        );
 
-    return result[0];
+      const existingAttemptNumbers = new Set(
+        allAttemptsResult.map((r) => r.attemptNumber)
+      );
+
+      // Find the next available attempt number starting from 1
+      let nextAttemptNumber = 1;
+      while (existingAttemptNumbers.has(nextAttemptNumber)) {
+        nextAttemptNumber++;
+        // Safety limit to prevent infinite loops (e.g., if there are 1000+ attempts)
+        if (nextAttemptNumber > 10000) {
+          throw new Error(
+            "Unable to find available attempt number. Please contact support."
+          );
+        }
+      }
+
+      // Log for debugging
+      if (retry > 0) {
+        console.log(
+          `Retry ${retry + 1}: Existing attempt numbers: [${Array.from(existingAttemptNumbers).sort((a, b) => a - b).join(", ")}], Next: ${nextAttemptNumber}`
+        );
+      }
+
+      try {
+        const result = await db
+          .insert(quizAttempts)
+          .values({
+            userId: data.userId,
+            quizId: data.quizId,
+            topicId: data.topicId,
+            courseId: data.courseId,
+            topicProgressId: data.topicProgressId ?? null,
+            attemptNumber: nextAttemptNumber,
+            totalQuestions,
+            correctAnswers: 0,
+            timeLimitStartedAt: quiz[0]?.timeLimitMinutes ? sql`now()` : null,
+          })
+          .returning();
+
+        return result[0];
+      } catch (insertError: any) {
+        // Check if it's a duplicate key error (PostgreSQL error code 23505)
+        // Drizzle may wrap the error in different ways, so check multiple locations
+        // Also check nested error objects and string representations
+        const errorCode =
+          insertError?.code ||
+          insertError?.cause?.code ||
+          insertError?.originalError?.code;
+        const errorMessage =
+          insertError?.message ||
+          insertError?.cause?.message ||
+          insertError?.originalError?.message ||
+          String(insertError) ||
+          "";
+        
+        // Check error code (string or number)
+        const isDuplicateKeyByCode =
+          errorCode === "23505" ||
+          errorCode === 23505 ||
+          errorCode === "unique_violation";
+        
+        // Check error message for key phrases (case insensitive)
+        const errorMessageLower = errorMessage.toLowerCase();
+        const isDuplicateKeyByMessage =
+          errorMessageLower.includes("duplicate key") ||
+          errorMessageLower.includes("unique constraint") ||
+          errorMessageLower.includes("quiz_attempts_user_quiz_attempt_unique") ||
+          errorMessageLower.includes("23505");
+
+        if (isDuplicateKeyByCode || isDuplicateKeyByMessage) {
+          // Another request created an attempt with this number between our check and insert
+          // Retry with a fresh check of existing attempts
+          console.log(
+            `Duplicate key error detected on retry ${retry + 1}/${maxRetries} (attempt_number: ${nextAttemptNumber}), retrying with fresh attempt number check...`
+          );
+          if (retry === maxRetries - 1) {
+            // Last retry failed, throw a more helpful error
+            console.error(
+              `Failed to create quiz attempt after ${maxRetries} retries. Error:`,
+              insertError
+            );
+            throw new Error(
+              `Failed to create quiz attempt after ${maxRetries} retries due to race condition. Please try again.`
+            );
+          }
+          // Wait a small random amount to reduce collision probability
+          // Increase wait time slightly with each retry
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.random() * 100 + 20 * (retry + 1))
+          );
+          continue; // Retry the loop
+        }
+        // Not a duplicate key error, log and rethrow
+        console.error("Non-duplicate key error during attempt creation:", insertError);
+        throw insertError;
+      }
+    }
+
+    // Should never reach here, but TypeScript needs this
+    throw new Error("Failed to create quiz attempt: unexpected error");
   },
 
   updateAnswer: async (
@@ -169,12 +267,29 @@ export const quizAttemptsRepo = {
       .where(eq(quizAttemptAnswers.attemptId, attemptId));
 
     // Group user answers by question
+    // Handle both old format (answerId) and new format (answerIds JSONB)
     const answersByQuestion = new Map<string, string[]>();
     for (const userAnswer of userAnswers) {
       if (!answersByQuestion.has(userAnswer.questionId)) {
         answersByQuestion.set(userAnswer.questionId, []);
       }
-      answersByQuestion.get(userAnswer.questionId)!.push(userAnswer.answerId);
+      
+      // Extract answer IDs from JSONB array or fall back to single answerId
+      let answerIds: string[] = [];
+      if (userAnswer.answerIds) {
+        // New format: answerIds is a JSONB array
+        answerIds = Array.isArray(userAnswer.answerIds) 
+          ? userAnswer.answerIds 
+          : JSON.parse(userAnswer.answerIds as any);
+      } else if (userAnswer.answerId) {
+        // Old format: single answerId (for backward compatibility during migration)
+        answerIds = [userAnswer.answerId];
+      }
+      
+      // Add all answer IDs for this question
+      answerIds.forEach((answerId) => {
+        answersByQuestion.get(userAnswer.questionId)!.push(answerId);
+      });
     }
 
     // Count correct questions
@@ -293,4 +408,22 @@ export const quizAttemptsRepo = {
         )
       )
       .orderBy(desc(vQuizAttemptsEnriched.attemptNumber)),
+
+  // Get in-progress quiz attempt for a topic (any quiz in that topic)
+  getInProgressAttemptByTopic: async (userId: string, topicId: string) => {
+    const result = await db
+      .select()
+      .from(quizAttempts)
+      .where(
+        and(
+          eq(quizAttempts.userId, userId),
+          eq(quizAttempts.topicId, topicId),
+          sql`completed_at IS NULL`
+        )
+      )
+      .orderBy(desc(quizAttempts.startedAt))
+      .limit(1);
+
+    return result[0] ?? null;
+  },
 };
