@@ -5,6 +5,7 @@ import { TutorialGuard } from "@/components/molecules/tutorial-guard";
 import { DashboardTutorialGuard } from "@/components/molecules/dashboard-tutorial-guard";
 import { TeacherClassesGuard } from "@/components/molecules/teacher-classes-guard";
 import { SchoolPageTutorialGuard } from "@/components/molecules/school-page-tutorial-guard";
+import { CourseRatingDashboardGuard } from "@/components/organisms/course-rating-dashboard-guard";
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
 import { ResponsiveSidebarProvider } from "@/components/organisms/responsive-sidebar-provider";
@@ -23,6 +24,7 @@ export default function MainLayout({
       <DashboardTutorialGuard />
       <TeacherClassesGuard />
       <SchoolPageTutorialGuard />
+      <CourseRatingDashboardGuard />
       <AppSidebar />
       <div className="flex flex-col flex-1 max-w-7xl mx-auto">
         <AppHeader />
