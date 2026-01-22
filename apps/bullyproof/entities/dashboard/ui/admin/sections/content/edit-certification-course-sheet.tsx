@@ -12,6 +12,12 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from "@workspace/ui/components/tabs";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -24,6 +30,8 @@ import {
 import { Loader2, Edit, Trash2 } from "lucide-react";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type { certificationCourses } from "@/server/db/schema";
+import { CourseRatingQuestionsEditor } from "@/components/organisms/course-rating-questions-editor";
+import type { QuestionDefinition } from "@/types/course-ratings";
 
 type Course = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
@@ -46,6 +54,8 @@ export function EditCertificationCourseSheet({
 }: EditCertificationCourseSheetProps) {
   const [name, setName] = useState("");
   const [sortIndex, setSortIndex] = useState<string>("");
+  const [ratingQuestions, setRatingQuestions] = useState<QuestionDefinition[]>([]);
+  const [activeTab, setActiveTab] = useState("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +66,14 @@ export function EditCertificationCourseSheet({
     if (open && course) {
       setName(course.name || "");
       setSortIndex(course.sortIndex?.toString() || "");
+      // Load rating questions from course data
+      if (course.ratingQuestions && Array.isArray(course.ratingQuestions)) {
+        setRatingQuestions(course.ratingQuestions as QuestionDefinition[]);
+      } else {
+        setRatingQuestions([]);
+      }
       setError(null);
+      setActiveTab("info");
     }
   }, [open, course]);
 
@@ -87,15 +104,22 @@ export function EditCertificationCourseSheet({
 
     setIsSubmitting(true);
     try {
-      const result = await certificationApi.courses.update(course.id, {
+      const updateData = {
         name: name.trim(),
         sortIndex: sortIndex ? Number(sortIndex) : undefined,
-      });
+        ratingQuestions: ratingQuestions.length > 0 ? ratingQuestions : [],
+      };
+      console.log("[EditCourseSheet] Updating course with data:", updateData);
+      console.log("[EditCourseSheet] Rating questions:", ratingQuestions);
+      
+      const result = await certificationApi.courses.update(course.id, updateData);
 
       if (result.error) {
         setError(result.error.message || "Failed to update course");
         return;
       }
+      
+      console.log("[EditCourseSheet] Update result:", result.data);
 
       // Success - close sheet and refresh
       onOpenChange(false);
@@ -180,69 +204,85 @@ export function EditCertificationCourseSheet({
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="code">Code</Label>
-                  <Input
-                    id="code"
-                    value={course.code}
-                    disabled
-                    className="bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Course code cannot be changed after creation.
-                  </p>
-                </div>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="info">Course Info</TabsTrigger>
+                    <TabsTrigger value="questions">Rating Questions</TabsTrigger>
+                  </TabsList>
 
-                <div className="space-y-2">
-                  <Label htmlFor="name">
-                    Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="name"
-                    placeholder="e.g., Certification Course, Advanced Certification"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    The display name for this certification course
-                  </p>
-                </div>
+                  <TabsContent value="info" className="space-y-6 mt-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="code">Code</Label>
+                      <Input
+                        id="code"
+                        value={course.code}
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Course code cannot be changed after creation.
+                      </p>
+                    </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="sortIndex">
-                    Sort Index
-                  </Label>
-                  <Input
-                    id="sortIndex"
-                    type="number"
-                    placeholder="Sort order"
-                    value={sortIndex}
-                    onChange={(e) => setSortIndex(e.target.value)}
-                    disabled={isSubmitting}
-                    min={0}
-                    max={32767}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    The sort order for this course. Lower numbers appear first.
-                  </p>
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="name">
+                        Name <span className="text-destructive">*</span>
+                      </Label>
+                      <Input
+                        id="name"
+                        placeholder="e.g., Certification Course, Advanced Certification"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The display name for this certification course
+                      </p>
+                    </div>
 
-                <div className="pt-4 border-t">
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                    disabled={isSubmitting || isDeleting}
-                    className="w-full"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Course
-                  </Button>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Permanently delete this course. This action cannot be undone.
-                  </p>
-                </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="sortIndex">
+                        Sort Index
+                      </Label>
+                      <Input
+                        id="sortIndex"
+                        type="number"
+                        placeholder="Sort order"
+                        value={sortIndex}
+                        onChange={(e) => setSortIndex(e.target.value)}
+                        disabled={isSubmitting}
+                        min={0}
+                        max={32767}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        The sort order for this course. Lower numbers appear first.
+                      </p>
+                    </div>
+
+                    <div className="pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={() => setShowDeleteDialog(true)}
+                        disabled={isSubmitting || isDeleting}
+                        className="w-full"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Course
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Permanently delete this course. This action cannot be undone.
+                      </p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="questions" className="mt-6">
+                    <CourseRatingQuestionsEditor
+                      questions={ratingQuestions}
+                      onChange={setRatingQuestions}
+                    />
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
 
