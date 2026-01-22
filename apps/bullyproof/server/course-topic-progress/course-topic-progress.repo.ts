@@ -3,7 +3,8 @@ import { courseTopicProgress, courseTopicSlides, vQuizAttemptsEnriched } from "@
 import { eq, and, desc, max, sql } from "drizzle-orm";
 
 export const courseTopicProgressRepo = {
-  getLatestAttempt: async (
+  // Get progress for a user/topic
+  getProgress: async (
     userId: string,
     courseId: string,
     topicId: string
@@ -18,13 +19,22 @@ export const courseTopicProgressRepo = {
           eq(courseTopicProgress.topicId, topicId)
         )
       )
-      .orderBy(desc(courseTopicProgress.attemptNumber))
       .limit(1);
 
     return result[0] ?? null;
   },
 
-  getInProgressAttempt: async (
+  // Alias for backward compatibility
+  getLatestAttempt: async (
+    userId: string,
+    courseId: string,
+    topicId: string
+  ) => {
+    return courseTopicProgressRepo.getProgress(userId, courseId, topicId);
+  },
+
+  // Get in-progress record
+  getInProgress: async (
     userId: string,
     courseId: string,
     topicId: string
@@ -40,32 +50,37 @@ export const courseTopicProgressRepo = {
           sql`status IN ('not_started', 'viewing_slides', 'quiz_unlocked')`
         )
       )
-      .orderBy(desc(courseTopicProgress.attemptNumber))
       .limit(1);
 
     return result[0] ?? null;
   },
 
-  createAttempt: async (
+  // Alias for backward compatibility
+  getInProgressAttempt: async (
+    userId: string,
+    courseId: string,
+    topicId: string
+  ) => {
+    return courseTopicProgressRepo.getInProgress(userId, courseId, topicId);
+  },
+
+  // Get or create progress
+  getOrCreateProgress: async (
     userId: string,
     courseId: string,
     topicId: string,
     currentSlideId?: string
   ) => {
-    const maxAttemptResult = await db
-      .select({
-        maxAttempt: max(courseTopicProgress.attemptNumber),
-      })
-      .from(courseTopicProgress)
-      .where(
-        and(
-          eq(courseTopicProgress.userId, userId),
-          eq(courseTopicProgress.courseId, courseId),
-          eq(courseTopicProgress.topicId, topicId)
-        )
-      );
+    // First, check if progress already exists
+    const existing = await courseTopicProgressRepo.getProgress(
+      userId,
+      courseId,
+      topicId
+    );
 
-    const nextAttemptNumber = (maxAttemptResult[0]?.maxAttempt ?? 0) + 1;
+    if (existing) {
+      return existing;
+    }
 
     // Get slide order index if slideId provided
     let currentSlideIndex: number | null = null;
@@ -79,13 +94,13 @@ export const courseTopicProgressRepo = {
     }
 
     try {
+      // Create new progress
       const result = await db
         .insert(courseTopicProgress)
         .values({
           userId,
           courseId,
           topicId,
-          attemptNumber: nextAttemptNumber,
           currentSlideId: currentSlideId ?? null,
           currentSlideIndex,
           status: "viewing_slides",
@@ -95,29 +110,48 @@ export const courseTopicProgressRepo = {
       return result[0];
     } catch (error: any) {
       // Handle duplicate key violation (race condition)
-      // PostgreSQL error code 23505 is unique_violation
-      if (error?.code === "23505" || error?.message?.includes("duplicate key")) {
-        // Fetch and return the existing attempt
-        const existingAttempt = await db
-          .select()
-          .from(courseTopicProgress)
-          .where(
-            and(
-              eq(courseTopicProgress.userId, userId),
-              eq(courseTopicProgress.courseId, courseId),
-              eq(courseTopicProgress.topicId, topicId),
-              eq(courseTopicProgress.attemptNumber, nextAttemptNumber)
-            )
-          )
-          .limit(1);
+      // Check for PostgreSQL unique constraint violation (error code 23505)
+      // The error might be in error.code or error.cause.code (for nested PostgresError)
+      const errorCode = error?.code || error?.cause?.code;
+      const errorMessage = error?.message || error?.cause?.message || String(error || "");
+      const isDuplicateKeyError = 
+        errorCode === "23505" || 
+        errorCode === 23505 ||
+        errorMessage.includes("duplicate key") ||
+        errorMessage.includes("unique constraint") ||
+        errorMessage.includes("course_topic_progress_user_course_topic_unique");
 
-        if (existingAttempt[0]) {
-          return existingAttempt[0];
+      if (isDuplicateKeyError) {
+        // Another request created it - fetch and return the existing progress
+        const existingProgress = await courseTopicProgressRepo.getProgress(
+          userId,
+          courseId,
+          topicId
+        );
+        
+        if (existingProgress) {
+          return existingProgress;
         }
       }
-      // Re-throw if it's not a duplicate key error or if we couldn't find the existing attempt
+      
+      // Re-throw if it's not a duplicate key error or if we couldn't find the existing progress
       throw error;
     }
+  },
+
+  // Alias for backward compatibility
+  createAttempt: async (
+    userId: string,
+    courseId: string,
+    topicId: string,
+    currentSlideId?: string
+  ) => {
+    return courseTopicProgressRepo.getOrCreateProgress(
+      userId,
+      courseId,
+      topicId,
+      currentSlideId
+    );
   },
 
   updateCurrentSlide: async (attemptId: string, slideId: string) => {
@@ -146,9 +180,9 @@ export const courseTopicProgressRepo = {
     attemptId: string,
     status: "not_started" | "viewing_slides" | "quiz_unlocked" | "completed",
     options?: {
-      slidesCompletedAt?: Date | null;
-      quizUnlockedAt?: Date | null;
-      completedAt?: Date | null;
+      slidesCompletedAt?: Date | string | null;
+      quizUnlockedAt?: Date | string | null;
+      completedAt?: Date | string | null;
     }
   ) => {
     // Prevent downgrading from "completed" to any other status
@@ -168,13 +202,22 @@ export const courseTopicProgressRepo = {
     };
 
     if (options?.slidesCompletedAt !== undefined) {
-      updateData.slidesCompletedAt = options.slidesCompletedAt;
+      // Convert Date to ISO string if needed (schema expects string mode)
+      updateData.slidesCompletedAt = options.slidesCompletedAt instanceof Date 
+        ? options.slidesCompletedAt.toISOString() 
+        : options.slidesCompletedAt;
     }
     if (options?.quizUnlockedAt !== undefined) {
-      updateData.quizUnlockedAt = options.quizUnlockedAt;
+      // Convert Date to ISO string if needed (schema expects string mode)
+      updateData.quizUnlockedAt = options.quizUnlockedAt instanceof Date 
+        ? options.quizUnlockedAt.toISOString() 
+        : options.quizUnlockedAt;
     }
     if (options?.completedAt !== undefined) {
-      updateData.completedAt = options.completedAt;
+      // Convert Date to ISO string if needed (schema expects string mode)
+      updateData.completedAt = options.completedAt instanceof Date 
+        ? options.completedAt.toISOString() 
+        : options.completedAt;
     }
 
     return db
@@ -251,7 +294,7 @@ export const courseTopicProgressRepo = {
           eq(courseTopicProgress.courseId, courseId)
         )
       )
-      .orderBy(courseTopicProgress.topicId, desc(courseTopicProgress.attemptNumber));
+      .orderBy(courseTopicProgress.topicId);
 
     // Get all quiz attempts for this user/course
     const allQuizAttempts = await db
@@ -323,19 +366,16 @@ export const courseTopicProgressRepo = {
     }
 
     // Combine topic progress with quiz attempts
-    // Preserve topic progress attemptNumber for grouping, add quiz attempt data
+    // Add quiz attempt data
     return topicProgressRecords.map((progress) => {
       const quizAttempt = quizAttemptsMap.get(progress.topicId);
       return {
         ...progress,
         // Add quiz attempt data
         scorePercentage: quizAttempt?.scorePercentage ?? null,
-        // Preserve topic progress attemptNumber, but also include quiz attemptNumber
-        // The API route will use topicProgressAttemptNumber for grouping
-        topicProgressAttemptNumber: progress.attemptNumber,
         quizAttemptNumber: quizAttempt?.attemptNumber ?? null,
         // For backward compatibility, attemptNumber will be quiz attempt number if available
-        attemptNumber: quizAttempt?.attemptNumber ?? progress.attemptNumber,
+        attemptNumber: quizAttempt?.attemptNumber ?? null,
       };
     });
   },

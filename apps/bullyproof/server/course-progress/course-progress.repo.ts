@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { courseProgress, courseTopics, courseTopicProgress } from "@/server/db/schema";
-import { eq, and, count, sql } from "drizzle-orm";
+import { eq, and, count, sql, inArray } from "drizzle-orm";
 
 export const courseProgressRepo = {
   getByUserAndCourse: (userId: string, courseId: string) =>
@@ -81,15 +81,18 @@ export const courseProgressRepo = {
     const completedTopicIds = completedTopicsResult.map((r) => r.topicId);
 
     // Get completed topic orders
-    const completedTopics = await db
-      .select({ courseOrder: courseTopics.courseOrder })
-      .from(courseTopics)
-      .where(
-        and(
-          eq(courseTopics.courseId, courseId),
-          sql`id = ANY(${completedTopicIds})`
-        )
-      );
+    // Handle empty array case
+    const completedTopics = completedTopicIds.length > 0
+      ? await db
+          .select({ courseOrder: courseTopics.courseOrder })
+          .from(courseTopics)
+          .where(
+            and(
+              eq(courseTopics.courseId, courseId),
+              inArray(courseTopics.id, completedTopicIds)
+            )
+          )
+      : [];
 
     const maxCompletedOrder =
       completedTopics.length > 0

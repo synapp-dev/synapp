@@ -1,6 +1,7 @@
 import { db } from "@/server/db/drizzle";
 import { courseTopicQuizzes, courseTopics } from "@/server/db/schema";
-import { eq, asc, sql, desc } from "drizzle-orm";
+import { eq, asc, sql, desc, and, ne } from "drizzle-orm";
+import { createSlug } from "@/utils/slug";
 
 export const courseTopicQuizzesRepo = {
   getByTopicId: (topicId: string) =>
@@ -15,6 +16,18 @@ export const courseTopicQuizzesRepo = {
       .select()
       .from(courseTopicQuizzes)
       .where(eq(courseTopicQuizzes.id, id))
+      .limit(1),
+
+  getByTopicIdAndSlug: (topicId: string, slug: string) =>
+    db
+      .select()
+      .from(courseTopicQuizzes)
+      .where(
+        and(
+          eq(courseTopicQuizzes.topicId, topicId),
+          eq(courseTopicQuizzes.slug, slug)
+        )
+      )
       .limit(1),
 
   getByIdEnriched: async (id: string) => {
@@ -93,6 +106,32 @@ export const courseTopicQuizzesRepo = {
       data.sortOrder = maxOrder + 1;
     }
 
+    // Generate slug from title, handling collisions
+    let baseSlug = createSlug(data.title);
+    let finalSlug = baseSlug;
+    let counter = 1;
+
+    // Check for slug collisions within the same topic
+    while (true) {
+      const existing = await db
+        .select()
+        .from(courseTopicQuizzes)
+        .where(
+          and(
+            eq(courseTopicQuizzes.topicId, data.topicId),
+            eq(courseTopicQuizzes.slug, finalSlug)
+          )
+        )
+        .limit(1);
+
+      if (existing.length === 0) {
+        break;
+      }
+
+      counter++;
+      finalSlug = `${baseSlug}-${counter}`;
+    }
+
     return db.insert(courseTopicQuizzes).values({
       topicId: data.topicId,
       title: data.title,
@@ -103,10 +142,11 @@ export const courseTopicQuizzesRepo = {
       isRequired: data.isRequired ?? true,
       sequenceType: data.sequenceType ?? "sequential",
       sortOrder: data.sortOrder,
+      slug: finalSlug,
     }).returning();
   },
 
-  update: (
+  update: async (
     id: string,
     data: {
       title?: string;
@@ -119,15 +159,64 @@ export const courseTopicQuizzesRepo = {
       sortOrder?: number;
       status?: "draft" | "published" | "archived";
     }
-  ) =>
-    db
+  ) => {
+    // If title is being updated, regenerate slug
+    if (data.title) {
+      const existing = await db
+        .select()
+        .from(courseTopicQuizzes)
+        .where(eq(courseTopicQuizzes.id, id))
+        .limit(1);
+
+      if (existing.length > 0) {
+        const topicId = existing[0].topicId;
+        let baseSlug = createSlug(data.title);
+        let finalSlug = baseSlug;
+        let counter = 1;
+
+        // Check for slug collisions within the same topic (excluding current quiz)
+        while (true) {
+          const collision = await db
+            .select()
+            .from(courseTopicQuizzes)
+            .where(
+              and(
+                eq(courseTopicQuizzes.topicId, topicId),
+                eq(courseTopicQuizzes.slug, finalSlug),
+                ne(courseTopicQuizzes.id, id)
+              )
+            )
+            .limit(1);
+
+          if (collision.length === 0) {
+            break;
+          }
+
+          counter++;
+          finalSlug = `${baseSlug}-${counter}`;
+        }
+
+        return db
+          .update(courseTopicQuizzes)
+          .set({
+            ...data,
+            slug: finalSlug,
+            updatedAt: sql`now()`,
+          })
+          .where(eq(courseTopicQuizzes.id, id))
+          .returning();
+      }
+    }
+
+    return db
       .update(courseTopicQuizzes)
       .set({
         ...data,
         updatedAt: sql`now()`,
       })
       .where(eq(courseTopicQuizzes.id, id))
-      .returning(),
+      .returning();
+  },
 
   delete: (id: string) =>
     db.delete(courseTopicQuizzes).where(eq(courseTopicQuizzes.id, id)),
