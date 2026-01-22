@@ -11,11 +11,12 @@ import {
   CommandList,
 } from "@workspace/ui/components/command";
 import { Button } from "@workspace/ui/components/button";
-import { Command as CommandIcon, SquareTerminal, ShieldCheck } from "lucide-react";
+import { Command as CommandIcon, SquareTerminal, ShieldCheck, BadgeCheck } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { useRouter } from "next/navigation";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { useSchoolStore } from "@/stores/school-store";
+import { useIsPlatformAdmin } from "@/entities/me/model/store";
 import type { vSchoolsReadable } from "@/drizzle/schema";
 
 type School = typeof vSchoolsReadable.$inferSelect;
@@ -26,6 +27,7 @@ export function CommandMenu() {
   const [loadingSchools, setLoadingSchools] = useState<boolean>(false);
   const router = useRouter();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
+  const isPlatformAdmin = useIsPlatformAdmin();
   const isMac =
     typeof navigator !== "undefined"
       ? navigator.platform.toUpperCase().indexOf("MAC") >= 0
@@ -83,31 +85,39 @@ export function CommandMenu() {
           <CommandGroup heading="Actions">
             <CommandItem
               onSelect={() => {
-                if (currentSchool?.slug) {
+                if (currentSchool?.slug && isPlatformAdmin) {
                   router.push(
                     `/schools/${currentSchool.slug}/lessons?startingYourLesson=true`
                   );
                   setOpen(false);
                 }
               }}
-              disabled={!currentSchool?.slug}
-            >
-              Start new lesson
-            </CommandItem>
-            <CommandItem
-              onSelect={() => {
-                router.push("/admin/schools?modal=add-new-school");
-                setOpen(false);
-              }}
+              disabled={!currentSchool?.slug || !isPlatformAdmin}
             >
               <div className="flex w-full items-center justify-between gap-2">
-                <span>Invite a school</span>
+                <span>Start new lesson</span>
                 <Badge variant="secondary" className="shrink-0 ml-auto flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3" />
-                  Admin
+                  <BadgeCheck className="h-3 w-3" />
+                  AP Teacher
                 </Badge>
               </div>
             </CommandItem>
+            {isPlatformAdmin && (
+              <CommandItem
+                onSelect={() => {
+                  router.push("/admin/schools?modal=add-new-school");
+                  setOpen(false);
+                }}
+              >
+                <div className="flex w-full items-center justify-between gap-2">
+                  <span>Invite a school</span>
+                  <Badge variant="secondary" className="shrink-0 ml-auto flex items-center gap-1">
+                    <ShieldCheck className="h-3 w-3" />
+                    Admin
+                  </Badge>
+                </div>
+              </CommandItem>
+            )}
           </CommandGroup>
           <CommandGroup heading="Schools">
             {(!loadingSchools ? schools : []).map((school) => {

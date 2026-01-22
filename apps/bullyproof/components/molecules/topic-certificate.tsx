@@ -61,7 +61,9 @@ export function TopicCertificate({
   return (
     <Card
       className={cn(
-        "relative flex flex-row items-center justify-between gap-6 p-6 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/20 dark:to-cyan-950/20 border-2 border-blue-200 dark:border-blue-800 shadow-lg w-full",
+        "relative flex flex-row items-center justify-between gap-6 p-6 border-2 shadow-lg w-full",
+        "bg-gradient-to-br from-[color:var(--brand-bullyproof-primary)]/10 to-[color:var(--brand-bullyproof-primary)]/5 dark:from-[color:var(--brand-bullyproof-primary)]/20 dark:to-[color:var(--brand-bullyproof-primary)]/10",
+        "border-[color:var(--brand-bullyproof-primary)]/30 dark:border-[color:var(--brand-bullyproof-primary)]/40",
         className
       )}
     >
@@ -96,8 +98,6 @@ export function TopicCertificate({
             Has successfully completed the <span className="font-bold">Amayda Program</span>
           </p>
         </div>
-
-       
       </div>
 
       {/* Right side - Certificate info */}

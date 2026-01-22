@@ -38,7 +38,7 @@ import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useSchoolStore } from "@/stores/school-store";
 import { usePathname, useRouter } from "next/navigation";
-import { useIsPlatformAdmin, useMeStore } from "@/entities/me/model/store";
+import { useIsPlatformAdmin, useMeStore, useIsSchoolStaff, useIsTeacher } from "@/entities/me/model/store";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
 import { useUserLessonsStatusRealtime } from "@/hooks/use-lesson-status-realtime";
@@ -151,7 +151,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
   const isPlatformAdmin = useIsPlatformAdmin();
   const currentUser = useMeStore((s) => s.currentUser);
-
+  const isSchoolStaff = useIsSchoolStaff();
+  const isTeacher = useIsTeacher();
   // Listen for real-time status changes to user's lessons
   useUserLessonsStatusRealtime(currentUser?.id);
 
@@ -240,8 +241,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const filteredNavSchoolMain = React.useMemo(
     () => {
       const filtered = filterItems(data.navSchoolMain);
+      // Hide Performance and Settings for staff-only members (SCHOOL_STAFF without TEACHER)
+      const isStaffOnly = isSchoolStaff && !isTeacher;
+      const visibleItems = isStaffOnly
+        ? filtered.filter((item) => item.title !== "Performance" && item.title !== "Settings")
+        : filtered;
+      
       // Lock Home, Teachers, and Classes for non-platform admins
-      return filtered.map((item) => {
+      return visibleItems.map((item) => {
         if ((item.title === "Home" || item.title === "Teachers" || item.title === "Classes") && !isPlatformAdmin) {
           return {
             ...item,
@@ -252,7 +259,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         return item;
       });
     },
-    [filterItems, isPlatformAdmin]
+    [filterItems, isPlatformAdmin, isSchoolStaff, isTeacher]
   );
 
   // Lock curriculum items (Lessons, Content, Resources) for non-platform admins
@@ -273,8 +280,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   );
 
   const filteredNavData = React.useMemo(
-    () => filterItems(data.navData),
-    [filterItems]
+    () => {
+      const filtered = filterItems(data.navData);
+      // Hide Reports for staff-only members (SCHOOL_STAFF without TEACHER)
+      const isStaffOnly = isSchoolStaff && !isTeacher;
+      return isStaffOnly
+        ? filtered.filter((item) => item.title !== "Reports")
+        : filtered;
+    },
+    [filterItems, isSchoolStaff, isTeacher]
   );
 
   // Track if component has mounted to prevent hydration mismatch
