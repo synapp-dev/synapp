@@ -11,6 +11,9 @@ import {
   XCircle,
   Trophy,
   AlertCircle,
+  ChevronsRight,
+  ChevronsLeft,
+  RotateCcw,
 } from "lucide-react";
 import {
   Card,
@@ -41,10 +44,9 @@ import type {
   quizQuestions,
   quizAnswers,
 } from "@/server/db/schema";
-import { createSlug } from "@/utils/slug";
 import { useMeStore } from "@/entities/me/model/store";
-import { toast } from "sonner";
 import { StarRating } from "@/components/atoms/star-rating";
+import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
 
 type Course = typeof certificationCourses.$inferSelect;
 type Topic = typeof courseTopics.$inferSelect;
@@ -66,7 +68,7 @@ function QuizPageContent() {
   const router = useRouter();
   const courseNameSlug = params?.course_name as string;
   const topicSlug = params?.topic as string;
-  const quizId = params?.quizId as string;
+  const quizSlug = params?.quizSlug as string;
   usePageTitle(["courses", courseNameSlug, topicSlug, "quiz"]);
 
   const currentUser = useMeStore((s) => s.currentUser);
@@ -79,76 +81,51 @@ function QuizPageContent() {
   const [selectedAnswers, setSelectedAnswers] = useState<Map<string, string[]>>(new Map());
   const [submittedAnswers, setSubmittedAnswers] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittingQuestions, setSubmittingQuestions] = useState<Set<string>>(new Set()); // Track which questions are being submitted
   const [isSubmittingQuiz, setIsSubmittingQuiz] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showResults, setShowResults] = useState(false);
   const [results, setResults] = useState<any | null>(null);
 
-  // Fetch course by slug
-  useEffect(() => {
-    const fetchCourse = async () => {
-      if (!courseNameSlug) return;
-
-      try {
-        const result = await certificationApi.courses.bySlug(courseNameSlug);
-        if (result.data) {
-          setCourse(result.data);
-        } else {
-          setError(result.error?.message ?? "Failed to fetch course");
-        }
-      } catch (err) {
-        console.error("Failed to fetch course:", err);
-        setError(err instanceof Error ? err.message : "Failed to fetch course");
-      }
-    };
-
-    fetchCourse();
-  }, [courseNameSlug]);
-
-  // Fetch topic, quiz, questions, and start/resume attempt
+  // Fetch all quiz data in a single API call
   useEffect(() => {
     const fetchQuizData = async () => {
-      if (!course || !topicSlug || !quizId) return;
+      if (!courseNameSlug || !topicSlug || !quizSlug || !currentUser) return;
 
       try {
         setIsLoading(true);
         setError(null);
 
-        // Fetch all topics for this course
-        const topicsResult = await certificationApi.topics.byCourseCode(course.code);
-        if (!topicsResult.data) {
-          setError(topicsResult.error?.message ?? "Failed to fetch topics");
-          return;
-        }
-
-        // Find the topic with matching slug
-        const foundTopic = topicsResult.data.find(
-          (t) => createSlug(t.title) === topicSlug
+        // Single API call to get all quiz data
+        const result = await certificationApi.quizzes.bySlugs(
+          courseNameSlug,
+          topicSlug,
+          quizSlug
         );
 
-        if (!foundTopic) {
-          setError("Topic not found");
+        if (!result.data) {
+          setError(result.error?.message ?? "Failed to fetch quiz data");
           return;
         }
 
-        setTopic(foundTopic);
+        const {
+          quiz: enrichedQuiz,
+          attempt: quizAttempt,
+          existingAnswers,
+          earliestUnansweredQuestionIndex,
+          course: courseData,
+          topic: topicData,
+        } = result.data;
 
-        // Fetch quiz details with enriched data (includes questions and answers)
-        const quizResult = await certificationApi.quizzes.byId(quizId);
-        if (!quizResult.data) {
-          setError(quizResult.error?.message ?? "Quiz not found");
-          return;
-        }
+        // Set course and topic
+        setCourse(courseData);
+        setTopic(topicData);
 
-        const enrichedQuiz = quizResult.data as any;
+        // Set quiz
         setQuiz(enrichedQuiz);
 
-        // Extract questions from enriched quiz response
-        // The questions field is a JSONB array with nested answers (already transformed to camelCase)
+        // Extract and sort questions from enriched quiz response
         const questionsFromEnriched = enrichedQuiz.questions || [];
-        
-        // Ensure questions are sorted by orderIndex (should already be sorted from view, but ensure it)
         const questionsWithAnswers = questionsFromEnriched
           .map((q: any) => ({
             ...q,
@@ -159,53 +136,37 @@ function QuizPageContent() {
 
         setQuestions(questionsWithAnswers);
 
-        // Start or resume quiz attempt
-        if (currentUser) {
-          try {
-            // Get topic progress to find topicProgressId
-            const topicProgressResult = await fetch(
-              `/api/certification/topics/${foundTopic.id}/progress`
-            ).catch(() => null);
+        // Set attempt
+        setAttempt(quizAttempt);
 
-            let topicProgressId: string | null = null;
-            if (topicProgressResult?.ok) {
-              const progressData = await topicProgressResult.json();
-              topicProgressId = progressData?.id || null;
+        // Set current question index to earliest unanswered question
+        if (earliestUnansweredQuestionIndex >= 0) {
+          setCurrentQuestionIndex(earliestUnansweredQuestionIndex);
+        }
+
+        // Process existing answers (now stored as JSONB array in answerIds)
+        if (existingAnswers && existingAnswers.length > 0) {
+          const answersMap = new Map<string, string[]>();
+          existingAnswers.forEach((answer: any) => {
+            const questionId = answer.questionId;
+            // Handle both old format (answerId) and new format (answerIds JSONB)
+            let answerIds: string[] = [];
+            if (answer.answerIds) {
+              // New format: answerIds is a JSONB array
+              answerIds = Array.isArray(answer.answerIds) 
+                ? answer.answerIds 
+                : JSON.parse(answer.answerIds);
+            } else if (answer.answerId) {
+              // Old format: single answerId (for backward compatibility during migration)
+              answerIds = [answer.answerId];
             }
-
-            const startResult = await certificationApi.quizzes.start(quizId, {
-              courseId: course.id,
-              topicProgressId,
-            });
-
-            if (startResult.data) {
-              setAttempt(startResult.data);
-
-              // If resuming, fetch existing answers
-              if (startResult.data.id) {
-                const existingAnswersResult = await certificationApi.quizzes.attempts.answers.list(
-                  quizId,
-                  startResult.data.id
-                );
-
-                if (existingAnswersResult.data) {
-                  const answersMap = new Map<string, string[]>();
-                  existingAnswersResult.data.forEach((answer: any) => {
-                    const questionId = answer.questionId;
-                    if (!answersMap.has(questionId)) {
-                      answersMap.set(questionId, []);
-                    }
-                    answersMap.get(questionId)!.push(answer.answerId);
-                    setSubmittedAnswers((prev) => new Set(prev).add(questionId));
-                  });
-                  setSelectedAnswers(answersMap);
-                }
-              }
+            
+            if (answerIds.length > 0) {
+              answersMap.set(questionId, answerIds);
+              setSubmittedAnswers((prev) => new Set(prev).add(questionId));
             }
-          } catch (err) {
-            console.error("Failed to start quiz attempt:", err);
-            // Continue without attempt - user can still view questions
-          }
+          });
+          setSelectedAnswers(answersMap);
         }
       } catch (err) {
         console.error("Failed to fetch quiz data:", err);
@@ -216,98 +177,52 @@ function QuizPageContent() {
     };
 
     fetchQuizData();
-  }, [course, topicSlug, quizId, currentUser]);
+  }, [courseNameSlug, topicSlug, quizSlug, currentUser]);
 
   const handleSubmitAnswer = useCallback(
     async (questionId: string, answerIdsOverride?: string[]) => {
-      if (!attempt || !quizId) return;
+      if (!attempt || !quiz) return;
 
       const answerIds = answerIdsOverride || selectedAnswers.get(questionId) || [];
       if (answerIds.length === 0) {
-        toast.error("Please select an answer");
         return;
       }
 
-      setIsSubmitting(true);
+      // Prevent concurrent submissions for the same question
+      if (submittingQuestions.has(questionId)) {
+        return;
+      }
+
+      setSubmittingQuestions((prev) => new Set(prev).add(questionId));
       try {
-        // Get existing answers for this question
-        const existingAnswersResult = await certificationApi.quizzes.attempts.answers.list(
-          quizId,
-          attempt.id
-        );
-        const existingAnswers = existingAnswersResult.data || [];
-        const existingAnswerIds = existingAnswers
-          .filter((a: any) => a.questionId === questionId)
-          .map((a: any) => a.answerId);
-
-        // For multiple choice, we need to handle adding/removing answers
-        // For single choice, replace the answer
-        const currentQuestion = questions.find((q) => q.id === questionId);
-        const isMultiple = currentQuestion?.allowMultipleSelections ?? false;
-
-        if (isMultiple) {
-          // Multiple choice: sync selected answers with submitted answers
-          // Remove answers that are no longer selected
-          for (const existingId of existingAnswerIds) {
-            if (!answerIds.includes(existingId)) {
-              // The PUT endpoint removes oldAnswerId and adds a new answerId
-              // If there are still selected answers, use the first one
-              // Otherwise, this shouldn't happen due to the early return check above
-              const newAnswerId = answerIds.length > 0 ? answerIds[0] : existingId;
-              await certificationApi.quizzes.attempts.answers.update(quizId, attempt.id, {
-                questionId,
-                answerId: newAnswerId,
-                oldAnswerId: existingId,
-              });
-            }
-          }
-
-          // Add new answers that aren't already submitted
-          for (const answerId of answerIds) {
-            if (!existingAnswerIds.includes(answerId)) {
-              await certificationApi.quizzes.attempts.answers.submit(quizId, attempt.id, {
-                questionId,
-                answerId,
-              });
-            }
-          }
-        } else {
-          // Single choice: replace answer if different
-          const answerId = answerIds[0];
-          const existingAnswer = existingAnswers.find(
-            (a: any) => a.questionId === questionId
-          );
-
-          if (existingAnswer) {
-            if (existingAnswer.answerId !== answerId) {
-              await certificationApi.quizzes.attempts.answers.update(quizId, attempt.id, {
-                questionId,
-                answerId,
-                oldAnswerId: existingAnswer.answerId,
-              });
-            }
-          } else {
-            await certificationApi.quizzes.attempts.answers.submit(quizId, attempt.id, {
-              questionId,
-              answerId,
-            });
-          }
-        }
+        // Simple: just submit/upsert the current answer IDs for this question
+        // The backend handles upsert logic to prevent duplicates
+        await certificationApi.quizzes.attempts.answers.submit(quiz.id, attempt.id, {
+          questionId,
+          answerIds,
+        });
 
         setSubmittedAnswers((prev) => new Set(prev).add(questionId));
-        toast.success("Answer saved");
       } catch (err) {
         console.error("Failed to submit answer:", err);
-        toast.error("Failed to save answer");
       } finally {
-        setIsSubmitting(false);
+        setSubmittingQuestions((prev) => {
+          const next = new Set(prev);
+          next.delete(questionId);
+          return next;
+        });
       }
     },
-    [attempt, quizId, selectedAnswers, questions]
+    [attempt, quiz, selectedAnswers, submittingQuestions]
   );
 
   const handleAnswerSelect = useCallback(
     (questionId: string, answerId: string, isMultiple: boolean) => {
+      // Don't allow selection changes while submitting
+      if (submittingQuestions.has(questionId)) {
+        return;
+      }
+
       // Calculate new answer IDs from current state before updating
       // Read from selectedAnswers state (may be slightly stale but acceptable for this use case)
       const currentAnswers = selectedAnswers.get(questionId) || [];
@@ -337,7 +252,6 @@ function QuizPageContent() {
         
         // For multiple choice: prevent deselecting if it would result in no answers
         if (isMultiple && newAnswerIds.length === 0) {
-          toast.error("Cannot deselect all answers - at least one answer must remain selected.");
           return;
         }
       }
@@ -350,11 +264,11 @@ function QuizPageContent() {
       });
 
       // Auto-save the answer using the calculated value
-      if (newAnswerIds.length > 0 && attempt && quizId) {
+      if (newAnswerIds.length > 0 && attempt && quiz) {
         handleSubmitAnswer(questionId, newAnswerIds);
       }
     },
-    [attempt, quizId, handleSubmitAnswer, selectedAnswers, submittedAnswers]
+    [attempt, quiz, handleSubmitAnswer, selectedAnswers, submittedAnswers, submittingQuestions]
   );
 
   const handleNextQuestion = useCallback(async () => {
@@ -378,7 +292,7 @@ function QuizPageContent() {
   }, [currentQuestionIndex]);
 
   const handleSubmitQuiz = useCallback(async () => {
-    if (!attempt || !quizId) return;
+    if (!attempt || !quiz) return;
 
     setIsSubmittingQuiz(true);
     try {
@@ -387,29 +301,26 @@ function QuizPageContent() {
         if (!submittedAnswers.has(question.id)) {
           const answerIds = selectedAnswers.get(question.id);
           if (answerIds && answerIds.length > 0) {
-            await certificationApi.quizzes.attempts.answers.submit(quizId, attempt.id, {
+            await certificationApi.quizzes.attempts.answers.submit(quiz.id, attempt.id, {
               questionId: question.id,
-              answerId: answerIds[0],
+              answerIds,
             });
           }
         }
       }
 
       // Submit quiz
-      const submitResult = await certificationApi.quizzes.attempts.submit(quizId, attempt.id);
+      const submitResult = await certificationApi.quizzes.attempts.submit(quiz.id, attempt.id);
       if (submitResult.data) {
         setResults(submitResult.data);
         setShowResults(true);
-      } else {
-        toast.error(submitResult.error?.message ?? "Failed to submit quiz");
       }
     } catch (err) {
       console.error("Failed to submit quiz:", err);
-      toast.error("Failed to submit quiz");
     } finally {
       setIsSubmittingQuiz(false);
     }
-  }, [attempt, quizId, questions, selectedAnswers, submittedAnswers]);
+  }, [attempt, quiz, questions, selectedAnswers, submittedAnswers]);
 
   const handleBackToOverview = () => {
     if (!courseNameSlug || !topicSlug) return;
@@ -490,6 +401,7 @@ function QuizPageContent() {
                 correctAnswers={correctAnswers}
                 totalQuestions={totalQuestions}
                 passingThreshold={quiz.passingScorePercentage}
+                size="h-8 w-8"
               />
             </div>
           </CardHeader>
@@ -504,12 +416,16 @@ function QuizPageContent() {
             </div>
           </CardContent>
           <CardFooter className="flex-col gap-3">
-            <Button onClick={handleBackToOverview} variant="outline" className="w-full">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-            <Button onClick={handleBackToCourse} className="w-full">
-              Back
+            {correctAnswers !== totalQuestions && (
+              <Button onClick={handleBackToOverview} variant="outline" className="w-full flex items-center gap-2"> 
+                <RotateCcw className="h-4 w-4" />
+                Retake Quiz
+              </Button>
+            )}
+            <Button onClick={handleBackToCourse} className="w-full flex items-center gap-2">
+              <ChevronsLeft className="h-4 w-4" />
+
+              Return to Course
             </Button>
           </CardFooter>
         </Card>
@@ -554,7 +470,10 @@ function QuizPageContent() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl">
-            {currentQuestion.questionText}
+            {renderQuestionWithUrls(
+              currentQuestion.questionText, 
+              (currentQuestion.questionUrls as Record<string, string> | null | undefined) ?? null
+            )}
           </CardTitle>
           {currentQuestion.explanation && (
             <CardDescription>{currentQuestion.explanation}</CardDescription>
@@ -578,7 +497,8 @@ function QuizPageContent() {
               {currentQuestion.answers.map((answer) => {
                 const isSelected = currentAnswers[0] === answer.id;
                 const isSubmitted = submittedAnswers.has(currentQuestion.id);
-                const isDisabled = isSubmitted && isSelected;
+                const isSubmitting = submittingQuestions.has(currentQuestion.id);
+                const isDisabled = (isSubmitted && isSelected) || isSubmitting;
                 
                 return (
                   <div
@@ -616,11 +536,15 @@ function QuizPageContent() {
               {currentQuestion.answers.map((answer) => {
                 const isSelected = currentAnswers.includes(answer.id);
                 const isSubmitted = submittedAnswers.has(currentQuestion.id);
+                const isSubmitting = submittingQuestions.has(currentQuestion.id);
                 // For multiple choice: disable if submitted, selected, and it's the last answer
-                const isDisabled = isSubmitted && 
+                // Also disable while submitting to prevent rapid clicks
+                const isDisabled = isSubmitting || (
+                  isSubmitted && 
                   isSelected && 
                   currentAnswers.length === 1 &&
-                  (currentQuestion.allowMultipleSelections ?? false);
+                  (currentQuestion.allowMultipleSelections ?? false)
+                );
                 
                 return (
                   <div
