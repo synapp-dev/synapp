@@ -55,15 +55,30 @@ export async function POST(
     }
 
     // Create new attempt
-    const attempt = await quizAttemptsRepo.createAttempt({
-      userId: user.id,
-      quizId,
-      topicId: quiz[0].topicId,
-      courseId: body.courseId, // Should be provided in request body
-      topicProgressId: body.topicProgressId ?? null,
-    });
+    try {
+      const attempt = await quizAttemptsRepo.createAttempt({
+        userId: user.id,
+        quizId,
+        topicId: quiz[0].topicId,
+        courseId: body.courseId, // Should be provided in request body
+        topicProgressId: body.topicProgressId ?? null,
+      });
 
-    return NextResponse.json(attempt, { status: 201 });
+      return NextResponse.json(attempt, { status: 201 });
+    } catch (createError: any) {
+      // If createAttempt throws an error about in-progress attempt, check again
+      // This handles race conditions where an attempt was created between our check and createAttempt call
+      if (createError.message?.includes("in-progress")) {
+        const inProgress = await quizAttemptsRepo.getInProgressAttempt(
+          user.id,
+          quizId
+        );
+        if (inProgress) {
+          return NextResponse.json(inProgress, { status: 200 });
+        }
+      }
+      throw createError; // Re-throw if it's a different error
+    }
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(

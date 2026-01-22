@@ -55,33 +55,47 @@ export async function POST(
     const finalAttempt = scoredAttempt[0];
 
     // If passed, mark quiz as completed
+    // Note: We wrap this in try-catch to ensure quiz submission always returns result
+    // even if progress tracking fails
     if (finalAttempt.isPassed) {
-      await courseTopicQuizCompletionsRepo.markQuizPassed({
-        userId: user.id,
-        topicId: finalAttempt.topicId,
-        quizId: finalAttempt.quizId,
-        passedAttemptId: finalAttempt.id,
-      });
-
-      // Get topic progress to check current status
-      const topicProgress = await courseTopicProgressRepo.getLatestAttempt(
-        user.id,
-        finalAttempt.courseId,
-        finalAttempt.topicId
-      );
-
-      // If topic is not already completed, update it to completed
-      // This ensures that once a topic is marked completed, it stays completed
-      if (topicProgress && topicProgress.status !== "completed") {
-        await courseTopicProgressRepo.updateStatus(topicProgress.id, "completed", {
-          completedAt: new Date(),
+      try {
+        await courseTopicQuizCompletionsRepo.markQuizPassed({
+          userId: user.id,
+          topicId: finalAttempt.topicId,
+          quizId: finalAttempt.quizId,
+          passedAttemptId: finalAttempt.id,
         });
 
-        // Update course-level progress
-        await courseProgressRepo.updateProgress(user.id, finalAttempt.courseId);
+        // Get topic progress to check current status
+        const topicProgress = await courseTopicProgressRepo.getLatestAttempt(
+          user.id,
+          finalAttempt.courseId,
+          finalAttempt.topicId
+        );
+
+        // If topic is not already completed, update it to completed
+        // This ensures that once a topic is marked completed, it stays completed
+        if (topicProgress && topicProgress.status !== "completed") {
+          await courseTopicProgressRepo.updateStatus(topicProgress.id, "completed", {
+            completedAt: new Date(),
+          });
+
+          // Update course-level progress
+          // Wrap in try-catch to prevent progress update errors from blocking quiz submission
+          try {
+            await courseProgressRepo.updateProgress(user.id, finalAttempt.courseId);
+          } catch (progressError: any) {
+            // Log but don't fail - quiz submission should succeed even if progress update fails
+            console.error("Failed to update course progress:", progressError);
+          }
+        }
+      } catch (completionError: any) {
+        // Log but don't fail - quiz submission should succeed even if completion tracking fails
+        console.error("Failed to mark quiz as completed:", completionError);
       }
     }
 
+    // Always return the quiz attempt result, regardless of progress tracking success/failure
     return NextResponse.json(finalAttempt, { status: 200 });
   } catch (e: any) {
     console.error(e);
