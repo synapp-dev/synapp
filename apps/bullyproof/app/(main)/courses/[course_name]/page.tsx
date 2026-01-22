@@ -1258,7 +1258,7 @@ export default function CoursePage() {
                   >
                     <div className="flex-shrink-0 py-3">
                       {isCompleted && (
-                        <CheckCircle2 className="h-5 w-5 text-foreground transition-colors" />
+                        <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 transition-colors" />
                       )}
                       {isCurrent && (
                         <PlayCircle className="h-5 w-5 text-[var(--brand-bullyproof-primary)]" />

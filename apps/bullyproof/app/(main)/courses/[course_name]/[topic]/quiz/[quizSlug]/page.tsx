@@ -380,57 +380,59 @@ function QuizPageContent() {
     const totalQuestions = results.totalQuestions ?? questions.length;
 
     return (
-      <div className="container mx-auto px-4 py-8 max-w-md">
-        <Card>
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              {isPassed ? (
-                <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-4">
-                  <Trophy className="h-12 w-12 text-green-600 dark:text-green-400" />
-                </div>
-              ) : (
-                <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-4">
-                  <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
-                </div>
+      <>
+        <div className="container mx-auto px-4 py-8 max-w-md">
+          <Card>
+            <CardHeader className="text-center">
+              <div className="flex justify-center mb-4">
+                {isPassed ? (
+                  <div className="rounded-full bg-green-100 dark:bg-green-900/20 p-4">
+                    <Trophy className="h-12 w-12 text-green-600 dark:text-green-400" />
+                  </div>
+                ) : (
+                  <div className="rounded-full bg-red-100 dark:bg-red-900/20 p-4">
+                    <XCircle className="h-12 w-12 text-red-600 dark:text-red-400" />
+                  </div>
+                )}
+              </div>
+              <CardTitle className="text-3xl">
+                {isPassed ? "Quiz Passed!" : "Quiz Failed"}
+              </CardTitle>
+              <div className="flex justify-center mt-4">
+                <StarRating
+                  correctAnswers={correctAnswers}
+                  totalQuestions={totalQuestions}
+                  passingThreshold={quiz.passingScorePercentage}
+                  size="h-8 w-8"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="text-center space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  You answered {correctAnswers} out of {totalQuestions} questions correctly.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Passing score: {quiz.passingScorePercentage}%
+                </p>
+              </div>
+            </CardContent>
+            <CardFooter className="flex-col gap-3">
+              {correctAnswers !== totalQuestions && (
+                <Button onClick={handleBackToOverview} variant="outline" className="w-full flex items-center gap-2"> 
+                  <RotateCcw className="h-4 w-4" />
+                  Retake Quiz
+                </Button>
               )}
-            </div>
-            <CardTitle className="text-3xl">
-              {isPassed ? "Quiz Passed!" : "Quiz Failed"}
-            </CardTitle>
-            <div className="flex justify-center mt-4">
-              <StarRating
-                correctAnswers={correctAnswers}
-                totalQuestions={totalQuestions}
-                passingThreshold={quiz.passingScorePercentage}
-                size="h-8 w-8"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="text-center space-y-2">
-              <p className="text-sm text-muted-foreground">
-                You answered {correctAnswers} out of {totalQuestions} questions correctly.
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Passing score: {quiz.passingScorePercentage}%
-              </p>
-            </div>
-          </CardContent>
-          <CardFooter className="flex-col gap-3">
-            {correctAnswers !== totalQuestions && (
-              <Button onClick={handleBackToOverview} variant="outline" className="w-full flex items-center gap-2"> 
-                <RotateCcw className="h-4 w-4" />
-                Retake Quiz
-              </Button>
-            )}
-            <Button onClick={handleBackToCourse} className="w-full flex items-center gap-2">
-              <ChevronsLeft className="h-4 w-4" />
+              <Button onClick={handleBackToCourse} className="w-full flex items-center gap-2">
+                <ChevronsLeft className="h-4 w-4" />
 
-              Return to Course
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+                Return to Course
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
+      </>
     );
   }
 

@@ -1030,6 +1030,10 @@ function CourseTopicSlidesPageContent() {
             setShowCompletionModal(open);
             if (!open) {
               setIsFinishing(false);
+              // Navigate to course page when completion modal closes
+              if (courseNameSlug) {
+                router.push(`/courses/${courseNameSlug}`);
+              }
             }
           }}
         >
