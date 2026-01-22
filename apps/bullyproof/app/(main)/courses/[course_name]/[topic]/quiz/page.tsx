@@ -136,9 +136,10 @@ function QuizOverviewPageContent() {
     fetchTopicAndQuizzes();
   }, [course, topicSlug, currentUser]);
 
-  const handleStartQuiz = (quizId: string) => {
+  const handleStartQuiz = (quiz: QuizWithDetails) => {
     if (!courseNameSlug || !topicSlug) return;
-    router.push(`/courses/${courseNameSlug}/${topicSlug}/quiz/${quizId}`);
+    const quizSlug = createSlug(quiz.title);
+    router.push(`/courses/${courseNameSlug}/${topicSlug}/quiz/${quizSlug}`);
   };
 
   const handleBackToCourse = () => {
@@ -282,7 +283,7 @@ function QuizOverviewPageContent() {
               </CardContent>
               <CardFooter>
                 <Button
-                  onClick={() => handleStartQuiz(quiz.id)}
+                  onClick={() => handleStartQuiz(quiz)}
                   className="w-full"
                   size="lg"
                 >

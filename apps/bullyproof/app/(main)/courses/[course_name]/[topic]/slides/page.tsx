@@ -7,7 +7,7 @@ import {
   useRef,
   Suspense,
 } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams, usePathname } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Loader2,
@@ -34,7 +34,6 @@ import {
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type {
   courseTopics,
-  courseTopicSlides,
   certificationCourses,
 } from "@/server/db/schema";
 import {
@@ -43,87 +42,63 @@ import {
 } from "@/components/organisms/slide-renderer";
 import { useCertificationTopicStore } from "@/stores/certification-topic-store";
 import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
-import { usePrefetchCertificationImages } from "@/hooks/use-prefetch-certification-images";
 import { usePreloadAllSlideImages } from "@/hooks/use-preload-all-slide-images";
 import { createSlug } from "@/utils/slug";
 import { cn } from "@workspace/ui/lib/utils";
-import { useMeStore } from "@/entities/me/model/store";
 
-type Topic = typeof courseTopics.$inferSelect;
-type Slide = typeof courseTopicSlides.$inferSelect;
 type Course = typeof certificationCourses.$inferSelect;
+type Topic = typeof courseTopics.$inferSelect;
 
-type ExtendedSlideData = SlideData & {};
+type ExtendedSlideData = SlideData & {
+  signedUrl?: string | null;
+};
 
 function CourseTopicSlidesPageContent() {
   const params = useParams();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const courseNameSlug = params?.course_name as string;
   const topicSlug = params?.topic as string;
-  const slideId = searchParams.get("index");
-  const fullscreenParam = searchParams.get("fullscreen");
+  // Read fullscreen query param only once on initial load (non-reactive)
+  const initialFullscreenRef = useRef<string | null>(null);
+  if (initialFullscreenRef.current === null) {
+    initialFullscreenRef.current = searchParams.get("fullscreen");
+  }
+  const fullscreenParam = initialFullscreenRef.current;
   const [currentSlideId, setCurrentSlideId] = useState<string | null>(null);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [course, setCourse] = useState<Course | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(fullscreenParam === "true");
   const [showControls, setShowControls] = useState(false);
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
-  const [newSlideTimer, setNewSlideTimer] = useState<number | null>(null);
-  const [isNextDisabled, setIsNextDisabled] = useState(false);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
   const [hasQuizzes, setHasQuizzes] = useState<boolean | null>(null);
   const [showLockedDialog, setShowLockedDialog] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
-  const [isCheckingUnlock, setIsCheckingUnlock] = useState(true);
   const [isTopicUnlocked, setIsTopicUnlocked] = useState<boolean | null>(null);
-  // Local state for tracking navigation and viewed slides (client-side only)
-  const [localViewedSlides, setLocalViewedSlides] = useState<Set<string>>(new Set());
-  const [pendingUpdates, setPendingUpdates] = useState<{
-    currentSlideId: string | null;
-    viewedSlides: Set<string>;
-  }>({ currentSlideId: null, viewedSlides: new Set() });
+  const [isMounted, setIsMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const currentUser = useMeStore((s) => s.currentUser);
-  const isNavigatingRef = useRef(false);
-  const lastViewedSlideRef = useRef<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const batchUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const timedSlideIdRef = useRef<string | null>(null);
-  const currentAttemptRef = useRef<typeof currentAttempt>(null);
-  const initialLoadCompleteRef = useRef(false);
-  const lastUrlSlideIdRef = useRef<string | null>(null);
-  const initializedTopicRef = useRef<string | null>(null);
   const redirectCountdownRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingSlideRef = useRef<string | null>(null);
 
   // Zustand store
   const {
     getTopic,
-    getSlides,
-    getAttempt,
-    isSlideUnlocked,
     setTopic,
-    setSlides,
     setAttempt,
-    setLoading,
-    setError,
-    loading: storeLoading,
-    errors: storeErrors,
+    setSlides,
   } = useCertificationTopicStore();
 
   // Get data from store
   const [foundTopicId, setFoundTopicId] = useState<string | null>(null);
   const topic = foundTopicId ? getTopic(foundTopicId) : null;
-  const allSlides = foundTopicId ? getSlides(foundTopicId) || [] : [];
-  // Filter to only regular slides (not quizzes)
-  const slides = allSlides.filter((slide) => slide.kind !== "quiz");
-  const currentAttempt = foundTopicId ? getAttempt(foundTopicId) : null;
-  const isLoading = foundTopicId ? (storeLoading[foundTopicId] ?? false) : true;
-  const error = foundTopicId ? (storeErrors[foundTopicId] ?? null) : null;
-
-  const isCompleted = currentAttempt?.status === "completed";
+  
+  // Local state for slides and attempt (from single API call)
+  const [slides, setSlidesState] = useState<ExtendedSlideData[]>([]);
+  const [currentAttempt, setCurrentAttemptState] = useState<any | null>(null);
 
   // Find current slide by ID
   const currentSlide = currentSlideId
@@ -135,691 +110,211 @@ function CourseTopicSlidesPageContent() {
 
   usePageTitle(["courses", courseNameSlug, topicSlug, "slides"]);
 
+  // Set mounted state to prevent hydration errors with Radix components
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Pre-fetch all image URLs in background when topic loads
-  usePrefetchCertificationImages(slides, !isLoading && slides.length > 0);
+  // DISABLED: URLs are already included in the API response, so no need to fetch individually
+  // usePrefetchCertificationImages(slides, !isLoading && slides.length > 0);
   
   // Preload all slide images into browser cache for instant navigation
+  // This uses cached URLs from the API response, so no additional API calls
   usePreloadAllSlideImages(slides, !isLoading && slides.length > 0, true);
 
-  // Helper function to build URL for a slide
-  const buildSlideUrl = useCallback(
-    (slideId: string) => {
-      if (!courseNameSlug || !topicSlug) return "";
-      return `/courses/${courseNameSlug}/${topicSlug}/slides?index=${encodeURIComponent(slideId)}`;
-    },
-    [courseNameSlug, topicSlug]
-  );
-
-  // Ref to track pending updates (avoids stale closure issues)
-  const pendingUpdatesRef = useRef<{
-    currentSlideId: string | null;
-    viewedSlides: Set<string>;
-  }>({ currentSlideId: null, viewedSlides: new Set() });
-
-  // Immediate batch update function - executes instantly without delay (for last slide)
-  const immediateBatchedUpdate = useCallback(
-    async (topicId: string, slideId: string, viewedSlides: Set<string>) => {
-      try {
-        // Convert viewed slides Set to array
-        const viewedSlidesArray = Array.from(viewedSlides);
-
-        // Send all updates in a single batch API call immediately
-        const batchResult = await certificationApi.topics.progress.batch(topicId, {
-          currentSlideId: slideId || undefined,
-          viewedSlideIds: viewedSlidesArray,
-        });
-
-        // Update local state with server response
-        if (batchResult.data?.attempt && foundTopicId) {
-          setAttempt(foundTopicId, batchResult.data.attempt);
-        }
-      } catch (err) {
-        console.error("Failed to batch update progress:", err);
-      }
-    },
-    [foundTopicId, setAttempt]
-  );
-
-  // Batched update function - sends all navigation changes after user stops navigating
-  const scheduleBatchedUpdate = useCallback(
-    (topicId: string, slideId: string, viewedSlides: Set<string>) => {
-      // Clear any existing batch update timeout
-      if (batchUpdateTimeoutRef.current) {
-        clearTimeout(batchUpdateTimeoutRef.current);
-      }
-
-      // Update pending updates ref and state
-      pendingUpdatesRef.current = {
-        currentSlideId: slideId,
-        viewedSlides: new Set(viewedSlides),
-      };
-      setPendingUpdates(pendingUpdatesRef.current);
-
-      // Schedule batch update after 3 seconds of inactivity
-      batchUpdateTimeoutRef.current = setTimeout(async () => {
-        try {
-          const updates = pendingUpdatesRef.current;
-          
-          // Convert viewed slides Set to array
-          const viewedSlidesArray = Array.from(updates.viewedSlides);
-
-          // Send all updates in a single batch API call
-          const batchResult = await certificationApi.topics.progress.batch(topicId, {
-            currentSlideId: updates.currentSlideId || undefined,
-            viewedSlideIds: viewedSlidesArray,
-          });
-
-          // Update local state with server response
-          if (batchResult.data?.attempt && foundTopicId) {
-            setAttempt(foundTopicId, batchResult.data.attempt);
-          }
-
-          // Clear pending updates
-          pendingUpdatesRef.current = { currentSlideId: null, viewedSlides: new Set() };
-          setPendingUpdates(pendingUpdatesRef.current);
-        } catch (err) {
-          console.error("Failed to batch update progress:", err);
-        } finally {
-          batchUpdateTimeoutRef.current = null;
-        }
-      }, 3000);
-    },
-    [foundTopicId, setAttempt]
-  );
-
-
-  // Fetch course by slug first
+  // Single API call to fetch topic, slides, progress, and unlock status
   useEffect(() => {
-    const fetchCourse = async () => {
-      if (!courseNameSlug) return;
-
-      try {
-        const result = await certificationApi.courses.bySlug(courseNameSlug);
-        if (result.data) {
-          setCourse(result.data);
-        }
-      } catch (err) {
-        console.error("Failed to fetch course:", err);
-      }
-    };
-
-    fetchCourse();
-  }, [courseNameSlug]);
-
-  // Check topic unlock status BEFORE loading slides
-  useEffect(() => {
-    const checkTopicUnlock = async () => {
-      if (!course || !topicSlug) {
-        setIsCheckingUnlock(false);
+    const fetchTopicData = async () => {
+      if (!courseNameSlug || !topicSlug) {
+        setIsLoading(false);
+        setError("Course or topic slug missing");
         return;
       }
 
-      setIsCheckingUnlock(true);
-      setIsTopicUnlocked(null);
-
       try {
-        // Fetch all topics for this course
-        const topicsResult = await certificationApi.topics.byCourseCode(course.code);
-        if (!topicsResult.data) {
-          console.error("Failed to fetch topics:", topicsResult.error);
-          setIsCheckingUnlock(false);
-          setIsTopicUnlocked(false);
-          return;
-        }
+        setIsLoading(true);
+        setError(null);
+        setIsTopicUnlocked(null);
 
-        // Find the topic with matching slug
-        const foundTopic = topicsResult.data.find(
-          (t) => createSlug(t.title) === topicSlug
+        // Single API call that returns everything
+        const result = await certificationApi.topics.bySlugWithCourse(
+          courseNameSlug,
+          topicSlug
         );
 
-        if (!foundTopic) {
-          console.error("Topic not found");
-          setIsCheckingUnlock(false);
-          setIsTopicUnlocked(false);
+        // Check for errors (ApiResult has data: null when error)
+        if (!result.data) {
+          const errorObj = (result as { error: { message: string; status?: number } }).error;
+          const errorMessage = errorObj?.message || "Failed to fetch topic";
+          setError(errorMessage);
+          setIsLoading(false);
           return;
         }
 
-        // Check if topic is unlocked (all previous topics completed)
-        const topicOrder = foundTopic.courseOrder ?? 1;
-        const isFirstTopic = topicOrder === 1;
-        
-        if (isFirstTopic) {
-          // First topic is always unlocked
-          setIsTopicUnlocked(true);
-          setIsCheckingUnlock(false);
-          return;
-        }
+        const { topic: topicData, slides: slidesData, attempt: attemptData, isUnlocked } = result.data;
 
-        // For non-first topics, check if user is logged in
-        if (!currentUser?.id) {
-          // No user - assume locked
-          setIsTopicUnlocked(false);
-          setIsCheckingUnlock(false);
+        // Set unlock status
+        setIsTopicUnlocked(isUnlocked);
+
+        if (!isUnlocked) {
           setShowLockedDialog(true);
+          setIsLoading(false);
+          // Still set topic for display
+          setFoundTopicId(topicData.id);
+          setTopic(topicData.id, topicData);
           return;
         }
 
-        // Fetch course progress to check if previous topics are completed
-        const progressResult = await certificationApi.courses.progress.byCode(course.code);
-        if (progressResult.data?.progress) {
-          // Get all topics for the course
-          const allTopics = topicsResult.data;
-          
-          // Get completed topic IDs
-          const completedTopicIds = new Set(
-            progressResult.data.progress
-              .filter((p: any) => p.status === "completed" || p.status === "passed")
-              .map((p: any) => p.topicId)
-          );
-          
-          // Check if all topics with lower courseOrder are completed
-          const previousTopics = allTopics.filter(
-            (t) => {
-              const tOrder = t.courseOrder ?? 999;
-              return tOrder < topicOrder;
-            }
-          );
-          
-          const allPreviousCompleted = previousTopics.length === 0 || previousTopics.every((t) =>
-            completedTopicIds.has(t.id)
-          );
-          
-          if (!allPreviousCompleted) {
-            // Topic is locked - delete invalid slide views and show dialog
-            try {
-              // Delete slide views for this topic via API
-              await fetch(`/api/user-slide-views/delete-by-topic`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ topicId: foundTopic.id }),
-              });
-            } catch (err) {
-              console.error("Failed to delete slide views:", err);
+        // Process slides to match ExtendedSlideData format and cache signed URLs
+        const cacheStore = useCertificationSlidesCacheStore.getState();
+        const processedSlides: ExtendedSlideData[] = slidesData
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map((slide) => {
+            // Extract signedUrl from API response and cache it
+            const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
+            if (slideWithUrl.signedUrl && slide.kind === "image") {
+              // Cache the signed URL so prefetch hook doesn't fetch it again
+              cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
             }
             
-            setIsTopicUnlocked(false);
-            setShowLockedDialog(true);
-          } else {
-            setIsTopicUnlocked(true);
-          }
-        } else {
-          // No progress data - assume locked if not first topic
-          setIsTopicUnlocked(false);
-          setShowLockedDialog(true);
+            return {
+              id: slide.id,
+              kind: slide.kind as SlideData["kind"],
+              orderIndex: slide.orderIndex,
+              textHtml: slide.textHtml ?? null,
+              imageUrl: slide.imageUrl ?? null,
+              videoUrl: slide.videoUrl ?? null,
+              videoStartS: slide.videoStartS ?? null,
+              videoEndS: slide.videoEndS ?? null,
+              effectiveNotes: (slide as any).officialNotes ?? null,
+              // Preserve signedUrl for image slides
+              ...(slide.kind === "image" && slideWithUrl.signedUrl
+                ? { signedUrl: slideWithUrl.signedUrl }
+                : {}),
+            };
+          });
+
+        // Set topic and slides in store
+        setFoundTopicId(topicData.id);
+        setTopic(topicData.id, topicData);
+        setSlides(topicData.id, processedSlides);
+        setSlidesState(processedSlides);
+
+        // Set attempt
+        if (attemptData) {
+          setAttempt(topicData.id, attemptData as any);
+          setCurrentAttemptState(attemptData);
         }
-      } catch (err) {
-        console.error("Failed to check topic unlock:", err);
-        setIsTopicUnlocked(false);
-        setShowLockedDialog(true);
-      } finally {
-        setIsCheckingUnlock(false);
-      }
-    };
 
-    checkTopicUnlock();
-  }, [course, topicSlug, currentUser?.id]);
-
-  useEffect(() => {
-    const fetchTopic = async () => {
-      if (!course || !topicSlug) return;
-      
-      // Don't load slides until unlock check is complete and topic is unlocked
-      if (isCheckingUnlock || isTopicUnlocked !== true) return;
-      
-      // Check if this is a new topic (haven't initialized for this topic yet)
-      const isNewTopic = initializedTopicRef.current !== topicSlug;
-      if (isNewTopic) {
-        // Reset flags for new topic
-        initialLoadCompleteRef.current = false;
-        initializedTopicRef.current = topicSlug;
-      }
-      
-      // Read slideId from URL only on initial load (first time this topic loads)
-      const initialSlideId = isNewTopic ? searchParams.get("index") : null;
-
-      // Fetch all topics for this course
-      const topicsResult = await certificationApi.topics.byCourseCode(course.code);
-      if (!topicsResult.data) {
-        console.error("Failed to fetch topics:", topicsResult.error);
-        return;
-      }
-
-      // Find the topic with matching slug
-      const foundTopic = topicsResult.data.find(
-        (t) => createSlug(t.title) === topicSlug
-      );
-
-      if (!foundTopic) {
-        console.error("Topic not found");
-        return;
-      }
-
-      setFoundTopicId(foundTopic.id);
-      setTopic(foundTopic.id, foundTopic);
-      // Reset quiz check only when topic actually changes (not on status updates)
-      // Don't reset if completion modal is open to prevent flickering
-      // This prevents the completion modal from flickering when attempt status updates
-      if (isNewTopic && !showCompletionModal) {
+        // Reset quiz check
         setHasQuizzes(null);
-      }
 
-      // Check if we already have slides cached
-      const cachedSlides = getSlides(foundTopic.id);
-      if (cachedSlides) {
-        // Filter to only regular slides
-        const regularSlides = cachedSlides.filter((s) => s.kind !== "quiz");
-        let targetSlideId: string | null = null;
-
-        if (initialSlideId) {
-          // Check if the requested slide ID exists
-          const requestedSlide = regularSlides.find((s) => s.id === initialSlideId);
-          if (requestedSlide) {
-            const slideIds = regularSlides.map((s) => s.id);
-            const isUnlocked =
-              currentAttempt?.status === "completed" ||
-              !currentAttempt ||
-              isSlideUnlocked(foundTopic.id, requestedSlide.id, slideIds);
-            if (isUnlocked) {
-              targetSlideId = requestedSlide.id;
-            }
-          }
-        }
-
-        // If no valid slide ID from query param, check saved progress
-        if (!targetSlideId) {
-          const cachedAttempt = getAttempt(foundTopic.id);
-          if (cachedAttempt?.currentSlideId) {
-            const slide = regularSlides.find(
-              (s) => s.id === cachedAttempt.currentSlideId
-            );
-            if (slide) {
-              const slideIds = regularSlides.map((s) => s.id);
-              const isUnlocked =
-                cachedAttempt.status === "completed" ||
-                isSlideUnlocked(
-                  foundTopic.id,
-                  cachedAttempt.currentSlideId,
-                  slideIds
-                );
-              if (isUnlocked) {
-                targetSlideId = slide.id;
-                // Update URL if needed
-                if (targetSlideId !== initialSlideId) {
-                  isNavigatingRef.current = true;
-                  const targetUrl = buildSlideUrl(targetSlideId);
-                  if (targetUrl) {
-                    router.replace(targetUrl, { scroll: false });
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Default to first slide if nothing found
-        if (!targetSlideId && regularSlides.length > 0) {
-          targetSlideId = regularSlides[0].id;
-          if (targetSlideId !== initialSlideId) {
-            isNavigatingRef.current = true;
-            const targetUrl = buildSlideUrl(targetSlideId);
-            if (targetUrl) {
-              router.replace(targetUrl, { scroll: false });
-            }
-          }
-        }
-
-        setCurrentSlideId(targetSlideId);
-        lastUrlSlideIdRef.current = targetSlideId;
-        setLoading(foundTopic.id, false);
-        // Mark initial load as complete after setting initial slide
-        initialLoadCompleteRef.current = true;
-        return;
-      }
-
-      // Fetch slides for this topic
-      setLoading(foundTopic.id, true);
-      try {
-        const slidesResult = await certificationApi.topics.slides.list(
-          foundTopic.id
-        );
-        if (slidesResult.data) {
-          const cacheStore = useCertificationSlidesCacheStore.getState();
-          
-          const sortedSlides: ExtendedSlideData[] = slidesResult.data
-            .sort((a, b) => a.orderIndex - b.orderIndex)
-            .map((slide) => {
-              const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
-              if (slideWithUrl.signedImageUrl && slide.kind === "image") {
-                cacheStore.setSlideUrl(slide.id, slideWithUrl.signedImageUrl);
-              }
-              
-              return {
-                id: slide.id,
-                kind: slide.kind as SlideData["kind"],
-                orderIndex: slide.orderIndex,
-                textHtml: slide.textHtml ?? null,
-                imageUrl: slide.imageUrl ?? null,
-                videoUrl: slide.videoUrl ?? null,
-                videoStartS: slide.videoStartS ?? null,
-                videoEndS: slide.videoEndS ?? null,
-                effectiveNotes: (slide as any).officialNotes ?? null,
-              };
-            });
-          setSlides(foundTopic.id, sortedSlides);
-
-          // Filter to only regular slides
-          const regularSlides = sortedSlides.filter((s) => s.kind !== "quiz");
-          let targetSlideId: string | null = null;
-          let shouldUpdateUrl = false;
-
-          try {
-            const cachedAttempt = getAttempt(foundTopic.id);
-            let attempt = cachedAttempt;
-
-            if (!attempt) {
-              const progressResult = await certificationApi.topics.progress.get(
-                foundTopic.id
-              );
-              if (progressResult.data?.attempt) {
-                attempt = progressResult.data.attempt;
-                setAttempt(foundTopic.id, attempt);
-              }
-            }
-
-            // Check slide ID from query param (only on initial load)
-            if (initialSlideId) {
-              const requestedSlide = regularSlides.find((s) => s.id === initialSlideId);
-              if (requestedSlide) {
-                const slideIds = regularSlides.map((s) => s.id);
-                const isUnlocked =
-                  attempt?.status === "completed" ||
-                  !attempt ||
-                  isSlideUnlocked(foundTopic.id, requestedSlide.id, slideIds);
-
-                if (isUnlocked) {
-                  targetSlideId = requestedSlide.id;
-                } else {
-                  // Find highest unlocked slide
-                  let highestUnlockedSlide: ExtendedSlideData | null = null;
-                  for (let i = 0; i < regularSlides.length; i++) {
-                    if (
-                      isSlideUnlocked(
-                        foundTopic.id,
-                        regularSlides[i].id,
-                        slideIds
-                      )
-                    ) {
-                      highestUnlockedSlide = regularSlides[i];
-                    } else {
-                      break;
-                    }
-                  }
-                  if (highestUnlockedSlide) {
-                    targetSlideId = highestUnlockedSlide.id;
-                    shouldUpdateUrl = true;
-                  }
-                }
-              }
-            }
-
-            // If no valid slide ID from query param, use saved progress
-            if (!targetSlideId && attempt?.currentSlideId) {
-              const slide = regularSlides.find(
-                (s) => s.id === attempt.currentSlideId
-              );
-              if (slide) {
-                const slideIds = regularSlides.map((s) => s.id);
-                if (
-                  attempt.status === "completed" ||
-                  isSlideUnlocked(foundTopic.id, attempt.currentSlideId, slideIds)
-                ) {
-                  targetSlideId = slide.id;
-                  shouldUpdateUrl = true;
-                } else {
-                  // Find highest unlocked slide
-                  let highestUnlockedSlide: ExtendedSlideData | null = null;
-                  for (let i = 0; i < regularSlides.length; i++) {
-                    if (
-                      isSlideUnlocked(
-                        foundTopic.id,
-                        regularSlides[i].id,
-                        slideIds
-                      )
-                    ) {
-                      highestUnlockedSlide = regularSlides[i];
-                    } else {
-                      break;
-                    }
-                  }
-                  if (highestUnlockedSlide) {
-                    targetSlideId = highestUnlockedSlide.id;
-                    shouldUpdateUrl = true;
-                  }
-                }
-              }
-            }
-
-            // Default to first slide if nothing found
-            if (!targetSlideId && regularSlides.length > 0) {
-              targetSlideId = regularSlides[0].id;
-              shouldUpdateUrl = true;
-            }
-
-            if (!attempt && targetSlideId) {
-              const createResult =
-                await certificationApi.topics.progress.create(foundTopic.id, {
-                  currentSlideId: targetSlideId,
-                });
-              if (createResult.data?.attempt) {
-                attempt = createResult.data.attempt;
-                const progressResult =
-                  await certificationApi.topics.progress.get(foundTopic.id);
-                if (progressResult.data?.attempt) {
-                  setAttempt(foundTopic.id, progressResult.data.attempt);
-                  attempt = progressResult.data.attempt;
-                } else {
-                  setAttempt(foundTopic.id, attempt);
-                }
-              }
-            }
-
-            if (
-              attempt &&
-              targetSlideId === regularSlides[0]?.id &&
-              regularSlides.length > 0 &&
-              attempt.status !== "completed"
-            ) {
-              const slideProgress =
-                (attempt.slideProgress as Record<string, any>) || {};
-              if (!slideProgress[targetSlideId]?.viewed) {
-                try {
-                  await certificationApi.topics.slides.markViewed(
-                    foundTopic.id,
-                    targetSlideId
-                  );
-                  const progressResult =
-                    await certificationApi.topics.progress.get(foundTopic.id);
-                  if (progressResult.data?.attempt) {
-                    setAttempt(foundTopic.id, progressResult.data.attempt);
-                  }
-                } catch (err) {
-                  console.error("Failed to mark first slide as viewed:", err);
-                }
-              }
-            }
-
-            setCurrentSlideId(targetSlideId);
-            lastUrlSlideIdRef.current = targetSlideId;
-            if (shouldUpdateUrl && targetSlideId) {
-              isNavigatingRef.current = true;
-              const targetUrl = buildSlideUrl(targetSlideId);
-              if (targetUrl) {
-                router.replace(targetUrl, { scroll: false });
-              }
-            }
-            // Mark initial load as complete after setting initial slide
-            initialLoadCompleteRef.current = true;
-          } catch (progressError) {
-            console.error("Failed to load progress:", progressError);
-            if (regularSlides.length > 0) {
-              setCurrentSlideId(regularSlides[0].id);
-              lastUrlSlideIdRef.current = regularSlides[0].id;
-            }
-            // Mark initial load as complete even on error
-            initialLoadCompleteRef.current = true;
-          }
-        }
+        setIsLoading(false);
       } catch (err) {
-        console.error("Failed to fetch slides:", err);
-        setError(
-          foundTopic.id,
-          err instanceof Error ? err.message : "Failed to fetch slides"
-        );
-        // Mark initial load as complete even on error
-        initialLoadCompleteRef.current = true;
-      } finally {
-        setLoading(foundTopic.id, false);
+        console.error("Failed to fetch topic data:", err);
+        setError(err instanceof Error ? err.message : "Failed to fetch topic data");
+        setIsLoading(false);
       }
     };
 
-    fetchTopic();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    course,
-    topicSlug,
-    isCheckingUnlock,
-    isTopicUnlocked,
-    searchParams, // Only used to read initial slideId inside the function, not reactive
-    // slideId intentionally NOT in dependencies - we only read URL on initial load
-    // Including it would cause re-runs when URL changes, which resets state
-    getSlides,
-    getAttempt,
-    isSlideUnlocked,
-    setTopic,
-    setSlides,
-    setAttempt,
-    setLoading,
-    setError,
-    router,
-    buildSlideUrl,
-    currentAttempt,
-  ]);
+    fetchTopicData();
+  }, [courseNameSlug, topicSlug, setTopic, setAttempt, setSlides]);
 
-  // Update URL param when currentSlideId changes (one-way: state → URL)
-  // This allows bookmarking/sharing but doesn't control navigation
-  // Only runs after initial load is complete
-  useEffect(() => {
-    if (!currentSlideId || isLoading || !foundTopicId) return;
+  // Update current slide on page exit
+  const updateCurrentSlideOnExit = useCallback(async () => {
+    const currentSlideId = pendingSlideRef.current;
     
-    // Don't update URL until initial load is complete
-    if (!initialLoadCompleteRef.current) return;
-    
-    // Skip if we're currently navigating (to avoid circular updates)
-    if (isNavigatingRef.current) {
-      isNavigatingRef.current = false;
+    // Check if there's a slide to update
+    if (!currentSlideId || !foundTopicId || !topic) {
       return;
     }
 
-    // Only update URL if it's different from what we last set
-    // Don't read from searchParams here - it's reactive and causes issues
-    if (lastUrlSlideIdRef.current !== currentSlideId) {
-      const targetUrl = buildSlideUrl(currentSlideId);
-      if (targetUrl) {
-        lastUrlSlideIdRef.current = currentSlideId;
-        router.replace(targetUrl, { scroll: false });
+    try {
+      // Update current slide with a single API call
+      const result = await certificationApi.topics.progress.update(topic.id, {
+        currentSlideId,
+      });
+
+      // Update local state with server response
+      if (result.data?.attempt && foundTopicId) {
+        setAttempt(foundTopicId, result.data.attempt);
+      }
+    } catch (err) {
+      console.error("Failed to update current slide on exit:", err);
+    }
+  }, [foundTopicId, topic, setAttempt]);
+
+
+
+  // Determine current slide from attempt when slides/attempt are available (only once)
+  useEffect(() => {
+    if (!foundTopicId || !slides.length || currentSlideId !== null) return;
+
+    let targetSlideId: string | null = null;
+
+    if (currentAttempt?.currentSlideId) {
+      const slide = slides.find((s) => s.id === currentAttempt.currentSlideId);
+      if (slide) {
+        targetSlideId = slide.id;
       }
     }
-  }, [currentSlideId, isLoading, foundTopicId, router, buildSlideUrl]);
 
-  const handleNextSlide = useCallback(() => {
-    // Check if next button is disabled (timer active)
-    if (isNextDisabled) {
-      return;
+    // Default to first slide if nothing found
+    if (!targetSlideId && slides.length > 0) {
+      targetSlideId = slides[0].id;
     }
 
+    if (targetSlideId) {
+      setCurrentSlideId(targetSlideId);
+    }
+  }, [foundTopicId, slides, currentAttempt, currentSlideId]);
+
+  // Sync pendingSlideRef whenever currentSlideId changes
+  useEffect(() => {
+    if (currentSlideId) {
+      pendingSlideRef.current = currentSlideId;
+    }
+  }, [currentSlideId]);
+
+  const handleNextSlide = useCallback(async () => {
     // Check if we're on the last slide
     if (currentSlideIndex >= 0 && currentSlideIndex === slides.length - 1) {
-      // Mark the current (last) slide as viewed and immediately update progress (no delay)
+      // Call complete endpoint
       if (currentSlideId && foundTopicId && topic && currentAttempt && currentAttempt.status !== "completed") {
-        setLocalViewedSlides((prev) => {
-          const updated = new Set(prev);
-          updated.add(currentSlideId);
-          // Immediately call batch update (no delay/debounce) to unlock quiz instantly
-          immediateBatchedUpdate(topic.id, currentSlideId, updated);
-          return updated;
-        });
-      }
-      // Check for quizzes before showing completion modal
-      if (foundTopicId && hasQuizzes === null) {
         setIsLoadingQuiz(true);
-        certificationApi.quizzes.list(foundTopicId)
-          .then((result) => {
-            if (result.data && result.data.length > 0) {
-              // Check if any quiz has questions
-              Promise.all(
-                result.data.map((quiz) =>
-                  certificationApi.quizzes.questions.list(quiz.id)
-                )
-              ).then((questionResults) => {
-                const hasQuestions = questionResults.some(
-                  (qResult) => qResult.data && qResult.data.length > 0
-                );
-                setHasQuizzes(hasQuestions);
-                setIsLoadingQuiz(false);
-                if (hasQuestions) {
-                  setShowCompletionModal(true);
-                } else {
-                  setShowCompletionModal(true);
-                }
-              });
-            } else {
-              setHasQuizzes(false);
-              setIsLoadingQuiz(false);
-              setShowCompletionModal(true);
-            }
-          })
-          .catch((err) => {
-            console.error("Failed to check quizzes:", err);
-            setHasQuizzes(false);
-            setIsLoadingQuiz(false);
-            setShowCompletionModal(true);
+        
+        try {
+          const result = await certificationApi.topics.progress.complete(topic.id, {
+            currentSlideId,
           });
+          
+          if (result.data) {
+            setAttempt(foundTopicId, result.data.attempt);
+            setHasQuizzes(result.data.hasQuiz);
+            setShowCompletionModal(true);
+          } else {
+            console.error("Failed to complete topic:", result.error);
+            setHasQuizzes(false);
+            setShowCompletionModal(true);
+          }
+        } catch (err) {
+          console.error("Failed to complete topic:", err);
+          setHasQuizzes(false);
+          setShowCompletionModal(true);
+        } finally {
+          setIsLoadingQuiz(false);
+        }
       } else {
         setShowCompletionModal(true);
       }
       return;
     }
 
+    // Navigate to next slide
     if (currentSlideIndex >= 0 && currentSlideIndex < slides.length - 1) {
       const nextSlide = slides[currentSlideIndex + 1];
-      const isNextSlideLast = currentSlideIndex + 1 === slides.length - 1;
-
-      if (nextSlide && foundTopicId) {
-        const slideIds = slides.map((s) => s.id);
-        if (
-          currentAttempt?.status !== "completed" &&
-          !isSlideUnlocked(foundTopicId, nextSlide.id, slideIds)
-        ) {
-          return;
-        }
-      }
-
-      // Update UI immediately (optimistic update)
-      // URL will be updated automatically by the effect that watches currentSlideId
-      isNavigatingRef.current = true;
       setCurrentSlideId(nextSlide.id);
-
-      // Track viewed slide locally and schedule batched update
-      // Skip batch update when navigating TO the last slide - it will be called when clicking Next ON the last slide
-      if (nextSlide && foundTopicId && topic && currentAttempt && currentAttempt.status !== "completed" && !isNextSlideLast) {
-        setLocalViewedSlides((prev) => {
-          const updated = new Set(prev);
-          updated.add(nextSlide.id);
-          // Schedule batched update with updated viewed slides
-          scheduleBatchedUpdate(topic.id, nextSlide.id, updated);
-          return updated;
-        });
-      }
     }
   }, [
     currentSlideIndex,
@@ -828,39 +323,15 @@ function CourseTopicSlidesPageContent() {
     currentAttempt,
     currentSlideId,
     foundTopicId,
-    isSlideUnlocked,
-    scheduleBatchedUpdate,
-    immediateBatchedUpdate,
-    isNextDisabled,
+    setAttempt,
   ]);
 
   const handlePrevSlide = useCallback(() => {
     if (currentSlideIndex > 0) {
       const prevSlide = slides[currentSlideIndex - 1];
-
-      // Update UI immediately (optimistic update)
-      // URL will be updated automatically by the effect that watches currentSlideId
-      isNavigatingRef.current = true;
       setCurrentSlideId(prevSlide.id);
-
-      // Schedule batched update
-      if (
-        topic &&
-        currentAttempt &&
-        prevSlide &&
-        currentAttempt.status !== "completed"
-      ) {
-        scheduleBatchedUpdate(topic.id, prevSlide.id, localViewedSlides);
-      }
     }
-  }, [
-    currentSlideIndex,
-    slides,
-    topic,
-    currentAttempt,
-    scheduleBatchedUpdate,
-    localViewedSlides,
-  ]);
+  }, [currentSlideIndex, slides]);
 
   // Handle quiz navigation
   const handleTakeQuiz = useCallback(async () => {
@@ -1025,106 +496,65 @@ function CourseTopicSlidesPageContent() {
     };
   }, [isLoading, error, slides.length, isFullscreen, showControlsWithTimeout]);
 
-
-  // Timer logic for new slides (5-second countdown)
-  // This effect only runs when currentSlideId changes, not when currentAttempt updates
+  // Page exit detection - update current slide on browser close or navigation away
   useEffect(() => {
-    const attempt = currentAttemptRef.current;
-    
-    if (!currentSlideId || isLoading || !foundTopicId || !attempt) {
-      // Reset timer state when conditions aren't met
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
-      }
-      timedSlideIdRef.current = null;
-      setIsNextDisabled(false);
-      setNewSlideTimer(null);
-      return;
-    }
+    const slidesPathPattern = `/courses/${courseNameSlug}/${topicSlug}/slides`;
+    const isOnSlidesPage = pathname.startsWith(slidesPathPattern);
 
-    // If we're already timing this slide, don't reset (this prevents reset when currentAttempt updates)
-    if (timedSlideIdRef.current === currentSlideId && timerIntervalRef.current) {
-      return;
-    }
-
-    // Clear any existing timer for a different slide
-    if (timerIntervalRef.current) {
-      clearInterval(timerIntervalRef.current);
-      timerIntervalRef.current = null;
-    }
-
-    // Check if this is a new slide using local state (client-side only)
-    const isNewSlide = !localViewedSlides.has(currentSlideId);
-
-    if (isNewSlide && attempt.status !== "completed") {
-      // Track that we're timing this slide
-      timedSlideIdRef.current = currentSlideId;
-      
-      // Start 5-second countdown timer
-      setIsNextDisabled(true);
-      setNewSlideTimer(5);
-
-      timerIntervalRef.current = setInterval(() => {
-        setNewSlideTimer((prev) => {
-          if (prev === null || prev <= 1) {
-            setIsNextDisabled(false);
-            timedSlideIdRef.current = null;
-            if (timerIntervalRef.current) {
-              clearInterval(timerIntervalRef.current);
-              timerIntervalRef.current = null;
-            }
-            return null;
-          }
-          return prev - 1;
+    // Handle beforeunload (browser/tab close)
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Update current slide before page unloads
+      // Use fetch with keepalive for reliable delivery during page exit
+      // Note: sendBeacon doesn't support PATCH method, so we use fetch instead
+      const currentSlideId = pendingSlideRef.current;
+      if (currentSlideId && foundTopicId && topic) {
+        const payload = JSON.stringify({
+          currentSlideId,
         });
-      }, 1000);
-    } else {
-      // Already viewed or completed, allow immediate navigation
-      timedSlideIdRef.current = null;
-      setIsNextDisabled(false);
-      setNewSlideTimer(null);
-    }
 
-    // Cleanup on unmount or when slide changes
-    return () => {
-      // Only cleanup if we're moving to a different slide
-      if (timedSlideIdRef.current !== currentSlideId && timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-        timerIntervalRef.current = null;
+        const url = `/api/certification/topics/${encodeURIComponent(topic.id)}/progress`;
+
+        // Use fetch with keepalive for reliable delivery during page exit
+        // keepalive ensures the request completes even if the page unloads
+        fetch(url, {
+          method: "PATCH",
+          body: payload,
+          headers: { "Content-Type": "application/json" },
+          keepalive: true,
+          credentials: "include", // Ensure cookies are sent
+        }).catch(() => {
+          // Ignore errors during page unload
+        });
       }
     };
-  }, [
-    currentSlideId, // Only run when slide ID changes
-    isLoading,
-    foundTopicId,
-    currentAttempt?.status,
-    localViewedSlides, // Use local state to check if slide is new
-  ]);
 
-  // Initialize localViewedSlides from server state when attempt loads
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [pathname, courseNameSlug, topicSlug, foundTopicId, topic]);
+
+  // Detect navigation away from slides page and update current slide
   useEffect(() => {
-    if (currentAttempt?.slideProgress && foundTopicId) {
-      const slideProgress = currentAttempt.slideProgress as Record<string, any>;
-      const viewedSlides = new Set<string>();
-      Object.keys(slideProgress).forEach((slideId) => {
-        if (slideProgress[slideId]?.viewed) {
-          viewedSlides.add(slideId);
-        }
-      });
-      setLocalViewedSlides(viewedSlides);
-    }
-  }, [currentAttempt?.slideProgress, foundTopicId]);
+    const slidesPathPattern = `/courses/${courseNameSlug}/${topicSlug}/slides`;
+    const isOnSlidesPage = pathname.startsWith(slidesPathPattern);
 
-  // Cleanup batch update timeout on unmount
+    // If we're navigating away from slides page, update current slide
+    if (!isOnSlidesPage && foundTopicId && topic) {
+      updateCurrentSlideOnExit();
+    }
+  }, [pathname, courseNameSlug, topicSlug, foundTopicId, topic, updateCurrentSlideOnExit]);
+
+  // Cleanup: update current slide on component unmount
   useEffect(() => {
     return () => {
-      if (batchUpdateTimeoutRef.current) {
-        clearTimeout(batchUpdateTimeoutRef.current);
-        batchUpdateTimeoutRef.current = null;
+      // Update current slide on unmount
+      if (foundTopicId && topic) {
+        updateCurrentSlideOnExit();
       }
     };
-  }, []);
+  }, [foundTopicId, topic, updateCurrentSlideOnExit]);
 
   // Redirect countdown timer effect
   useEffect(() => {
@@ -1172,8 +602,8 @@ function CourseTopicSlidesPageContent() {
     }
   }, [redirectCountdown, showLockedDialog, courseNameSlug, router]);
 
-  // Show loading while checking unlock status
-  if (isCheckingUnlock) {
+  // Show loading while fetching data
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -1236,14 +666,7 @@ function CourseTopicSlidesPageContent() {
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
+  // Show error if fetch failed
   if (error || !topic) {
     return (
       <div className="space-y-6">
@@ -1259,20 +682,7 @@ function CourseTopicSlidesPageContent() {
   }
 
   const canGoPrev = currentSlideIndex > 0;
-  const nextSlide =
-    currentSlideIndex >= 0 && currentSlideIndex < slides.length - 1
-      ? slides[currentSlideIndex + 1]
-      : null;
-  const slideIdsForNav = slides.map((s) => s.id);
   const isLastSlide = currentSlideIndex >= 0 && currentSlideIndex === slides.length - 1;
-  const canGoNext =
-    !isNextDisabled &&
-    (isLastSlide ||
-      (nextSlide !== null &&
-        (isCompleted ||
-          !nextSlide ||
-          (foundTopicId &&
-            isSlideUnlocked(foundTopicId, nextSlide.id, slideIdsForNav)))));
 
   return (
     <div
@@ -1398,24 +808,13 @@ function CourseTopicSlidesPageContent() {
                     variant="ghost"
                     size="sm"
                     onClick={handleNextSlide}
-                    disabled={!canGoNext}
-                    className="text-foreground hover:bg-foreground/20 disabled:opacity-50 flex items-center gap-2"
+                    className="text-foreground hover:bg-foreground/20 flex items-center gap-2"
                   >
                     <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                       →
                     </kbd>
-                    <span className="text-sm">Next</span>
+                    <span className="text-sm">{isLastSlide ? "Finish" : "Next"}</span>
                   </Button>
-                  {newSlideTimer !== null && newSlideTimer > 0 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted-foreground/20 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300 ease-linear rounded-full"
-                        style={{
-                          width: `${((5 - newSlideTimer) / 5) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -1428,12 +827,6 @@ function CourseTopicSlidesPageContent() {
             {/* Header - always visible, tight spacing */}
             <div className="px-6 py-0 flex items-center justify-between h-auto min-h-[60px]">
               <div className="flex flex-col gap-1 h-full justify-center flex-[0.6] min-w-0">
-                {/* Course name - small label above */}
-                {course && (
-                  <p className="text-xs text-muted-foreground">
-                    {course.name}
-                  </p>
-                )}
                 {/* Topic title with badge */}
                 <div className="flex items-center gap-2 min-w-0">
                   {topic.courseOrder !== null && topic.courseOrder !== undefined && (
@@ -1444,16 +837,22 @@ function CourseTopicSlidesPageContent() {
                       T{topic.courseOrder}
                     </Badge>
                   )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <p className="text-foreground text-2xl font-semibold truncate min-w-0">
-                        {topic.title}
-                      </p>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{topic.title}</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  {isMounted ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="text-foreground text-2xl font-semibold truncate min-w-0">
+                          {topic.title}
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{topic.title}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <p className="text-foreground text-2xl font-semibold truncate min-w-0">
+                      {topic.title}
+                    </p>
+                  )}
                 </div>
               </div>
               <Button
@@ -1526,24 +925,13 @@ function CourseTopicSlidesPageContent() {
                     variant="ghost"
                     size="sm"
                     onClick={handleNextSlide}
-                    disabled={!canGoNext}
-                    className="text-foreground hover:bg-foreground/20 disabled:opacity-50 flex items-center gap-2 h-full"
+                    className="text-foreground hover:bg-foreground/20 flex items-center gap-2 h-full"
                   >
                     <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
                       →
                     </kbd>
-                    <span className="text-base">Next</span>
+                    <span className="text-base">{isLastSlide ? "Finish" : "Next"}</span>
                   </Button>
-                  {newSlideTimer !== null && newSlideTimer > 0 && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-muted-foreground/20 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all duration-300 ease-linear rounded-full"
-                        style={{
-                          width: `${((5 - newSlideTimer) / 5) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -1552,8 +940,9 @@ function CourseTopicSlidesPageContent() {
       )}
 
       {/* Locked Topic Dialog */}
-      <Dialog open={showLockedDialog} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+      {isMounted && (
+        <Dialog open={showLockedDialog} onOpenChange={() => {}}>
+          <DialogContent className="sm:max-w-md" showCloseButton={false}>
           <DialogHeader>
             <div className="flex flex-col items-center gap-4 mb-4">
               <div className="rounded-full bg-destructive/10 p-3">
@@ -1598,10 +987,12 @@ function CourseTopicSlidesPageContent() {
           </div>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Completion Modal */}
-      <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+      {isMounted && (
+        <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
+          <DialogContent className="sm:max-w-md" showCloseButton={false}>
           <DialogHeader>
             <div className="flex flex-col items-center gap-4 mb-4">
               <div className="rounded-full bg-primary/10 p-3">
@@ -1610,6 +1001,11 @@ function CourseTopicSlidesPageContent() {
               <DialogTitle className="text-2xl text-center">
                 Congratulations!
               </DialogTitle>
+              {topic?.title && (
+                <p className="text-lg font-semibold text-center">
+                  {topic.title}
+                </p>
+              )}
               <DialogDescription className="text-center text-base">
                 {hasQuizzes === null
                   ? isLoadingQuiz
@@ -1651,6 +1047,7 @@ function CourseTopicSlidesPageContent() {
           </div>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import {
   Eye,
   FileQuestion,
   ChevronsRight,
+  ChevronRight,
   TrendingUp,
   Award,
 } from "lucide-react";
@@ -51,6 +52,7 @@ import { useCertificationCourseByCode } from "@/entities/certification/model/sto
 import Image from "next/image";
 import { StarRating } from "@/components/atoms/star-rating";
 import CountUp from "react-countup";
+import { TopicCertificate } from "@/components/molecules/topic-certificate";
 
 type Course = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
@@ -67,6 +69,7 @@ type TopicProgress = {
   scorePercentage: number | null;
   slideProgress: Record<string, any>;
   attemptNumber: number;
+  completedAt?: string | null;
 };
 
 export default function CoursePage() {
@@ -120,6 +123,11 @@ export default function CoursePage() {
     Map<string, TopicProgress>
   >(new Map());
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+  
+  // Track in-progress quiz attempts by topic ID
+  const [inProgressQuizAttempts, setInProgressQuizAttempts] = useState<
+    Map<string, any>
+  >(new Map());
   
   // Animation state for progress bars
   const [animatedProgress, setAnimatedProgress] = useState<number[]>([]);
@@ -187,6 +195,34 @@ export default function CoursePage() {
 
     fetchProgress();
   }, [course]);
+
+  // Fetch in-progress quiz attempts for topics with quizzes
+  useEffect(() => {
+    const fetchInProgressAttempts = async () => {
+      if (!currentTopic || !currentTopic.hasQuiz) return;
+
+      try {
+        const result = await certificationApi.topics.progress.getQuizInProgress(
+          currentTopic.id
+        );
+        if (result.data) {
+          setInProgressQuizAttempts((prev) => {
+            const newMap = new Map(prev);
+            if (result.data) {
+              newMap.set(currentTopic.id, result.data);
+            } else {
+              newMap.delete(currentTopic.id);
+            }
+            return newMap;
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch in-progress quiz attempt:", err);
+      }
+    };
+
+    fetchInProgressAttempts();
+  }, [currentTopic]);
 
   // Helper function to animate a value
   const animateValue = useCallback((
@@ -419,6 +455,29 @@ export default function CoursePage() {
     }, 100);
   }, [topicsList, topicProgress, currentTopic, isLoadingTopics, isLoadingProgress, animateValue, topicStatuses, calculateTopicCompletion]);
 
+  // Calculate progress data from topics and progress (must be before early returns for hook order)
+  const completedTopics = Array.from(topicProgress.values()).filter(
+    (p) => p.status === "completed" || p.status === "passed"
+  ).length;
+  const totalTopics = topicsList.length;
+  const isCertificationComplete = completedTopics === totalTopics && totalTopics > 0;
+
+  // Get the last completed topic's completion date for the certificate (must be before early returns)
+  const lastCompletedTopicDate = useMemo(() => {
+    if (!isCertificationComplete) return null;
+    const completedProgresses = Array.from(topicProgress.values()).filter(
+      (p) => (p.status === "completed" || p.status === "passed") && p.completedAt
+    );
+    if (completedProgresses.length === 0) return null;
+    // Sort by completedAt descending and get the most recent
+    const sorted = completedProgresses.sort((a, b) => {
+      const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+      const dateB = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+      return dateB - dateA;
+    });
+    return sorted[0]?.completedAt || null;
+  }, [completedTopics, totalTopics, topicProgress, isCertificationComplete]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -499,12 +558,6 @@ export default function CoursePage() {
     return "Good evening";
   };
 
-  // Calculate progress data from topics and progress
-  const completedTopics = Array.from(topicProgress.values()).filter(
-    (p) => p.status === "completed" || p.status === "passed"
-  ).length;
-  const totalTopics = topicsList.length;
-
   const currentTopicNumber = currentTopic
     ? (currentTopic.courseOrder ?? topicsList.indexOf(currentTopic) + 1)
     : totalTopics + 1;
@@ -550,9 +603,6 @@ export default function CoursePage() {
     // No quiz attempt yet
     quizStatus = "not_attempted";
   }
-
-  const isCertificationComplete = completedTopics === totalTopics && totalTopics > 0;
-
 
   // Use animated radial chart data if available, otherwise calculate static values
   const radialChartData = animatedRadialChartData.length > 0 
@@ -639,7 +689,10 @@ export default function CoursePage() {
             height={48}
             className="shrink-0"
           />
-          <p className="text-2xl font-normal text-white text-center">Welcome to the <span className="font-black">AMAYDA Program</span></p>
+          <div className="flex flex-col gap-1">
+            <p className="text-lg font-normal text-white text-center">Welcome to the</p>  
+            <p className="text-3xl font-black text-white text-center"><span className="font-black">AMAYDA Program</span></p>
+          </div>
         </Card>
 
         {/* Chevron separator */}
@@ -647,8 +700,8 @@ export default function CoursePage() {
           <ChevronsRight className="h-8 w-8 text-muted-foreground" />
         </div>
 
-        {/* Current Topic Card - 2/3 width */}
-        {isLoadingTopics || !currentTopic ? (
+        {/* Current Topic Card or Certificate - 2/3 width */}
+        {isLoadingTopics ? (
           <Card className="lg:w-2/3 flex flex-row overflow-hidden p-0">
             <div className="flex-shrink-0 h-full aspect-video bg-muted/30 border-r">
               <Skeleton className="h-full w-full" />
@@ -682,6 +735,13 @@ export default function CoursePage() {
               </CardFooter>
             </div>
           </Card>
+        ) : isCertificationComplete ? (
+          /* Certificate - shown when all topics are completed, rendered without Card wrapper */
+          <TopicCertificate
+            user={currentUser}
+            completedAt={lastCompletedTopicDate}
+            className="lg:w-2/3"
+          />
         ) : currentTopic ? (
           <Card className="lg:w-2/3 flex flex-row overflow-hidden p-0">
             {/* Thumbnail - Left side */}
@@ -731,85 +791,144 @@ export default function CoursePage() {
                   )}
                 </div>
               </CardContent>
-              <CardFooter className="p-4 pt-0 mt-auto flex-shrink-0">
-                {quizStatus === "not_attempted"
-                  ? slidesViewed === totalSlides
-                    ? (
+              <CardFooter className="p-4 pt-0 mt-auto flex-shrink-0 flex justify-end">
+                {currentTopicProgress?.status === "quiz_unlocked"
+                  ? (() => {
+                      // Check if there's an in-progress quiz attempt
+                      const hasInProgressAttempt = inProgressQuizAttempts.has(currentTopic.id) && 
+                        inProgressQuizAttempts.get(currentTopic.id) !== null;
+                      
+                      return (
                         <Button
-                          className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
-                          size="default"
-                          onClick={() => {
-                            const topicSlug = createSlug(currentTopic.title);
-                            router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
-                          }}
-                        >
-                          Take Quiz
-                        </Button>
-                      )
-                    : (
-                        <Button
-                          className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
-                          size="default"
-                          onClick={() => {
-                            const topicSlug = createSlug(currentTopic.title);
-                            // Get first slide ID (non-quiz)
-                            const firstSlide = currentTopic.slides?.find(s => s.kind !== "quiz");
-                            if (firstSlide) {
-                              router.push(`/courses/${courseSlug}/${topicSlug}/slides?index=${firstSlide.id}`);
-                            } else {
-                              router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
-                            }
-                          }}
-                        >
-                          {isTopicStarted(currentTopicProgress) ? "Continue Topic" : "Begin"}
-                        </Button>
-                      )
-                  : quizStatus === "passed"
-                    ? (
-                        <Button
-                          className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
-                          size="default"
-                          onClick={() => {
-                            const topicSlug = createSlug(currentTopic.title);
-                            // Get first slide ID (non-quiz)
-                            const firstSlide = currentTopic.slides?.find(s => s.kind !== "quiz");
-                            if (firstSlide) {
-                              router.push(`/courses/${courseSlug}/${topicSlug}/slides?index=${firstSlide.id}`);
-                            } else {
-                              router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
-                            }
-                          }}
-                        >
-                          Review slides
-                        </Button>
-                      )
-                    : (
-                        <Button
-                          className="w-full bg-[var(--brand-bullyproof-secondary)] text-white hover:bg-[var(--brand-bullyproof-secondary)]/90 hover:text-white"
+                          className="w-1/2 bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
                           size="default"
                           onClick={async () => {
                             const topicSlug = createSlug(currentTopic.title);
-                            // Fetch first quiz ID for this topic
-                            try {
-                              const quizzesResult = await certificationApi.quizzes.list(currentTopic.id);
-                              if (quizzesResult.data && quizzesResult.data.length > 0) {
-                                const firstQuiz = quizzesResult.data[0];
-                                router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${firstQuiz.id}`);
-                              } else {
-                                // No quiz found, navigate to slides instead
-                                const firstSlide = currentTopic.slides?.find(s => s.kind !== "quiz");
-                                if (firstSlide) {
-                                  router.push(`/courses/${courseSlug}/${topicSlug}/slides?index=${firstSlide.id}`);
+                            // If there's an in-progress attempt, navigate to the quiz page which will resume it
+                            // Otherwise, navigate to quiz overview page
+                            if (hasInProgressAttempt) {
+                              const inProgressAttempt = inProgressQuizAttempts.get(currentTopic.id);
+                              if (inProgressAttempt?.quizId) {
+                                // Fetch quiz to get title for slug
+                                try {
+                                  const quizResult = await certificationApi.quizzes.byId(inProgressAttempt.quizId);
+                                  if (quizResult.data) {
+                                    const quizSlug = createSlug(quizResult.data.title);
+                                    router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${quizSlug}`);
+                                  } else {
+                                    router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                  }
+                                } catch (err) {
+                                  console.error("Failed to fetch quiz:", err);
+                                  router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
                                 }
+                              } else {
+                                router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
                               }
-                            } catch (err) {
-                              console.error("Failed to fetch quizzes:", err);
+                            } else {
+                              router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
                             }
                           }}
                         >
-                          Retake Quiz
+                          <span className="flex items-center gap-2">
+                            {hasInProgressAttempt ? "Continue Quiz" : "Start Quiz"}
+                            <ChevronsRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
+                          </span>
                         </Button>
-                      )}
+                      );
+                    })()
+                  : quizStatus === "not_attempted"
+                    ? slidesViewed === totalSlides
+                      ? (() => {
+                          // Check if there's an in-progress quiz attempt
+                          const hasInProgressAttempt = inProgressQuizAttempts.has(currentTopic.id) && 
+                            inProgressQuizAttempts.get(currentTopic.id) !== null;
+                          
+                          return (
+                            <Button
+                              className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                              size="default"
+                              onClick={async () => {
+                                const topicSlug = createSlug(currentTopic.title);
+                                // If there's an in-progress attempt, navigate to the quiz page which will resume it
+                                // Otherwise, navigate to quiz overview page
+                                if (hasInProgressAttempt) {
+                                  const inProgressAttempt = inProgressQuizAttempts.get(currentTopic.id);
+                                  if (inProgressAttempt?.quizId) {
+                                    // Fetch quiz to get title for slug
+                                    try {
+                                      const quizResult = await certificationApi.quizzes.byId(inProgressAttempt.quizId);
+                                      if (quizResult.data) {
+                                        const quizSlug = createSlug(quizResult.data.title);
+                                        router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${quizSlug}`);
+                                      } else {
+                                        router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                      }
+                                    } catch (err) {
+                                      console.error("Failed to fetch quiz:", err);
+                                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                    }
+                                  } else {
+                                    router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                  }
+                                } else {
+                                  router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                                }
+                              }}
+                            >
+                              {hasInProgressAttempt ? "Continue Quiz" : "Take Quiz"}
+                            </Button>
+                          );
+                        })()
+                      : (
+                          <Button
+                            className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                            size="default"
+                            onClick={() => {
+                              const topicSlug = createSlug(currentTopic.title);
+                              router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
+                            }}
+                          >
+                            {isTopicStarted(currentTopicProgress) ? "Continue Topic" : "Begin"}
+                          </Button>
+                        )
+                    : quizStatus === "passed"
+                      ? (
+                          <Button
+                            className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 hover:text-white"
+                            size="default"
+                            onClick={() => {
+                              const topicSlug = createSlug(currentTopic.title);
+                              router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
+                            }}
+                          >
+                            Review slides
+                          </Button>
+                        )
+                      : (
+                          <Button
+                            className="w-full bg-[var(--brand-bullyproof-secondary)] text-white hover:bg-[var(--brand-bullyproof-secondary)]/90 hover:text-white"
+                            size="default"
+                            onClick={async () => {
+                              const topicSlug = createSlug(currentTopic.title);
+                              // Fetch first quiz ID for this topic
+                              try {
+                                const quizzesResult = await certificationApi.quizzes.list(currentTopic.id);
+                                if (quizzesResult.data && quizzesResult.data.length > 0) {
+                                  const firstQuiz = quizzesResult.data[0];
+                                  router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${firstQuiz.id}`);
+                              } else {
+                                // No quiz found, navigate to slides instead
+                                router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
+                              }
+                              } catch (err) {
+                                console.error("Failed to fetch quizzes:", err);
+                              }
+                            }}
+                          >
+                            Retake Quiz
+                          </Button>
+                        )}
               </CardFooter>
             </div>
           </Card>
@@ -1017,13 +1136,14 @@ export default function CoursePage() {
                   {/* Certificate Progress Bar - Last */}
                   <div className="flex-1 flex flex-col gap-1 group relative transition-all duration-300 hover:translate-y-[-15px]">
                     {/* Certificate Icon */}
-                    <div className="flex justify-center mb-1">
-                      <Award 
-                        className="h-32 w-32 text-yellow-400 stroke-yellow-400 fill-none stroke-2" 
-                        style={{
-                          animation: "float-gentle 3s ease-in-out infinite",
-                          filter: "drop-shadow(0 0 15px rgba(250, 204, 21, 0.8))",
-                        }}
+                    <div className="flex justify-center mb-2">
+                      <Image 
+                        src="/images/ap-badge.svg"
+                        alt="AP Logo"
+                        width={82}
+                        height={82}
+                        className="animate-bounce-slow"
+                       
                       />
                     </div>
                     
@@ -1068,34 +1188,65 @@ export default function CoursePage() {
                   if (status === "locked") return;
                   
                   const topicSlug = createSlug(topic.title);
-                  // Get first slide ID (non-quiz)
-                  const firstSlide = topic.slides?.find(s => s.kind !== "quiz");
-                  if (firstSlide) {
-                    router.push(`/courses/${courseSlug}/${topicSlug}/slides?index=${firstSlide.id}`);
-                  } else {
-                    router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
-                  }
+                  router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
                 };
 
                 const handleReviewClick = (e: React.MouseEvent) => {
                   e.stopPropagation();
                   const topicSlug = createSlug(topic.title);
-                  // For completed topics, always start from slide 1
-                  const firstSlide = topic.slides?.find(s => s.kind !== "quiz");
-                  if (firstSlide) {
-                    router.push(`/courses/${courseSlug}/${topicSlug}/slides?index=${firstSlide.id}`);
-                  } else {
-                    router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
+                  router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
+                };
+
+                const handleQuizClick = async (e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  const topicSlug = createSlug(topic.title);
+                  try {
+                    const quizzesResult = await certificationApi.quizzes.list(topic.id);
+                    if (quizzesResult.data && quizzesResult.data.length > 0) {
+                      const firstQuiz = quizzesResult.data[0];
+                      const quizSlug = createSlug(firstQuiz.title);
+                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${quizSlug}`);
+                    } else {
+                      // No quiz found, navigate to quiz overview page
+                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                    }
+                  } catch (err) {
+                    console.error("Failed to fetch quizzes:", err);
+                    // Fallback to quiz overview page
+                    router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
                   }
                 };
 
-                const handleContinueClick = (e: React.MouseEvent) => {
+                const handleContinueClick = async (e: React.MouseEvent) => {
                   e.stopPropagation();
                   const topicSlug = createSlug(topic.title);
-                  // Get first slide ID (non-quiz)
-                  const firstSlide = topic.slides?.find(s => s.kind !== "quiz");
-                  if (firstSlide) {
-                    router.push(`/courses/${courseSlug}/${topicSlug}/slides?index=${firstSlide.id}`);
+                  
+                  // If status is quiz_unlocked, navigate to quiz instead of slides
+                  if (progress?.status === "quiz_unlocked") {
+                    // Check if there's an in-progress quiz attempt
+                    try {
+                      const result = await certificationApi.topics.progress.getQuizInProgress(topic.id);
+                      if (result.data?.quizId) {
+                        // Fetch quiz to get title for slug
+                        try {
+                          const quizResult = await certificationApi.quizzes.byId(result.data.quizId);
+                          if (quizResult.data) {
+                            const quizSlug = createSlug(quizResult.data.title);
+                            router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${quizSlug}`);
+                          } else {
+                            router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                          }
+                        } catch (err) {
+                          console.error("Failed to fetch quiz:", err);
+                          router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                        }
+                      } else {
+                        router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                      }
+                    } catch (err) {
+                      console.error("Failed to fetch in-progress quiz attempt:", err);
+                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
+                    }
                   } else {
                     router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
                   }
@@ -1190,14 +1341,24 @@ export default function CoursePage() {
                       )}
                     </div>
                     {isCompleted && (
-                      <Button
-                        variant="ghost"
-                        size="lg"
-                        onClick={handleReviewClick}
-                        className="flex-shrink-0 my-3"
-                      >
-                        Review slides
-                      </Button>
+                      <div className="flex items-center gap-2 flex-shrink-0 my-3">
+                        <Button
+                          variant="ghost"
+                          size="lg"
+                          onClick={handleReviewClick}
+                        >
+                          Review slides
+                        </Button>
+                        {hasQuiz && (
+                          <Button
+                            variant="ghost"
+                            size="lg"
+                            onClick={handleQuizClick}
+                          >
+                            Take Quiz
+                          </Button>
+                        )}
+                      </div>
                     )}
                     {isCurrent && (
                       <Button
@@ -1205,7 +1366,16 @@ export default function CoursePage() {
                         size="lg"
                         onClick={handleContinueClick}
                       >
-                        {topicStarted ? "Continue" : "Begin"}
+                        {progress?.status === "quiz_unlocked" ? (
+                          <span className="flex items-center gap-2">
+                            Continue Quiz
+                            <ChevronRight className="h-4 w-4" style={{ animation: "bounce-right-subtle 1s ease-in-out infinite" }} />
+                          </span>
+                        ) : topicStarted ? (
+                          "Continue"
+                        ) : (
+                          "Begin"
+                        )}
                       </Button>
                     )}
                     {isRetryAvailable && (
@@ -1234,66 +1404,41 @@ export default function CoursePage() {
                 );
               })}
 
-              {/* Separator before Certificate */}
-              <Separator className="my-4" />
+              {/* Only show "Receive Certification" section if certification is not complete */}
+              {!isCertificationComplete && (
+                <>
+                  {/* Separator before Certificate */}
+                  <Separator className="my-4" />
 
-              {/* Certificate as Final Step */}
-              <div
-                className={cn(
-                  "flex flex-row items-center gap-4 min-h-[200px] p-8 rounded-lg border transition-colors",
-                  isCertificationComplete
-                    ? "hover:bg-accent/50"
-                    : "opacity-50 hover:bg-accent/30"
-                )}
-              >
-                <div className="flex-shrink-0">
-                  <Image
-                    src="/images/ap-teacher-icon.svg"
-                    alt="AP Logo"
-                    width={64}
-                    height={64}
+                  {/* Certificate as Final Step */}
+                  <div
                     className={cn(
-                      isCertificationComplete ? "opacity-100" : "opacity-50"
+                      "flex flex-row items-center gap-4 min-h-[200px] p-8 rounded-lg border transition-colors",
+                      "opacity-50 hover:bg-accent/30"
                     )}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-col">
-                    <p
-                      className={cn(
-                        "text-4xl font-semibold",
-                        isCertificationComplete
-                          ? ""
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      Receive
-                    </p>
-                    <p
-                      className={cn(
-                        "text-4xl font-semibold",
-                        isCertificationComplete
-                          ? ""
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      Certification
-                    </p>
-                  </div>
-                  {isCertificationComplete && (
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm">
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Certificate
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <Download className="mr-2 h-4 w-4" />
-                        Download PDF
-                      </Button>
+                  >
+                    <div className="flex-shrink-0">
+                      <Image
+                        src="/images/ap-teacher-icon.svg"
+                        alt="AP Logo"
+                        width={64}
+                        height={64}
+                        className="opacity-50"
+                      />
                     </div>
-                  )}
-                </div>
-              </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-col">
+                        <p className="text-4xl font-semibold text-muted-foreground">
+                          Receive
+                        </p>
+                        <p className="text-4xl font-semibold text-muted-foreground">
+                          Certification
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
