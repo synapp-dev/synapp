@@ -95,6 +95,13 @@ export const certificationApi = {
           `/certification/courses/${encodeURIComponent(courseId)}/ratings/check`
         );
       },
+      getAll(
+        courseId: string
+      ): Promise<ApiResult<Array<{ id: string; userId: string; courseId: string; rating: number; comment: string | null; createdAt: string; updatedAt: string; questionMetadata: Record<string, any> | null }>>> {
+        return apiFetch<Array<{ id: string; userId: string; courseId: string; rating: number; comment: string | null; createdAt: string; updatedAt: string; questionMetadata: Record<string, any> | null }>>(
+          `/certification/courses/${encodeURIComponent(courseId)}/ratings`
+        );
+      },
     },
     unrated(): Promise<ApiResult<Array<{ id: string; name: string; completedAt: string | null }>>> {
       return apiFetch<Array<{ id: string; name: string; completedAt: string | null }>>(
