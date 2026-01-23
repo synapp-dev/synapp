@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
+// DEPRECATED: These repos use old schema tables that no longer exist
+// TODO: Migrate this route to use:
+//   - quizAttemptAnswersRepo instead of certificationAnswersRepo
+//   - courseTopicProgressRepo instead of certificationTopicProgressRepo
+// See: server/certification-answers/certification-answers.repo.ts
+// See: server/certification-topic-progress/certification-topic-progress.repo.ts
 import { certificationAnswersRepo } from "@/server/certification-answers/certification-answers.repo";
 import { certificationTopicProgressRepo } from "@/server/certification-topic-progress/certification-topic-progress.repo";
 
