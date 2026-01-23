@@ -10,7 +10,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Presentation, Settings } from "lucide-react";
-// import { Settings } from "lucide-react"; // Commented out for now - control mode disabled
 import {
   Dialog,
   DialogContent,
