@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, FileText, FileQuestion, Pencil } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
+import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type { courseTopics } from "@/server/db/schema";
