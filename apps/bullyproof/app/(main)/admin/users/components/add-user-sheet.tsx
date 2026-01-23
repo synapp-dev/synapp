@@ -12,19 +12,6 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@workspace/ui/components/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
@@ -33,7 +20,6 @@ import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
   Loader2,
   AlertCircle,
-  ChevronsLeft,
   ChevronsRight,
   Check,
   ShieldCheck,
@@ -42,8 +28,6 @@ import {
   Landmark,
   BicepsFlexed,
   School as SchoolIcon,
-  ChevronsUpDown,
-  UserPlus,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { Card } from "@workspace/ui/components/card";
@@ -52,8 +36,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
-import { Separator } from "@workspace/ui/components/separator";
-import { Progress } from "@workspace/ui/components/progress";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -85,8 +67,6 @@ export function AddUserSheet({
   const [loadingRoles, setLoadingRoles] = useState(false);
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
-  const [roleComboboxOpen, setRoleComboboxOpen] = useState(false);
 
   const totalSteps = 4;
 
