@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       body.name = capitalizeSchoolName(body.name.trim());
     }
     
-    // eslint-disable-next-line no-console
+     
     console.log("[schools/invite] POST body:", body);
 
     return NextResponse.json({ ok: true, received: body });
