@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   DndContext,
@@ -62,7 +62,6 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import Marquee from "react-fast-marquee";
-import { EditCertificationCourseSheet } from "./edit-certification-course-sheet";
 import { AddCertificationTopicDrawer } from "./add-certification-topic-drawer";
 import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer";
 import {
@@ -72,11 +71,25 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import {
   AnimatedThumbnail,
   type TopicSlide,
 } from "@/components/organisms/animated-thumbnail";
+import { CertificationCourseSidebar, type CertificationCourseTab } from "./certification-course-sidebar";
+import { CertificationCourseInformation } from "./certification-course-information";
+import { CertificationCourseRatings } from "./certification-course-ratings";
+import { CertificationCourseResults } from "./certification-course-results";
 
 type Course = typeof certificationCourses.$inferSelect & {
   topicCount?: number;
@@ -668,7 +681,18 @@ export function CertificationCourseDetailSection({
   onBackClick,
 }: CertificationCourseDetailSectionProps) {
   const router = useRouter();
-  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false);
+  const searchParams = useSearchParams();
+  
+  // Initialize activeTab from query params or default to "topics"
+  const getInitialTab = (): CertificationCourseTab => {
+    const tabParam = searchParams?.get("tab");
+    if (tabParam && ["information", "topics", "results", "rating"].includes(tabParam)) {
+      return tabParam as CertificationCourseTab;
+    }
+    return "topics";
+  };
+  
+  const [activeTab, setActiveTab] = useState<CertificationCourseTab>(getInitialTab());
   const [isAddTopicDrawerOpen, setIsAddTopicDrawerOpen] = useState(false);
   const [editingTopic, setEditingTopic] = useState<TopicWithSlides | null>(
     null
@@ -676,6 +700,8 @@ export function CertificationCourseDetailSection({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [localTopics, setLocalTopics] = useState<TopicWithSlides[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   // Use React Query hooks for caching
   const {
@@ -722,6 +748,32 @@ export function CertificationCourseDetailSection({
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Wrapper function to update both state and URL when tab changes
+  const handleTabChange = (newTab: CertificationCourseTab) => {
+    setActiveTab(newTab);
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    params.set("tab", newTab);
+    router.replace(`?${params.toString()}`, { scroll: false });
+  };
+
+  // Sync activeTab with query params on mount and when query params change
+  useEffect(() => {
+    const tabParam = searchParams?.get("tab");
+    if (tabParam && ["information", "topics", "results", "rating"].includes(tabParam)) {
+      const newTab = tabParam as CertificationCourseTab;
+      if (newTab !== activeTab) {
+        setActiveTab(newTab);
+      }
+    } else if (!tabParam && activeTab !== "topics") {
+      // If no tab param, set to default and update URL
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("tab", "topics");
+      router.replace(`?${params.toString()}`, { scroll: false });
+      setActiveTab("topics");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // Fetch course
   useEffect(() => {
@@ -1007,6 +1059,40 @@ export function CertificationCourseDetailSection({
     handleTopicUpdated();
   };
 
+  const handleDelete = async () => {
+    if (!course) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await certificationApi.courses.delete(course.id);
+
+      if (result.error) {
+        toast.error(result.error.message || "Failed to delete course");
+        setShowDeleteDialog(false);
+        return;
+      }
+
+      toast.success("Course deleted successfully");
+      setShowDeleteDialog(false);
+      
+      // Navigate back after deletion
+      if (onBackClick) {
+        onBackClick();
+      } else {
+        router.push(basePath);
+      }
+    } catch (err) {
+      console.error("Failed to delete certification course:", err);
+      const errorMessage = err instanceof Error
+        ? err.message
+        : "Failed to delete certification course. Please try again.";
+      toast.error(errorMessage);
+      setShowDeleteDialog(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   // Get display topics (localTopics if we have unsaved changes, otherwise cachedTopics)
   const displayTopics = hasUnsavedChanges ? localTopics : cachedTopics;
 
@@ -1118,18 +1204,8 @@ export function CertificationCourseDetailSection({
                 {course.name}
               </h1>
             </div>
-            {!readonly && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditSheetOpen(true)}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Course
-              </Button>
-            )}
           </div>
-          {!readonly && hasUnsavedChanges && (
+          {!readonly && activeTab === "topics" && hasUnsavedChanges && (
             <Button onClick={handleSaveChanges} disabled={isSaving}>
               {isSaving ? (
                 <>
@@ -1144,7 +1220,7 @@ export function CertificationCourseDetailSection({
               )}
             </Button>
           )}
-          {!readonly && !hasUnsavedChanges && (
+          {!readonly && activeTab === "topics" && !hasUnsavedChanges && (
             <Button onClick={() => setIsAddTopicDrawerOpen(true)} size="sm">
               <Plus className="h-4 w-4 mr-2" />
               Add Topic
@@ -1153,13 +1229,26 @@ export function CertificationCourseDetailSection({
         </div>
       </div>
 
-      {/* Topics Section */}
-      <div className="flex flex-col h-full">
-        {/* Scrollable Topics Grid */}
-        <ScrollArea className="flex-1 pr-4">
-          <div className="pr-4">
+      {/* Sidebar + Content Layout */}
+      <div className="flex gap-6 h-full">
+        {/* Sidebar Navigation */}
+        <CertificationCourseSidebar
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          course={course}
+          onDeleteClick={() => setShowDeleteDialog(true)}
+          isDeleting={isDeleting}
+        />
+
+        {/* Content Area */}
+        <div className="flex-1 min-w-0">
+          {activeTab === "topics" && (
+            <div className="flex flex-col h-full">
+              {/* Scrollable Topics Grid */}
+              <ScrollArea className="flex-1 pr-4">
+                <div className="pr-4">
             {isLoadingTopics && displayTopics.length === 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
                   <Skeleton key={i} className="h-32" />
                 ))}
@@ -1178,7 +1267,7 @@ export function CertificationCourseDetailSection({
                 )}
               </div>
             ) : readonly ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {displayTopics.map((topic, index) => (
                   <StaggeredAnimation
                     key={topic.id}
@@ -1223,7 +1312,7 @@ export function CertificationCourseDetailSection({
                   items={displayTopics.map((t) => t.id)}
                   strategy={rectSortingStrategy}
                 >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     {displayTopics.map((topic, index) => {
                       const isHovered = hoveredIndex === index && !activeId;
                       const isLeaving = leavingIndex === index && !activeId;
@@ -1466,32 +1555,43 @@ export function CertificationCourseDetailSection({
                 </DragOverlay>
               </DndContext>
             )}
-          </div>
-        </ScrollArea>
-      </div>
+                </div>
+              </ScrollArea>
+            </div>
+          )}
 
-      {/* Edit Course Sheet */}
-      {course && (
-        <EditCertificationCourseSheet
-          open={isEditSheetOpen}
-          onOpenChange={setIsEditSheetOpen}
-          course={course}
-          onCourseUpdated={() => {
-            certificationApi.courses.byCode(slug).then((result) => {
-              if (result.data) {
-                setCourse(result.data);
-              }
-            });
-          }}
-          onCourseDeleted={() => {
-            if (onBackClick) {
-              onBackClick();
-            } else {
-              router.push(basePath);
-            }
-          }}
-        />
-      )}
+          {activeTab === "information" && course && (
+            <CertificationCourseInformation
+              course={course}
+              onCourseUpdated={() => {
+                certificationApi.courses.byCode(slug).then((result) => {
+                  if (result.data) {
+                    setCourse(result.data);
+                  }
+                });
+              }}
+            />
+          )}
+
+          {activeTab === "rating" && course && (
+            <CertificationCourseRatings
+              courseId={course.id}
+              course={course}
+              onCourseUpdated={() => {
+                certificationApi.courses.byCode(slug).then((result) => {
+                  if (result.data) {
+                    setCourse(result.data);
+                  }
+                });
+              }}
+            />
+          )}
+
+          {activeTab === "results" && course && (
+            <CertificationCourseResults courseId={course.id} />
+          )}
+        </div>
+      </div>
 
       {/* Add Topic Drawer */}
       {course && (
@@ -1516,6 +1616,39 @@ export function CertificationCourseDetailSection({
           onTopicUpdated={handleTopicUpdated}
           onTopicDeleted={handleTopicDeleted}
         />
+      )}
+
+      {/* Delete Course Dialog */}
+      {course && (
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete the certification course "{course.name}". This action
+                cannot be undone. All topics associated with this course will also
+                be affected.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  "Delete"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
   );
