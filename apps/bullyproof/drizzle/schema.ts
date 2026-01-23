@@ -483,7 +483,7 @@ export const slideViewingSessions = pgTable("slide_viewing_sessions", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "slide_viewing_sessions_user_id_fkey"
 		}).onDelete("cascade"),
 	pgPolicy("slide_viewing_sessions_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(auth.uid() = user_id)` }),
@@ -735,7 +735,7 @@ export const courseTopicProgress = pgTable("course_topic_progress", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "course_topic_progress_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("course_topic_progress_user_course_topic_unique").on(table.userId, table.courseId, table.topicId),
@@ -789,7 +789,7 @@ export const lessonFeedback = pgTable("lesson_feedback", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.teacherUserId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "lesson_feedback_teacher_user_id_fkey"
 		}),
 	unique("lesson_feedback_lesson_id_unique").on(table.lessonId),
@@ -866,7 +866,7 @@ export const userSlideViews = pgTable("user_slide_views", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "user_slide_views_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("user_slide_views_user_slide_unique").on(table.userId, table.slideId),
@@ -922,7 +922,7 @@ export const quizAttempts = pgTable("quiz_attempts", {
 		}).onDelete("set null"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "quiz_attempts_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("quiz_attempts_user_quiz_attempt_unique").on(table.userId, table.quizId, table.attemptNumber),
@@ -1031,7 +1031,7 @@ export const lessons = pgTable("lessons", {
 	index("idx_lessons_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
 			columns: [table.createdByUserId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "lessons_created_by_user_id_fkey"
 		}),
 	foreignKey({
@@ -1120,7 +1120,7 @@ export const lessonLiveState = pgTable("lesson_live_state", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.updatedBy],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "lesson_live_state_updated_by_fkey"
 		}),
 	pgPolicy("livestate_select", { as: "permissive", for: "select", to: ["public"], using: sql`(has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid) OR has_any_role(ARRAY['SCHOOL_ADMIN'::text, 'TEACHER'::text], ( SELECT lessons.school_id
@@ -1167,7 +1167,7 @@ export const userRoles = pgTable("user_roles", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "user_roles_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("user_roles_unique").on(table.userId, table.roleId, table.schoolId),
@@ -1189,7 +1189,7 @@ export const lessonSessions = pgTable("lesson_sessions", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.startedBy],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "lesson_sessions_started_by_fkey"
 		}),
 	pgPolicy("sessions_select", { as: "permissive", for: "select", to: ["public"], using: sql`(has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid) OR has_any_role(ARRAY['SCHOOL_ADMIN'::text, 'TEACHER'::text], ( SELECT lessons.school_id
@@ -1215,7 +1215,7 @@ export const lessonEvents = pgTable("lesson_events", {
 	index("lesson_events_session_idx").using("btree", table.sessionId.asc().nullsLast().op("timestamptz_ops"), table.createdAt.desc().nullsFirst().op("timestamptz_ops")),
 	foreignKey({
 			columns: [table.actorUserId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "lesson_events_actor_user_id_fkey"
 		}),
 	foreignKey({
@@ -1316,7 +1316,7 @@ export const courseProgress = pgTable("course_progress", {
 		}).onDelete("set null"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "course_progress_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("course_progress_user_course_unique").on(table.userId, table.courseId),
@@ -1356,7 +1356,7 @@ export const courseTopicQuizCompletions = pgTable("course_topic_quiz_completions
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "course_topic_quiz_completions_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("course_topic_quiz_completions_user_quiz_unique").on(table.userId, table.quizId),
@@ -1387,7 +1387,7 @@ export const courseRatings = pgTable("course_ratings", {
 		}).onDelete("cascade"),
 	foreignKey({
 			columns: [table.userId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "course_ratings_user_id_fkey"
 		}).onDelete("cascade"),
 	unique("course_ratings_user_course_unique").on(table.userId, table.courseId),
@@ -1501,7 +1501,7 @@ export const teacherSlideNotes = pgTable("teacher_slide_notes", {
 }, (table) => [
 	foreignKey({
 			columns: [table.teacherUserId],
-			foreignColumns: [usersInAuth.id],
+			foreignColumns: [userProfile.id],
 			name: "teacher_slide_notes_teacher_user_id_fkey"
 		}).onDelete("cascade"),
 	foreignKey({
@@ -1530,6 +1530,37 @@ export const lessonSlideNotes = pgTable("lesson_slide_notes", {
 		}).onDelete("restrict"),
 	primaryKey({ columns: [table.lessonId, table.topicSlideId], name: "lesson_slide_notes_pkey"}),
 ]);
+export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
+	topicId: uuid("topic_id"),
+	title: text(),
+	description: text(),
+	passingScorePercentage: integer("passing_score_percentage"),
+	timeLimitMinutes: integer("time_limit_minutes"),
+	maxAttempts: integer("max_attempts"),
+	isRequired: boolean("is_required"),
+	sequenceType: text("sequence_type"),
+	sortOrder: integer("sort_order"),
+	status: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	questions: jsonb(),
+}).with({ securityInvoker: true }).as(sql`SELECT id, topic_id, title, description, passing_score_percentage, time_limit_minutes, max_attempts, is_required, sequence_type, sort_order, status, created_at, updated_at, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qq.id, 'quiz_id', qq.quiz_id, 'question_text', qq.question_text, 'question_type', qq.question_type, 'allow_multiple_selections', qq.allow_multiple_selections, 'explanation', qq.explanation, 'points', qq.points, 'order_index', qq.order_index, 'question_urls', qq.question_urls, 'created_at', qq.created_at, 'updated_at', qq.updated_at, 'answers', COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qa.id, 'question_id', qa.question_id, 'answer_text', qa.answer_text, 'is_correct', qa.is_correct, 'order_index', qa.order_index, 'created_at', qa.created_at, 'updated_at', qa.updated_at) ORDER BY qa.order_index) AS jsonb_agg FROM quiz_answers qa WHERE qa.question_id = qq.id), '[]'::jsonb)) ORDER BY qq.order_index) AS jsonb_agg FROM quiz_questions qq WHERE qq.quiz_id = ctq.id), '[]'::jsonb) AS questions FROM course_topic_quizzes ctq`);
+
+export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
+	name: text(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	teacherCount: bigint("teacher_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	classCount: bigint("class_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	schoolAdminCount: bigint("school_admin_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
+	activeLicence: boolean("active_licence"),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	staffCount: bigint("staff_count", { mode: "number" }),
+}).with({ securityInvoker: true }).as(sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, (EXISTS ( SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status)) AS active_licence, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_STAFF'::text), 0::bigint) AS staff_count FROM schools s`);
+
 export const vStageThresholds = pgView("v_stage_thresholds", {	stageId: uuid("stage_id"),
 	minSortIndex: smallint("min_sort_index"),
 	maxSortIndex: smallint("max_sort_index"),
@@ -1648,32 +1679,18 @@ export const vUserProfileExpanded = pgView("v_user_profile_expanded", {	id: uuid
 	schoolRoles: jsonb("school_roles"),
 }).with({ securityInvoker: true }).as(sql`SELECT up.id, up.first_name, up.last_name, TRIM(BOTH ' '::text FROM concat(up.first_name, ' ', up.last_name)) AS full_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'roleKey', r.key)) FILTER (WHERE ur.role_scope = 'school'::text), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);
 
-export const vUsersWithRolesAndSchools = pgView("v_users_with_roles_and_schools", {	id: uuid(),
-	firstName: text("first_name"),
-	lastName: text("last_name"),
-	email: text(),
-	avatarUrl: text("avatar_url"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-	metadata: jsonb(),
-	platformRoles: text("platform_roles"),
-	schoolRoles: jsonb("school_roles"),
-}).with({"securityInvoker":true}).as(sql`SELECT up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'schoolName', s.name, 'roleKey', r.key, 'roleName', r.name)) FILTER (WHERE ur.role_scope = 'school'::text AND ur.school_id IS NOT NULL), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id LEFT JOIN schools s ON s.id = ur.school_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);
-
-export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
-	name: text(),
+export const vCourseTopicsEnriched = pgView("v_course_topics_enriched", {	topicId: uuid("topic_id"),
+	courseId: uuid("course_id"),
+	topicTitle: text("topic_title"),
+	courseOrder: smallint("course_order"),
+	topicStatus: text("topic_status"),
+	topicCreatedAt: timestamp("topic_created_at", { withTimezone: true, mode: 'string' }),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	teacherCount: bigint("teacher_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	classCount: bigint("class_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	schoolAdminCount: bigint("school_admin_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
-	activeLicence: boolean("active_licence"),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	staffCount: bigint("staff_count", { mode: "number" }),
-}).as(sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, (EXISTS ( SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status)) AS active_licence, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_STAFF'::text), 0::bigint) AS staff_count FROM schools s`);
+	slideCount: bigint("slide_count", { mode: "number" }),
+	hasQuiz: boolean("has_quiz"),
+	quizCompleted: boolean("quiz_completed"),
+	quizScorePercentage: integer("quiz_score_percentage"),
+}).with({ securityInvoker: true }).as(sql`SELECT ct.id AS topic_id, ct.course_id, ct.title AS topic_title, ct.course_order, ct.status AS topic_status, ct.created_at AS topic_created_at, COALESCE(slide_counts.slide_count, 0::bigint) AS slide_count, COALESCE(quiz_exists.has_quiz, false) AS has_quiz, COALESCE(user_quiz_status.quiz_completed, false) AS quiz_completed, user_quiz_status.quiz_score_percentage FROM course_topics ct LEFT JOIN ( SELECT course_topic_slides.topic_id, count(*) AS slide_count FROM course_topic_slides GROUP BY course_topic_slides.topic_id) slide_counts ON slide_counts.topic_id = ct.id LEFT JOIN ( SELECT DISTINCT ctq.topic_id, true AS has_quiz FROM course_topic_quizzes ctq JOIN quiz_questions qq ON qq.quiz_id = ctq.id GROUP BY ctq.topic_id HAVING count(qq.id) > 0) quiz_exists ON quiz_exists.topic_id = ct.id LEFT JOIN ( SELECT qa.topic_id, bool_or(qa.is_passed = true) AS quiz_completed, ( SELECT qa2.score_percentage FROM quiz_attempts qa2 WHERE qa2.topic_id = qa.topic_id AND qa2.user_id = auth.uid() AND (qa2.is_passed = true AND qa2.score_percentage IS NOT NULL OR NOT (EXISTS ( SELECT 1 FROM quiz_attempts qa3 WHERE qa3.topic_id = qa.topic_id AND qa3.user_id = auth.uid() AND qa3.is_passed = true)) AND qa2.score_percentage IS NOT NULL) ORDER BY ( CASE WHEN qa2.is_passed = true THEN 0 ELSE 1 END), qa2.completed_at DESC NULLS LAST, qa2.started_at DESC LIMIT 1) AS quiz_score_percentage FROM quiz_attempts qa WHERE qa.user_id = auth.uid() GROUP BY qa.topic_id) user_quiz_status ON user_quiz_status.topic_id = ct.id ORDER BY ct.course_id, ct.course_order`);
 
 export const vQuizAttemptsEnriched = pgView("v_quiz_attempts_enriched", {	attemptId: uuid("attempt_id"),
 	userId: uuid("user_id"),
@@ -1688,33 +1705,16 @@ export const vQuizAttemptsEnriched = pgView("v_quiz_attempts_enriched", {	attemp
 	isPassed: boolean("is_passed"),
 	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }),
 	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
-}).as(sql`SELECT qa.id AS attempt_id, qa.user_id, qa.quiz_id, qa.topic_id, qa.course_id, qa.attempt_number, qa.total_questions, qa.correct_answers, qa.score_percentage, ctq.passing_score_percentage, qa.is_passed, qa.started_at, qa.completed_at FROM quiz_attempts qa JOIN course_topic_quizzes ctq ON ctq.id = qa.quiz_id WHERE qa.completed_at IS NOT NULL`);
+}).with({ securityInvoker: true }).as(sql`SELECT qa.id AS attempt_id, qa.user_id, qa.quiz_id, qa.topic_id, qa.course_id, qa.attempt_number, qa.total_questions, qa.correct_answers, qa.score_percentage, ctq.passing_score_percentage, qa.is_passed, qa.started_at, qa.completed_at FROM quiz_attempts qa JOIN course_topic_quizzes ctq ON ctq.id = qa.quiz_id WHERE qa.completed_at IS NOT NULL`);
 
-export const vCourseTopicsEnriched = pgView("v_course_topics_enriched", {	topicId: uuid("topic_id"),
-	courseId: uuid("course_id"),
-	topicTitle: text("topic_title"),
-	courseOrder: smallint("course_order"),
-	topicStatus: text("topic_status"),
-	topicCreatedAt: timestamp("topic_created_at", { withTimezone: true, mode: 'string' }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	slideCount: bigint("slide_count", { mode: "number" }),
-	hasQuiz: boolean("has_quiz"),
-	quizCompleted: boolean("quiz_completed"),
-	quizScorePercentage: integer("quiz_score_percentage"),
-}).as(sql`SELECT ct.id AS topic_id, ct.course_id, ct.title AS topic_title, ct.course_order, ct.status AS topic_status, ct.created_at AS topic_created_at, COALESCE(slide_counts.slide_count, 0::bigint) AS slide_count, COALESCE(quiz_exists.has_quiz, false) AS has_quiz, COALESCE(user_quiz_status.quiz_completed, false) AS quiz_completed, user_quiz_status.quiz_score_percentage FROM course_topics ct LEFT JOIN ( SELECT course_topic_slides.topic_id, count(*) AS slide_count FROM course_topic_slides GROUP BY course_topic_slides.topic_id) slide_counts ON slide_counts.topic_id = ct.id LEFT JOIN ( SELECT DISTINCT ctq.topic_id, true AS has_quiz FROM course_topic_quizzes ctq JOIN quiz_questions qq ON qq.quiz_id = ctq.id GROUP BY ctq.topic_id HAVING count(qq.id) > 0) quiz_exists ON quiz_exists.topic_id = ct.id LEFT JOIN ( SELECT qa.topic_id, bool_or(qa.is_passed = true) AS quiz_completed, ( SELECT qa2.score_percentage FROM quiz_attempts qa2 WHERE qa2.topic_id = qa.topic_id AND qa2.user_id = auth.uid() AND (qa2.is_passed = true AND qa2.score_percentage IS NOT NULL OR NOT (EXISTS ( SELECT 1 FROM quiz_attempts qa3 WHERE qa3.topic_id = qa.topic_id AND qa3.user_id = auth.uid() AND qa3.is_passed = true)) AND qa2.score_percentage IS NOT NULL) ORDER BY ( CASE WHEN qa2.is_passed = true THEN 0 ELSE 1 END), qa2.completed_at DESC NULLS LAST, qa2.started_at DESC LIMIT 1) AS quiz_score_percentage FROM quiz_attempts qa WHERE qa.user_id = auth.uid() GROUP BY qa.topic_id) user_quiz_status ON user_quiz_status.topic_id = ct.id ORDER BY ct.course_id, ct.course_order`);
-
-export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
-	topicId: uuid("topic_id"),
-	title: text(),
-	description: text(),
-	passingScorePercentage: integer("passing_score_percentage"),
-	timeLimitMinutes: integer("time_limit_minutes"),
-	maxAttempts: integer("max_attempts"),
-	isRequired: boolean("is_required"),
-	sequenceType: text("sequence_type"),
-	sortOrder: integer("sort_order"),
-	status: text(),
+export const vUsersWithRolesAndSchools = pgView("v_users_with_roles_and_schools", {	id: uuid(),
+	firstName: text("first_name"),
+	lastName: text("last_name"),
+	email: text(),
+	avatarUrl: text("avatar_url"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
-	questions: jsonb(),
-}).as(sql`SELECT id, topic_id, title, description, passing_score_percentage, time_limit_minutes, max_attempts, is_required, sequence_type, sort_order, status, created_at, updated_at, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qq.id, 'quiz_id', qq.quiz_id, 'question_text', qq.question_text, 'question_type', qq.question_type, 'allow_multiple_selections', qq.allow_multiple_selections, 'explanation', qq.explanation, 'points', qq.points, 'order_index', qq.order_index, 'question_urls', qq.question_urls, 'created_at', qq.created_at, 'updated_at', qq.updated_at, 'answers', COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qa.id, 'question_id', qa.question_id, 'answer_text', qa.answer_text, 'is_correct', qa.is_correct, 'order_index', qa.order_index, 'created_at', qa.created_at, 'updated_at', qa.updated_at) ORDER BY qa.order_index) AS jsonb_agg FROM quiz_answers qa WHERE qa.question_id = qq.id), '[]'::jsonb)) ORDER BY qq.order_index) AS jsonb_agg FROM quiz_questions qq WHERE qq.quiz_id = ctq.id), '[]'::jsonb) AS questions FROM course_topic_quizzes ctq`);
+	metadata: jsonb(),
+	platformRoles: text("platform_roles"),
+	schoolRoles: jsonb("school_roles"),
+}).with({"securityInvoker":true}).as(sql`SELECT up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'schoolName', s.name, 'roleKey', r.key, 'roleName', r.name)) FILTER (WHERE ur.role_scope = 'school'::text AND ur.school_id IS NOT NULL), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id LEFT JOIN schools s ON s.id = ur.school_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);

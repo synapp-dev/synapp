@@ -60,22 +60,8 @@ export const usersInAuthRelations = relations(usersInAuth, ({many}) => ({
 	oneTimeTokensInAuths: many(oneTimeTokensInAuth),
 	userProfiles: many(userProfile),
 	sessionsInAuths: many(sessionsInAuth),
-	slideViewingSessions: many(slideViewingSessions),
 	oauthAuthorizationsInAuths: many(oauthAuthorizationsInAuth),
-	courseTopicProgresses: many(courseTopicProgress),
 	oauthConsentsInAuths: many(oauthConsentsInAuth),
-	lessonFeedbacks: many(lessonFeedback),
-	userSlideViews: many(userSlideViews),
-	quizAttempts: many(quizAttempts),
-	lessons: many(lessons),
-	lessonLiveStates: many(lessonLiveState),
-	userRoles: many(userRoles),
-	lessonSessions: many(lessonSessions),
-	lessonEvents: many(lessonEvents),
-	courseProgresses: many(courseProgress),
-	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
-	courseRatings: many(courseRatings),
-	teacherSlideNotes: many(teacherSlideNotes),
 }));
 
 export const refreshTokensInAuthRelations = relations(refreshTokensInAuth, ({one}) => ({
@@ -146,8 +132,22 @@ export const userProfileRelations = relations(userProfile, ({one, many}) => ({
 		fields: [userProfile.id],
 		references: [usersInAuth.id]
 	}),
+	slideViewingSessions: many(slideViewingSessions),
+	courseTopicProgresses: many(courseTopicProgress),
+	lessonFeedbacks: many(lessonFeedback),
+	userSlideViews: many(userSlideViews),
+	quizAttempts: many(quizAttempts),
+	lessons: many(lessons),
+	lessonLiveStates: many(lessonLiveState),
+	userRoles: many(userRoles),
+	lessonSessions: many(lessonSessions),
+	lessonEvents: many(lessonEvents),
 	userSchoolPositions: many(userSchoolPositions),
+	courseProgresses: many(courseProgress),
+	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
+	courseRatings: many(courseRatings),
 	teacherClasses: many(teacherClasses),
+	teacherSlideNotes: many(teacherSlideNotes),
 }));
 
 export const oauthClientsInAuthRelations = relations(oauthClientsInAuth, ({many}) => ({
@@ -181,9 +181,9 @@ export const slideViewingSessionsRelations = relations(slideViewingSessions, ({o
 		fields: [slideViewingSessions.topicId],
 		references: [courseTopics.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [slideViewingSessions.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -288,9 +288,9 @@ export const courseTopicProgressRelations = relations(courseTopicProgress, ({one
 		fields: [courseTopicProgress.topicId],
 		references: [courseTopics.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [courseTopicProgress.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 	quizAttempts: many(quizAttempts),
 }));
@@ -311,17 +311,17 @@ export const lessonFeedbackRelations = relations(lessonFeedback, ({one}) => ({
 		fields: [lessonFeedback.lessonId],
 		references: [lessons.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [lessonFeedback.teacherUserId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
 export const lessonsRelations = relations(lessons, ({one, many}) => ({
 	lessonFeedbacks: many(lessonFeedback),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [lessons.createdByUserId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 	school: one(schools, {
 		fields: [lessons.schoolId],
@@ -351,9 +351,9 @@ export const userSlideViewsRelations = relations(userSlideViews, ({one}) => ({
 		fields: [userSlideViews.topicId],
 		references: [courseTopics.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [userSlideViews.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -374,9 +374,9 @@ export const quizAttemptsRelations = relations(quizAttempts, ({one, many}) => ({
 		fields: [quizAttempts.topicProgressId],
 		references: [courseTopicProgress.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [quizAttempts.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 	quizAttemptAnswers: many(quizAttemptAnswers),
 	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
@@ -444,9 +444,9 @@ export const lessonLiveStateRelations = relations(lessonLiveState, ({one}) => ({
 		fields: [lessonLiveState.lessonId],
 		references: [lessons.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [lessonLiveState.updatedBy],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -469,9 +469,9 @@ export const userRolesRelations = relations(userRoles, ({one}) => ({
 		fields: [userRoles.schoolId],
 		references: [schools.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [userRoles.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -480,17 +480,17 @@ export const lessonSessionsRelations = relations(lessonSessions, ({one, many}) =
 		fields: [lessonSessions.lessonId],
 		references: [lessons.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [lessonSessions.startedBy],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 	lessonEvents: many(lessonEvents),
 }));
 
 export const lessonEventsRelations = relations(lessonEvents, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [lessonEvents.actorUserId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 	lesson: one(lessons, {
 		fields: [lessonEvents.lessonId],
@@ -522,9 +522,9 @@ export const courseProgressRelations = relations(courseProgress, ({one}) => ({
 		fields: [courseProgress.currentTopicId],
 		references: [courseTopics.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [courseProgress.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -541,9 +541,9 @@ export const courseTopicQuizCompletionsRelations = relations(courseTopicQuizComp
 		fields: [courseTopicQuizCompletions.topicId],
 		references: [courseTopics.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [courseTopicQuizCompletions.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -552,9 +552,9 @@ export const courseRatingsRelations = relations(courseRatings, ({one}) => ({
 		fields: [courseRatings.courseId],
 		references: [certificationCourses.id]
 	}),
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [courseRatings.userId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 }));
 
@@ -614,9 +614,9 @@ export const teacherClassesRelations = relations(teacherClasses, ({one}) => ({
 }));
 
 export const teacherSlideNotesRelations = relations(teacherSlideNotes, ({one}) => ({
-	usersInAuth: one(usersInAuth, {
+	userProfile: one(userProfile, {
 		fields: [teacherSlideNotes.teacherUserId],
-		references: [usersInAuth.id]
+		references: [userProfile.id]
 	}),
 	topicSlide: one(topicSlides, {
 		fields: [teacherSlideNotes.topicSlideId],
