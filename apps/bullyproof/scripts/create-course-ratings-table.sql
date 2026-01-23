@@ -6,7 +6,7 @@
 -- ============================================================================
 CREATE TABLE course_ratings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   course_id uuid NOT NULL REFERENCES certification_courses(id) ON DELETE CASCADE,
   rating integer NOT NULL CHECK (rating >= 1 AND rating <= 5),
   comment text,

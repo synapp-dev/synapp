@@ -48,7 +48,7 @@ CREATE TABLE course_topic_slides (
 -- ============================================================================
 CREATE TABLE user_slide_views (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   slide_id uuid NOT NULL REFERENCES course_topic_slides(id) ON DELETE CASCADE,
   topic_id uuid NOT NULL REFERENCES course_topics(id) ON DELETE CASCADE,
   course_id uuid NOT NULL REFERENCES certification_courses(id) ON DELETE CASCADE,
@@ -64,7 +64,7 @@ CREATE TABLE user_slide_views (
 -- ============================================================================
 CREATE TABLE slide_viewing_sessions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   slide_id uuid NOT NULL REFERENCES course_topic_slides(id) ON DELETE CASCADE,
   topic_id uuid NOT NULL REFERENCES course_topics(id) ON DELETE CASCADE,
   course_id uuid NOT NULL REFERENCES certification_courses(id) ON DELETE CASCADE,
@@ -133,7 +133,7 @@ CREATE TABLE quiz_answers (
 -- ============================================================================
 CREATE TABLE course_topic_progress (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   course_id uuid NOT NULL REFERENCES certification_courses(id) ON DELETE CASCADE,
   topic_id uuid NOT NULL REFERENCES course_topics(id) ON DELETE CASCADE,
   attempt_number integer NOT NULL DEFAULT 1,
@@ -154,7 +154,7 @@ CREATE TABLE course_topic_progress (
 -- ============================================================================
 CREATE TABLE quiz_attempts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   quiz_id uuid NOT NULL REFERENCES course_topic_quizzes(id) ON DELETE CASCADE,
   topic_id uuid NOT NULL REFERENCES course_topics(id) ON DELETE CASCADE,
   course_id uuid NOT NULL REFERENCES certification_courses(id) ON DELETE CASCADE,
@@ -191,7 +191,7 @@ CREATE TABLE quiz_attempt_answers (
 -- ============================================================================
 CREATE TABLE course_topic_quiz_completions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   topic_id uuid NOT NULL REFERENCES course_topics(id) ON DELETE CASCADE,
   quiz_id uuid NOT NULL REFERENCES course_topic_quizzes(id) ON DELETE CASCADE,
   passed_attempt_id uuid REFERENCES quiz_attempts(id) ON DELETE SET NULL,
@@ -206,7 +206,7 @@ CREATE TABLE course_topic_quiz_completions (
 -- ============================================================================
 CREATE TABLE course_progress (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES user_profile(id) ON DELETE CASCADE,
   course_id uuid NOT NULL REFERENCES certification_courses(id) ON DELETE CASCADE,
   current_topic_id uuid REFERENCES course_topics(id) ON DELETE SET NULL,
   current_topic_order integer,

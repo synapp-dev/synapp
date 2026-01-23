@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS certification_user_answers (
 	is_correct boolean NOT NULL,
 	time_taken integer,
 	answered_at timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT certification_user_answers_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+	CONSTRAINT certification_user_answers_user_id_fkey FOREIGN KEY (user_id) REFERENCES user_profile(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_answers_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES certification_stages(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_answers_topic_id_fkey FOREIGN KEY (topic_id) REFERENCES certification_topics(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_answers_slide_id_fkey FOREIGN KEY (slide_id) REFERENCES certification_slides(id) ON DELETE CASCADE
@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS certification_user_progress (
 	completed_at timestamp with time zone,
 	updated_at timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT certification_user_progress_user_stage UNIQUE(user_id, stage_id),
-	CONSTRAINT certification_user_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+	CONSTRAINT certification_user_progress_user_id_fkey FOREIGN KEY (user_id) REFERENCES user_profile(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_progress_stage_id_fkey FOREIGN KEY (stage_id) REFERENCES certification_stages(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_progress_status_check CHECK (status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text]))
 );

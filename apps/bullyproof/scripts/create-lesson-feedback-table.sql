@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS lesson_feedback (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
-  teacher_user_id UUID NOT NULL REFERENCES auth.users(id),
+  teacher_user_id UUID NOT NULL REFERENCES user_profile(id),
   rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
   comments TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS certification_user_topic_progress (
 	CONSTRAINT certification_user_topic_progress_status_check 
 		CHECK (status = ANY (ARRAY['started'::text, 'in_progress'::text, 'completed'::text, 'passed'::text, 'failed'::text])),
 	CONSTRAINT certification_user_topic_progress_user_id_fkey 
-		FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+		FOREIGN KEY (user_id) REFERENCES user_profile(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_topic_progress_stage_id_fkey 
 		FOREIGN KEY (stage_id) REFERENCES certification_stages(id) ON DELETE CASCADE,
 	CONSTRAINT certification_user_topic_progress_topic_id_fkey 
