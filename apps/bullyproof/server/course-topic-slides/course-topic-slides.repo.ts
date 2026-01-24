@@ -90,18 +90,40 @@ export const courseTopicSlidesRepo = {
   },
 
   bulkUpdateOrder: async (topicId: string, slideIds: string[]) => {
-    // Normalize order indices for the provided slide IDs
-    const updates = slideIds.map((slideId, index) => ({
-      id: slideId,
-      orderIndex: index,
-    }));
+    if (slideIds.length === 0) {
+      return { success: true };
+    }
 
-    // Perform updates
-    for (const update of updates) {
+    // Get all slides for this topic to calculate a safe temporary offset
+    const allSlides = await db
+      .select()
+      .from(courseTopicSlides)
+      .where(eq(courseTopicSlides.topicId, topicId));
+
+    // Calculate tempOffset based on current max orderIndex to avoid conflicts
+    const maxOrderIndex =
+      allSlides.length > 0
+        ? Math.max(...allSlides.map((s) => s.orderIndex))
+        : 0;
+    // Use an offset that's higher than any existing orderIndex
+    const tempOffset = Math.max(100000, maxOrderIndex + 100000);
+
+    // Phase 1: Move all slides being reordered to temporary high indices
+    // This prevents unique constraint violations when assigning final indices
+    for (let i = 0; i < slideIds.length; i++) {
       await db
         .update(courseTopicSlides)
-        .set({ orderIndex: update.orderIndex })
-        .where(eq(courseTopicSlides.id, update.id));
+        .set({ orderIndex: tempOffset + i })
+        .where(eq(courseTopicSlides.id, slideIds[i]));
+    }
+
+    // Phase 2: Assign final order indices (0, 1, 2, ...)
+    // Now that all slides are at temp indices, we can safely assign sequential values
+    for (let i = 0; i < slideIds.length; i++) {
+      await db
+        .update(courseTopicSlides)
+        .set({ orderIndex: i })
+        .where(eq(courseTopicSlides.id, slideIds[i]));
     }
 
     return { success: true };
