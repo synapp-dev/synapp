@@ -490,7 +490,7 @@ export function CertificationCourseResults({
             </div>
             <div className="flex flex-row items-center justify-between gap-8">
               <div className="flex items-center gap-2">
-                <div 
+                <div
                   className="w-3 h-3 rounded-full" 
                   style={{ backgroundColor: STATUS_COLORS.inProgress }}
                 />
