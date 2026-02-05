@@ -3594,7 +3594,7 @@ export function TopicDetailSection({
           <DialogHeader>
             <DialogTitle>Lesson Plan</DialogTitle>
             <DialogDescription>
-              Lesson plan for {topic?.name || "this topic"}
+              Lesson plan for {topic?.title || "this topic"}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
