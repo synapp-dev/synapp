@@ -8,6 +8,7 @@ import {
   schoolLicences,
 } from "@/server/db/schema";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { eq, and, sql, inArray } from "drizzle-orm";
 
 type AuthContext = {
@@ -61,25 +62,20 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const userRoles = await getUserScopedRoles(ctx.userId);
-    const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_schools");
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
-    // Build where conditions
     let currentWhereConditions: any[] = [];
     let previousWhereConditions: any[] = [];
 
-    // Apply scope filtering
     if (params.scope === "all") {
-      if (!isPlatformAdmin) {
-        throw new Error("Unauthorized - PLATFORM_ADMIN required for scope=all");
+      if (!hasScopeAll) {
+        throw new Error("Unauthorized");
       }
-      // No filtering needed for platform admin
     } else {
-      // Filter by user's schools
       const schoolIds = await getUserSchoolIds(ctx.userId);
-      if (schoolIds.length === 0 && !isPlatformAdmin) {
+      if (schoolIds.length === 0 && !hasScopeAll) {
         // User has no schools, return zeros
         return {
           value: { amount: 0, type: "number" },
@@ -169,27 +165,22 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const userRolesData = await getUserScopedRoles(ctx.userId);
-    const isPlatformAdmin = userRolesData.platform.includes("PLATFORM_ADMIN");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_schools");
     const { previousMonthEnd } = getDateRanges();
 
-    // Build WHERE clause conditions
     let currentWhereConditions = [eq(roles.key, "TEACHER")];
     let previousWhereConditions = [
       eq(roles.key, "TEACHER"),
       sql`${userRoles.assignedAt} <= ${previousMonthEnd}`,
     ];
 
-    // Apply scope filtering
     if (params.scope === "all") {
-      if (!isPlatformAdmin) {
-        throw new Error("Unauthorized - PLATFORM_ADMIN required for scope=all");
+      if (!hasScopeAll) {
+        throw new Error("Unauthorized");
       }
-      // No filtering needed for platform admin
     } else {
-      // Filter by user's schools
       const schoolIds = await getUserSchoolIds(ctx.userId);
-      if (schoolIds.length === 0 && !isPlatformAdmin) {
+      if (schoolIds.length === 0 && !hasScopeAll) {
         return {
           value: { amount: 0, type: "number" },
           previousValue: { amount: 0, type: "number" },
@@ -236,12 +227,10 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const userRoles = await getUserScopedRoles(ctx.userId);
-    const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_lessons");
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
-    // Build where conditions
     let currentWhereConditions = [
       eq(lessons.status, "completed"),
       sql`${lessons.createdAt} >= ${currentMonthStart}`,
@@ -253,16 +242,13 @@ export const metricsService = {
       sql`${lessons.createdAt} <= ${previousMonthEnd}`,
     ];
 
-    // Apply scope filtering
     if (params.scope === "all") {
-      if (!isPlatformAdmin) {
-        throw new Error("Unauthorized - PLATFORM_ADMIN required for scope=all");
+      if (!hasScopeAll) {
+        throw new Error("Unauthorized");
       }
-      // No filtering needed for platform admin
     } else {
-      // Filter by user's schools
       const schoolIds = await getUserSchoolIds(ctx.userId);
-      if (schoolIds.length === 0 && !isPlatformAdmin) {
+      if (schoolIds.length === 0 && !hasScopeAll) {
         return {
           value: { amount: 0, type: "number" },
           previousValue: { amount: 0, type: "number" },
@@ -307,33 +293,30 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const userRoles = await getUserScopedRoles(ctx.userId);
-    const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_lessons");
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
-    // Build base query for active schools (with active licence)
     const activeSchoolsQuery = db
       .select({ id: schools.id })
       .from(schools)
       .innerJoin(schoolLicences, eq(schools.id, schoolLicences.schoolId))
       .where(eq(schoolLicences.status, "ACTIVE"));
 
-    // Apply scope filtering for schools
     let activeSchools = await activeSchoolsQuery;
     if (params.scope !== "all") {
       const schoolIds = await getUserSchoolIds(ctx.userId);
       if (schoolIds.length > 0) {
         activeSchools = activeSchools.filter((s) => schoolIds.includes(s.id));
-      } else if (!isPlatformAdmin) {
+      } else if (!hasScopeAll) {
         return {
           value: { amount: 0, type: "percentage" },
           previousValue: { amount: 0, type: "percentage" },
         };
       }
     } else {
-      if (!isPlatformAdmin) {
-        throw new Error("Unauthorized - PLATFORM_ADMIN required for scope=all");
+      if (!hasScopeAll) {
+        throw new Error("Unauthorized");
       }
     }
 

@@ -5,7 +5,11 @@ import {
   getSchoolsByUserIdSchema,
 } from "./me.validators";
 import { meRepo } from "@/server/me/me.repo";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
+import { featuresRepo } from "@/server/features/features.repo";
+import { db } from "@/server/db/drizzle";
+import { userRoles } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -20,19 +24,8 @@ async function assertCanAccessUserProfile(
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
-
-  // Users can access their own profile
-  if (ctx.userId === targetUserId) {
-    return;
-  }
-
-  // Check if user has platform admin role
-  const roles = await getUserScopedRoles(ctx.userId);
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to access this user profile");
+  if (ctx.userId === targetUserId) return;
+  await assertFeature(ctx, "admin_users");
 }
 
 export const meService = {
@@ -46,28 +39,110 @@ export const meService = {
 
   async getUserByEmail(ctx: AuthContext, params: unknown) {
     const { email } = getUserByEmailSchema.parse(params);
-
-    // Only allow platform admins to search by email
-    if (!ctx.userId) {
-      throw new Error("Unauthorized");
-    }
-
-    const roles = await getUserScopedRoles(ctx.userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
-      throw new Error("Unauthorized to search users by email");
-    }
-
+    await assertFeature(ctx, "admin_users");
     const rows = await meRepo.getProfileByUserEmail(email);
     return rows[0] ?? null;
   },
 
-  async getCurrentUser(ctx: AuthContext) {
+  async getCurrentUser(ctx: AuthContext, includeFeaturePermissions = false) {
     if (!ctx.userId) {
       throw new Error("Unauthorized");
     }
 
     const rows = await meRepo.getProfileByUserId(ctx.userId);
-    return rows[0] ?? null;
+    const user = rows[0] ?? null;
+
+    const maintenanceBypass = !!(
+      process.env.MAINTENANCE_BYPASS_DEV_KEY &&
+      (user?.metadata as Record<string, unknown> | null)?.devKey ===
+        process.env.MAINTENANCE_BYPASS_DEV_KEY
+    );
+
+    // Optionally include feature permissions
+    if (user && includeFeaturePermissions) {
+      try {
+        // Get all permissions for the user (across all schools)
+        const permissions = await featuresRepo.getUserPermissions(ctx.userId);
+        
+        // Get user's roles and schools to build permission map
+        const userRolesData = await db
+          .select({
+            roleId: userRoles.roleId,
+            schoolId: userRoles.schoolId,
+          })
+          .from(userRoles)
+          .where(eq(userRoles.userId, ctx.userId));
+        
+        const userSchoolIds = userRolesData
+          .map((ur) => ur.schoolId)
+          .filter((id): id is string => id !== null);
+        
+        const userRoleIds = userRolesData.map((ur) => ur.roleId);
+
+        // Build a map: featureKey -> { global?, schools, roles, user? } with { enabled, visible } per level
+        const featurePermissionsMap: Record<
+          string,
+          {
+            global?: { enabled: boolean; visible: boolean | null };
+            schools: Record<string, { enabled: boolean; visible: boolean | null }>;
+            roles: Record<string, { enabled: boolean; visible: boolean | null }>;
+            user?: { enabled: boolean; visible: boolean | null };
+          }
+        > = {};
+
+        permissions.forEach((p) => {
+          const featureKey = p.feature.key;
+          if (!featurePermissionsMap[featureKey]) {
+            featurePermissionsMap[featureKey] = {
+              schools: {},
+              roles: {},
+            };
+          }
+
+          const level = p.permission.level;
+          const enabled = p.permission.enabled;
+          const visible = p.permission.visible ?? null;
+          const levelValue = { enabled, visible };
+
+          if (level === "global") {
+            featurePermissionsMap[featureKey].global = levelValue;
+          } else if (level === "school" && p.permission.targetId) {
+            featurePermissionsMap[featureKey].schools[p.permission.targetId] = levelValue;
+          } else if (level === "role" && p.permission.targetId) {
+            featurePermissionsMap[featureKey].roles[p.permission.targetId] = levelValue;
+          } else if (level === "user") {
+            featurePermissionsMap[featureKey].user = levelValue;
+          }
+        });
+
+        const result = {
+          ...user,
+          featurePermissions: featurePermissionsMap,
+          // Also include user's school IDs and role IDs for convenience
+          schoolIds: userSchoolIds,
+          roleIds: userRoleIds,
+          maintenanceBypass,
+        };
+
+        // Debug logging for lessons
+        if (featurePermissionsMap["lessons"]) {
+          console.log("[lessons] User feature permissions loaded:", {
+            userId: ctx.userId,
+            schoolIds: userSchoolIds,
+            roleIds: userRoleIds,
+            lessonsPermission: featurePermissionsMap["lessons"],
+          });
+        }
+
+        return result;
+      } catch (error) {
+        // If feature permissions fail to load, return user without them
+        console.error("Failed to load feature permissions:", error);
+        return user ? { ...user, maintenanceBypass } : user;
+      }
+    }
+
+    return user ? { ...user, maintenanceBypass } : user;
   },
 
   async updateUserProfile(ctx: AuthContext, params: unknown) {
@@ -90,12 +165,8 @@ export const meService = {
 
     const { id, limit } = getSchoolsByUserIdSchema.parse(params);
 
-    // Users can only get their own schools, or platform admins can get any user's schools
     if (ctx.userId !== id) {
-      const roles = await getUserScopedRoles(ctx.userId);
-      if (!roles.platform.includes("PLATFORM_ADMIN")) {
-        throw new Error("Unauthorized to access this user's schools");
-      }
+      await assertFeature(ctx, "admin_users");
     }
 
     return await meRepo.getAssignedSchoolsByUserId(id, limit);

@@ -10,6 +10,7 @@ import {
 } from "./classes.validators";
 import { classesRepo } from "./classes.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -18,49 +19,26 @@ type AuthContext = {
 };
 
 async function assertCanManageClasses(ctx: AuthContext, schoolId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminClasses = await checkFeatureAccess(ctx.userId, "admin_classes");
+  if (hasAdminClasses) return;
+  if (schoolId) {
+    const hasClasses = await checkFeatureAccess(ctx.userId, "classes", schoolId);
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (hasClasses && roles.school.some((r) => r.schoolId === schoolId)) return;
   }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can manage all classes
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // School admins/teachers can manage classes in their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) =>
-        role.schoolId === schoolId &&
-        (role.roleKey === "SCHOOL_ADMIN" || role.roleKey === "TEACHER")
-    )
-  ) {
-    return;
-  }
-
   throw new Error("Unauthorized to manage classes");
 }
 
 async function assertCanViewClasses(ctx: AuthContext, schoolId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminClasses = await checkFeatureAccess(ctx.userId, "admin_classes");
+  if (hasAdminClasses) return;
+  if (schoolId) {
+    const hasClasses = await checkFeatureAccess(ctx.userId, "classes", schoolId);
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (hasClasses && roles.school.some((r) => r.schoolId === schoolId)) return;
   }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can view all classes
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // School users can view classes in their schools
-  if (schoolId && roles.school.some((role) => role.schoolId === schoolId)) {
-    return;
-  }
-
   throw new Error("Unauthorized to view classes");
 }
 

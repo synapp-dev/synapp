@@ -12,6 +12,7 @@ import {
 } from "./invites.validators";
 import { invitesRepo } from "./invites.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 
 // Placeholder auth context type; adapt to your actual session/context
@@ -21,52 +22,34 @@ type AuthContext = {
 };
 
 async function assertCanManageInvites(ctx: AuthContext, schoolId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can manage all invites
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // School admins can manage invites for their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  if (hasAdminSchools) return;
+  if (schoolId) {
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (
+      roles.school.some(
+        (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+      )
     )
-  ) {
-    return;
+      return;
   }
-
   throw new Error("Unauthorized to manage invites");
 }
 
 async function assertCanViewInvites(ctx: AuthContext, schoolId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can view all invites
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // School admins can view invites for their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  if (hasAdminSchools) return;
+  if (schoolId) {
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (
+      roles.school.some(
+        (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+      )
     )
-  ) {
-    return;
+      return;
   }
-
   throw new Error("Unauthorized to view invites");
 }
 

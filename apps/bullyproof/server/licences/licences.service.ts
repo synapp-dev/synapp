@@ -10,6 +10,7 @@ import {
 } from "./licences.validators";
 import { licencesRepo } from "./licences.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { userService } from "../user/user.service";
 import { rolesRepo } from "../roles/roles.repo";
 
@@ -20,52 +21,34 @@ type AuthContext = {
 };
 
 async function assertCanManageLicences(ctx: AuthContext, schoolId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can manage all licences
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // School admins can manage licences for their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  if (hasAdminSchools) return;
+  if (schoolId) {
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (
+      roles.school.some(
+        (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+      )
     )
-  ) {
-    return;
+      return;
   }
-
   throw new Error("Unauthorized to manage licences");
 }
 
 async function assertCanViewLicences(ctx: AuthContext, schoolId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can view all licences
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // School admins can view licences for their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) => role.schoolId === schoolId && role.roleKey === "SCHOOL_ADMIN"
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  if (hasAdminSchools) return;
+  if (schoolId) {
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (
+      roles.school.some(
+        (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+      )
     )
-  ) {
-    return;
+      return;
   }
-
   throw new Error("Unauthorized to view licences");
 }
 

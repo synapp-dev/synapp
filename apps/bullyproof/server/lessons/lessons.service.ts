@@ -15,6 +15,7 @@ import { topicsRepo } from "../topics/topics.repo";
 import { curriculumRepo } from "../curriculum/curriculum.repo";
 import { classesRepo } from "../classes/classes.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { classes, lessons, topics, lessonClasses } from "@/server/db/schema";
 import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
@@ -25,28 +26,26 @@ type AuthContext = {
   roles?: string[];
 };
 
-async function assertCanManageLessons(ctx: AuthContext, teacherId?: string) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
+async function assertCanManageLessons(
+  ctx: AuthContext,
+  teacherId?: string,
+  schoolId?: string
+) {
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+  if (hasAdminLessons) return;
+  if (teacherId && ctx.userId === teacherId) return;
+  if (schoolId) {
+    const hasLessons = await checkFeatureAccess(ctx.userId, "lessons", schoolId);
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (
+      hasLessons &&
+      roles.school.some(
+        (r) => r.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim()
+      )
+    )
+      return;
   }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can manage all lessons
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // Teachers can manage their own lessons
-  if (teacherId && ctx.userId === teacherId) {
-    return;
-  }
-
-  // School admins can manage lessons in their schools
-  if (roles.school.some((role) => role.roleKey === "SCHOOL_ADMIN")) {
-    return;
-  }
-
   throw new Error("Unauthorized to manage lessons");
 }
 
@@ -55,57 +54,25 @@ async function assertCanViewLessons(
   teacherId?: string,
   schoolId?: string
 ) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can view all lessons
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // Teachers can view their own lessons
-  if (teacherId && ctx.userId === teacherId) {
-    return;
-  }
-
-  // School admins can view lessons in their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) =>
-        role.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim() &&
-        role.roleKey === "SCHOOL_ADMIN"
+  if (!ctx.userId) throw new Error("Unauthorized");
+  const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+  if (hasAdminLessons) return;
+  if (teacherId && ctx.userId === teacherId) return;
+  if (schoolId) {
+    const hasLessons = await checkFeatureAccess(ctx.userId, "lessons", schoolId);
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (
+      hasLessons &&
+      roles.school.some(
+        (r) => r.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim()
+      )
     )
-  ) {
-    return;
+      return;
   }
-
-  // Teachers at the school can view lessons in their schools
-  if (
-    schoolId &&
-    roles.school.some(
-      (role) =>
-        role.schoolId?.toLowerCase().trim() === schoolId.toLowerCase().trim() &&
-        role.roleKey === "TEACHER"
-    )
-  ) {
-    return;
+  if (!schoolId) {
+    const roles = await getUserScopedRoles(ctx.userId);
+    if (roles.school.some((r) => r.roleKey === "TEACHER")) return;
   }
-
-  // If no specific schoolId is provided, allow if user is a TEACHER at any school
-  // This allows teachers to list/view lessons from their schools
-  if (!schoolId && roles.school.some((role) => role.roleKey === "TEACHER")) {
-    return;
-  }
-
-  console.log("roles", roles);
-  console.log("teacherId", teacherId);
-  console.log("schoolId", schoolId);
-  console.log("ctx.userId", ctx.userId);
-
   throw new Error("Unauthorized to view lessons");
 }
 
@@ -126,19 +93,14 @@ export const lessonsService = {
       return await lessonsRepo.getBySchoolId(params.schoolId, params.status);
     }
 
-    // If no specific filters provided and user is authenticated, 
-    // automatically filter by current user's lessons (for "my lessons")
     if (ctx.userId) {
-      const roles = await getUserScopedRoles(ctx.userId);
-      // Platform admins can see all lessons when no filters are provided
-      if (roles.platform.includes("PLATFORM_ADMIN")) {
+      const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+      if (hasAdminLessons) {
         return await lessonsRepo.getAll(params.status);
       }
-      // Regular users see only their own lessons when no filters are provided
       return await lessonsRepo.getByTeacherId(ctx.userId, params.status);
     }
 
-    // For platform admins, return all lessons (optionally filtered by status)
     return await lessonsRepo.getAll(params.status);
   },
 
@@ -179,7 +141,11 @@ export const lessonsService = {
       throw new Error("Lesson not found");
     }
 
-    await assertCanManageLessons(ctx, existingLesson[0].createdByUserId);
+    await assertCanManageLessons(
+      ctx,
+      existingLesson[0].createdByUserId,
+      existingLesson[0].schoolId
+    );
 
     // Validate classes if classIds is provided
     if (data.classIds !== undefined) {
@@ -228,7 +194,11 @@ export const lessonsService = {
       throw new Error("Lesson not found");
     }
 
-    await assertCanManageLessons(ctx, existingLesson[0].createdByUserId);
+    await assertCanManageLessons(
+      ctx,
+      existingLesson[0].createdByUserId,
+      existingLesson[0].schoolId
+    );
 
     await lessonsRepo.delete(id);
     return { success: true };
@@ -270,33 +240,17 @@ export const lessonsService = {
         throw new Error("One or more classes not found");
       }
 
-      // Check permissions - user must have access to all classes' schools
-      console.log(`${requestId} [SERVICE] Step 4: Checking user permissions`);
-      const roles = await getUserScopedRoles(ctx.userId);
-      console.log(`${requestId} [SERVICE] Step 4: User roles:`, {
-        platform: roles.platform,
-        school: roles.school.map(r => ({ schoolId: r.schoolId, roleKey: r.roleKey }))
-      });
-      
       const schoolIds = [...new Set(classData.map((c) => c.schoolId))];
-      console.log(`${requestId} [SERVICE] Step 4: Required schoolIds:`, schoolIds);
-
-      // Platform admins can access any school
-      if (!roles.platform.includes("PLATFORM_ADMIN")) {
-        console.log(`${requestId} [SERVICE] Step 4: User is not platform admin, checking school access`);
-        // Check if user has access to all required schools
+      const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+      if (!hasAdminLessons) {
+        const roles = await getUserScopedRoles(ctx.userId);
         for (const schoolId of schoolIds) {
-          const hasAccess = roles.school.some(
-            (role) => role.schoolId === schoolId
-          );
-          console.log(`${requestId} [SERVICE] Step 4: School ${schoolId} access:`, hasAccess);
-          if (!hasAccess) {
-            console.error(`${requestId} [SERVICE] ERROR: User lacks access to school ${schoolId}`);
+          const hasLessons = await checkFeatureAccess(ctx.userId, "lessons", schoolId);
+          const hasMembership = roles.school.some((r) => r.schoolId === schoolId);
+          if (!hasLessons || !hasMembership) {
             throw new Error("Unauthorized to access one or more classes");
           }
         }
-      } else {
-        console.log(`${requestId} [SERVICE] Step 4: User is platform admin - skipping school access check`);
       }
 
       // Get recommendation data from repository
