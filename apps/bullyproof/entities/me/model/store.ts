@@ -3,9 +3,35 @@ import type { vUserProfileExpanded } from "@/drizzle/schema";
 
 type UserProfile = typeof vUserProfileExpanded.$inferSelect;
 
+// Per-level permission: enabled = can use feature; visible = show in nav (null = follow enabled)
+export type FeaturePermissionLevel = {
+  enabled: boolean;
+  visible: boolean | null;
+};
+
+// Feature permissions structure: featureKey -> { global?, schools, roles, user? } with enabled + visible per level
+export type FeaturePermissions = Record<
+  string,
+  {
+    global?: FeaturePermissionLevel;
+    schools: Record<string, FeaturePermissionLevel>;
+    roles: Record<string, FeaturePermissionLevel>;
+    user?: FeaturePermissionLevel;
+  }
+>;
+
+// Extended user profile with feature permissions
+export type UserProfileWithFeatures = UserProfile & {
+  featurePermissions?: FeaturePermissions;
+  schoolIds?: string[];
+  roleIds?: string[];
+  /** When true, user bypasses maintenance mode (e.g. dev key matches MAINTENANCE_BYPASS_DEV_KEY). */
+  maintenanceBypass?: boolean;
+};
+
 type MeState = {
-  currentUser: UserProfile | null;
-  setCurrentUser: (user: UserProfile | null) => void;
+  currentUser: UserProfileWithFeatures | null;
+  setCurrentUser: (user: UserProfileWithFeatures | null) => void;
   users: Record<string, UserProfile>;
   setUser: (id: string, user: UserProfile) => void;
   clearUsers: () => void;

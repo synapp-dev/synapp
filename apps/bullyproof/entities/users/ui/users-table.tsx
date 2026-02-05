@@ -515,9 +515,11 @@ export function UsersTable({
                   if (columnId === "select") {
                     width = "40px";
                   } else if (columnId === "name") {
-                    width = "25%";
+                    width = "20%";
                   } else if (columnId === "roles") {
-                    width = "60%";
+                    width = "50%";
+                  } else if (columnId === "lastLoginAt") {
+                    width = "15%";
                   } else if (columnId === "createdAt") {
                     width = "15%";
                   }
@@ -558,9 +560,11 @@ export function UsersTable({
                     if (columnId === "select") {
                       width = "40px";
                     } else if (columnId === "name") {
-                      width = "25%";
+                      width = "20%";
                     } else if (columnId === "roles") {
-                      width = "60%";
+                      width = "50%";
+                    } else if (columnId === "lastLoginAt") {
+                      width = "15%";
                     } else if (columnId === "createdAt") {
                       width = "15%";
                     }

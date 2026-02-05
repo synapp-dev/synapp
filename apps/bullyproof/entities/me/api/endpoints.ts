@@ -1,6 +1,7 @@
 // Client bundle should import the client fetcher; server-only code can use the server fetcher if needed
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type { vUserProfileExpanded, vSchoolsEnriched } from "@/drizzle/schema";
+import type { UserProfileWithFeatures } from "@/entities/me/model/store";
 
 type UserProfile = typeof vUserProfileExpanded.$inferSelect;
 type School = typeof vSchoolsEnriched.$inferSelect;
@@ -49,6 +50,7 @@ export type UserWithRolesAndSchools = {
     roleKey: string | null;
     roleName: string | null;
   }>;
+  lastLoginAt: string | null;
 };
 
 export type TutorialProgress = {
@@ -67,8 +69,9 @@ export type DialogProgress = {
 
 export const meApi = {
   get: {
-    currentUser(): Promise<ApiResult<UserProfile | null>> {
-      return apiFetch<UserProfile | null>("/me");
+    currentUser(includeFeatures?: boolean): Promise<ApiResult<UserProfileWithFeatures | null>> {
+      const query = includeFeatures ? "?includeFeatures=true" : "";
+      return apiFetch<UserProfileWithFeatures | null>(`/me${query}`);
     },
     userById(id: string): Promise<ApiResult<UserProfile | null>> {
       return apiFetch<UserProfile | null>(`/users/${encodeURIComponent(id)}`);

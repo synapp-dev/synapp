@@ -24,6 +24,11 @@ export const schoolApi = {
     schoolBySlug(slug: string): Promise<ApiResult<School | null>> {
       return apiFetch<School | null>(`/schools/${encodeURIComponent(slug)}`);
     },
+    years(schoolId: string): Promise<
+      ApiResult<Array<{ year: { id: string; code: string; displayName: string; levelId: string; sortIndex: number }; level: { id: string; name: string; key: string } }>>
+    > {
+      return apiFetch(`/schools/${encodeURIComponent(schoolId)}/years`);
+    },
   },
   post: {
     inviteSchool(payload: {
@@ -43,7 +48,8 @@ export const schoolApi = {
       name: string;
       stateId: string;
       sectorId: string;
-      levelIds: string[];
+      levelIds?: string[];
+      yearIds?: string[];
     }): Promise<ApiResult<School>> {
       return apiFetch<School>("/schools", {
         method: "POST",
@@ -63,6 +69,7 @@ export const schoolApi = {
         bannerUrl?: string | null;
         avatarUrl?: string | null;
         levelIds?: string[];
+        yearIds?: string[];
       }
     ): Promise<ApiResult<School>> {
       return apiFetch<School>(`/schools/${encodeURIComponent(schoolId)}`, {

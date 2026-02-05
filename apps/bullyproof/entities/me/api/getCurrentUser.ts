@@ -7,25 +7,26 @@ import { useEffect } from "react";
 import { meApi } from "@/entities/me/api/endpoints";
 import type { vUserProfileExpanded } from "@/drizzle/schema";
 import { meKeys } from "@/entities/me/model/keys";
-import { useMeStore } from "@/entities/me/model/store";
+import { useMeStore, type UserProfileWithFeatures } from "@/entities/me/model/store";
 
 type UserProfile = typeof vUserProfileExpanded.$inferSelect;
 
 export const getCurrentUserOptions = () =>
-  queryOptions<UserProfile | null>({
+  queryOptions<UserProfileWithFeatures | null>({
     queryKey: meKeys.current(),
     queryFn: async () => {
-      const { data, error } = await meApi.get.currentUser();
+      // Always fetch with feature permissions included
+      const { data, error } = await meApi.get.currentUser(true);
       if (error) {
         console.error(error);
         throw new Error(error.message);
       }
-      return data ?? null;
+      return (data ?? null) as UserProfileWithFeatures | null;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-export function useCurrentUser(): UseQueryResult<UserProfile | null, Error> {
+export function useCurrentUser(): UseQueryResult<UserProfileWithFeatures | null, Error> {
   const setCurrentUser = useMeStore((s) => s.setCurrentUser);
   const query = useQuery(getCurrentUserOptions());
 
@@ -35,5 +36,5 @@ export function useCurrentUser(): UseQueryResult<UserProfile | null, Error> {
     }
   }, [query.data, setCurrentUser]);
 
-  return query as UseQueryResult<UserProfile | null, Error>;
+  return query as UseQueryResult<UserProfileWithFeatures | null, Error>;
 }

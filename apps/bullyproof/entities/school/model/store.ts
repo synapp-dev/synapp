@@ -19,6 +19,7 @@ export type School = {
   status: "onboarding" | "active";
   slug: string | null;
   levels?: string[] | null;
+  levelBadge?: string | null;
 };
 
 interface SchoolsState {
@@ -103,6 +104,7 @@ function transformSchoolData(school: any): School {
     status,
     slug: school.slug || null,
     levels: school.levels || null,
+    levelBadge: school.levelBadge ?? school.level_badge ?? null,
   };
 }
 
