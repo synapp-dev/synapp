@@ -80,15 +80,68 @@ export const lessonsRepo = {
 
     if (lessonData.length === 0) return null;
 
-    const assignedClasses = await db
+    // Get assigned classes with their year level information
+    const assignedClassesRaw = await db
       .select({
         classId: lessonClasses.classId,
         className: classes.name,
         classCode: classes.code,
+        yearDisplayName: schoolYears.displayName,
+        yearSortIndex: schoolYears.sortIndex,
       })
       .from(lessonClasses)
       .innerJoin(classes, eq(lessonClasses.classId, classes.id))
+      .leftJoin(classYears, eq(classes.id, classYears.classId))
+      .leftJoin(schoolYears, eq(classYears.schoolYearId, schoolYears.id))
       .where(eq(lessonClasses.lessonId, id));
+
+    // Group year names by class and create a range display
+    const classesMap = new Map<string, {
+      classId: string;
+      className: string;
+      classCode: string | null;
+      yearNames: { name: string; sortIndex: number | null }[];
+    }>();
+
+    for (const row of assignedClassesRaw) {
+      if (!classesMap.has(row.classId)) {
+        classesMap.set(row.classId, {
+          classId: row.classId,
+          className: row.className,
+          classCode: row.classCode,
+          yearNames: [],
+        });
+      }
+      if (row.yearDisplayName) {
+        const entry = classesMap.get(row.classId)!;
+        // Avoid duplicates
+        if (!entry.yearNames.some(y => y.name === row.yearDisplayName)) {
+          entry.yearNames.push({ name: row.yearDisplayName, sortIndex: row.yearSortIndex });
+        }
+      }
+    }
+
+    // Convert to final format with year name range
+    const assignedClasses = Array.from(classesMap.values()).map(c => {
+      // Sort year names by sort index
+      c.yearNames.sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+      const names = c.yearNames.map(y => y.name);
+      
+      // Create display string: single name or "First – Last" range
+      let yearLevelDisplay: string | null = null;
+      if (names.length === 1) {
+        yearLevelDisplay = names[0]!;
+      } else if (names.length > 1) {
+        yearLevelDisplay = `${names[0]} – ${names[names.length - 1]}`;
+      }
+
+      return {
+        classId: c.classId,
+        className: c.className,
+        classCode: c.classCode,
+        yearLevelDisplay,
+      };
+    });
 
     return {
       ...lessonData[0]!.lesson,
