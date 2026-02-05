@@ -5,33 +5,6 @@ export async function middleware(request: NextRequest) {
   // Update Supabase session
   const response = await updateSession(request);
 
-  const { pathname } = request.nextUrl;
-
-  // /@username redirect (already present)
-  if (pathname.startsWith("/@") && pathname.length > 2) {
-    const username = pathname.substring(2);
-    const newUrl = new URL(`/api/steam/resolve/${username}`, request.url);
-    return NextResponse.redirect(newUrl);
-  }
-
-  // /id/* redirect
-  if (pathname.startsWith("/id/") && pathname.length > 4) {
-    const id = pathname.substring(4); // everything after /id/
-    if (id) {
-      const newUrl = new URL(`/api/steam/resolve/${id}`, request.url);
-      return NextResponse.redirect(newUrl);
-    }
-  }
-
-  // /profiles/* redirect
-  if (pathname.startsWith("/profiles/") && pathname.length > 10) {
-    const id = pathname.substring(10); // everything after /profiles/
-    if (id) {
-      const newUrl = new URL(`/api/steam/resolve/${id}`, request.url);
-      return NextResponse.redirect(newUrl);
-    }
-  }
-
   return response;
 }
 
