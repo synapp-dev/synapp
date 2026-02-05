@@ -1,5 +1,6 @@
 import { LessonSidebarNav } from "@/components/organisms/lesson-sidebar-nav";
 import { LessonHeader } from "@/components/organisms/lesson-header";
+import { LessonStatusRedirect } from "@/components/organisms/lesson-status-redirect";
 
 export default async function LessonLayout({
   children,
@@ -28,7 +29,9 @@ export default async function LessonLayout({
         
         {/* Main Content - Scrollable */}
         <div className="flex-1 overflow-auto min-w-0 mt-6 rounded-lg border p-6">
-          {children}
+          <LessonStatusRedirect schoolId={school_id} lessonId={lesson_id}>
+            {children}
+          </LessonStatusRedirect>
         </div>
       </div>
     </div>

@@ -1,14 +1,11 @@
 "use client";
 
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
 import { Users, Loader2, GraduationCap } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useParams } from "next/navigation";
@@ -28,43 +25,35 @@ export default function LessonClassesPage() {
 
   if (isLoading) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="flex flex-col items-center gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <p className="text-muted-foreground">Loading classes...</p>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Loading classes...</p>
         </div>
-      </>
+      </div>
     );
   }
 
   if (isError || !lessonData) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <p className="text-destructive font-medium">
-              {error?.message || "Failed to load lesson classes"}
-            </p>
-            <p className="text-muted-foreground mt-2">
-              {error?.message?.includes("Unauthorized")
-                ? "You don't have permission to view this lesson"
-                : "Please try again later"}
-            </p>
-          </div>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-destructive font-medium">
+            {error?.message || "Failed to load lesson classes"}
+          </p>
+          <p className="text-muted-foreground mt-2">
+            {error?.message?.includes("Unauthorized")
+              ? "You don't have permission to view this lesson"
+              : "Please try again later"}
+          </p>
         </div>
-      </>
+      </div>
     );
   }
 
   const assignedClasses = lessonData.assignedClasses || [];
 
   return (
-    <>
-      <PlatformAdminGuard />
       <div className="space-y-6">
       {/* Header */}
       <div>
@@ -101,19 +90,13 @@ export default function LessonClassesPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {assignedClass.classCode && (
-                  <div className="space-y-2">
-                    <div className="text-sm">
-                      <span className="text-muted-foreground">Code: </span>
-                      <Badge variant="outline" className="ml-1">
-                        {assignedClass.classCode}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-                {!assignedClass.classCode && (
+                {assignedClass.yearLevelDisplay ? (
                   <p className="text-sm text-muted-foreground">
-                    No class code available
+                    {assignedClass.yearLevelDisplay}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No year level assigned
                   </p>
                 )}
               </CardContent>
@@ -122,6 +105,5 @@ export default function LessonClassesPage() {
         </div>
       )}
     </div>
-    </>
   );
 }
