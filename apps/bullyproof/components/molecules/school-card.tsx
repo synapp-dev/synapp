@@ -105,9 +105,9 @@ export function SchoolCard() {
             {formatSector(currentSchool.sector)}
           </span>
         )}
-        {currentSchool.levels && currentSchool.levels.length > 0 && (
+        {((currentSchool as { levelBadge?: string | null }).levelBadge || (currentSchool.levels && currentSchool.levels.length > 0)) && (
           <span className="text-sm text-muted-foreground">
-            {formatSchoolLevel(currentSchool.levels)}
+            {(currentSchool as { levelBadge?: string | null }).levelBadge ?? formatSchoolLevel(currentSchool.levels)}
           </span>
         )}
       </div>

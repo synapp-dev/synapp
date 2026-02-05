@@ -35,7 +35,6 @@ import {
 } from "lucide-react";
 import { Label } from "@workspace/ui/components/label";
 import { Alert } from "@workspace/ui/components/alert";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Tooltip,
   TooltipTrigger,

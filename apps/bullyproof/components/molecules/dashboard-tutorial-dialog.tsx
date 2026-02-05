@@ -56,7 +56,7 @@ export function DashboardTutorialDialog({
               alt="BullyProof"
               width={120}
               height={32}
-              className="h-auto"
+              className="w-auto h-auto"
             />
           </div>
           <DialogTitle className="text-center text-2xl mt-6">
