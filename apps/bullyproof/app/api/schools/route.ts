@@ -36,7 +36,7 @@ import { capitalizeSchoolName } from "@/utils/school-name";
  * Query parameters:
  * - metric: 'count' - Returns count metric instead of list of schools
  * - scope: 'all' | 'school' (only used with metric=count)
- *   - 'all': Returns count of all schools (requires PLATFORM_ADMIN)
+ *   - 'all': Returns count of all schools (requires admin_schools feature)
  *   - 'school': Returns count of user's schools
  *
  * @param request The incoming HTTP request.
@@ -68,10 +68,7 @@ export async function GET(request: Request) {
     return NextResponse.json(rows, { status: 200 });
   } catch (e: any) {
     console.error(e);
-    const status =
-      e.message?.includes("Unauthorized") || e.message?.includes("PLATFORM_ADMIN")
-        ? 403
-        : 500;
+    const status = e.message?.includes("Unauthorized") ? 403 : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status }
@@ -96,29 +93,29 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    let { name, stateId, sectorId, levelIds } = body;
+    let { name, stateId, sectorId, levelIds, yearIds } = body;
 
-    if (!name || !stateId || !sectorId || !levelIds) {
+    if (!name || !stateId || !sectorId) {
       return NextResponse.json(
-        { error: "School name, state ID, sector ID, and level IDs are required" },
+        { error: "School name, state ID, and sector ID are required" },
         { status: 400 }
       );
     }
 
-    if (!Array.isArray(levelIds) || levelIds.length === 0) {
+    const hasLevelIds = Array.isArray(levelIds) && levelIds.length > 0;
+    const hasYearIds = Array.isArray(yearIds) && yearIds.length > 0;
+    if (!hasLevelIds && !hasYearIds) {
       return NextResponse.json(
-        { error: "At least one school level is required" },
+        { error: "At least one school level or year level is required" },
         { status: 400 }
       );
     }
 
-    // Capitalize school name as a safety measure (also handled in validator)
     name = capitalizeSchoolName(name.trim());
 
-    // Create the school
     const createdSchool = await schoolService.createSchool(
       { userId },
-      { name, stateId, sectorId, levelIds }
+      { name, stateId, sectorId, levelIds: hasLevelIds ? levelIds : undefined, yearIds: hasYearIds ? yearIds : undefined }
     );
 
     if (!createdSchool) {

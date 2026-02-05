@@ -10,6 +10,9 @@
  * Endpoints:
  * - POST /api/slides/sessions/start - Start a new viewing session
  *
+ * Request body:
+ * - { slideId: string, topicId: string, courseId: string }
+ *
  * Responses:
  * - 201 Created: Returns the created session.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
@@ -19,6 +22,15 @@ import { NextResponse } from "next/server";
 import { slideViewingSessionsRepo } from "@/server/slide-viewing-sessions/slide-viewing-sessions.repo";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle POST /api/slides/sessions/start
+ *
+ * Starts a new slide viewing session. Ends any existing active session for the same slide
+ * before creating a new one.
+ *
+ * @param request The incoming HTTP request containing slideId, topicId, and courseId.
+ * @returns A JSON `NextResponse` with the created session or an error payload.
+ */
 export async function POST(request: Request) {
   try {
     const supabase = await createServerClient();

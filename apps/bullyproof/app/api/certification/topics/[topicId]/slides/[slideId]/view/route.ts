@@ -1,3 +1,21 @@
+/**
+ * Mark Slide as Viewed API route handler.
+ *
+ * Exposes HTTP endpoint for marking a slide as viewed in a topic.
+ *
+ * Authentication:
+ * - Requires a valid user derived from the request (401 if missing).
+ * - All authenticated users can mark their own slides as viewed.
+ *
+ * Endpoints:
+ * - POST /api/certification/topics/[topicId]/slides/[slideId]/view - Mark a slide as viewed
+ *
+ * Responses:
+ * - 200 OK: Returns success confirmation.
+ * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 404 Not Found: `{ error: string }` when topic is not found.
+ * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
@@ -6,6 +24,16 @@ import { courseTopics } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
+/**
+ * Handle POST /api/certification/topics/[topicId]/slides/[slideId]/view
+ *
+ * Marks a slide as viewed for the authenticated user. Creates progress if it doesn't exist.
+ * Updates both the topic progress tracking and the user slide views table.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the topic ID and slide ID.
+ * @returns A JSON `NextResponse` with success confirmation or an error payload.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ topicId: string; slideId: string }> }

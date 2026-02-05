@@ -79,7 +79,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
+import { schoolApi } from "@/entities/school/api/endpoints";
 import { schoolYears } from "@/server/db/schema";
 import type { School as SchoolType } from "./schools-table-columns";
 
@@ -245,7 +245,6 @@ export function ImportClassesDialog({
     Array<typeof schoolYears.$inferSelect>
   >([]);
   const [loadingYears, setLoadingYears] = useState(false);
-  const [schoolLevelsMap, setSchoolLevelsMap] = useState<Map<string, string>>(new Map());
 
   // Load year levels when dialog opens
   useEffect(() => {
@@ -255,40 +254,17 @@ export function ImportClassesDialog({
   }, [open, school]);
 
   const loadYearLevels = async () => {
-    if (!school) return;
-    
+    if (!school?.id) return;
+
     setLoadingYears(true);
     try {
-      // First, load school levels to create a map
-      const levelsResult = await apiFetch("/api/school-levels");
-      if (levelsResult.data && Array.isArray(levelsResult.data)) {
-        const levelsMap = new Map<string, string>();
-        levelsResult.data.forEach((level: any) => {
-          levelsMap.set(level.name.toLowerCase().trim(), level.id);
-        });
-        setSchoolLevelsMap(levelsMap);
-      }
+      const result = await schoolApi.get.years(school.id);
 
-      // Extract level IDs from school's levels array
-      const levelIds = school.levels
-        ?.map((levelName: string) => {
-          const normalizedName = levelName.toLowerCase().trim();
-          return schoolLevelsMap.get(normalizedName);
-        })
-        .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-      // Fetch years filtered by school's level IDs
-      const result = await curriculumApi.years.list(
-        levelIds && levelIds.length > 0 ? { levelIds } : undefined
-      );
-      
       if (!result.error && result.data) {
-        // Extract year objects from the nested response structure
         const years = result.data
-          .map((item: any) => item.year)
+          .map((item: { year: any }) => item.year)
           .filter((year: any) => year != null);
 
-        // Sort by sortIndex if available, otherwise by code
         const sortedYears = [...years].sort((a, b) => {
           if (a.sortIndex != null && b.sortIndex != null) {
             return a.sortIndex - b.sortIndex;

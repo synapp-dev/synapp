@@ -10,6 +10,9 @@
  * Endpoints:
  * - POST /api/slides/sessions/heartbeat - Send heartbeat update
  *
+ * Request body:
+ * - { sessionId: string, slideId: string }
+ *
  * Responses:
  * - 200 OK: Returns the updated session.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
@@ -20,6 +23,15 @@ import { NextResponse } from "next/server";
 import { slideViewingSessionsRepo } from "@/server/slide-viewing-sessions/slide-viewing-sessions.repo";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle POST /api/slides/sessions/heartbeat
+ *
+ * Sends a heartbeat update to keep a slide viewing session active.
+ * Updates the last activity timestamp for the session.
+ *
+ * @param request The incoming HTTP request containing sessionId and slideId.
+ * @returns A JSON `NextResponse` with the updated session or an error payload.
+ */
 export async function POST(request: Request) {
   try {
     const supabase = await createServerClient();

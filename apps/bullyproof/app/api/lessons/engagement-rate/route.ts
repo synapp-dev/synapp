@@ -5,11 +5,11 @@
  *
  * Authentication:
  * - Requires a valid user derived from the request (401 if missing).
- * - Requires PLATFORM_ADMIN role for scope=all, otherwise filters by user's schools.
+ * - Requires admin_lessons feature for scope=all, otherwise filters by user's schools.
  *
  * Query parameters:
  * - scope: 'all' | 'school' (default: 'school')
- *   - 'all': Returns engagement rate for all active schools (requires PLATFORM_ADMIN)
+ *   - 'all': Returns engagement rate for all active schools (requires admin_lessons)
  *   - 'school': Returns engagement rate for user's active schools
  *
  * Formula: (lessons completed) / (total classes for active schools * active schools) * 100
@@ -51,10 +51,7 @@ export async function GET(request: Request) {
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
     console.error("[ENGAGEMENT RATE METRIC] Error:", e);
-    const status =
-      e.message?.includes("Unauthorized") || e.message?.includes("PLATFORM_ADMIN")
-        ? 403
-        : 500;
+    const status = e.message?.includes("Unauthorized") ? 403 : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status }

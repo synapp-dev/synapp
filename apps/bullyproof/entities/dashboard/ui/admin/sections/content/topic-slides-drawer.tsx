@@ -19,6 +19,7 @@ import { Loader2, FileText, Image, Video } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { VimeoPlayer } from "@/components/organisms/vimeo-player";
 
 type Topic = typeof topics.$inferSelect & {
@@ -175,7 +176,7 @@ export function TopicSlidesDrawer({
                     {slide.kind === "image" && slide.imageUrl && (
                       <div className="space-y-2">
                         <img
-                          src={slide.imageUrl}
+                          src={toStorageUrl(slide.imageUrl) ?? slide.imageUrl}
                           alt={`Slide ${slide.orderIndex}`}
                           className="w-full rounded-md border"
                         />

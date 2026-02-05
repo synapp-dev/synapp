@@ -33,6 +33,7 @@ import {
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { VimeoPlayer } from "@/components/organisms/vimeo-player";
 import {
   Select,
@@ -348,7 +349,7 @@ function SlidePreview({ slide }: { slide: Slide }) {
       {slide.kind === "image" && slide.imageUrl && (
         <div className="space-y-2">
           <img
-            src={slide.imageUrl}
+            src={toStorageUrl(slide.imageUrl) ?? slide.imageUrl}
             alt={`Slide ${slide.orderIndex}`}
             className="w-full rounded-md border max-h-64 object-contain"
           />
@@ -510,7 +511,7 @@ function SlideEditForm({
           />
           {imageUrl && (
             <img
-              src={imageUrl}
+              src={toStorageUrl(imageUrl) ?? imageUrl}
               alt="Preview"
               className="w-full rounded-md border max-h-64 object-contain"
             />

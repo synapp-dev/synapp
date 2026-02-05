@@ -20,6 +20,15 @@ import { db } from "@/server/db/drizzle";
 import { courseProgress, certificationCourses, courseRatings } from "@/server/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 
+/**
+ * Handle GET /api/certification/courses/unrated
+ *
+ * Returns a list of courses that the user has completed but hasn't rated yet.
+ * Courses are sorted by completion date (most recent first).
+ *
+ * @param request The incoming HTTP request.
+ * @returns A JSON `NextResponse` with array of unrated courses or an error payload.
+ */
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient();

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import {
   Card,
   CardContent,
@@ -649,7 +650,9 @@ export default function CoursePage() {
   const isAdmin = userRole === "admin" || currentUser?.platformRoles?.includes("admin");
 
   return (
-    <div className="h-full w-full flex flex-col gap-6 p-6">
+    <>
+      <FeatureGuard feature="ap_certification" />
+      <div className="h-full w-full flex flex-col gap-6 p-6">
       <div className="flex flex-col lg:flex-row gap-6 items-stretch">
         {/* Amayda Program Card - 1/3 width */}
         <Card 
@@ -1578,5 +1581,6 @@ export default function CoursePage() {
         </div>
       ) : null}
     </div>
+    </>
   );
 }

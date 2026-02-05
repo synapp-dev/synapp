@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { ContentSectionReadonly } from "@/entities/dashboard/ui/resources/sections/content-section-readonly";
 
 export default function ContentPage({
@@ -18,7 +18,7 @@ export default function ContentPage({
   if (!schoolId) {
     return (
       <>
-        <PlatformAdminGuard />
+        <FeatureGuard feature="content" />
         {null}
       </>
     );
@@ -26,7 +26,7 @@ export default function ContentPage({
 
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="content" schoolId={schoolId} />
       <ContentSectionReadonly schoolId={schoolId} />
     </>
   );

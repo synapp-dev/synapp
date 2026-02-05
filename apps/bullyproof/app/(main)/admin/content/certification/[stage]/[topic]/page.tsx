@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, FileText, FileQuestion, Pencil } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -85,7 +84,6 @@ export default function CertificationTopicPage() {
 
   return (
     <>
-      <PlatformAdminGuard />
       <div className="container mx-auto py-8 max-w-4xl">
       {/* Topic Header */}
       {topic && (

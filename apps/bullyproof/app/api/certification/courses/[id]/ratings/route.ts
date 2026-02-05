@@ -12,6 +12,9 @@
  * - GET /api/certification/courses/[id]/ratings - Get all ratings for a course (admin only)
  * - POST /api/certification/courses/[id]/ratings - Submit/update rating
  *
+ * Request body (POST):
+ * - { rating: number (1-5), comment?: string, questionMetadata?: object }
+ *
  * Responses:
  * - 200 OK: Returns the created/updated rating object or array of ratings.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
@@ -22,12 +25,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { courseRatingsRepo } from "@/server/course-ratings/course-ratings.repo";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { db } from "@/server/db/drizzle";
 import { courseRatings, userProfile, userRoles, schools } from "@/server/db/schema";
 import { eq, sql } from "drizzle-orm";
 
+/**
+ * Handle GET /api/certification/courses/[id]/ratings
+ *
+ * Returns all ratings for a course with user and school information.
+ * Only accessible to platform admins.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the course ID.
+ * @returns A JSON `NextResponse` with array of ratings or an error payload.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,13 +52,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is platform admin
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    if (!hasAccess) {
       return NextResponse.json(
-        { error: "Forbidden - Platform admin access required" },
+        { error: "Forbidden" },
         { status: 403 }
       );
     }
@@ -127,6 +137,16 @@ export async function GET(
   }
 }
 
+/**
+ * Handle POST /api/certification/courses/[id]/ratings
+ *
+ * Submits or updates a course rating. Creates a new rating if one doesn't exist,
+ * or updates the existing rating for the user and course.
+ *
+ * @param request The incoming HTTP request containing rating, comment, and questionMetadata.
+ * @param params The route parameters containing the course ID.
+ * @returns A JSON `NextResponse` with the created/updated rating or an error payload.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

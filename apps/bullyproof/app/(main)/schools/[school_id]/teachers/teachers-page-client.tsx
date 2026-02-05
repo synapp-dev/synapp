@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo, Fragment } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -371,9 +370,7 @@ export default function TeachersPageClient() {
   }
 
   return (
-    <>
-      <PlatformAdminGuard />
-      <div className="space-y-6">
+    <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">
           <Users className="h-8 w-8" />
@@ -477,6 +474,5 @@ export default function TeachersPageClient() {
         </div>
       )}
     </div>
-    </>
   );
 }

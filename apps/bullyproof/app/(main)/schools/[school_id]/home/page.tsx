@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useSchoolStore } from "@/stores/school-store";
 import {
   meApi,
@@ -42,6 +42,7 @@ export default function HomePage({
   params: Promise<{ school_id: string }>;
 }) {
   const [schoolSlug, setSchoolSlug] = useState<string>("");
+  const [schoolId, setSchoolId] = useState<string>("");
   const [teachers, setTeachers] = useState<UserWithRolesAndSchools[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,7 +51,10 @@ export default function HomePage({
   const currentSchool = useSchoolStore((state) => state.currentSchool);
 
   useEffect(() => {
-    params.then(({ school_id }) => setSchoolSlug(school_id));
+    params.then(({ school_id }) => {
+      setSchoolSlug(school_id);
+      setSchoolId(school_id);
+    });
   }, [params]);
 
   useEffect(() => {
@@ -250,7 +254,7 @@ export default function HomePage({
   if (loading) {
     return (
       <>
-        <PlatformAdminGuard />
+        <FeatureGuard feature="home" schoolId={schoolId} />
         <div className="space-y-8">
         {/* Hero Section Skeleton */}
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-8 border border-border">
@@ -316,7 +320,7 @@ export default function HomePage({
 
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="home" schoolId={schoolId} />
       <div className="space-y-8">
         {/* Hero Section */}
         {currentSchool && (

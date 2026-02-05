@@ -10,6 +10,9 @@
  * Endpoints:
  * - POST /api/slides/sessions/end - End a viewing session
  *
+ * Request body:
+ * - { sessionId: string, slideId: string }
+ *
  * Responses:
  * - 200 OK: Returns the ended session with duration.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
@@ -21,6 +24,14 @@ import { slideViewingSessionsRepo } from "@/server/slide-viewing-sessions/slide-
 import { userSlideViewsRepo } from "@/server/user-slide-views/user-slide-views.repo";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle POST /api/slides/sessions/end
+ *
+ * Ends a slide viewing session and updates the total viewing time for the slide.
+ *
+ * @param request The incoming HTTP request containing sessionId and slideId.
+ * @returns A JSON `NextResponse` with the ended session or an error payload.
+ */
 export async function POST(request: Request) {
   try {
     const supabase = await createServerClient();

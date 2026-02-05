@@ -11,6 +11,7 @@
  * - POST /api/certification/quizzes/[quizId]/attempts/[attemptId]/submit - Submit and score a quiz attempt
  *
  * Responses:
+ * - 200 OK: Returns the scored attempt with rating modal flag.
  * - 200 OK: Returns the scored attempt.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
  * - 403 Forbidden: `{ error: string }` when user lacks required permissions.
@@ -25,6 +26,16 @@ import { courseProgressRepo } from "@/server/course-progress/course-progress.rep
 import { shouldShowRatingModal } from "@/server/course-ratings/course-ratings.utils";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle POST /api/certification/quizzes/[quizId]/attempts/[attemptId]/submit
+ *
+ * Submits and scores a quiz attempt. Calculates the score, marks the attempt as completed,
+ * updates topic progress, and checks if the rating modal should be shown.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the quiz ID and attempt ID.
+ * @returns A JSON `NextResponse` with the scored attempt and rating modal flag or an error payload.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }

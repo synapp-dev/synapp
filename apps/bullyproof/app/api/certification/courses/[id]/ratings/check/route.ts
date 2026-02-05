@@ -18,6 +18,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { courseRatingsRepo } from "@/server/course-ratings/course-ratings.repo";
 
+/**
+ * Handle GET /api/certification/courses/[id]/ratings/check
+ *
+ * Checks if the authenticated user has rated the specified course.
+ * Returns the rating details if one exists.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the course ID.
+ * @returns A JSON `NextResponse` with hasRated flag and optional rating data or an error payload.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

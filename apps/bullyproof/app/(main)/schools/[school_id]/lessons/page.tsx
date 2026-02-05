@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@workspace/ui/components/button";
@@ -42,6 +42,7 @@ import {
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import {
   Tooltip,
   TooltipContent,
@@ -131,7 +132,7 @@ function LessonTopicThumbnail({ topicId, horizontal = false }: { topicId: string
   return (
     <div className={`relative ${horizontal ? 'h-full w-auto flex-shrink-0 aspect-video' : 'w-full aspect-video'} ${horizontal ? 'rounded-l-md' : 'rounded-t-md'} overflow-hidden bg-muted`}>
       <Image
-        src={imageUrl}
+        src={toStorageUrl(imageUrl) ?? imageUrl}
         alt={topicData?.title || "Topic thumbnail"}
         fill
         className="object-contain"
@@ -308,6 +309,11 @@ export default function LessonsPage({
 }: {
   params: Promise<{ school_id: string }>;
 }) {
+  const [schoolId, setSchoolId] = useState<string>("");
+
+  useEffect(() => {
+    params.then(({ school_id }) => setSchoolId(school_id));
+  }, [params]);
   usePageTitle(["schools", "lessons"]);
   const currentSchool = useSchoolStore((state) => state.currentSchool);
   const [schoolSlug, setSchoolSlug] = useState<string>("");
@@ -320,7 +326,10 @@ export default function LessonsPage({
   const { data: currentUser } = useCurrentUser();
 
   useEffect(() => {
-    params.then(({ school_id }) => setSchoolSlug(school_id));
+    params.then(({ school_id }) => {
+      setSchoolSlug(school_id);
+      setSchoolId(school_id);
+    });
   }, [params]);
 
   // Check for dialog query parameter and open wizard if present
@@ -488,7 +497,7 @@ export default function LessonsPage({
   if (!currentSchool) {
     return (
       <>
-        <PlatformAdminGuard />
+        <FeatureGuard feature="lessons" schoolId={currentSchool?.id} />
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold">School not found</h1>
@@ -503,7 +512,7 @@ export default function LessonsPage({
 
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="lessons" schoolId={currentSchool.id} />
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-2">

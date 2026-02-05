@@ -11,7 +11,7 @@ import {
   SidebarProvider,
   SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
-import { User, ShieldCheck, History, Trash2, Briefcase, GraduationCap } from "lucide-react";
+import { User, ShieldCheck, History, Trash2, Briefcase, GraduationCap, Settings } from "lucide-react";
 import type { TabType } from "./types";
 
 interface UserDetailSidebarProps {
@@ -103,6 +103,20 @@ export function UserDetailSidebar({
                       >
                         <History className="h-4 w-4" />
                         <span>History</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        isActive={activeTab === "features"}
+                        onClick={() => onTabChange("features")}
+                        className={
+                          activeTab === "features"
+                            ? "!bg-[var(--brand-bullyproof-primary)] !text-white hover:!bg-[var(--brand-bullyproof-primary)]/90 hover:!text-white data-[active=true]:!bg-[var(--brand-bullyproof-primary)] data-[active=true]:!text-white"
+                            : ""
+                        }
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>Feature Access</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                     <SidebarSeparator className="!mx-0 !ml-0 my-1" />

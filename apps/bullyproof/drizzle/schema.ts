@@ -11,6 +11,7 @@ export const oauthClientTypeInAuth = auth.enum("oauth_client_type", ['public', '
 export const oauthRegistrationTypeInAuth = auth.enum("oauth_registration_type", ['dynamic', 'manual'])
 export const oauthResponseTypeInAuth = auth.enum("oauth_response_type", ['code'])
 export const oneTimeTokenTypeInAuth = auth.enum("one_time_token_type", ['confirmation_token', 'reauthentication_token', 'recovery_token', 'email_change_token_new', 'email_change_token_current', 'phone_change_token'])
+export const featurePermissionLevel = pgEnum("feature_permission_level", ['global', 'role', 'school', 'user'])
 export const inviteStatus = pgEnum("invite_status", ['PENDING', 'ACCEPTED', 'CANCELLED', 'EXPIRED'])
 export const licenceStatus = pgEnum("licence_status", ['DRAFT', 'PENDING', 'ACTIVE', 'SUSPENDED', 'EXPIRED', 'CANCELLED'])
 
@@ -634,6 +635,18 @@ export const schoolLicences = pgTable("school_licences", {
 	check("school_licences_plan_length_check", sql`(plan_length >= 1) AND (plan_length <= 5)`),
 ]);
 
+export const features = pgTable("features", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	key: text().notNull(),
+	name: text().notNull(),
+	description: text(),
+	category: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	unique("features_key_key").on(table.key),
+]);
+
 export const schoolInvites = pgTable("school_invites", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	schoolId: uuid("school_id").notNull(),
@@ -656,6 +669,33 @@ export const schoolInvites = pgTable("school_invites", {
 			name: "school_invites_school_id_fkey"
 		}).onDelete("cascade"),
 	check("school_invites_email_check", sql`POSITION(('@'::text) IN (email)) > 1`),
+]);
+
+export const featurePermissions = pgTable("feature_permissions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	featureId: uuid("feature_id").notNull(),
+	level: featurePermissionLevel().notNull(),
+	targetId: uuid("target_id"),
+	enabled: boolean().default(true).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+	visible: boolean(),
+}, (table) => [
+	index("idx_feature_permissions_feature_id").using("btree", table.featureId.asc().nullsLast().op("uuid_ops")),
+	index("idx_feature_permissions_level_target").using("btree", table.level.asc().nullsLast().op("uuid_ops"), table.targetId.asc().nullsLast().op("uuid_ops")),
+	index("idx_feature_permissions_target_id").using("btree", table.targetId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [userProfile.id],
+			name: "feature_permissions_created_by_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.featureId],
+			foreignColumns: [features.id],
+			name: "feature_permissions_feature_id_fkey"
+		}).onDelete("cascade"),
+	unique("feature_permissions_unique").on(table.featureId, table.level, table.targetId),
 ]);
 
 export const oauthAuthorizationsInAuth = auth.table("oauth_authorizations", {
@@ -1169,7 +1209,7 @@ export const userRoles = pgTable("user_roles", {
 			columns: [table.userId],
 			foreignColumns: [userProfile.id],
 			name: "user_roles_user_id_fkey"
-		}).onDelete("cascade"),
+		}).onUpdate("cascade").onDelete("cascade"),
 	unique("user_roles_unique").on(table.userId, table.roleId, table.schoolId),
 	check("user_roles_scope_coherence_chk", sql`((role_scope = 'platform'::text) AND (school_id IS NULL)) OR ((role_scope = 'school'::text) AND (school_id IS NOT NULL))`),
 ]);
@@ -1264,6 +1304,35 @@ export const topicSlides = pgTable("topic_slides", {
 	check("topic_slides_payload_chk", sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (text_html IS NULL))`),
 ]);
 
+export const userSessions = pgTable("user_sessions", {
+	id: uuid().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	refreshedAt: timestamp("refreshed_at", { mode: 'string' }),
+	userAgent: text("user_agent"),
+	oauthClientId: uuid("oauth_client_id"),
+}, (table) => [
+	index("user_sessions_refreshed_at_idx").using("btree", table.refreshedAt.desc().nullsLast().op("timestamp_ops")),
+	index("user_sessions_user_id_created_at_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops"), table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+	index("user_sessions_user_id_idx").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.oauthClientId],
+			foreignColumns: [oauthClientsInAuth.id],
+			name: "user_sessions_oauth_client_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [usersInAuth.id],
+			name: "user_sessions_user_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [userProfile.id],
+			name: "user_sessions_user_id_fkey1"
+		}).onUpdate("cascade").onDelete("set null"),
+]);
+
 export const userSchoolPositions = pgTable("user_school_positions", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -1283,7 +1352,7 @@ export const userSchoolPositions = pgTable("user_school_positions", {
 			columns: [table.userId],
 			foreignColumns: [userProfile.id],
 			name: "user_school_positions_user_id_fkey"
-		}).onDelete("cascade"),
+		}).onUpdate("cascade").onDelete("cascade"),
 ]);
 
 export const courseProgress = pgTable("course_progress", {
@@ -1415,6 +1484,25 @@ export const schoolLevelAssignments = pgTable("school_level_assignments", {
 			name: "school_level_assignments_school_id_fkey"
 		}).onDelete("cascade"),
 	primaryKey({ columns: [table.schoolId, table.levelId], name: "school_level_assignments_pkey"}),
+]);
+
+export const schoolYearAssignments = pgTable("school_year_assignments", {
+	schoolId: uuid("school_id").notNull(),
+	schoolYearId: uuid("school_year_id").notNull(),
+}, (table) => [
+	index("idx_school_year_assignments_school_id").using("btree", table.schoolId.asc().nullsLast().op("uuid_ops")),
+	index("idx_school_year_assignments_school_year_id").using("btree", table.schoolYearId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.schoolYearId],
+			foreignColumns: [schoolYears.id],
+			name: "school_year_assignments_school_year_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.schoolId],
+			foreignColumns: [schools.id],
+			name: "school_year_assignments_school_id_fkey"
+		}).onDelete("cascade"),
+	primaryKey({ columns: [table.schoolId, table.schoolYearId], name: "school_year_assignments_pkey"}),
 ]);
 
 export const stageYearLinks = pgTable("stage_year_links", {
@@ -1568,7 +1656,7 @@ export const vStageThresholds = pgView("v_stage_thresholds", {	stageId: uuid("st
 
 export const vSchoolLevelBadge = pgView("v_school_level_badge", {	schoolId: uuid("school_id"),
 	levelBadge: text("level_badge"),
-}).with({ securityInvoker: true }).as(sql`SELECT s.id AS school_id, CASE WHEN count(*) FILTER (WHERE sl.key = 'primary'::text) = 1 AND count(*) FILTER (WHERE sl.key = 'secondary'::text) = 1 THEN 'P–12'::text WHEN COALESCE(bool_or(sl.key = 'primary'::text), false) THEN 'Primary'::text WHEN COALESCE(bool_or(sl.key = 'secondary'::text), false) THEN 'Secondary'::text ELSE 'Unknown'::text END AS level_badge FROM schools s LEFT JOIN school_level_assignments sla ON sla.school_id = s.id LEFT JOIN school_levels sl ON sl.id = sla.level_id GROUP BY s.id`);
+}).with({ securityInvoker: true }).as(sql`SELECT s.id AS school_id, COALESCE((SELECT CASE WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 12 THEN 'P–12'::text WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 10 THEN 'P–10'::text WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 6 THEN 'Primary'::text WHEN min(y.sort_index) >= 7 AND max(y.sort_index) = 12 THEN 'Secondary'::text WHEN count(*) > 0 THEN 'Custom'::text ELSE 'Unknown'::text END FROM school_year_assignments sya JOIN school_years y ON y.id = sya.school_year_id WHERE sya.school_id = s.id), 'Unknown'::text) AS level_badge FROM schools s`);
 
 export const vSchoolYears = pgView("v_school_years", {	id: uuid(),
 	code: text(),
@@ -1647,7 +1735,8 @@ export const vSchoolsEnriched = pgView("v_schools_enriched", {	id: uuid(),
 	state: jsonb(),
 	sector: jsonb(),
 	levels: jsonb(),
-}).with({ securityInvoker: true }).as(sql`SELECT sch.id, sch.name, sch.code, sch.slug, sch.email_domain, sch.address, sch.joined_at, sch.created_at, CASE WHEN st.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', st.id, 'code', st.code, 'name', st.name) END AS state, CASE WHEN sec.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', sec.id, 'key', sec.key, 'name', sec.name) END AS sector, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', lvl.id, 'key', lvl.key, 'name', lvl.name) ORDER BY lvl.key) AS jsonb_agg FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id), '[]'::jsonb) AS levels FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id`);
+	levelBadge: text("level_badge"),
+}).with({ securityInvoker: true }).as(sql`SELECT sch.id, sch.name, sch.code, sch.slug, sch.email_domain, sch.address, sch.joined_at, sch.created_at, CASE WHEN st.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', st.id, 'code', st.code, 'name', st.name) END AS state, CASE WHEN sec.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', sec.id, 'key', sec.key, 'name', sec.name) END AS sector, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', lvl.id, 'key', lvl.key, 'name', lvl.name) ORDER BY lvl.key) AS jsonb_agg FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id), '[]'::jsonb) AS levels, b.level_badge FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id LEFT JOIN school_level_badge b ON b.school_id = sch.id`);
 
 export const vSchoolsReadable = pgView("v_schools_readable", {	id: uuid(),
 	name: text(),
@@ -1664,7 +1753,8 @@ export const vSchoolsReadable = pgView("v_schools_readable", {	id: uuid(),
 	state: text(),
 	sector: text(),
 	levels: text(),
-}).with({ securityInvoker: true }).as(sql`SELECT sch.id, sch.name, sch.code, sch.state_id, sch.sector_id, sch.email_domain, sch.address, sch.joined_at, sch.created_at, sch.slug, sch.banner_url, sch.avatar_url, lower(st.code) AS state, sec.key AS sector, ARRAY( SELECT lvl.name FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id ORDER BY ( CASE lvl.key WHEN 'primary'::text THEN 1 WHEN 'secondary'::text THEN 2 ELSE 99 END)) AS levels FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id`);
+	levelBadge: text("level_badge"),
+}).with({ securityInvoker: true }).as(sql`SELECT sch.id, sch.name, sch.code, sch.state_id, sch.sector_id, sch.email_domain, sch.address, sch.joined_at, sch.created_at, sch.slug, sch.banner_url, sch.avatar_url, lower(st.code) AS state, sec.key AS sector, ARRAY( SELECT lvl.name FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id ORDER BY ( CASE lvl.key WHEN 'primary'::text THEN 1 WHEN 'secondary'::text THEN 2 ELSE 99 END)) AS levels, b.level_badge FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id LEFT JOIN school_level_badge b ON b.school_id = sch.id`);
 
 export const vUserProfileExpanded = pgView("v_user_profile_expanded", {	id: uuid(),
 	firstName: text("first_name"),
@@ -1718,3 +1808,21 @@ export const vUsersWithRolesAndSchools = pgView("v_users_with_roles_and_schools"
 	platformRoles: text("platform_roles"),
 	schoolRoles: jsonb("school_roles"),
 }).with({"securityInvoker":true}).as(sql`SELECT up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata, COALESCE(array_agg(DISTINCT r.key) FILTER (WHERE ur.role_scope = 'platform'::text), ARRAY[]::text[]) AS platform_roles, COALESCE(jsonb_agg(DISTINCT jsonb_build_object('schoolId', ur.school_id, 'schoolName', s.name, 'roleKey', r.key, 'roleName', r.name)) FILTER (WHERE ur.role_scope = 'school'::text AND ur.school_id IS NOT NULL), '[]'::jsonb) AS school_roles FROM user_profile up LEFT JOIN user_roles ur ON ur.user_id = up.id LEFT JOIN roles r ON r.id = ur.role_id LEFT JOIN schools s ON s.id = ur.school_id GROUP BY up.id, up.first_name, up.last_name, up.email, up.avatar_url, up.created_at, up.updated_at, up.metadata`);
+
+export const vFeaturePermissionsReadable = pgView("v_feature_permissions_readable", {	id: uuid(),
+	featureId: uuid("feature_id"),
+	featureKey: text("feature_key"),
+	featureName: text("feature_name"),
+	featureCategory: text("feature_category"),
+	featureDescription: text("feature_description"),
+	level: featurePermissionLevel(),
+	targetId: uuid("target_id"),
+	targetName: text("target_name"),
+	targetType: text("target_type"),
+	enabled: boolean(),
+	visible: boolean(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
+	createdBy: uuid("created_by"),
+	createdByName: text("created_by_name"),
+}).with({ securityInvoker: true }).as(sql`SELECT fp.id, fp.feature_id, f.key AS feature_key, f.name AS feature_name, f.category AS feature_category, f.description AS feature_description, fp.level, fp.target_id, CASE WHEN fp.level = 'global'::feature_permission_level THEN 'Global'::text WHEN fp.level = 'school'::feature_permission_level THEN s.name WHEN fp.level = 'role'::feature_permission_level THEN r.name WHEN fp.level = 'user'::feature_permission_level THEN COALESCE(TRIM(BOTH ' '::text FROM (up.first_name || ' '::text) || up.last_name), up.email) ELSE NULL::text END AS target_name, CASE WHEN fp.level = 'global'::feature_permission_level THEN 'Global'::text WHEN fp.level = 'school'::feature_permission_level THEN 'School'::text WHEN fp.level = 'role'::feature_permission_level THEN 'Role'::text WHEN fp.level = 'user'::feature_permission_level THEN 'User'::text ELSE NULL::text END AS target_type, fp.enabled, fp.visible, fp.created_at, fp.updated_at, fp.created_by, COALESCE(TRIM(BOTH ' '::text FROM (creator.first_name || ' '::text) || creator.last_name), creator.email) AS created_by_name FROM feature_permissions fp JOIN features f ON f.id = fp.feature_id LEFT JOIN schools s ON fp.level = 'school'::feature_permission_level AND s.id = fp.target_id LEFT JOIN roles r ON fp.level = 'role'::feature_permission_level AND r.id = fp.target_id LEFT JOIN user_profile up ON fp.level = 'user'::feature_permission_level AND up.id = fp.target_id LEFT JOIN user_profile creator ON creator.id = fp.created_by`);

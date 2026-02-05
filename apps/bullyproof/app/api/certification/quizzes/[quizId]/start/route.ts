@@ -10,9 +10,14 @@
  * Endpoints:
  * - POST /api/certification/quizzes/[quizId]/start - Start a new quiz attempt
  *
+ * Request body:
+ * - { courseId: string, topicProgressId?: string }
+ *
  * Responses:
+ * - 200 OK: Returns existing in-progress attempt (if one exists).
  * - 201 Created: Returns the created attempt.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 404 Not Found: `{ error: string }` when quiz is not found.
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
@@ -21,6 +26,17 @@ import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-top
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle POST /api/certification/quizzes/[quizId]/start
+ *
+ * Starts a new quiz attempt or returns an existing in-progress attempt.
+ * Handles race conditions by checking for in-progress attempts both before
+ * and after attempting to create a new one.
+ *
+ * @param request The incoming HTTP request containing courseId and optional topicProgressId.
+ * @param params The route parameters containing the quiz ID.
+ * @returns A JSON `NextResponse` with the quiz attempt or an error payload.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ quizId: string }> }

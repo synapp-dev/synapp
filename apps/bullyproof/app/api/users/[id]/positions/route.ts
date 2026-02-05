@@ -21,7 +21,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import { userSchoolPositions, schools } from "@/server/db/schema";
 import { eq, and, ne } from "drizzle-orm";
@@ -63,13 +63,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }
@@ -126,13 +123,10 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }
@@ -241,13 +235,10 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }
@@ -365,13 +356,10 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }

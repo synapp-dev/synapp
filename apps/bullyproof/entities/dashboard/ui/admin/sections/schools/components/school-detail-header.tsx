@@ -59,7 +59,7 @@ export function SchoolDetailHeader({ school }: SchoolDetailHeaderProps) {
   if (!school) return null;
 
   const sectorDisplay = formatSector(school.sector);
-  const levelDisplay = formatSchoolLevel(school.levels);
+  const levelDisplay = (school as { levelBadge?: string | null }).levelBadge ?? formatSchoolLevel(school.levels);
 
   return (
     <div className="p-4 bg-muted shrink-0">

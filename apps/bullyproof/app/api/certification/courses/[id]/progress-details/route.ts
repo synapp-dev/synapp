@@ -18,11 +18,21 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { eq, sql } from "drizzle-orm";
 import { courseProgress, userProfile, userRoles, schools } from "@/server/db/schema";
 import { db } from "@/server/db/drizzle";
 
+/**
+ * Handle GET /api/certification/courses/[id]/progress-details
+ *
+ * Returns detailed course progress information with user and school data for all users.
+ * Only accessible to platform admins.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the course ID.
+ * @returns A JSON `NextResponse` with course progress details array or an error payload.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -34,13 +44,10 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is platform admin
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    if (!hasAccess) {
       return NextResponse.json(
-        { error: "Forbidden - Platform admin access required" },
+        { error: "Forbidden" },
         { status: 403 }
       );
     }

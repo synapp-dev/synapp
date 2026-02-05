@@ -22,7 +22,7 @@
 import { NextResponse } from "next/server";
 import { meService } from "@/server/me/me.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import { userProfile } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -113,17 +113,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions: must be platform admin
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
-      console.error("[USER UPDATE] Unauthorized - insufficient permissions:", {
-        userId,
-        platformRoles: roles.platform,
-      });
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }

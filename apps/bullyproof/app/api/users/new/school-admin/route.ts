@@ -19,6 +19,7 @@
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { db } from "@/server/db/drizzle";
@@ -60,28 +61,26 @@ export async function POST(request: Request) {
     // Validate request body
     const data = createSchoolAdminSchema.parse(body);
 
-    // Check permissions: platform admin OR school admin for this specific school
+    // Check permissions: admin_users (platform) OR teachers feature at this school + membership
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
     const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-    const isSchoolAdminForThisSchool = roles.school.some(
-      (role) =>
-        role.schoolId === data.schoolId && role.roleKey === "SCHOOL_ADMIN"
+    const hasTeachersAtSchool =
+      await checkFeatureAccess(userId, "teachers", data.schoolId);
+    const isMemberOfSchool = roles.school.some(
+      (r) => r.schoolId === data.schoolId
     );
+    const allowed =
+      hasAdminUsers || (hasTeachersAtSchool && isMemberOfSchool);
 
-    if (!isPlatformAdmin && !isSchoolAdminForThisSchool) {
+    if (!allowed) {
       console.error(
         "[SCHOOL ADMIN CREATE] Unauthorized - insufficient permissions:",
-        {
-          userId,
-          schoolId: data.schoolId,
-          platformRoles: roles.platform,
-          schoolRoles: roles.school,
-        }
+        { userId, schoolId: data.schoolId }
       );
       return NextResponse.json(
         {
           error:
-            "Unauthorized - Platform admin or school admin for this school required",
+            "Unauthorized - Admin users or teachers access for this school required",
         },
         { status: 403 }
       );

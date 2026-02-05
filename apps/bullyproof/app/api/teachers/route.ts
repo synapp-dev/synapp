@@ -5,11 +5,11 @@
  *
  * Authentication:
  * - Requires a valid user derived from the request (401 if missing).
- * - Requires PLATFORM_ADMIN role for scope=all, otherwise filters by user's schools.
+ * - Requires admin_schools feature for scope=all, otherwise filters by user's schools.
  *
  * Query parameters:
  * - scope: 'all' | 'school' (default: 'school')
- *   - 'all': Returns count of all teachers (requires PLATFORM_ADMIN)
+ *   - 'all': Returns count of all teachers (requires admin_schools)
  *   - 'school': Returns count of teachers in user's schools
  *
  * Responses:
@@ -49,11 +49,7 @@ export async function GET(request: Request) {
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
     console.error("[TEACHERS METRIC] Error:", e);
-    const status =
-      e.message?.includes("Unauthorized") ||
-      e.message?.includes("PLATFORM_ADMIN")
-        ? 403
-        : 500;
+    const status = e.message?.includes("Unauthorized") ? 403 : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status }

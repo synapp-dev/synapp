@@ -7,6 +7,7 @@ import { isVideoUrl, getVideoEmbedUrl } from "@/utils/video";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { useCompleteTutorial } from "@/entities/me/api/completeTutorial";
 import { useMeStore } from "@/entities/me/model/store";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import Image from "next/image";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -80,7 +81,9 @@ export default function WelcomePage() {
   };
 
   return (
-    <div className="min-h-fit bg-background flex items-start justify-center">
+    <>
+      <FeatureGuard feature="welcome" />
+      <div className="min-h-fit bg-background flex items-start justify-center">
       <div className="container max-w-5xl mx-auto px-4">
         {/* Intro Step */}
         {currentStep === "intro" && (
@@ -225,5 +228,6 @@ export default function WelcomePage() {
         )}
       </div>
     </div>
+    </>
   );
 }

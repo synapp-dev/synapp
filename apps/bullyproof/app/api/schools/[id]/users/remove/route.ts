@@ -19,7 +19,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import {
   userRoles,
@@ -67,8 +67,7 @@ export async function POST(
 
     // Step 2: Check permissions
     console.log("[REMOVE USERS FROM SCHOOL] Step 2: Checking permissions...");
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
+    const isPlatformAdmin = await checkFeatureAccess(userId, "admin_schools");
 
     if (!isPlatformAdmin) {
       console.error(

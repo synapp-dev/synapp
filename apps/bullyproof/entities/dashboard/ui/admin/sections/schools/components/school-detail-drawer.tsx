@@ -166,6 +166,7 @@ import { SchoolDetailSidebar } from "./school-detail-sidebar";
 import { ImportUsersDialog } from "./import-users-dialog";
 import { ImportClassesDialog } from "./import-classes-dialog";
 import { BulkRoleDialog } from "./bulk-role-dialog";
+import { SchoolFeaturesTab } from "./school-features-tab";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import {
@@ -181,7 +182,8 @@ type TabId =
   | "classes"
   | "activity"
   | "culture"
-  | "license";
+  | "license"
+  | "features";
 
 interface SchoolDetailDrawerProps {
   school: SchoolType | null;
@@ -1414,28 +1416,17 @@ function SchoolDetailDrawerContent({
     });
   }, [users, school?.id]);
 
-  // Fetch school years for edit dialog
+  // Fetch school years for edit dialog (from school_year_assignments)
   useEffect(() => {
-    if (editClassDialogOpen && school && schoolLevelsMap.size > 0) {
+    if (editClassDialogOpen && school?.id) {
       setEditLoadingYears(true);
-
-      // Extract level IDs from school's levels array
-      const levelIds = school.levels
-        ?.map((levelName: string) => {
-          const normalizedName = levelName.toLowerCase().trim();
-          return schoolLevelsMap.get(normalizedName);
-        })
-        .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-      // Fetch years filtered by school's level IDs
-      curriculumApi.years
-        .list(levelIds && levelIds.length > 0 ? { levelIds } : undefined)
+      schoolApi.get
+        .years(school.id)
         .then((result) => {
           if (!result.error && result.data) {
             const years = result.data
-              .map((item: any) => item.year)
+              .map((item: { year: any }) => item.year)
               .filter((year: any) => year != null);
-
             const sortedYears = [...years].sort((a, b) => {
               if (a.sortIndex != null && b.sortIndex != null) {
                 return a.sortIndex - b.sortIndex;
@@ -1444,47 +1435,25 @@ function SchoolDetailDrawerContent({
               const bCode = b.code || "";
               return aCode.localeCompare(bCode);
             });
-
             setEditAvailableYears(sortedYears);
           }
         })
-        .catch((error) => {
-          console.error("Failed to fetch school years:", error);
-          setEditAvailableYears([]);
-        })
-        .finally(() => {
-          setEditLoadingYears(false);
-        });
+        .catch(() => setEditAvailableYears([]))
+        .finally(() => setEditLoadingYears(false));
     }
-  }, [editClassDialogOpen, school, schoolLevelsMap]);
+  }, [editClassDialogOpen, school?.id]);
 
-  // Fetch school years when dialog opens
+  // Fetch school years when add class dialog opens (from school_year_assignments)
   useEffect(() => {
-    if (addClassDialogOpen && school && schoolLevelsMap.size > 0) {
+    if (addClassDialogOpen && school?.id) {
       setLoadingYears(true);
-
-      // Extract level IDs from school's levels array
-      // School levels structure: string[] (level names like ["Primary", "Secondary"])
-      const levelIds = school.levels
-        ?.map((levelName: string) => {
-          // Look up level ID by name (case-insensitive)
-          const normalizedName = levelName.toLowerCase().trim();
-          return schoolLevelsMap.get(normalizedName);
-        })
-        .filter((id): id is string => typeof id === "string" && id.length > 0);
-
-      // Fetch years filtered by school's level IDs
-      curriculumApi.years
-        .list(levelIds && levelIds.length > 0 ? { levelIds } : undefined)
+      schoolApi.get
+        .years(school.id)
         .then((result) => {
           if (!result.error && result.data) {
-            // Extract year objects from the nested response structure
-            // Response format: [{ year: {...}, level: {...} }, ...]
             const years = result.data
-              .map((item: any) => item.year)
+              .map((item: { year: any }) => item.year)
               .filter((year: any) => year != null);
-
-            // Sort by sortIndex if available, otherwise by code
             const sortedYears = [...years].sort((a, b) => {
               if (a.sortIndex != null && b.sortIndex != null) {
                 return a.sortIndex - b.sortIndex;
@@ -1493,25 +1462,18 @@ function SchoolDetailDrawerContent({
               const bCode = b.code || "";
               return aCode.localeCompare(bCode);
             });
-
             setAvailableYears(sortedYears);
           }
         })
-        .catch((error) => {
-          console.error("Failed to fetch school years:", error);
-          setAvailableYears([]);
-        })
-        .finally(() => {
-          setLoadingYears(false);
-        });
+        .catch(() => setAvailableYears([]))
+        .finally(() => setLoadingYears(false));
     } else if (!addClassDialogOpen) {
-      // Reset form when dialog closes
       setClassName("");
       setClassCode("");
       setClassRunningYear(new Date().getFullYear().toString());
       setSelectedYearIds([]);
     }
-  }, [addClassDialogOpen, school, schoolLevelsMap]);
+  }, [addClassDialogOpen, school?.id]);
 
   // Generate year options for class running year (current year - 2 to current year + 8)
   const getClassRunningYearOptions = () => {
@@ -1766,7 +1728,7 @@ function SchoolDetailDrawerContent({
 
   if (!school) return null;
 
-  const levelDisplay = formatSchoolLevel(school.levels);
+  const levelDisplay = (school as { levelBadge?: string | null }).levelBadge ?? formatSchoolLevel(school.levels);
   const sectorDisplay =
     school.sector === "government"
       ? "Government"
@@ -2822,6 +2784,11 @@ function SchoolDetailDrawerContent({
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* Features Section */}
+              {activeSection === "features" && school && (
+                <SchoolFeaturesTab school={school} />
               )}
             </div>
           </main>

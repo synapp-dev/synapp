@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { useState, useMemo, useEffect } from "react";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useSchoolStore } from "@/stores/school-store";
 import { useClasses } from "@/entities/classes/model/store";
 import { useMeStore } from "@/entities/me/model/store";
@@ -60,15 +60,24 @@ type UserClass = {
   createdAt: string;
 };
 
-export default function ClassesPage() {
+export default function ClassesPage({
+  params,
+}: {
+  params: Promise<{ school_id: string }>;
+}) {
   usePageTitle(["schools", "classes"]);
   const currentSchool = useSchoolStore((state) => state.currentSchool);
   const currentUser = useMeStore((state) => state.currentUser);
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
+  const [schoolId, setSchoolId] = useState<string>("");
   const [filter, setFilter] = useState<"all" | "my-classes" | "other-classes">(
     "all"
   );
+
+  useEffect(() => {
+    params.then(({ school_id }) => setSchoolId(school_id));
+  }, [params]);
 
   // Use React Query hook for classes
   const {
@@ -235,7 +244,7 @@ export default function ClassesPage() {
   if (!currentSchool) {
     return (
       <>
-        <PlatformAdminGuard />
+        <FeatureGuard feature="classes" schoolId={schoolId} />
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold">School not found</h1>
@@ -250,7 +259,7 @@ export default function ClassesPage() {
 
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="classes" schoolId={schoolId} />
       <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-2">

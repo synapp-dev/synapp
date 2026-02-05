@@ -1,3 +1,26 @@
+/**
+ * Batch Topic Progress Update API route handler.
+ *
+ * Exposes HTTP endpoint for batch updating slide views and progress for a topic.
+ *
+ * Authentication:
+ * - Requires a valid user derived from the request (401 if missing).
+ * - All authenticated users can update their own progress.
+ *
+ * Endpoints:
+ * - POST /api/certification/topics/[topicId]/progress/batch - Batch update slide views and progress
+ *
+ * Request body:
+ * - { currentSlideId?: string, viewedSlideIds: string[] }
+ *
+ * Responses:
+ * - 200 OK: Returns updated progress attempt.
+ * - 400 Bad Request: `{ error: string }` when viewedSlideIds is not an array.
+ * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 403 Forbidden: `{ error: string }` when slides are locked (must complete previous slides first).
+ * - 404 Not Found: `{ error: string }` when topic is not found.
+ * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
@@ -7,6 +30,17 @@ import { courseTopics, courseTopicProgress } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
+/**
+ * Handle POST /api/certification/topics/[topicId]/progress/batch
+ *
+ * Batch updates slide views and progress for a topic. Validates that slides are unlocked
+ * in sequence before allowing batch marking. Useful for marking multiple slides as viewed
+ * in a single request.
+ *
+ * @param request The incoming HTTP request containing currentSlideId and viewedSlideIds.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with the updated progress attempt or an error payload.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ topicId: string }> }

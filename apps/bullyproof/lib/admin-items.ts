@@ -7,7 +7,9 @@ import {
   FileText,
   HelpCircle,
   BookOpenText,
+  Settings,
   type LucideIcon,
+  Component,
 } from "lucide-react";
 
 export interface AdminItem {
@@ -16,8 +18,10 @@ export interface AdminItem {
   icon: LucideIcon;
   iconName: string; // String identifier for passing to client components
   description: string;
-  enabled?: boolean; // false = hidden, true/undefined = visible
-  disabled?: boolean; // true = visible but disabled (grayed out, non-clickable)
+  /** Feature key for access control (e.g. admin_content). Used with useFeaturesAccess. */
+  featureKey: string;
+  enabled?: boolean; // false = hidden from config, true/undefined = visible
+  disabled?: boolean; // true = visible but disabled (e.g. under development)
 }
 
 /**
@@ -31,6 +35,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: BookOpenText,
     iconName: "BookOpenText",
     description: "Manage curriculum content and resources",
+    featureKey: "admin_content",
     enabled: true,
   },
   {
@@ -39,6 +44,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: School,
     iconName: "School",
     description: "View and manage school accounts",
+    featureKey: "admin_schools",
     enabled: true,
   },
   {
@@ -47,6 +53,16 @@ export const adminItemsConfig: AdminItem[] = [
     icon: Users,
     iconName: "Users",
     description: "Manage user accounts and permissions",
+    featureKey: "admin_users",
+    enabled: true,
+  },
+  {
+    title: "Features",
+    url: "/admin/features",
+    icon: Component,
+    iconName: "Component",
+    description: "Manage feature access control and permissions",
+    featureKey: "admin_features",
     enabled: true,
   },
   {
@@ -55,6 +71,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: GraduationCap,
     iconName: "GraduationCap",
     description: "View and manage class rosters",
+    featureKey: "admin_classes",
     enabled: false,
   },
   {
@@ -63,6 +80,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: Presentation,
     iconName: "Presentation",
     description: "Monitor and manage lesson delivery",
+    featureKey: "admin_lessons",
     enabled: false,
   },
   {
@@ -71,6 +89,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: BarChart3,
     iconName: "BarChart3",
     description: "View culture rating analytics and reports",
+    featureKey: "admin_culture_ratings",
     enabled: true,
     disabled: true,
   },
@@ -80,6 +99,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: FileText,
     iconName: "FileText",
     description: "Review system activity and changes",
+    featureKey: "admin_audit_logs",
     enabled: true,
     disabled: true,
   },
@@ -89,10 +109,27 @@ export const adminItemsConfig: AdminItem[] = [
     icon: HelpCircle,
     iconName: "HelpCircle",
     description: "Access support and troubleshooting tools",
+    featureKey: "admin_support_tools",
     enabled: true,
     disabled: true,
   },
 ];
+
+/**
+ * Map URL segment (first path segment under /admin) to feature key for route guarding.
+ * Used by AdminRouteGuard to protect sub-routes.
+ */
+export const adminSegmentToFeatureKey: Record<string, string> = {
+  content: "admin_content",
+  schools: "admin_schools",
+  users: "admin_users",
+  features: "admin_features",
+  classes: "admin_classes",
+  lessons: "admin_lessons",
+  "culture-ratings": "admin_culture_ratings",
+  "audit-logs": "admin_audit_logs",
+  "support-tools": "admin_support_tools",
+};
 
 /**
  * Get only enabled admin items

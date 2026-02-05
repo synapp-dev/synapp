@@ -11,6 +11,9 @@
  * - GET /api/certification/quizzes/[quizId]/attempts/[attemptId]/answers - Get all answers for an attempt
  * - POST /api/certification/quizzes/[quizId]/attempts/[attemptId]/answers - Submit/upsert answers (accepts answerIds array)
  *
+ * Request body (POST):
+ * - { questionId: string, answerIds: string[], timeTakenSeconds?: number }
+ *
  * Responses:
  * - 200 OK: Returns answer data or array of answers.
  * - 201 Created: Returns the created answer.
@@ -23,6 +26,15 @@ import { quizAttemptAnswersRepo } from "@/server/quiz-attempt-answers/quiz-attem
 import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle GET /api/certification/quizzes/[quizId]/attempts/[attemptId]/answers
+ *
+ * Returns all answers submitted for a quiz attempt.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the quiz ID and attempt ID.
+ * @returns A JSON `NextResponse` with array of answers or an error payload.
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }
@@ -60,6 +72,16 @@ export async function GET(
   }
 }
 
+/**
+ * Handle POST /api/certification/quizzes/[quizId]/attempts/[attemptId]/answers
+ *
+ * Submits or updates an answer for a quiz question. Accepts multiple answer IDs for multi-select questions.
+ * Updates the attempt's correct answers count based on the submitted answer.
+ *
+ * @param request The incoming HTTP request containing questionId, answerIds, and optional timeTakenSeconds.
+ * @param params The route parameters containing the quiz ID and attempt ID.
+ * @returns A JSON `NextResponse` with the submitted answer or an error payload.
+ */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }

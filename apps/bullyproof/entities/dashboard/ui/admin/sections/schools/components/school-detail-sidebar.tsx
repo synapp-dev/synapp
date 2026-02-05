@@ -21,6 +21,7 @@ import {
   Star,
   Key,
   Trash2,
+  Settings,
 } from "lucide-react";
 
 type TabId =
@@ -30,7 +31,8 @@ type TabId =
   | "classes"
   | "activity"
   | "culture"
-  | "license";
+  | "license"
+  | "features";
 
 interface SchoolDetailSidebarProps {
   activeTab: TabId;
@@ -46,6 +48,7 @@ const navItems = [
   { id: "activity", name: "Activity", icon: Activity, disabled: true },
   { id: "culture", name: "Culture", icon: Star, disabled: true },
   { id: "license", name: "License", icon: Key },
+  { id: "features", name: "Feature Access", icon: Settings },
 ];
 
 export function SchoolDetailSidebar({

@@ -18,7 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import { teacherClasses, classes, schools } from "@/server/db/schema";
 import { eq, asc } from "drizzle-orm";
@@ -46,8 +46,7 @@ export async function GET(
     const { id: targetUserId } = await params;
 
     // Check permissions - platform admins can view any user's classes
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
+    const isPlatformAdmin = await checkFeatureAccess(userId, "admin_users");
 
     if (!isPlatformAdmin && userId !== targetUserId) {
       return NextResponse.json(

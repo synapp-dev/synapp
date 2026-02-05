@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import {
   Card,
   CardContent,
@@ -177,30 +176,24 @@ export default function TeacherPageClient({
 
   if (loading) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <div className="space-y-6">
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">Loading teacher profile...</p>
-          </div>
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Loading teacher profile...</p>
         </div>
-      </>
+      </div>
     );
   }
 
   if (!teacher) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Teacher not found</h1>
-            <p className="text-muted-foreground">
-              The teacher you're looking for doesn't exist.
-            </p>
-          </div>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Teacher not found</h1>
+          <p className="text-muted-foreground">
+            The teacher you're looking for doesn't exist.
+          </p>
         </div>
-      </>
+      </div>
     );
   }
 

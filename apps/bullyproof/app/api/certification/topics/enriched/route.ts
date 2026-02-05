@@ -10,6 +10,9 @@
  * Endpoints:
  * - GET /api/certification/topics/enriched?courseCode=xxx - Get enriched topics by course code
  *
+ * Query parameters:
+ * - courseCode: string (required) - The course code to filter topics by
+ *
  * Responses:
  * - 200 OK: Returns array of enriched certification topics.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.

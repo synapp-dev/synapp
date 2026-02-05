@@ -18,7 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { licencesRepo } from "@/server/licences/licences.repo";
@@ -56,18 +56,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user is platform admin
-    const roles = await getUserScopedRoles(userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
+    // Check if user has admin_schools feature (licences/invites are school-related admin)
+    const hasAdminSchools = await checkFeatureAccess(userId, "admin_schools");
+    if (!hasAdminSchools) {
       console.error(
-        "[SCHOOL LICENSE CREATE] Unauthorized - not platform admin:",
-        {
-          userId,
-          platformRoles: roles.platform,
-        }
+        "[SCHOOL LICENSE CREATE] Unauthorized - admin_schools required:",
+        { userId }
       );
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized - Admin schools permission required" },
         { status: 403 }
       );
     }

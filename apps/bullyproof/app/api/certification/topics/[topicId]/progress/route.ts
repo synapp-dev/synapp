@@ -1,3 +1,30 @@
+/**
+ * Topic Progress API route handler.
+ *
+ * Exposes HTTP endpoints for managing user progress through certification topics.
+ *
+ * Authentication:
+ * - Requires a valid user derived from the request (401 if missing).
+ * - All authenticated users can track their own progress.
+ *
+ * Endpoints:
+ * - GET /api/certification/topics/[topicId]/progress - Get latest progress attempt for a topic
+ * - POST /api/certification/topics/[topicId]/progress - Create or update progress (navigate slides)
+ * - PATCH /api/certification/topics/[topicId]/progress - Update progress status or current slide (page exit)
+ *
+ * Request body (POST):
+ * - { currentSlideId?: string }
+ *
+ * Request body (PATCH):
+ * - { currentSlideId?: string, status?: "in_progress" | "quiz_unlocked" | "completed" }
+ *
+ * Responses:
+ * - 200 OK: Returns progress attempt data.
+ * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 403 Forbidden: `{ error: string }` when slide is locked (must complete previous slides first).
+ * - 404 Not Found: `{ error: string }` when topic or attempt is not found.
+ * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
@@ -22,6 +49,15 @@ async function topicHasValidQuizzes(topicId: string): Promise<boolean> {
   return false;
 }
 
+/**
+ * Handle GET /api/certification/topics/[topicId]/progress
+ *
+ * Returns the latest progress attempt for the authenticated user and specified topic.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with the progress attempt or an error payload.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ topicId: string }> }
@@ -68,6 +104,17 @@ export async function GET(
   }
 }
 
+/**
+ * Handle POST /api/certification/topics/[topicId]/progress
+ *
+ * Creates or updates progress for a topic. Used when navigating to a new slide.
+ * Validates that slides are unlocked in sequence before allowing access.
+ * Automatically marks slides as viewed when navigating to them.
+ *
+ * @param request The incoming HTTP request containing currentSlideId.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with the progress attempt or an error payload.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ topicId: string }> }
@@ -169,6 +216,16 @@ export async function POST(
   }
 }
 
+/**
+ * Handle PATCH /api/certification/topics/[topicId]/progress
+ *
+ * Updates progress status or current slide position. Used for page exit updates.
+ * Skips unlock validation to allow saving the user's current position regardless of sequence.
+ *
+ * @param request The incoming HTTP request containing currentSlideId and/or status.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with the updated progress attempt or an error payload.
+ */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ topicId: string }> }

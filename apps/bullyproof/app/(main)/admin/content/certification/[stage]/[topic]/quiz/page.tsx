@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -51,34 +50,23 @@ export default function CertificationTopicQuizPage() {
 
   if (isLoading) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
-      </>
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
     );
   }
 
   if (error || !topicId) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-destructive">
-              {error || "Topic not found"}
-            </p>
-          </CardContent>
-        </Card>
-      </>
+      <Card>
+        <CardContent className="pt-6">
+          <p className="text-sm text-destructive">
+            {error || "Topic not found"}
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 
-  return (
-    <>
-      <PlatformAdminGuard />
-      <QuizGridSection topicId={topicId} />
-    </>
-  );
+  return <QuizGridSection topicId={topicId} />;
 }

@@ -1,6 +1,6 @@
 import { generateMetadataFromSegment } from "@/utils/metadata";
 import { Metadata } from "next";
-import TeacherPageClient from "./teacher-page-client";
+import { TeacherPageWrapper } from "./teacher-page-wrapper";
 
 export async function generateMetadata({
   params,
@@ -11,12 +11,10 @@ export async function generateMetadata({
   return generateMetadataFromSegment(teacherName);
 }
 
-export default async function TeacherPage({
+export default function TeacherPage({
   params,
 }: {
   params: Promise<{ school_id: string; "teacher-name": string }>;
 }) {
-  const { school_id, "teacher-name": teacherSlug } = await params;
-
-  return <TeacherPageClient teacherSlug={teacherSlug} schoolSlug={school_id} />;
+  return <TeacherPageWrapper params={params} />;
 }

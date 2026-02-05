@@ -18,7 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { db } from "@/server/db/drizzle";
@@ -145,34 +145,10 @@ export async function POST(request: Request) {
 
     // Step 4: Check permissions
     console.log("[BULK USER CREATE] Step 4: Checking permissions...");
-    let userRoles: any;
-    try {
-      userRoles = await getUserScopedRoles(userId);
-      console.log("[BULK USER CREATE] Step 4: Success, roles:", {
-        platformRoles: userRoles.platform,
-        schoolRoles: userRoles.school,
-      });
-    } catch (error: any) {
-      console.error("[BULK USER CREATE] Step 4: Failed to get roles:", {
-        error: error.message,
-        stack: error.stack,
-      });
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: `Failed to check permissions: ${error.message}` },
-        { status: 500 }
-      );
-    }
-
-    const isPlatformAdmin = userRoles.platform.includes("PLATFORM_ADMIN");
-    if (!isPlatformAdmin) {
-      console.error("[BULK USER CREATE] Step 4: Insufficient permissions:", {
-        userId,
-        platformRoles: userRoles.platform,
-      });
-      return NextResponse.json(
-        {
-          error: "Unauthorized - Platform admin required",
-        },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }
@@ -1535,6 +1511,31 @@ export async function POST(request: Request) {
         }
       }
 
+      // Step 2b: Remove TEACHER role for this school where import has apTeacher false (upsert: sync roles to import)
+      if (teacherRole.length > 0) {
+        const userIdsToRemoveTeacher = existingUsers
+          .filter((eu) => !eu.user.apTeacher)
+          .map((eu) => eu.userId);
+        if (userIdsToRemoveTeacher.length > 0) {
+          console.log(
+            `[BULK USER CREATE] Removing TEACHER role for ${userIdsToRemoveTeacher.length} existing users (apTeacher not set in import)...`
+          );
+          await Promise.all(
+            userIdsToRemoveTeacher.map((uid) =>
+              rolesRepo
+                .removeRole(uid, teacherRole[0].id, data.schoolId)
+                .catch((err: any) => {
+                  console.error(
+                    `[BULK USER CREATE] Failed to remove TEACHER for ${uid}:`,
+                    err.message
+                  );
+                  return null;
+                })
+            )
+          );
+        }
+      }
+
       // Step 3: Batch check and assign roles
       const staffRoleUserIds = new Set(existingUserIds);
       const teacherRoleUserIds = new Set(
@@ -1636,7 +1637,20 @@ export async function POST(request: Request) {
         }
       }
 
-      // Batch create positions for users with positions
+      // Step 4: Replace positions for this school (upsert: delete existing, then insert from import)
+      console.log(
+        `[BULK USER CREATE] Replacing positions for ${existingUserIds.length} existing users at this school...`
+      );
+      await db
+        .delete(userSchoolPositions)
+        .where(
+          and(
+            inArray(userSchoolPositions.userId, existingUserIds),
+            eq(userSchoolPositions.schoolId, data.schoolId)
+          )
+        );
+
+      // Batch create positions from import (now that old positions are removed)
       const existingUsersWithPositions = existingUsers.filter(
         (eu) => eu.user.position && eu.user.position.trim().length > 0
       );
@@ -1724,7 +1738,7 @@ export async function POST(request: Request) {
     // Handle business logic errors (authorization)
     if (
       e.message?.includes("Unauthorized") ||
-      e.message?.includes("PLATFORM_ADMIN")
+      e.message?.includes("Unauthorized")
     ) {
       return NextResponse.json({ error: e.message }, { status: 403 });
     }

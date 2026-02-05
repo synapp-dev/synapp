@@ -1,6 +1,8 @@
 "use client";
 
 import { MeLoader } from "@/components/molecules/me-loader";
+import { PermissionsReadyGate } from "@/components/molecules/permissions-ready-gate";
+import { MaintenanceRedirectGuard } from "@/components/molecules/maintenance-redirect-guard";
 import { TutorialGuard } from "@/components/molecules/tutorial-guard";
 import { DashboardTutorialGuard } from "@/components/molecules/dashboard-tutorial-guard";
 import { TeacherClassesGuard } from "@/components/molecules/teacher-classes-guard";
@@ -20,18 +22,21 @@ export default function MainLayout({
   return (
     <ResponsiveSidebarProvider>
       <MeLoader />
-      <TutorialGuard />
-      <DashboardTutorialGuard />
-      <TeacherClassesGuard />
-      <SchoolPageTutorialGuard />
-      <CourseRatingDashboardGuard />
-      <AppSidebar />
-      <div className="flex flex-col flex-1 max-w-7xl mx-auto">
-        <AppHeader />
-        <SidebarInset className="h-full">
-          <div className="px-6 py-3">{children}</div>
-        </SidebarInset>
-      </div>
+      <PermissionsReadyGate>
+        <MaintenanceRedirectGuard />
+        <TutorialGuard />
+        <DashboardTutorialGuard />
+        <TeacherClassesGuard />
+        <SchoolPageTutorialGuard />
+        <CourseRatingDashboardGuard />
+        <AppSidebar />
+        <div className="flex flex-col flex-1 max-w-7xl mx-auto">
+          <AppHeader />
+          <SidebarInset className="h-full">
+            <div className="px-6 py-3">{children}</div>
+          </SidebarInset>
+        </div>
+      </PermissionsReadyGate>
     </ResponsiveSidebarProvider>
   );
 }

@@ -32,7 +32,7 @@ import { NextResponse } from "next/server";
 import { topicsRepo } from "@/server/topics/topics.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import { topicSlides } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
@@ -168,19 +168,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions ONCE at the beginning for the entire bulk operation
-    console.log("[bulk-save] Checking user permissions...");
-    const roles = await getUserScopedRoles(userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
-      console.error(
-        "[bulk-save] ERROR: User does not have PLATFORM_ADMIN role - returning 403"
-      );
+    const hasAdminContent = await checkFeatureAccess(userId, "admin_content");
+    if (!hasAdminContent) {
       return NextResponse.json(
         { error: "Unauthorized to manage topics" },
         { status: 403 }
       );
     }
-    console.log("[bulk-save] Permission check passed - user is PLATFORM_ADMIN");
 
     console.log("[bulk-save] Parsing form data...");
     let formData: FormData;

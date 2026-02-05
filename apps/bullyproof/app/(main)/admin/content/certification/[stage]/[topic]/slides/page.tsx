@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -51,19 +50,14 @@ export default function CertificationTopicSlidesPage() {
 
   if (isLoading) {
     return (
-      <>
-        <PlatformAdminGuard />
-        <div className="flex items-center justify-center py-8">
+      <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
-      </>
     );
   }
 
   if (error || !topicId) {
     return (
-      <>
-        <PlatformAdminGuard />
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-destructive">
@@ -71,19 +65,15 @@ export default function CertificationTopicSlidesPage() {
             </p>
           </CardContent>
         </Card>
-      </>
     );
   }
 
   return (
-    <>
-      <PlatformAdminGuard />
-      <TopicDetailSection
-        context="certification"
-        topicId={topicId}
-        stageCode={stageCode}
-        excludeQuizSlides={true}
-      />
-    </>
+    <TopicDetailSection
+      context="certification"
+      topicId={topicId}
+      stageCode={stageCode}
+      excludeQuizSlides={true}
+    />
   );
 }

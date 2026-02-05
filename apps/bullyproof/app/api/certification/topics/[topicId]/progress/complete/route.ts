@@ -1,3 +1,24 @@
+/**
+ * Complete Topic Progress API route handler.
+ *
+ * Exposes HTTP endpoint for completing all slides in a topic and updating progress status.
+ *
+ * Authentication:
+ * - Requires a valid user derived from the request (401 if missing).
+ * - All authenticated users can complete their own topics.
+ *
+ * Endpoints:
+ * - POST /api/certification/topics/[topicId]/progress/complete - Complete topic slides
+ *
+ * Request body:
+ * - { currentSlideId?: string }
+ *
+ * Responses:
+ * - 200 OK: Returns updated progress attempt with quiz status and rating modal flag.
+ * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 404 Not Found: `{ error: string }` when topic is not found.
+ * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
@@ -22,6 +43,17 @@ async function topicHasValidQuizzes(topicId: string): Promise<boolean> {
   return false;
 }
 
+/**
+ * Handle POST /api/certification/topics/[topicId]/progress/complete
+ *
+ * Completes all slides in a topic. If the topic has quizzes with questions, unlocks the quiz.
+ * If the topic has no quizzes, marks the topic as completed. Also updates course-level progress
+ * and determines if the rating modal should be shown.
+ *
+ * @param request The incoming HTTP request containing currentSlideId.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with the updated progress attempt, quiz status, and rating modal flag or an error payload.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ topicId: string }> }

@@ -19,6 +19,16 @@ import { NextResponse } from "next/server";
 import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle GET /api/certification/topics/[topicId]/quiz-in-progress
+ *
+ * Returns the in-progress quiz attempt for the authenticated user and specified topic.
+ * Returns null if no in-progress attempt exists.
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with the in-progress attempt or null, or an error payload.
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ topicId: string }> }

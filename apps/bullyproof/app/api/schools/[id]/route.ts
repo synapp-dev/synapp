@@ -52,7 +52,7 @@ export async function PATCH(
   } catch (e: any) {
     console.error(e);
     const status =
-      e.message?.includes("Unauthorized") || e.message?.includes("PLATFORM_ADMIN")
+      e.message?.includes("Unauthorized")
         ? 403
         : e.message?.includes("not found")
           ? 404
@@ -82,7 +82,7 @@ export async function DELETE(
   } catch (e: any) {
     console.error(e);
     const status =
-      e.message?.includes("Unauthorized") || e.message?.includes("PLATFORM_ADMIN")
+      e.message?.includes("Unauthorized")
         ? 403
         : e.message?.includes("not found")
           ? 404

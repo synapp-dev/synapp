@@ -18,7 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { db } from "@/server/db/drizzle";
@@ -53,20 +53,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions: must be platform admin
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
+    // Check permissions: must have admin_users feature
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       console.error(
         "[PLATFORM ADMIN CREATE] Unauthorized - insufficient permissions:",
-        {
-          userId,
-          platformRoles: roles.platform,
-        }
+        { userId }
       );
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized - Admin users permission required" },
         { status: 403 }
       );
     }

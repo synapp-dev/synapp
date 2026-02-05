@@ -21,7 +21,7 @@
 import { NextResponse } from "next/server";
 import { quizQuestionsRepo } from "@/server/quiz-questions/quiz-questions.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 
 export async function GET(
   request: Request,
@@ -57,8 +57,8 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const roles = await getUserScopedRoles(userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
+    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    if (!hasAccess) {
       return NextResponse.json(
         { error: "Unauthorized to manage quiz questions" },
         { status: 403 }

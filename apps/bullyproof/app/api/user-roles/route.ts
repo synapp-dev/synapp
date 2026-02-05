@@ -156,12 +156,9 @@ export async function POST(request: Request) {
   } catch (e: any) {
     console.error("[POST /api/user-roles] Error:", e);
 
-    // Check for PLATFORM_ADMIN constraint errors (business logic errors)
+    // Check for business logic errors (e.g. role constraints)
     const errorMessage = e.message ?? "Internal error";
-    if (
-      errorMessage.includes("PLATFORM_ADMIN") ||
-      errorMessage.includes("cannot have any other roles")
-    ) {
+    if (errorMessage.includes("cannot have any other roles")) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 

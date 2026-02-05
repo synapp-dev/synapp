@@ -35,7 +35,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await meService.getCurrentUser({ userId });
+    // Check if feature permissions should be included
+    const { searchParams } = new URL(request.url);
+    const includeFeatures = searchParams.get("includeFeatures") === "true";
+
+    const user = await meService.getCurrentUser({ userId }, includeFeatures);
     return NextResponse.json(user, { status: 200 });
   } catch (e: any) {
     console.error(e);

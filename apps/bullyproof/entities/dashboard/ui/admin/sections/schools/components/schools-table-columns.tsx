@@ -16,7 +16,8 @@ export type School = {
   status: "onboarding" | "active";
   slug: string | null;
   levels?: string[] | null; // Array of level names (e.g., ["Primary", "Secondary"])
-};
+  levelBadge?: string | null; // From school_year_assignments: "Primary" | "Secondary" | "P–12" | "P–10" | "Custom"
+}
 
 // Helper function to format school levels
 function formatSchoolLevel(levels: string[] | null | undefined): string {
@@ -137,7 +138,7 @@ export const columns: ColumnDef<School>[] = [
     },
     cell: ({ row }) => {
       const school = row.original;
-      const levelDisplay = formatSchoolLevel(school.levels);
+      const levelDisplay = school.levelBadge ?? formatSchoolLevel(school.levels);
       return (
         <div className="text-left text-sm font-medium">{levelDisplay}</div>
       );

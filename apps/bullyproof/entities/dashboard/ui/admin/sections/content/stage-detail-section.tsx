@@ -77,6 +77,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { AnimatedThumbnail } from "@/components/organisms/animated-thumbnail";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 // Component to handle thumbnail image with error fallback
 function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
@@ -94,7 +95,7 @@ function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
   return (
     <div className="relative w-24 h-14 flex-shrink-0 rounded-md overflow-hidden bg-muted aspect-video">
       <Image
-        src={imageUrl}
+        src={toStorageUrl(imageUrl) ?? imageUrl}
         alt={alt}
         fill
         className="object-cover"

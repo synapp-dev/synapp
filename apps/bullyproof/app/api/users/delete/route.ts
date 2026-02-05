@@ -18,7 +18,7 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { db } from "@/server/db/drizzle";
 import { userRoles, teacherClasses, userSchoolPositions } from "@/server/db/schema";
@@ -55,23 +55,13 @@ export async function DELETE(request: Request) {
 
     console.log("[BULK USER DELETE] Step 1: Success, userId:", userId);
 
-    // Step 2: Check permissions
-    console.log("[BULK USER DELETE] Step 2: Checking permissions...");
-    const roles = await getUserScopedRoles(userId);
-    const isPlatformAdmin = roles.platform.includes("PLATFORM_ADMIN");
-
-    if (!isPlatformAdmin) {
-      console.error("[BULK USER DELETE] Step 2: Unauthorized - insufficient permissions:", {
-        userId,
-        platformRoles: roles.platform,
-      });
+    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    if (!hasAdminUsers) {
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized" },
         { status: 403 }
       );
     }
-
-    console.log("[BULK USER DELETE] Step 2: Success, user is platform admin");
 
     // Step 3: Parse request body
     console.log("[BULK USER DELETE] Step 3: Parsing request body...");

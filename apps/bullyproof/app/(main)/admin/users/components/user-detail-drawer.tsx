@@ -126,6 +126,7 @@ import { UserDetailsCard } from "./user-detail-drawer/user-details-card";
 import { UserHistoryTab } from "./user-detail-drawer/user-history-tab";
 import { UserPositionsTab } from "./user-detail-drawer/user-positions-tab";
 import { UserClassesTab } from "./user-detail-drawer/user-classes-tab";
+import { UserFeaturesTab } from "./user-detail-drawer/user-features-tab";
 import {
   extractSchoolMetadata,
   getDisplayName,
@@ -1255,6 +1256,8 @@ function UserDetailDrawerContent({
                   updateLogUsers={updateLogUsers}
                 />
               )}
+
+              {activeTab === "features" && <UserFeaturesTab user={user} />}
             </div>
           </main>
         </div>

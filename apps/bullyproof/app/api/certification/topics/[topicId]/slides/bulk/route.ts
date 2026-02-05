@@ -34,7 +34,7 @@ import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic
 import { courseTopicsRepo } from "@/server/course-topics/course-topics.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import {
   certificationCourses,
@@ -54,9 +54,8 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check permissions
-    const roles = await getUserScopedRoles(userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
+    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    if (!hasAccess) {
       return NextResponse.json(
         { error: "Unauthorized to manage certification slides" },
         { status: 403 }

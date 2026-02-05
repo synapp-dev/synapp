@@ -1,3 +1,21 @@
+/**
+ * Topic Slides with Progress API route handler.
+ *
+ * Exposes HTTP endpoint for fetching slides with signed URLs and user progress in a single request.
+ *
+ * Authentication:
+ * - Requires a valid user derived from the request (401 if missing).
+ * - All authenticated users can view their own progress.
+ *
+ * Endpoints:
+ * - GET /api/certification/topics/[topicId]/slides-with-progress - Get slides with progress
+ *
+ * Responses:
+ * - 200 OK: Returns slides array and progress attempt object.
+ * - 401 Unauthorized: `{ error: string }` when user identification fails.
+ * - 404 Not Found: `{ error: string }` when topic is not found.
+ * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ */
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { certificationSlidesService } from "@/server/certification-slides/certification-slides.service";
@@ -7,10 +25,15 @@ import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
 /**
- * GET /api/certification/topics/[topicId]/slides-with-progress
- * 
- * Returns slides for a topic along with the user's current progress/attempt.
- * This consolidates multiple API calls into a single request.
+ * Handle GET /api/certification/topics/[topicId]/slides-with-progress
+ *
+ * Returns slides for a topic with signed URLs along with the user's current progress/attempt.
+ * This consolidates multiple API calls into a single request for better performance.
+ * Progress is fetched but not created if it doesn't exist (lazy creation on navigation).
+ *
+ * @param request The incoming HTTP request.
+ * @param params The route parameters containing the topic ID.
+ * @returns A JSON `NextResponse` with slides and progress attempt or an error payload.
  */
 export async function GET(
   request: NextRequest,

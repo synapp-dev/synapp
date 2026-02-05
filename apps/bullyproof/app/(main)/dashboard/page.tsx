@@ -4,6 +4,7 @@ import { AdminDashboard } from "@/entities/dashboard/ui/admin/admin-dashboard";
 import { TeacherDashboard } from "@/entities/dashboard/ui/teacher/teacher-dashboard";
 import { useIsPlatformAdmin, useIsSchoolStaff, useIsTeacher } from "@/entities/me/model/store";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 
 export default function DashboardPage() {
   usePageTitle(["dashboard"]);
@@ -23,10 +24,13 @@ export default function DashboardPage() {
 
   // Fallback for users without specific roles
   return (
-    <div className="flex items-center justify-center h-64">
-      <p className="text-muted-foreground">
-        No dashboard available for your role.
-      </p>
-    </div>
+    <>
+      <FeatureGuard feature="dashboard" />
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">
+          No dashboard available for your role.
+        </p>
+      </div>
+    </>
   );
 }

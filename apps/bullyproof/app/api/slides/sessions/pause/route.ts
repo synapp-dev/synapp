@@ -10,6 +10,9 @@
  * Endpoints:
  * - POST /api/slides/sessions/pause - Pause a viewing session
  *
+ * Request body:
+ * - { sessionId: string, slideId: string }
+ *
  * Responses:
  * - 200 OK: Returns the paused session.
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
@@ -20,6 +23,14 @@ import { NextResponse } from "next/server";
 import { slideViewingSessionsRepo } from "@/server/slide-viewing-sessions/slide-viewing-sessions.repo";
 import { createServerClient } from "@/utils/supabase/server";
 
+/**
+ * Handle POST /api/slides/sessions/pause
+ *
+ * Pauses an active slide viewing session.
+ *
+ * @param request The incoming HTTP request containing sessionId and slideId.
+ * @returns A JSON `NextResponse` with the paused session or an error payload.
+ */
 export async function POST(request: Request) {
   try {
     const supabase = await createServerClient();

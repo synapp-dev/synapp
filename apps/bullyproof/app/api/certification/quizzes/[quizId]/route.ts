@@ -22,7 +22,7 @@
 import { NextResponse } from "next/server";
 import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { getUserScopedRoles } from "@/server/auth/rbac";
+import { checkFeatureAccess } from "@/server/features/features.service";
 
 export async function GET(
   request: Request,
@@ -64,8 +64,8 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const roles = await getUserScopedRoles(userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
+    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    if (!hasAccess) {
       return NextResponse.json(
         { error: "Unauthorized to manage quizzes" },
         { status: 403 }
@@ -97,8 +97,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const roles = await getUserScopedRoles(userId);
-    if (!roles.platform.includes("PLATFORM_ADMIN")) {
+    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    if (!hasAccess) {
       return NextResponse.json(
         { error: "Unauthorized to manage quizzes" },
         { status: 403 }

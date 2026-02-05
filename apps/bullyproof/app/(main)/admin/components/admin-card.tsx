@@ -11,6 +11,7 @@ import {
   FileText,
   HelpCircle,
   BookOpenText,
+  Component,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -39,6 +40,7 @@ const iconMap: Record<string, LucideIcon> = {
   BarChart3,
   FileText,
   HelpCircle,
+  Component,
 };
 
 export function AdminCard({

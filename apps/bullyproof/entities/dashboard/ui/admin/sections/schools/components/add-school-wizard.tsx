@@ -23,6 +23,7 @@ import { Loader2, School } from "lucide-react";
 import { statesApi } from "@/entities/states/api/endpoints";
 import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
 import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
+import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
 import { capitalizeSchoolName } from "@/utils/school-name";
@@ -178,23 +179,41 @@ export function AddSchoolWizard({
     setError(null);
 
     try {
-      // Map levelSelection to levelIds
-      let levelIds: string[] = [];
-      if (formData.levelSelection === "p12") {
-        // P-12 means both primary and secondary
+      let levelIds: string[] | undefined;
+      let yearIds: string[] | undefined;
+
+      if (formData.levelSelection === "p10") {
+        // P-10: Prep through Year 10 (sortIndex 0..10)
+        const yearsResult = await curriculumApi.years.list();
+        if (yearsResult.error || !yearsResult.data) {
+          setError("Could not load year levels");
+          setLoading(false);
+          return;
+        }
+        const p10Years = yearsResult.data
+          .map((item: { year: { id: string; sortIndex: number } }) => item.year)
+          .filter((y: { sortIndex: number }) => y != null && y.sortIndex >= 0 && y.sortIndex <= 10)
+          .sort((a: { sortIndex: number }, b: { sortIndex: number }) => a.sortIndex - b.sortIndex);
+        yearIds = p10Years.map((y: { id: string }) => y.id);
+        if (yearIds.length === 0) {
+          setError("Invalid P-10 year configuration");
+          setLoading(false);
+          return;
+        }
+      } else if (formData.levelSelection === "p12") {
         const primaryLevel = schoolLevels.find((l) => l.key === "primary");
         const secondaryLevel = schoolLevels.find((l) => l.key === "secondary");
+        levelIds = [];
         if (primaryLevel) levelIds.push(primaryLevel.id);
         if (secondaryLevel) levelIds.push(secondaryLevel.id);
       } else {
-        // Single level selection
         const selectedLevel = schoolLevels.find(
           (l) => l.key === formData.levelSelection
         );
-        if (selectedLevel) levelIds.push(selectedLevel.id);
+        levelIds = selectedLevel ? [selectedLevel.id] : [];
       }
 
-      if (levelIds.length === 0) {
+      if (!levelIds?.length && !yearIds?.length) {
         setError("Invalid school level selection");
         setLoading(false);
         return;
@@ -204,7 +223,8 @@ export function AddSchoolWizard({
         name: capitalizeSchoolName(formData.name.trim()),
         stateId: formData.stateId,
         sectorId: formData.sectorId,
-        levelIds,
+        ...(levelIds?.length ? { levelIds } : {}),
+        ...(yearIds?.length ? { yearIds } : {}),
       });
 
       if (result.error) {
@@ -303,6 +323,7 @@ export function AddSchoolWizard({
                           {level.name}
                         </SelectItem>
                       ))}
+                      <SelectItem value="p10">P-10</SelectItem>
                       <SelectItem value="p12">P-12</SelectItem>
                     </SelectContent>
                   </Select>

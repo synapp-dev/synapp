@@ -34,6 +34,6 @@ export interface UnavailableRoleToAssign {
   roleName: string;
 }
 
-export type TabType = "details" | "roles" | "positions" | "classes" | "history";
+export type TabType = "details" | "roles" | "positions" | "classes" | "history" | "features";
 export type HistorySubTabType = "details" | "roles";
 export type AddRoleStep = "school" | "role" | "confirm";
