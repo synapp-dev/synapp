@@ -15,8 +15,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
-import { Button } from "@workspace/ui/components/button";
-import { GraduationCap, Plus, Loader2, Search, Star } from "lucide-react";
+import { GraduationCap, Loader2, Search, Star } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
@@ -262,10 +261,10 @@ export default function ClassesPage({
       <FeatureGuard feature="classes" schoolId={schoolId} />
       <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-2">
+      {/* <div className="flex items-center gap-2">
         <GraduationCap className="h-8 w-8" />
         <h1 className="text-3xl font-bold">Classes</h1>
-      </div>
+      </div> */}
 
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -316,7 +315,10 @@ export default function ClassesPage({
           {/* My Classes Section */}
           {filter !== "other-classes" && filteredMyClasses.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">My Classes</h2>
+              <div className="flex items-center">
+                <GraduationCap className="h-5 w-5 text-muted-foreground" />
+                <h2 className="text-lg pl-2 font-medium text-muted-foreground">My Classes</h2>
+              </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredMyClasses.map((classItem) => {
                   const isStarred = userClassIds.has(classItem.id);
@@ -378,33 +380,18 @@ export default function ClassesPage({
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {classItem.code && (
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">
-                                Code:{" "}
-                              </span>
-                              <span className="font-medium">
-                                {classItem.code}
-                              </span>
-                            </div>
-                          )}
-                          {classItem.yearCodes &&
-                            classItem.yearCodes.length > 0 && (
-                              <div>
-                                <div className="text-sm text-muted-foreground mb-1">
-                                  Year Levels:
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {classItem.yearCodes.map((yearCode, idx) => (
-                                    <Badge
-                                      key={idx}
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {yearCode}
-                                    </Badge>
-                                  ))}
-                                </div>
+                          {classItem.yearNames &&
+                            classItem.yearNames.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {classItem.yearNames.map((yearName, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {yearName}
+                                  </Badge>
+                                ))}
                               </div>
                             )}
                           {classItem.room && (
@@ -436,10 +423,12 @@ export default function ClassesPage({
             </div>
           )}
 
-          {/* Other Classes Section */}
+          {/* Other Classes Section (or "All Classes" if user has no My Classes) */}
           {filter !== "my-classes" && filteredOtherClasses.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-2xl font-semibold">Other Classes</h2>
+              <h2 className="text-lg pl-2 font-medium text-muted-foreground">
+                {myClasses.length > 0 ? "Other Classes" : "All Classes"}
+              </h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {filteredOtherClasses.map((classItem) => {
                   const isStarred = userClassIds.has(classItem.id);
@@ -501,33 +490,18 @@ export default function ClassesPage({
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {classItem.code && (
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">
-                                Code:{" "}
-                              </span>
-                              <span className="font-medium">
-                                {classItem.code}
-                              </span>
-                            </div>
-                          )}
-                          {classItem.yearCodes &&
-                            classItem.yearCodes.length > 0 && (
-                              <div>
-                                <div className="text-sm text-muted-foreground mb-1">
-                                  Year Levels:
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {classItem.yearCodes.map((yearCode, idx) => (
-                                    <Badge
-                                      key={idx}
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      {yearCode}
-                                    </Badge>
-                                  ))}
-                                </div>
+                          {classItem.yearNames &&
+                            classItem.yearNames.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {classItem.yearNames.map((yearName, idx) => (
+                                  <Badge
+                                    key={idx}
+                                    variant="outline"
+                                    className="text-xs"
+                                  >
+                                    {yearName}
+                                  </Badge>
+                                ))}
                               </div>
                             )}
                           {classItem.room && (

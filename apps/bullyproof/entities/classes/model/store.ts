@@ -7,7 +7,7 @@ import type { classes } from "@/server/db/schema";
 
 type Class = typeof classes.$inferSelect;
 
-export type ClassWithYearCodes = Class & { yearCodes?: string[] | null };
+export type ClassWithYearCodes = Class & { yearCodes?: string[] | null; yearNames?: string[] | null };
 
 interface ClassesState {
   // Normalized cache: classId -> ClassWithYearCodes
