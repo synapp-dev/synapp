@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
@@ -55,6 +56,7 @@ export function LessonWizard({
   onOpenChange,
 }: LessonWizardProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const [loading, setLoading] = useState(false);
@@ -112,9 +114,12 @@ export function LessonWizard({
   const classIdsString = useMemo(() => classIds.join(","), [classIds]);
 
   // Fetch recommendations using React Query (only when shouldFetchRecommendations is true AND we're on step 2)
+  // IMPORTANT: Always fetch fresh data - never use cache for recommendations
+  // because users could proceed with stale data and create the wrong lesson
   const {
     data: recommendationData,
     isLoading: isLoadingRecommendation,
+    isFetching: isFetchingRecommendation,
     error: recommendationError,
   } = useQuery({
     queryKey: ["lesson-recommendations", classIdsString],
@@ -129,8 +134,15 @@ export function LessonWizard({
       return result.data;
     },
     enabled: shouldFetchRecommendations && classIds.length > 0 && state.step === 2,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    // Never use cached data for recommendations - always fetch fresh
+    staleTime: 0, // Data is immediately stale
+    gcTime: 0, // Don't keep old data in cache
+    refetchOnMount: "always", // Always refetch when component mounts
   });
+  
+  // For recommendations, we show loading state if fetching (even if we have cached data)
+  // This ensures users never see stale recommendations they could accidentally proceed with
+  const isRecommendationLoading = isLoadingRecommendation || isFetchingRecommendation;
 
   // Reset state when drawer closes to ensure clean state on next open
   useEffect(() => {
@@ -675,6 +687,11 @@ export function LessonWizard({
       // Set flag to prevent URL sync from interfering with redirect
       isRedirectingAfterCreationRef.current = true;
       
+      // Invalidate lessons queries so the list shows fresh data
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
+      // Invalidate recommendations so next wizard gets fresh data
+      queryClient.invalidateQueries({ queryKey: ["lesson-recommendations"] });
+      
       // Clear wizard params before redirecting
       clearWizardParams();
       
@@ -898,8 +915,8 @@ export function LessonWizard({
 
             {state.step === 2 && (
               <LessonWizardRecommendation
-                recommendationData={recommendationData}
-                isLoading={isLoadingRecommendation}
+                recommendationData={isFetchingRecommendation ? null : recommendationData}
+                isLoading={isRecommendationLoading}
                 selectedClasses={state.selectedClasses}
                 schoolSlug={schoolId}
                 onProceedWithRecommendation={handleProceedWithRecommendation}
@@ -991,6 +1008,11 @@ export function LessonWizard({
                       console.error("Lesson creation response:", createResult.data);
                       throw new Error("Lesson ID (UUID) not returned from API. Please try again.");
                     }
+                    
+                    // Invalidate lessons queries so the list shows fresh data
+                    queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
+                    // Invalidate recommendations so next wizard gets fresh data
+                    queryClient.invalidateQueries({ queryKey: ["lesson-recommendations"] });
                     
                     // Set flag to prevent URL sync from interfering with redirect
                     isRedirectingAfterCreationRef.current = true;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertTitle, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
@@ -624,13 +624,60 @@ export function LessonWizardRecommendation({
     staleTime: 5 * 60 * 1000,
   });
 
+  // Dynamic loading messages that cycle while fetching recommendations
+  const loadingMessages = [
+    "Analyzing class history...",
+    "Checking completed lessons...",
+    "Running recommendation algorithm...",
+    "Finding the best lesson match...",
+    "Calculating class progress...",
+    "Reviewing curriculum sequence...",
+  ];
+  
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  
+  // Cycle through loading messages
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingMessageIndex(0);
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      setLoadingMessageIndex((prev) => (prev + 1) % loadingMessages.length);
+    }, 1500); // Change message every 1.5 seconds
+    
+    return () => clearInterval(interval);
+  }, [isLoading, loadingMessages.length]);
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6">
-        {/* Skeleton Recommendation Card */}
-        <div className="space-y-3">
-          <Skeleton className="h-6 w-48" /> {/* Badge skeleton */}
-          <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
+        {/* Loading State with Dynamic Messages */}
+        <div className="space-y-4">
+          {/* Loading indicator with animated message */}
+          <div className="flex flex-col items-center justify-center py-8 gap-4">
+            <div className="relative">
+              {/* Animated spinner */}
+              <div className="w-16 h-16 border-4 border-muted rounded-full animate-spin border-t-[var(--brand-bullyproof-primary)]" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Star className="h-6 w-6 text-[var(--brand-bullyproof-primary)] animate-pulse" />
+              </div>
+            </div>
+            
+            {/* Dynamic loading message */}
+            <div className="text-center space-y-2">
+              <p className="text-lg font-medium text-primary animate-pulse">
+                {loadingMessages[loadingMessageIndex]}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Finding the best lesson for your selected classes
+              </p>
+            </div>
+          </div>
+          
+          {/* Skeleton Recommendation Card Preview */}
+          <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32 opacity-50">
             {/* Skeleton Thumbnail */}
             <Skeleton className="h-full w-48 flex-shrink-0 rounded-l-md" />
             {/* Skeleton Content */}
