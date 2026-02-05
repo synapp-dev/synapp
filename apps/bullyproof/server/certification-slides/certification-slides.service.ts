@@ -8,8 +8,9 @@ import {
 } from "./certification-slides.validators";
 import { certificationSlidesRepo } from "./certification-slides.repo";
 import { certificationTopicsRepo } from "../certification-topics/certification-topics.repo";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 import { createServerClient } from "@/utils/supabase/server";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { db } from "@/server/db/drizzle";
 import { courseTopics, certificationCourses } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -20,14 +21,7 @@ type AuthContext = {
 };
 
 async function assertCanManageCertificationSlides(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-  if (!roles.platform.includes("PLATFORM_ADMIN")) {
-    throw new Error("Unauthorized to manage certification slides");
-  }
+  await assertFeature(ctx, "ap_certification");
 }
 
 async function assertCanViewCertificationSlides(ctx: AuthContext) {
@@ -125,7 +119,7 @@ export const certificationSlidesService = {
           return { ...slide, signedUrl: null };
         }
         
-        return { ...slide, signedUrl: data.signedUrl };
+        return { ...slide, signedUrl: toStorageUrl(data.signedUrl) ?? data.signedUrl };
       })
     );
     
@@ -256,6 +250,6 @@ export const certificationSlidesService = {
       return { url: null };
     }
 
-    return { url: data.signedUrl };
+    return { url: toStorageUrl(data.signedUrl) ?? data.signedUrl };
   },
 };

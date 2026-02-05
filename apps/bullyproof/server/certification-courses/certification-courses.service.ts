@@ -15,7 +15,7 @@ import {
   type DeleteCourseParams,
 } from "./certification-courses.validators";
 import { certificationCoursesRepo } from "./certification-courses.repo";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -33,18 +33,7 @@ async function assertCanViewCertification(ctx: AuthContext) {
 }
 
 async function assertCanManageCertification(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Only platform admins can manage certification courses
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to manage certification courses");
+  await assertFeature(ctx, "ap_certification");
 }
 
 export const certificationCoursesService = {
@@ -63,8 +52,7 @@ export const certificationCoursesService = {
     if (courses.length === 0) return null;
 
     const course = await certificationCoursesRepo.getCourseWithTopics(id);
-    console.log("[CertificationCoursesService] getCourseById result:", course);
-    console.log("[CertificationCoursesService] ratingQuestions:", course?.ratingQuestions);
+
     return course;
   },
 

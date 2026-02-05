@@ -15,7 +15,7 @@ import {
 import { certificationTopicsRepo } from "./certification-topics.repo";
 import { certificationSlidesRepo } from "../certification-slides/certification-slides.repo";
 import { certificationSlidesService } from "../certification-slides/certification-slides.service";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 import { createServerClient } from "@/utils/supabase/server";
 import { db } from "@/server/db/drizzle";
 import { certificationCourses } from "@/server/db/schema";
@@ -37,18 +37,7 @@ async function assertCanViewCertificationTopics(ctx: AuthContext) {
 }
 
 async function assertCanManageCertificationTopics(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Only platform admins can manage certification topics
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to manage certification topics");
+  await assertFeature(ctx, "ap_certification");
 }
 
 export const certificationTopicsService = {

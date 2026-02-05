@@ -13,7 +13,7 @@ import {
   type DeleteStageParams,
 } from "./certification.validators";
 import { certificationRepo } from "./certification.repo";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -31,18 +31,7 @@ async function assertCanViewCertification(ctx: AuthContext) {
 }
 
 async function assertCanManageCertification(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Only platform admins can manage certification stages
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to manage certification stages");
+  await assertFeature(ctx, "ap_certification");
 }
 
 export const certificationService = {
