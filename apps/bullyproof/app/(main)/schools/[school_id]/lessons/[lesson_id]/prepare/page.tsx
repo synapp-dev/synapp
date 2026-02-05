@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -10,9 +10,35 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { BookOpen, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Checkbox } from "@workspace/ui/components/checkbox";
+import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog";
+import { Calendar } from "@workspace/ui/components/calendar";
+import { BookOpen, Loader2, ChevronLeft, ChevronRight, CloudDownload, CheckCircle2, PlayCircle, CalendarIcon, FileText, AlertCircle } from "lucide-react";
+import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
+import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
@@ -27,8 +53,27 @@ type Topic = typeof topics.$inferSelect & { slides?: any[] };
 export default function LessonPreparePage() {
   usePageTitle(["schools", "lessons", "prepare"]);
   const params = useParams();
+  const router = useRouter();
   const lesson_id = params?.lesson_id as string;
   const school_id = params?.school_id as string;
+  const queryClient = useQueryClient();
+
+  // Schedule dialog state
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [showConfirmOverwrite, setShowConfirmOverwrite] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(undefined);
+  const [scheduleTime, setScheduleTime] = useState("09:00"); // Default to 9 AM local time
+  const [isScheduling, setIsScheduling] = useState(false);
+  const [pendingSchedule, setPendingSchedule] = useState<{ date: Date; time: string } | null>(null);
+
+  // Check if the selected schedule time is in the past
+  const isScheduleTimeInPast = (() => {
+    if (!scheduleDate) return false;
+    const [hours, minutes] = scheduleTime.split(":").map(Number);
+    const scheduledDateTime = new Date(scheduleDate);
+    scheduledDateTime.setHours(hours, minutes, 0, 0);
+    return scheduledDateTime < new Date();
+  })();
 
   const {
     data: lessonData,
@@ -36,6 +81,23 @@ export default function LessonPreparePage() {
     isError: lessonError,
     error: lessonErrorData,
   } = useLessonById(lesson_id);
+
+  // Checklist state - initialize based on lesson status
+  const isAlreadyReady = lessonData?.status === "ready" || 
+    lessonData?.status === "in_progress" || 
+    lessonData?.status === "feedback" || 
+    lessonData?.status === "completed";
+  const [viewedSlides, setViewedSlides] = useState(false);
+  const [downloadedPlan, setDownloadedPlan] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  // Initialize checklist state when lesson data loads
+  useEffect(() => {
+    if (isAlreadyReady) {
+      setViewedSlides(true);
+      setDownloadedPlan(true);
+    }
+  }, [isAlreadyReady]);
 
   const [showPreview, setShowPreview] = useState(false);
   const [topic, setTopic] = useState<Topic | null>(null);
@@ -94,11 +156,12 @@ export default function LessonPreparePage() {
     }
   }, [lessonData?.topicId, invalidateSlide]);
 
+  // Fetch slides when lesson data loads (for thumbnail preview)
   useEffect(() => {
-    if (showPreview && lessonData?.topicId) {
+    if (lessonData?.topicId) {
       fetchTopicData();
     }
-  }, [showPreview, lessonData?.topicId, fetchTopicData]);
+  }, [lessonData?.topicId, fetchTopicData]);
 
   // Scroll gallery to show current slide
   useEffect(() => {
@@ -114,6 +177,104 @@ export default function LessonPreparePage() {
       }
     }
   }, [currentSlideIndex, slides.length]);
+
+  // Auto-update lesson status to 'ready' when both checklist items are checked
+  useEffect(() => {
+    const updateStatusToReady = async () => {
+      if (
+        viewedSlides &&
+        downloadedPlan &&
+        lessonData?.status === "preparing" &&
+        !isUpdatingStatus
+      ) {
+        setIsUpdatingStatus(true);
+        try {
+          await lessonsApi.put.update(lesson_id, { status: "ready" });
+          // Invalidate the lesson query to refresh data
+          queryClient.invalidateQueries({ queryKey: ["lesson", lesson_id] });
+        } catch (error) {
+          console.error("Failed to update lesson status:", error);
+        } finally {
+          setIsUpdatingStatus(false);
+        }
+      }
+    };
+
+    updateStatusToReady();
+  }, [viewedSlides, downloadedPlan, lessonData?.status, lesson_id, queryClient, isUpdatingStatus]);
+
+  // Open schedule dialog with pre-populated values if lesson already has a schedule
+  const openScheduleDialog = () => {
+    if (lessonData?.scheduledFor) {
+      const existingDate = new Date(lessonData.scheduledFor);
+      setScheduleDate(existingDate);
+      // Format time as HH:mm for the time input
+      const hours = existingDate.getHours().toString().padStart(2, "0");
+      const minutes = existingDate.getMinutes().toString().padStart(2, "0");
+      setScheduleTime(`${hours}:${minutes}`);
+    } else {
+      setScheduleDate(undefined);
+      setScheduleTime("09:00");
+    }
+    setShowScheduleDialog(true);
+  };
+
+  // Handle scheduling the lesson
+  const handleScheduleLesson = async () => {
+    if (!scheduleDate) return;
+    
+    // Combine date and time (time is in user's local timezone)
+    const [hours, minutes] = scheduleTime.split(":").map(Number);
+    const scheduledDateTime = new Date(scheduleDate);
+    scheduledDateTime.setHours(hours, minutes, 0, 0);
+    
+    // If there's an existing schedule, show confirmation dialog
+    if (lessonData?.scheduledFor) {
+      setPendingSchedule({ date: scheduledDateTime, time: scheduleTime });
+      setShowConfirmOverwrite(true);
+      return;
+    }
+    
+    // No existing schedule, proceed directly
+    await saveSchedule(scheduledDateTime);
+  };
+
+  // Actually save the schedule (called directly or after confirmation)
+  const saveSchedule = async (scheduledDateTime: Date) => {
+    setIsScheduling(true);
+    try {
+      await lessonsApi.put.update(lesson_id, { 
+        scheduledFor: scheduledDateTime.toISOString() 
+      });
+      queryClient.invalidateQueries({ queryKey: ["lesson", lesson_id] });
+      setShowScheduleDialog(false);
+      setShowConfirmOverwrite(false);
+      setPendingSchedule(null);
+      setScheduleDate(undefined);
+      setScheduleTime("09:00");
+    } catch (error) {
+      console.error("Failed to schedule lesson:", error);
+    } finally {
+      setIsScheduling(false);
+    }
+  };
+
+  // Handle confirmation of overwrite
+  const handleConfirmOverwrite = async () => {
+    if (!pendingSchedule) return;
+    await saveSchedule(pendingSchedule.date);
+  };
+
+  // Cancel overwrite confirmation
+  const handleCancelOverwrite = () => {
+    setShowConfirmOverwrite(false);
+    setPendingSchedule(null);
+  };
+
+  // Navigate to run lesson page
+  const handleRunLesson = () => {
+    router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
+  };
 
   const currentSlide = slides[currentSlideIndex];
   const canGoPrev = currentSlideIndex > 0;
@@ -164,7 +325,11 @@ export default function LessonPreparePage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => setShowPreview(false)}>
+          <Button variant="ghost" onClick={() => {
+            setShowPreview(false);
+            // Auto-check "viewed slides" when returning from preview
+            setViewedSlides(true);
+          }}>
             <ChevronLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -293,9 +458,9 @@ export default function LessonPreparePage() {
     );
   }
 
+  const firstSlide = slides[0];
+
   return (
-    <>
-      <PlatformAdminGuard />
       <div className="space-y-6">
       {/* Header */}
       <div>
@@ -306,34 +471,347 @@ export default function LessonPreparePage() {
         </p>
       </div>
 
-      {/* Lesson Card */}
+<div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+      {/* Lesson Card with slide thumbnail */}
       <Card
-        className="cursor-pointer hover:shadow-lg transition-shadow"
+        className="cursor-pointer hover:shadow-lg transition-shadow col-span-4 p-4 justify-center"
         onClick={() => setShowPreview(true)}
       >
+        <div className="flex">
+          {/* Slide thumbnail on the left - fixed dimensions to prevent layout shift */}
+          <div className="flex-shrink-0 w-48 aspect-video rounded-lg overflow-hidden border bg-muted">
+            {isLoadingTopic ? (
+              <Skeleton className="w-full h-full" />
+            ) : firstSlide ? (
+              <SlideRenderer
+                slide={firstSlide}
+                className="w-full h-full"
+                thumbnailOnly={true}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <BookOpen className="h-8 w-8 text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          
+          {/* Card content on the right */}
+          <div className="flex-1">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5" />
+                {lessonData.topic?.title || "Lesson"}
+              </CardTitle>
+              <CardDescription>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  {slides.length > 0 
+                    ? `${slides.length} slide${slides.length !== 1 ? 's' : ''} available`
+                    : "No slides available"}
+                </p>
+                
+              </div>
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+            <p className="text-sm text-muted-foreground">
+                  Click to view the lesson slides in preview mode.
+                </p>
+            </CardContent>
+          </div>
+        </div>
+      </Card>
+      <Card 
+        className="col-span-1 cursor-pointer hover:shadow-lg transition-shadow gap-2"
+        onClick={() => setDownloadedPlan(true)}
+      >
+        <CardHeader className="">
+          <CardTitle className="text-center">Lesson Plan</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-2 border mx-4 p-2 py-4 bg-muted rounded-lg">
+          <FileText className="h-14 w-14" />
+          <div className="flex items-center gap-2">
+          {/* <CloudDownload className="h-5 w-5" /> */}
+          <p className="text-sm font-medium underline text-blue-400">Download PDF</p>
+          </div>
+          
+        </CardContent>
+      </Card>
+      </div>
+
+      {/* Preparation Checklist */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            {lessonData.topic?.title || "Lesson"}
+            {isAlreadyReady ? (
+              <CheckCircle2 className="h-5 w-5 text-green-500" />
+            ) : null}
+            Preparation Checklist
           </CardTitle>
           <CardDescription>
-            Click to preview lesson content and slides
+            {isAlreadyReady 
+              ? "You're ready to deliver this lesson!"
+              : "Complete these steps before delivering your lesson"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              {lessonData.topic?.title
-                ? `Topic: ${lessonData.topic.title}`
-                : "No topic assigned"}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Click this card to view the lesson slides in preview mode.
-            </p>
+          <div className="space-y-4">
+            <div className="flex items-center space-x-3">
+              <Checkbox 
+                id="viewed-slides"
+                checked={viewedSlides} 
+                onCheckedChange={(checked) => setViewedSlides(checked === true)}
+                disabled={isAlreadyReady}
+              />
+              <label 
+                htmlFor="viewed-slides"
+                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${viewedSlides ? 'text-muted-foreground line-through' : ''}`}
+              >
+                I have viewed the slides
+              </label>
+            </div>
+            <div className="flex items-center space-x-3">
+              <Checkbox 
+                id="downloaded-plan"
+                checked={downloadedPlan} 
+                onCheckedChange={(checked) => setDownloadedPlan(checked === true)}
+                disabled={isAlreadyReady}
+              />
+              <label 
+                htmlFor="downloaded-plan"
+                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${downloadedPlan ? 'text-muted-foreground line-through' : ''}`}
+              >
+                I have downloaded the lesson plan
+              </label>
+            </div>
           </div>
+          {isUpdatingStatus && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Updating lesson status...
+            </div>
+          )}
+
+          {/* Action buttons - show when ready */}
+          {isAlreadyReady && !isUpdatingStatus && (
+            <div className="mt-6 pt-4 border-t flex items-center gap-3">
+              <Button onClick={handleRunLesson} className="flex items-center gap-2">
+                <PlayCircle className="h-4 w-4" />
+                Run Lesson
+              </Button>
+              <Button 
+                variant="ghost" 
+                onClick={openScheduleDialog}
+                className="flex items-center gap-2"
+              >
+                <CalendarIcon className="h-4 w-4" />
+                {lessonData?.scheduledFor ? "Reschedule Lesson" : "Schedule Lesson"}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Schedule Lesson Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>
+              {lessonData?.scheduledFor ? "Reschedule Lesson" : "Schedule Lesson"}
+            </DialogTitle>
+            <DialogDescription>
+              {lessonData?.scheduledFor 
+                ? "This lesson is currently scheduled. You can change the date and time below."
+                : "Choose a date and time to schedule this lesson for delivery."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 flex flex-row gap-6">
+            {/* Calendar on the left */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Date</Label>
+              <Calendar
+                mode="single"
+                selected={scheduleDate}
+                onSelect={setScheduleDate}
+                disabled={(date) => {
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  return date < today;
+                }}
+                initialFocus
+                className="rounded-lg border"
+              />
+            </div>
+            
+            {/* Time Picker on the right */}
+            <div className="flex flex-col justify-between flex-1">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="schedule-time" className="text-sm font-medium">
+                    Time
+                  </Label>
+                  <span className="text-xs text-muted-foreground">
+                    Your local timezone
+                  </span>
+                </div>
+                <Input
+                  id="schedule-time"
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="w-full rounded-lg"
+                />
+                {isScheduleTimeInPast && (
+                  <Alert variant="destructive" className="py-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      This time has already passed
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+              
+              {/* Summary Card */}
+              <Card className="bg-muted/50 py-0">
+                <CardContent className="p-4 space-y-3">
+                  {/* Lesson Details */}
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Lesson</p>
+                    <p className="text-sm font-medium">
+                      {lessonData?.topic?.title || "Untitled Lesson"}
+                    </p>
+                    {lessonData?.assignedClasses && lessonData.assignedClasses.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {lessonData.assignedClasses.map((c: any) => c.className).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {/* Schedule Details */}
+                  {scheduleDate && (
+                    <div className="pt-2 border-t">
+                      {/* <p className="text-xs text-muted-foreground mb-1">Scheduled for</p> */}
+                      <p className="text-sm font-medium">
+                        {scheduleDate.toLocaleDateString(undefined, {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        at {new Date(`2000-01-01T${scheduleTime}`).toLocaleTimeString(undefined, {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true,
+                        })}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowScheduleDialog(false);
+                setScheduleDate(undefined);
+                setScheduleTime("09:00");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleScheduleLesson}
+              disabled={!scheduleDate || isScheduling || isScheduleTimeInPast}
+            >
+              {isScheduling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Scheduling...
+                </>
+              ) : lessonData?.scheduledFor ? (
+                "Update Schedule"
+              ) : (
+                "Schedule"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Overwrite Dialog */}
+      <AlertDialog open={showConfirmOverwrite} onOpenChange={setShowConfirmOverwrite}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Scheduled Time?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>You're about to change the scheduled time for this lesson.</p>
+                
+                <div className="bg-muted/50 rounded-lg p-3 space-y-3">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Current schedule</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {lessonData?.scheduledFor && new Date(lessonData.scheduledFor).toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      at {lessonData?.scheduledFor && new Date(lessonData.scheduledFor).toLocaleTimeString(undefined, {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                    </p>
+                  </div>
+                  
+                  <div className="border-t pt-3">
+                    <p className="text-xs text-muted-foreground mb-1">New schedule</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {pendingSchedule?.date.toLocaleDateString(undefined, {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                      })}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      at {pendingSchedule?.date.toLocaleTimeString(undefined, {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                      })}
+                    </p>
+                  </div>
+                </div>
+                
+                <p>Are you sure you want to update the schedule?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelOverwrite} disabled={isScheduling}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmOverwrite} disabled={isScheduling}>
+              {isScheduling ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                "Yes, Update Schedule"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-    </>
   );
 }
