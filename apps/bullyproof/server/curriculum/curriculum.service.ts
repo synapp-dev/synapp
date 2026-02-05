@@ -19,7 +19,7 @@ import {
   type DeleteStageParams,
 } from "./curriculum.validators";
 import { curriculumRepo } from "./curriculum.repo";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -37,18 +37,7 @@ async function assertCanViewCurriculum(ctx: AuthContext) {
 }
 
 async function assertCanManageCurriculum(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Only platform admins can manage curriculum stages
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to manage curriculum stages");
+  await assertFeature(ctx, "admin_content");
 }
 
 export const curriculumService = {

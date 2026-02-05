@@ -17,8 +17,9 @@ import {
   type ReorderTopicsParams,
 } from "./topics.validators";
 import { topicsRepo } from "./topics.repo";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 import { createServerClient } from "@/utils/supabase/server";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { db } from "@/server/db/drizzle";
 import { curriculumStages } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -30,38 +31,7 @@ type AuthContext = {
 };
 
 async function assertCanManageTopics(ctx: AuthContext) {
-  console.log(
-    "[topics.service] assertCanManageTopics called with userId:",
-    ctx.userId
-  );
-
-  if (!ctx.userId) {
-    console.error(
-      "[topics.service] ERROR: No userId in context - throwing Unauthorized"
-    );
-    throw new Error("Unauthorized");
-  }
-
-  console.log(
-    "[topics.service] Getting user scoped roles for userId:",
-    ctx.userId
-  );
-  const roles = await getUserScopedRoles(ctx.userId);
-  console.log("[topics.service] User roles:", {
-    platform: roles.platform,
-    hasPlatformAdmin: roles.platform.includes("PLATFORM_ADMIN"),
-  });
-
-  // Only platform admins can manage topics
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    console.log("[topics.service] User has PLATFORM_ADMIN role - authorized");
-    return;
-  }
-
-  console.error(
-    "[topics.service] ERROR: User does not have PLATFORM_ADMIN role - throwing Unauthorized"
-  );
-  throw new Error("Unauthorized to manage topics");
+  await assertFeature(ctx, "admin_content");
 }
 
 async function assertCanViewTopics(ctx: AuthContext) {
@@ -170,7 +140,7 @@ export const topicsService = {
                     return { ...slide, signedUrl: null };
                   }
 
-                  return { ...slide, signedUrl: data.signedUrl };
+                  return { ...slide, signedUrl: toStorageUrl(data.signedUrl) ?? data.signedUrl };
                 })
               );
 
@@ -265,7 +235,7 @@ export const topicsService = {
             return { ...slide, signedUrl: null };
           }
 
-          return { ...slide, signedUrl: data.signedUrl };
+          return { ...slide, signedUrl: toStorageUrl(data.signedUrl) ?? data.signedUrl };
         })
       );
 
@@ -537,6 +507,6 @@ export const topicsService = {
       return { url: null };
     }
 
-    return { url: data.signedUrl };
+    return { url: toStorageUrl(data.signedUrl) ?? data.signedUrl };
   },
 };

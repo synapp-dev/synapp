@@ -4,6 +4,7 @@ import {
   schoolYears,
   stageYearLinks,
   schoolLevels,
+  schoolYearAssignments,
 } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc, sql } from "drizzle-orm";
 
@@ -106,6 +107,18 @@ export const curriculumRepo = {
       .from(schoolYears)
       .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
       .where(eq(schoolYears.levelId, levelId))
+      .orderBy(asc(schoolYears.sortIndex)),
+
+  getYearsForSchool: (schoolId: string) =>
+    db
+      .select({
+        year: schoolYears,
+        level: schoolLevels,
+      })
+      .from(schoolYearAssignments)
+      .innerJoin(schoolYears, eq(schoolYearAssignments.schoolYearId, schoolYears.id))
+      .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
+      .where(eq(schoolYearAssignments.schoolId, schoolId))
       .orderBy(asc(schoolYears.sortIndex)),
 
   getStageWithYears: async (stageId: string) => {

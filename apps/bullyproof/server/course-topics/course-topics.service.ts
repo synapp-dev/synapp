@@ -17,7 +17,7 @@ import {
 import { courseTopicsRepo } from "./course-topics.repo";
 import { topicSlidesRepo } from "../topic-slides/topic-slides.repo";
 import { topicSlidesService } from "../topic-slides/topic-slides.service";
-import { getUserScopedRoles } from "../auth/rbac";
+import { assertFeature } from "@/server/features/features.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -35,18 +35,7 @@ async function assertCanViewCertificationTopics(ctx: AuthContext) {
 }
 
 async function assertCanManageCertificationTopics(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Only platform admins can manage certification topics
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to manage certification topics");
+  await assertFeature(ctx, "admin_content");
 }
 
 export const courseTopicsService = {

@@ -1,6 +1,7 @@
 import { topicSlidesRepo } from "./topic-slides.repo";
 import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic-slides.repo";
 import { createServerClient } from "@/utils/supabase/server";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { db } from "@/server/db/drizzle";
 import {
   courseTopics,
@@ -158,7 +159,7 @@ export const topicSlidesService = {
               return url;
             }
 
-            return data.signedUrl;
+            return toStorageUrl(data.signedUrl) ?? data.signedUrl;
           } catch (error) {
             console.error(`Error generating signed URL for slide ${slideId}:`, error);
             return url;
@@ -184,8 +185,8 @@ export const topicSlidesService = {
 
         return {
           ...slide,
-          signedImageUrl,
-          signedVideoUrl,
+          signedImageUrl: signedImageUrl ? (toStorageUrl(signedImageUrl) ?? signedImageUrl) : signedImageUrl,
+          signedVideoUrl: signedVideoUrl ? (toStorageUrl(signedVideoUrl) ?? signedVideoUrl) : signedVideoUrl,
         };
       })
     );
