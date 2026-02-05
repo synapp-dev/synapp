@@ -13,6 +13,7 @@ import {
   getVideoThumbnailUrl,
   getYouTubeThumbnailUrl,
 } from "@/utils/video";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { VimeoPlayer } from "./vimeo-player";
 import type { QuizData } from "./quiz-slide-editor";
 
@@ -83,19 +84,19 @@ export function SlideRenderer({
       if (isCertification) {
         const certCache = useCertificationSlidesCacheStore.getState().cache[slide.id];
         if (certCache?.url) {
-          return certCache.url;
+          return toStorageUrl(certCache.url) ?? certCache.url;
         }
       } else {
         // Check new store first
         const topicsStoreState = useTopicsStore.getState();
         const newStoreUrl = topicsStoreState.slideUrls[slide.id];
         if (newStoreUrl && Date.now() - newStoreUrl.timestamp < 7 * 24 * 60 * 60 * 1000) {
-          return newStoreUrl.url;
+          return toStorageUrl(newStoreUrl.url) ?? newStoreUrl.url;
         }
         // Fall back to old store
         const topicCache = useTopicSlidesCacheStore.getState().cache[slide.id];
         if (topicCache?.url) {
-          return topicCache.url;
+          return toStorageUrl(topicCache.url) ?? topicCache.url;
         }
       }
     }
@@ -133,7 +134,7 @@ export function SlideRenderer({
       if (slide.imageUrl && !slide.imageUrl.startsWith("blob:")) {
         // Check cached URL first (from cache store, populated by batch fetch)
         if (!forceRefresh && cachedUrl) {
-          setImageUrl(cachedUrl);
+          setImageUrl(toStorageUrl(cachedUrl) ?? cachedUrl);
           return;
         }
 
@@ -142,7 +143,8 @@ export function SlideRenderer({
           const topicsStoreState = useTopicsStore.getState();
           const newStoreUrl = topicsStoreState.slideUrls[slide.id];
           if (newStoreUrl && Date.now() - newStoreUrl.timestamp < 7 * 24 * 60 * 60 * 1000) {
-            setImageUrl(newStoreUrl.url);
+            const url = toStorageUrl(newStoreUrl.url) ?? newStoreUrl.url;
+            setImageUrl(url);
             // Also populate old store for consistency
             if (!topicCachedUrl) {
               useTopicSlidesCacheStore.getState().setSlideUrl(slide.id, newStoreUrl.url);
@@ -154,8 +156,10 @@ export function SlideRenderer({
         // Fall back to fetching from API if not in cache
         let cancelled = false;
         getSlideUrl(slide.id, forceRefresh).then((url) => {
-          if (!cancelled) {
-            setImageUrl(url);
+          if (!cancelled && url) {
+            setImageUrl(toStorageUrl(url) ?? url);
+          } else if (!cancelled) {
+            setImageUrl(null);
           }
         });
 
@@ -183,7 +187,7 @@ export function SlideRenderer({
       cachedUrl &&
       !loading
     ) {
-      setImageUrl(cachedUrl);
+      setImageUrl(toStorageUrl(cachedUrl) ?? cachedUrl);
     }
   }, [slide.kind, slide.id, slide.imageUrl, cachedUrl, loading]);
 
@@ -239,7 +243,7 @@ export function SlideRenderer({
               <div className="text-destructive">Error: {error}</div>
             ) : hasImageUrl ? (
               <img
-                src={hasImageUrl}
+                src={toStorageUrl(hasImageUrl) ?? hasImageUrl}
                 alt="Slide content"
                 className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
               />

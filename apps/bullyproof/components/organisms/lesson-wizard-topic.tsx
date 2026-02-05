@@ -18,6 +18,7 @@ import {
   useTopicsStore,
   useSlideUrl,
 } from "@/entities/topics/model/store-enhanced";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { useStages } from "@/entities/stages/model/store";
 import { Alert, AlertTitle, AlertDescription } from "@workspace/ui/components/alert";
 
@@ -76,7 +77,7 @@ function TopicThumbnail({ topic }: { topic: TopicWithSlides }) {
   return (
     <div className="relative w-full aspect-video rounded-t-md overflow-hidden bg-muted">
       <Image
-        src={imageUrl}
+        src={toStorageUrl(imageUrl) ?? imageUrl}
         alt={topic.title}
         fill
         className="object-contain"

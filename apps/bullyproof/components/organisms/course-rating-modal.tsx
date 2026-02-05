@@ -79,17 +79,12 @@ export function CourseRatingModal({
           return;
         }
         
-        // Debug logging
-        console.log("[CourseRatingModal] Course data:", courseData);
-        console.log("[CourseRatingModal] ratingQuestions:", (courseData as any)?.ratingQuestions);
-        console.log("[CourseRatingModal] ratingQuestions type:", typeof (courseData as any)?.ratingQuestions);
-        console.log("[CourseRatingModal] ratingQuestions isArray:", Array.isArray((courseData as any)?.ratingQuestions));
+      
         
         // Extract rating questions from course data
         // Handle both array and null/undefined cases
         const questions = (courseData as any)?.ratingQuestions as QuestionDefinition[] | null | undefined;
         if (questions && Array.isArray(questions) && questions.length > 0) {
-          console.log("[CourseRatingModal] Found questions:", questions.length);
           setQuestionDefinitions(questions);
           // Initialize answers with null/empty values
           const initialAnswers: Record<string, string | number | string[] | null> = {};

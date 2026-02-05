@@ -28,6 +28,7 @@ import Image from "next/image";
 import type { ClassOption } from "@/types/lesson-wizard";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { useStages } from "@/entities/stages/model/store";
 import { useMeStore } from "@/entities/me/model/store";
@@ -155,7 +156,7 @@ function TopicThumbnail({ topic, horizontal = false }: { topic: TopicWithSlides;
   return (
     <div className={`relative ${horizontal ? 'h-full w-auto flex-shrink-0 aspect-video' : 'w-full aspect-video'} ${horizontal ? 'rounded-l-md' : 'rounded-t-md'} overflow-hidden bg-muted`}>
       <Image
-        src={imageUrl}
+        src={toStorageUrl(imageUrl) ?? imageUrl}
         alt={topic.title}
         fill
         className="object-contain"

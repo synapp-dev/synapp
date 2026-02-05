@@ -40,21 +40,15 @@ export function CourseRatingDashboardGuard() {
     const fetchUnratedCourses = async () => {
       try {
         setIsLoading(true);
-        console.log("[CourseRating] Fetching unrated courses...");
         const result = await certificationApi.courses.unrated();
-        console.log("[CourseRating] Unrated courses result:", result);
         if (result.data) {
-          console.log("[CourseRating] Found unrated courses:", result.data.length);
           setUnratedCourses(result.data);
           
           // On dashboard: show modal if there are any unrated courses
           // On course page: show modal only if current course is unrated
           if (isDashboard) {
             if (result.data.length > 0) {
-              console.log("[CourseRating] Showing rating modal for:", result.data[0].name);
               setShowRatingModal(true);
-            } else {
-              console.log("[CourseRating] No unrated courses found");
             }
           } else if (isCoursePage && currentCourseSlug) {
             // Find the current course in unrated courses by matching slug
@@ -68,10 +62,8 @@ export function CourseRatingDashboardGuard() {
                 if (currentCourseInUnrated) {
                   const index = result.data.findIndex((c) => c.id === currentCourseInUnrated.id);
                   setCurrentCourseIndex(index >= 0 ? index : 0);
-                  console.log("[CourseRating] Showing rating modal for current course:", currentCourseInUnrated.name);
                   setShowRatingModal(true);
                 } else {
-                  console.log("[CourseRating] Current course is not in unrated list");
                 }
               }
             } catch (err) {
@@ -161,20 +153,6 @@ export function CourseRatingDashboardGuard() {
       }
     }
   };
-
-  // Debug logging
-  useEffect(() => {
-    console.log("[CourseRating] Dashboard guard state:", {
-      isDashboard,
-      isCoursePage,
-      pathname,
-      isLoading,
-      unratedCoursesCount: unratedCourses.length,
-      currentCourseIndex,
-      currentCourse: currentCourse?.name,
-      showRatingModal,
-    });
-  }, [isDashboard, isCoursePage, pathname, isLoading, unratedCourses.length, currentCourseIndex, showRatingModal]);
 
   // Don't render if not on dashboard or course page
   if (!isDashboard && !isCoursePage) {
