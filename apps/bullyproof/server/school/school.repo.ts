@@ -40,6 +40,7 @@ export const schoolRepo = {
         state: vSchoolsReadable.state,
         sector: vSchoolsReadable.sector,
         levels: vSchoolsReadable.levels,
+        levelBadge: vSchoolsReadable.levelBadge,
         teacherCount:
           sql<number>`COALESCE(${vSchoolsStatistics.teacherCount}, 0)`.as(
             "teacher_count"

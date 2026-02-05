@@ -16,6 +16,7 @@ import {
 } from "./roles.validators";
 import { rolesRepo } from "./roles.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 import { userProfile, userRoles } from "@/server/db/schema";
 import { eq, and, inArray, sql, ilike, or } from "drizzle-orm";
@@ -27,18 +28,7 @@ type AuthContext = {
 };
 
 async function assertCanManageRoles(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Only platform admins can manage roles
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  throw new Error("Unauthorized to manage roles");
+  await assertFeature(ctx, "admin_features");
 }
 
 async function assertCanViewRoles(ctx: AuthContext) {
@@ -46,13 +36,13 @@ async function assertCanViewRoles(ctx: AuthContext) {
     throw new Error("Unauthorized");
   }
 
-  const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins and school admins can view roles
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
+  // Anyone with admin_features (from feature_permissions) can view roles, e.g. for the Features admin Role tab
+  const hasAdminFeatures = await checkFeatureAccess(ctx.userId, "admin_features");
+  if (hasAdminFeatures) {
     return;
   }
 
+  const roles = await getUserScopedRoles(ctx.userId);
   if (roles.school.some((role) => role.roleKey === "SCHOOL_ADMIN")) {
     return;
   }

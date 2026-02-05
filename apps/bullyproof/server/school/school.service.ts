@@ -7,10 +7,16 @@ import {
   type UpdateSchoolParams,
 } from "./school.validators";
 import { schoolRepo } from "./school.repo";
+import { curriculumRepo } from "../curriculum/curriculum.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
-import { schoolLevelAssignments } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import {
+  schoolLevelAssignments,
+  schoolYearAssignments,
+  schoolYears,
+} from "@/server/db/schema";
+import { eq, inArray } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -22,114 +28,61 @@ async function assertCanListSchools(ctx: AuthContext) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
-  // Extend with real RBAC (e.g., require specific roles/permissions)
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  if (hasAdminSchools) return;
   const roles = await getUserScopedRoles(ctx.userId);
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-  if (roles.school.length === 0) {
-    // throw new Error("Unauthorized");
-    return;
-  }
+  if (roles.school.length > 0) return;
+  throw new Error("Unauthorized");
 }
 
 /**
- * Get school IDs that the user has access to based on their role
- * - PLATFORM_ADMIN: returns undefined (can access all schools)
- * - TEACHER: returns only schools where they have TEACHER role
- * - SCHOOL_ADMIN: returns schools where they have SCHOOL_ADMIN role
- * - Other roles: returns their associated schools
+ * Get school IDs that the user has access to.
+ * - admin_schools feature: returns undefined (can access all schools)
+ * - Otherwise: returns school IDs from user's school roles (from user_roles)
  */
 async function getUserAccessibleSchoolIds(
   userId: string
 ): Promise<string[] | undefined> {
+  const hasAdminSchools = await checkFeatureAccess(userId, "admin_schools");
+  if (hasAdminSchools) return undefined;
+
   const roles = await getUserScopedRoles(userId);
-
-  // Platform admins can access all schools
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return undefined;
-  }
-
-  // Get school IDs from user's school roles
   const schoolIds = roles.school
     .map((role) => role.schoolId)
     .filter((id): id is string => id !== null && id !== undefined);
+  if (schoolIds.length === 0) return [];
 
-  // If user has no school roles, return empty array (no access)
-  if (schoolIds.length === 0) {
-    return [];
-  }
-
-  // Check if user is a teacher (has TEACHER role in any school)
   const isTeacher = roles.school.some((role) => role.roleKey === "TEACHER");
-
   if (isTeacher) {
-    // Teachers can only access schools where they have TEACHER role
     const teacherSchoolIds = roles.school
       .filter((role) => role.roleKey === "TEACHER")
       .map((role) => role.schoolId)
       .filter((id): id is string => id !== null && id !== undefined);
     return teacherSchoolIds.length > 0 ? teacherSchoolIds : [];
   }
-
-  // For other roles (like SCHOOL_ADMIN), return all their associated schools
   return schoolIds;
 }
 
 async function assertCanCreateSchool(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-  const roles = await getUserScopedRoles(ctx.userId);
-  // Only platform admins can create schools
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-  throw new Error("Unauthorized to create schools");
+  await assertFeature(ctx, "admin_schools");
 }
 
 async function assertCanUpdateSchool(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-  const roles = await getUserScopedRoles(ctx.userId);
-  // Only platform admins can update schools
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-  throw new Error("Unauthorized to update schools");
+  await assertFeature(ctx, "admin_schools");
 }
 
 async function assertCanDeleteSchool(ctx: AuthContext) {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-  const roles = await getUserScopedRoles(ctx.userId);
-  // Only platform admins can delete schools
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-  throw new Error("Unauthorized to delete schools");
+  await assertFeature(ctx, "admin_schools");
 }
 
 async function assertCanViewSchool(ctx: AuthContext, schoolId: string) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
-
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  if (hasAdminSchools) return;
   const roles = await getUserScopedRoles(ctx.userId);
-
-  // Platform admins can view any school
-  if (roles.platform.includes("PLATFORM_ADMIN")) {
-    return;
-  }
-
-  // Users with any school role assigned to this school can view it
-  // This includes TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF, SCHOOL_LICENCE, etc.
-  if (roles.school.some((role) => role.schoolId === schoolId)) {
-    return;
-  }
-
+  if (roles.school.some((role) => role.schoolId === schoolId)) return;
   throw new Error("Unauthorized to view school");
 }
 
@@ -144,7 +97,7 @@ export const schoolService = {
     }
     const accessibleSchoolIds = await getUserAccessibleSchoolIds(ctx.userId);
 
-    // If accessibleSchoolIds is undefined, user can access all schools (PLATFORM_ADMIN)
+    // If accessibleSchoolIds is undefined, user has admin_schools and can access all schools
     // If it's an empty array, user has no access
     // Otherwise, filter by the accessible school IDs
     const queryParams = {
@@ -157,6 +110,11 @@ export const schoolService = {
     const rows = await schoolRepo.getAllPaginated(queryParams);
     return rows;
   },
+  async getYearsForSchool(ctx: AuthContext, schoolId: string) {
+    await assertCanViewSchool(ctx, schoolId);
+    return curriculumRepo.getYearsForSchool(schoolId);
+  },
+
   async getSchoolBySlug(ctx: AuthContext, slug: string) {
     // First fetch the school by slug to get its ID
     const rows = await schoolRepo.getBySlug(slug);
@@ -175,10 +133,8 @@ export const schoolService = {
     await assertCanCreateSchool(ctx);
     const data: CreateSchoolParams = createSchoolSchema.parse(params);
 
-    // Extract levelIds before creating school (repo doesn't need them)
-    const { levelIds, ...schoolData } = data;
+    const { levelIds, yearIds, ...schoolData } = data;
 
-    // Create the school
     const result = await schoolRepo.create({
       name: schoolData.name,
       stateId: schoolData.stateId,
@@ -186,12 +142,30 @@ export const schoolService = {
     });
     const createdSchool = result[0];
 
-    // Create school level assignments
-    if (levelIds && levelIds.length > 0) {
+    let yearIdsToAssign: string[];
+    if (yearIds && yearIds.length > 0) {
+      yearIdsToAssign = yearIds;
+    } else if (levelIds && levelIds.length > 0) {
+      const yearsRows = await db
+        .select({ id: schoolYears.id })
+        .from(schoolYears)
+        .where(inArray(schoolYears.levelId, levelIds));
+      yearIdsToAssign = yearsRows.map((r) => r.id);
       await db.insert(schoolLevelAssignments).values(
         levelIds.map((levelId) => ({
           schoolId: createdSchool.id,
           levelId,
+        }))
+      );
+    } else {
+      yearIdsToAssign = [];
+    }
+
+    if (yearIdsToAssign.length > 0) {
+      await db.insert(schoolYearAssignments).values(
+        yearIdsToAssign.map((schoolYearId) => ({
+          schoolId: createdSchool.id,
+          schoolYearId,
         }))
       );
     }
@@ -202,30 +176,45 @@ export const schoolService = {
     await assertCanUpdateSchool(ctx);
     const data: UpdateSchoolParams = updateSchoolSchema.parse(params);
 
-    // Extract levelIds before updating school (repo doesn't handle them)
-    const { levelIds, ...schoolData } = data;
+    const { levelIds, yearIds, ...schoolData } = data;
 
-    // Update the school
     const updatedSchool = await schoolRepo.update(schoolId, schoolData);
 
     if (!updatedSchool) {
       throw new Error("School not found");
     }
 
-    // Update school level assignments if levelIds provided
     if (levelIds !== undefined) {
-      // Delete existing level assignments
       await db
         .delete(schoolLevelAssignments)
         .where(eq(schoolLevelAssignments.schoolId, schoolId));
-
-      // Insert new level assignments
       if (levelIds.length > 0) {
         await db.insert(schoolLevelAssignments).values(
-          levelIds.map((levelId) => ({
-            schoolId,
-            levelId,
-          }))
+          levelIds.map((levelId) => ({ schoolId, levelId }))
+        );
+      }
+    }
+
+    if (yearIds !== undefined) {
+      await db
+        .delete(schoolYearAssignments)
+        .where(eq(schoolYearAssignments.schoolId, schoolId));
+      if (yearIds.length > 0) {
+        await db.insert(schoolYearAssignments).values(
+          yearIds.map((schoolYearId) => ({ schoolId, schoolYearId }))
+        );
+      }
+    } else if (levelIds !== undefined && levelIds.length > 0) {
+      const yearsRows = await db
+        .select({ id: schoolYears.id })
+        .from(schoolYears)
+        .where(inArray(schoolYears.levelId, levelIds));
+      await db
+        .delete(schoolYearAssignments)
+        .where(eq(schoolYearAssignments.schoolId, schoolId));
+      if (yearsRows.length > 0) {
+        await db.insert(schoolYearAssignments).values(
+          yearsRows.map((r) => ({ schoolId, schoolYearId: r.id }))
         );
       }
     }
