@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { Button } from "@workspace/ui/components/button";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -12,26 +10,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
 import { LessonWizard } from "@/components/organisms/lesson-wizard";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSchoolStore } from "@/stores/school-store";
 import { useLessons } from "@/entities/lessons/model/store";
-import {
-  BookOpen,
-  Plus,
-  Loader2,
-  Calendar,
-  Search,
-  FileText,
-} from "lucide-react";
+import { BookOpen, Eye, EyeOff, Plus, Search } from "lucide-react";
+import { Button } from "@workspace/ui/components/button";
+import { Separator } from "@workspace/ui/components/separator";
 import { format } from "date-fns";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { useQuery } from "@tanstack/react-query";
-import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { getDisplayStatus } from "@/utils/lesson-status";
-import Image from "next/image";
 import {
   Select,
   SelectContent,
@@ -40,15 +29,52 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
-import { topicsApi } from "@/entities/topics/api/endpoints";
-import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
-import { toStorageUrl } from "@/utils/supabase/storage-url";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
+import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
+
+// Start New Lesson Card - matching LessonCard layout
+function StartNewLessonCard({ onClick }: { onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="block w-full text-left cursor-pointer">
+      <Card className="hover:shadow-md transition-shadow h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none bg-primary/5">
+        {/* CardHeader - matching LessonCard */}
+        <CardHeader className="py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center border-primary/30 border-dashed">
+          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            New
+          </span>
+          <span className="text-xs text-muted-foreground">
+            Create a lesson
+          </span>
+        </CardHeader>
+        {/* CardContent - Thumbnail area with plus icon */}
+        <CardContent className="p-0 bg-card/80 border-x border-primary/30 border-dashed rounded-lg relative z-[1]">
+          <div className="w-full aspect-video bg-muted flex items-center justify-center">
+            <div className="rounded-full bg-primary/10 p-4">
+              <Plus className="h-8 w-8 text-primary" />
+            </div>
+          </div>
+        </CardContent>
+        {/* CardFooter - matching LessonCard */}
+        <CardFooter className="flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start border-primary/30 border-dashed">
+          <p className="text-xs font-medium text-muted-foreground">
+            Get started
+          </p>
+          <div className="flex items-center gap-2 min-w-0">
+            <CardTitle className="text-base font-semibold text-primary capitalize line-clamp-2 flex-1 text-left">
+              Start New Lesson
+            </CardTitle>
+          </div>
+          {/* Placeholder to match LessonCard classes row */}
+          <div className="flex flex-wrap gap-1 mt-1">
+            <span className="text-xs py-0 px-1.5 h-5 border border-dashed border-muted-foreground/50 rounded-full inline-flex items-center text-muted-foreground">
+              Select classes
+            </span>
+          </div>
+        </CardFooter>
+      </Card>
+    </button>
+  );
+}
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -71,239 +97,6 @@ function fuzzySearch(query: string, text: string): boolean {
   return queryIndex === queryLower.length;
 }
 
-// Component to handle topic thumbnail for lesson cards (matching lesson wizard style)
-function LessonTopicThumbnail({ topicId, horizontal = false }: { topicId: string; horizontal?: boolean }) {
-  const [hasError, setHasError] = useState(false);
-
-  // Fetch topic with slides
-  const { data: topicData, isLoading } = useQuery({
-    queryKey: ["topic", topicId, "thumbnail"],
-    queryFn: async () => {
-      const result = await topicsApi.get.byId(topicId, {
-        includeSlides: true,
-        includeUrls: true,
-      });
-      if (result.error) {
-        return null;
-      }
-      return result.data;
-    },
-    enabled: !!topicId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-
-  // Get first image slide
-  const imageSlides = useMemo(() => {
-    if (!topicData?.slides) return [];
-    return topicData.slides
-      .filter((slide: any) => slide.kind === "image")
-      .sort((a: any, b: any) => a.orderIndex - b.orderIndex);
-  }, [topicData?.slides]);
-
-  const firstImageSlide = imageSlides[0];
-  const slideId = firstImageSlide?.id;
-
-  // Prefer signedUrl from API response, fall back to cached URL from store
-  const cachedUrl = useSlideUrl(slideId);
-  const imageUrl = firstImageSlide?.signedUrl || cachedUrl;
-
-  if (isLoading) {
-    return (
-      <div className={`${horizontal ? 'h-full w-auto flex-shrink-0 aspect-video' : 'w-full aspect-video'} ${horizontal ? 'rounded-l-md' : 'rounded-t-md'} bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center`}>
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (hasError || !imageUrl) {
-    return (
-      <div className={`${horizontal ? 'h-full w-auto flex-shrink-0 aspect-video' : 'w-full aspect-video'} ${horizontal ? 'rounded-l-md' : 'rounded-t-md'} bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center`}>
-        <Image
-          src="/images/bp-small-logo.svg"
-          alt="Bullyproof Logo"
-          width={48}
-          height={48}
-          className="h-12 w-12 object-contain"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`relative ${horizontal ? 'h-full w-auto flex-shrink-0 aspect-video' : 'w-full aspect-video'} ${horizontal ? 'rounded-l-md' : 'rounded-t-md'} overflow-hidden bg-muted`}>
-      <Image
-        src={toStorageUrl(imageUrl) ?? imageUrl}
-        alt={topicData?.title || "Topic thumbnail"}
-        fill
-        className="object-contain"
-        onError={() => setHasError(true)}
-      />
-    </div>
-  );
-}
-
-type Lesson = {
-  id: string;
-  schoolId: string;
-  topicId: string;
-  createdByUserId: string | null;
-  status: string;
-  scheduledFor: string | null;
-  createdAt: string;
-  topic?: { 
-    title?: string;
-    stageOrder?: number | null;
-    stageId?: string;
-    stageName?: string;
-  } | null;
-  teacher?: {
-    id: string;
-    firstName?: string | null;
-    lastName?: string | null;
-    email?: string | null;
-  } | null;
-  assignedClasses?: Array<{
-    classId: string;
-    className: string;
-    classCode: string | null;
-  }> | null;
-};
-
-// Component to fetch and display lesson card with topic details
-function LessonCard({ 
-  lesson, 
-  schoolSlug,
-  formatStatus,
-  formatCreatedDate,
-  getDisplayStatus,
-}: { 
-  lesson: Lesson; 
-  schoolSlug: string;
-  formatStatus: (status: string) => string;
-  formatCreatedDate: (dateString: string) => string;
-  getDisplayStatus: (status: string, scheduledFor: string | null) => string;
-}) {
-  // Fetch topic details to get stageOrder and stage info
-  const { data: topicData } = useQuery({
-    queryKey: ["topic", lesson.topicId, "card-details"],
-    queryFn: async () => {
-      const result = await topicsApi.get.byId(lesson.topicId, {
-        includeSlides: true,
-        includeUrls: false,
-      });
-      if (result.error) {
-        return null;
-      }
-      return result.data;
-    },
-    enabled: !!lesson.topicId,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  // Fetch stage data for stage name
-  const { data: stageData } = useQuery({
-    queryKey: ["stage", topicData?.stageId || lesson.topic?.stageId, "name"],
-    queryFn: async () => {
-      const stageId = topicData?.stageId || lesson.topic?.stageId;
-      if (!stageId) return null;
-      const result = await curriculumApi.stages.byId(stageId);
-      if (result.error) return null;
-      return result.data;
-    },
-    enabled: !!(topicData?.stageId || lesson.topic?.stageId),
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const stageOrder = topicData?.stageOrder ?? lesson.topic?.stageOrder ?? null;
-  const stageName = stageData?.name || null;
-  const topicTitle = topicData?.title || lesson.topic?.title || "Untitled Lesson";
-  const teacherName = lesson.teacher
-    ? `${lesson.teacher.firstName || ""} ${lesson.teacher.lastName || ""}`.trim() || lesson.teacher.email || "Unknown Teacher"
-    : "Unknown Teacher";
-
-  // Check if topic has image slides to determine z-index
-  const hasImageSlides = topicData?.slides?.some((slide: any) => slide.kind === "image") ?? false;
-
-  return (
-    <Link
-      href={`/schools/${schoolSlug}/lessons/${lesson.id}`}
-      className="block"
-    >
-      <Card className="hover:shadow-md transition-shadow h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 bg-transparent shadow-none">
-        {/* Status and Date tabs protruding from behind the card */}
-        <div className="relative w-full h-0">
-          {/* Status tab - protruding from top left */}
-          <div className={`absolute -top-5 left-0 flex items-center px-4 py-2 bg-card border border-border rounded-md shadow-sm ${hasImageSlides ? 'z-0' : 'z-10'}`}>
-            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap pb-1">
-              {formatStatus(getDisplayStatus(lesson.status, lesson.scheduledFor))}
-            </span>
-          </div>
-          {/* Date tab with teacher name - protruding from top right */}
-          <div className={`absolute -top-3 right-0 flex items-center px-4 py-2 bg-card border border-border rounded-md shadow-sm ${hasImageSlides ? 'z-0' : 'z-10'}`}>
-            <span className="text-xs text-muted-foreground whitespace-nowrap pb-1">
-              {teacherName} • {formatCreatedDate(lesson.createdAt)}
-            </span>
-          </div>
-        </div>
-        {/* CardHeader - Guideline area (minimal height, no border) */}
-        <CardHeader className="p-1 pb-0.5 bg-card border-0 border-b-0 rounded-t-lg">
-        </CardHeader>
-        {/* CardContent - Thumbnail (maintaining aspect ratio, full width) */}
-        <CardContent className="p-0 flex-1 flex items-center justify-center bg-card border-x border-border relative z-[1]">
-          {lesson.topicId && (
-            <LessonTopicThumbnail topicId={lesson.topicId} horizontal={false} />
-          )}
-        </CardContent>
-        {/* CardFooter - Details (stage, L badge, topic title, classes) */}
-        <CardFooter className="flex flex-col p-4 pt-3 gap-2 bg-card border border-border border-t-0 rounded-b-lg items-start">
-          {/* Curriculum stage name */}
-          {stageName && (
-            <p className="text-xs font-medium text-muted-foreground">
-              {stageName}
-            </p>
-          )}
-          {/* Topic title with L badge */}
-          <div className="flex items-center gap-2 min-w-0">
-            {stageOrder !== null && stageOrder !== undefined && (
-              <Badge
-                variant="secondary"
-                className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
-              >
-                L{stageOrder}
-              </Badge>
-            )}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <CardTitle className="text-base font-semibold text-primary capitalize line-clamp-2 flex-1 cursor-default text-left">
-                  {topicTitle}
-                </CardTitle>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{topicTitle}</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-          {/* Classes */}
-          {lesson.assignedClasses &&
-            lesson.assignedClasses.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {lesson.assignedClasses.map((classItem) => (
-                  <Badge
-                    key={classItem.classId}
-                    variant="outline"
-                    className="text-xs py-0 px-1.5 h-5"
-                  >
-                    {classItem.className}
-                  </Badge>
-                ))}
-              </div>
-            )}
-        </CardFooter>
-      </Card>
-    </Link>
-  );
-}
-
 export default function LessonsPage({
   params,
 }: {
@@ -319,11 +112,29 @@ export default function LessonsPage({
   const [schoolSlug, setSchoolSlug] = useState<string>("");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "my-lessons" | "other-lessons">(
-    "all"
-  );
+  const [showCompletedMyLessons, setShowCompletedMyLessons] = useState(false);
+  const [showCompletedOtherLessons, setShowCompletedOtherLessons] = useState(false);
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const { data: currentUser } = useCurrentUser();
+
+  // Get filter from URL query params, default to "my-lessons"
+  const filterParam = searchParams?.get("filter");
+  const filter: "all" | "my-lessons" = 
+    filterParam === "all" ? "all" : "my-lessons";
+
+  // Update URL when filter changes
+  const setFilter = (newFilter: "all" | "my-lessons") => {
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    if (newFilter === "my-lessons") {
+      params.delete("filter"); // Default, no need to show in URL
+    } else {
+      params.set("filter", newFilter);
+    }
+    const queryString = params.toString();
+    router.push(`${pathname}${queryString ? `?${queryString}` : ""}`, { scroll: false });
+  };
 
   useEffect(() => {
     params.then(({ school_id }) => {
@@ -401,7 +212,7 @@ export default function LessonsPage({
 
   // Separate lessons into categories
   // When filter is "my-lessons", lessons already contains only user's lessons (from API)
-  // When filter is "other-lessons" or "all", we need to separate them
+  // When filter is "all", we need to separate them into my lessons and other lessons
   const { myLessons, otherLessons } = useMemo(() => {
     if (filter === "my-lessons") {
       // API already filtered by user, so all lessons are "my lessons"
@@ -429,9 +240,8 @@ export default function LessonsPage({
     // Apply filter dropdown
     if (filter === "my-lessons") {
       lessonsToFilter = myLessons;
-    } else if (filter === "other-lessons") {
-      lessonsToFilter = otherLessons;
     } else {
+      // "all" - show all lessons
       lessonsToFilter = lessons;
     }
 
@@ -472,6 +282,24 @@ export default function LessonsPage({
       filteredOtherLessons: otherLessonsList,
     };
   }, [filteredLessons, currentUser?.id]);
+
+  // Filter out completed lessons from My Lessons unless showCompletedMyLessons is true
+  const displayedMyLessons = useMemo(() => {
+    if (showCompletedMyLessons) return filteredMyLessons;
+    return filteredMyLessons.filter((lesson) => {
+      const displayStatus = getDisplayStatus(lesson.status || "", lesson.scheduledFor);
+      return displayStatus !== "completed";
+    });
+  }, [filteredMyLessons, showCompletedMyLessons]);
+
+  // Filter out completed lessons from Other Lessons unless showCompletedOtherLessons is true
+  const displayedOtherLessons = useMemo(() => {
+    if (showCompletedOtherLessons) return filteredOtherLessons;
+    return filteredOtherLessons.filter((lesson) => {
+      const displayStatus = getDisplayStatus(lesson.status || "", lesson.scheduledFor);
+      return displayStatus !== "completed";
+    });
+  }, [filteredOtherLessons, showCompletedOtherLessons]);
 
   // Lesson card skeleton component (matching new vertical layout)
   const LessonCardSkeleton = () => (
@@ -515,10 +343,10 @@ export default function LessonsPage({
       <FeatureGuard feature="lessons" schoolId={currentSchool.id} />
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-2">
+        {/* <div className="flex items-center gap-2">
           <BookOpen className="h-8 w-8" />
           <h1 className="text-3xl font-bold">Lessons</h1>
-        </div>
+        </div> */}
 
         {/* Search and Filter */}
         <div className="flex flex-col sm:flex-row gap-4">
@@ -534,7 +362,7 @@ export default function LessonsPage({
           </div>
           <Select
             value={filter}
-            onValueChange={(value: "all" | "my-lessons" | "other-lessons") =>
+            onValueChange={(value: "all" | "my-lessons") =>
               setFilter(value)
             }
           >
@@ -542,137 +370,130 @@ export default function LessonsPage({
               <SelectValue placeholder="Filter lessons" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Lessons</SelectItem>
               <SelectItem value="my-lessons">My Lessons</SelectItem>
-              <SelectItem value="other-lessons">Other Lessons</SelectItem>
+              <SelectItem value="all">All Lessons</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Lessons Grid */}
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {/* Start New Lesson Card - Always First */}
-            <button
-              onClick={() => setIsWizardOpen(true)}
-              className="block w-full text-center"
-            >
-              <Card className="hover:shadow-md transition-shadow h-full border-2 border-dashed border-muted-foreground/40 hover:border-primary/50 cursor-pointer flex flex-col">
-                <CardHeader className="flex-1 flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-2 py-4">
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <Plus className="h-6 w-6 text-primary" />
-                    </div>
-                    <CardTitle className="text-lg text-center">
-                      Start New Lesson
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Create a new lesson for your classes
-                    </p>
-                  </div>
-                </CardHeader>
-              </Card>
-            </button>
-            {[...Array(5)].map((_, i) => (
-              <LessonCardSkeleton key={i} />
-            ))}
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold">My Lessons</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Start New Lesson Card - Always First */}
+                <StartNewLessonCard onClick={() => setIsWizardOpen(true)} />
+                {[...Array(5)].map((_, i) => (
+                  <LessonCardSkeleton key={i} />
+                ))}
+              </div>
+            </div>
           </div>
         ) : error ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {/* Start New Lesson Card - Always First */}
-            <button
-              onClick={() => setIsWizardOpen(true)}
-              className="block w-full text-center"
-            >
-              <Card className="hover:shadow-md transition-shadow h-full border-2 border-dashed border-muted-foreground/40 hover:border-primary/50 cursor-pointer flex flex-col">
-                <CardHeader className="flex-1 flex items-center justify-center">
-                  <div className="flex flex-col items-center gap-2 py-4">
-                    <div className="rounded-full bg-primary/10 p-3">
-                      <Plus className="h-6 w-6 text-primary" />
-                    </div>
-                    <CardTitle className="text-lg text-center">
-                      Start New Lesson
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground text-center">
-                      Create a new lesson for your classes
-                    </p>
-                  </div>
-                </CardHeader>
-              </Card>
-            </button>
-            <div className="col-span-full">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center py-12">
-                    <p className="text-destructive">
-                      Error loading lessons: {error}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h2 className="text-2xl font-semibold">My Lessons</h2>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {/* Start New Lesson Card - Always First */}
+                <StartNewLessonCard onClick={() => setIsWizardOpen(true)} />
+              </div>
             </div>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <p className="text-destructive">
+                    Error loading lessons: {error}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Start New Lesson Card - Always First */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <button
-                onClick={() => setIsWizardOpen(true)}
-                className="block w-full text-center"
-              >
-                <Card className="hover:shadow-md transition-shadow h-full border-2 border-dashed border-muted-foreground/40 hover:border-primary/50 cursor-pointer flex flex-col">
-                  <CardHeader className="flex-1 flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-2 py-4">
-                      <div className="rounded-full bg-primary/10 p-3">
-                        <Plus className="h-6 w-6 text-primary" />
-                      </div>
-                      <CardTitle className="text-lg text-center">
-                        Start New Lesson
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground text-center">
-                        Create a new lesson for your classes
-                      </p>
-                    </div>
-                  </CardHeader>
-                </Card>
-              </button>
-            </div>
-
             {/* My Lessons Section */}
-            {filter !== "other-lessons" && filteredMyLessons.length > 0 && (
+            {/* My Lessons Section - always shown */}
+            {(
               <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">My Lessons</h2>
+                <div className="flex items-center gap-4">
+                  <h2 className="text-2xl font-semibold">My Lessons</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCompletedMyLessons(!showCompletedMyLessons)}
+                    className="text-muted-foreground"
+                  >
+                    {showCompletedMyLessons ? (
+                      <>
+                        <EyeOff className="h-4 w-4" />
+                        Hide completed
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4" />
+                        Show completed
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredMyLessons.map((lesson) => (
+                  {/* Start New Lesson Card - Always First */}
+                  <StartNewLessonCard onClick={() => setIsWizardOpen(true)} />
+                  {displayedMyLessons.map((lesson) => (
                     <LessonCard 
                       key={lesson.id} 
                       lesson={lesson} 
                       schoolSlug={schoolSlug}
-                      formatStatus={formatStatus}
-                      formatCreatedDate={formatCreatedDate}
-                      getDisplayStatus={getDisplayStatus}
                     />
                   ))}
                 </div>
               </div>
             )}
 
+            {/* Separator between sections */}
+            {filter === "all" && filteredOtherLessons.length > 0 && (
+              <Separator />
+            )}
+
             {/* Other Lessons Section */}
-            {filter !== "my-lessons" && filteredOtherLessons.length > 0 && (
+            {filter === "all" && filteredOtherLessons.length > 0 && (
               <div className="space-y-4">
-                <h2 className="text-2xl font-semibold">Other Lessons</h2>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {filteredOtherLessons.map((lesson) => (
-                    <LessonCard 
-                      key={lesson.id} 
-                      lesson={lesson} 
-                      schoolSlug={schoolSlug}
-                      formatStatus={formatStatus}
-                      formatCreatedDate={formatCreatedDate}
-                      getDisplayStatus={getDisplayStatus}
-                    />
-                  ))}
+                <div className="flex items-center gap-4">
+                  <h2 className="text-2xl font-semibold">Other Lessons</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowCompletedOtherLessons(!showCompletedOtherLessons)}
+                    className="text-muted-foreground"
+                  >
+                    {showCompletedOtherLessons ? (
+                      <>
+                        <EyeOff className="h-4 w-4" />
+                        Hide completed
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4" />
+                        Show completed
+                      </>
+                    )}
+                  </Button>
                 </div>
+                {displayedOtherLessons.length > 0 ? (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {displayedOtherLessons.map((lesson) => (
+                      <LessonCard 
+                        key={lesson.id} 
+                        lesson={lesson} 
+                        schoolSlug={schoolSlug}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    All other lessons are completed. Click "Show completed" to see them.
+                  </p>
+                )}
               </div>
             )}
 
@@ -688,9 +509,7 @@ export default function LessonsPage({
                             ? "No lessons found matching your search."
                             : filter === "my-lessons"
                               ? "You haven't created any lessons yet."
-                              : filter === "other-lessons"
-                                ? "No other lessons found."
-                                : "No lessons found for this school."}
+                              : "No lessons found for this school."}
                         </p>
                       </div>
                     </CardContent>
