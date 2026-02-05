@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { useCertificationTopicsStore } from "@/entities/certification/model/topics-store";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 interface SlideUrlCache {
   url: string;
@@ -122,12 +123,13 @@ export const useCertificationSlidesCacheStore = create<CertificationSlidesCacheS
             return null;
           }
 
-          // Cache the URL only if it's not null
+          // Cache the URL only if it's not null (rewrite to configured storage host)
+          const url = toStorageUrl(result.data.url) ?? result.data.url;
           set((state) => ({
             cache: {
               ...state.cache,
               [slideId]: {
-                url: result.data.url,
+                url,
                 timestamp: now,
               },
             },
@@ -135,7 +137,7 @@ export const useCertificationSlidesCacheStore = create<CertificationSlidesCacheS
             errors: { ...state.errors, [slideId]: null },
           }));
 
-          return result.data.url;
+          return url;
         } else {
           // Handle error
           const errorMessage = result.error?.message || "Failed to load image";

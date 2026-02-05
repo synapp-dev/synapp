@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useTopicsStore } from "@/entities/topics/model/store-enhanced";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 interface SlideUrlCache {
   url: string;
@@ -116,12 +117,13 @@ export const useTopicSlidesCacheStore = create<TopicSlidesCacheState>(
             return null;
           }
 
-          // Cache the URL only if it's not null
+          // Cache the URL only if it's not null (rewrite to configured storage host)
+          const url = toStorageUrl(result.data.url) ?? result.data.url;
           set((state) => ({
             cache: {
               ...state.cache,
               [slideId]: {
-                url: result.data.url,
+                url,
                 timestamp: now,
               },
             },
@@ -129,7 +131,7 @@ export const useTopicSlidesCacheStore = create<TopicSlidesCacheState>(
             errors: { ...state.errors, [slideId]: null },
           }));
 
-          return result.data.url;
+          return url;
         } else {
           // Handle error
           const errorMessage = result.error?.message || "Failed to load image";
