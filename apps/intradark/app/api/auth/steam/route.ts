@@ -1,37 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
+import openid from "openid";
 
+const STEAM_OPENID_URL = "https://steamcommunity.com/openid/";
+
+/**
+ * Initiate Steam OpenID authentication flow
+ * GET /api/auth/steam
+ */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const returnUrl = searchParams.get("returnUrl") || "/dashboard";
+    const baseUrl = 'http://localhost:3004';
+    const returnUrl = `${baseUrl}/api/auth/steam/callback`;
 
-    // Get the base URL from the request
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                   `${request.headers.get('x-forwarded-proto') || 'http'}://${request.headers.get('host') || 'localhost:3000'}`;
+    // Create OpenID relying party
+    const relyingParty = new openid.RelyingParty(
+      returnUrl,
+      baseUrl,
+      true, // stateless
+      false, // strict mode
+      []
+    );
 
-    // Steam OpenID 2.0 authentication URL
-    const steamAuthUrl = "https://steamcommunity.com/openid/login";
+    // Wrap the callback-based authenticate in a Promise
+    return new Promise<NextResponse>((resolve) => {
+      relyingParty.authenticate(
+        STEAM_OPENID_URL,
+        false,
+        (error, authUrl) => {
+          if (error) {
+            console.error("OpenID authentication error:", error);
+            resolve(
+              NextResponse.redirect(
+                new URL("/dashboard?error=steam_auth_failed", baseUrl)
+              )
+            );
+            return;
+          }
 
-    // Generate a unique state parameter for security
-    const state = Math.random().toString(36).substring(2, 15);
+          if (!authUrl) {
+            resolve(
+              NextResponse.redirect(
+                new URL("/dashboard?error=steam_auth_failed", baseUrl)
+              )
+            );
+            return;
+          }
 
-    // Build the OpenID request parameters
-    const params = new URLSearchParams({
-      "openid.ns": "http://specs.openid.net/auth/2.0",
-      "openid.mode": "checkid_setup",
-      "openid.return_to": `${baseUrl}/api/auth/steam/callback?returnUrl=${encodeURIComponent(returnUrl)}&state=${state}`,
-      "openid.realm": baseUrl,
-      "openid.identity": "http://specs.openid.net/auth/2.0/identifier_select",
-      "openid.claimed_id": "http://specs.openid.net/auth/2.0/identifier_select",
+          // Redirect to Steam
+          resolve(NextResponse.redirect(authUrl));
+        }
+      );
     });
-
-    // Redirect to Steam for authentication
-    return NextResponse.redirect(`${steamAuthUrl}?${params.toString()}`);
   } catch (error) {
-    console.error("Steam auth error:", error);
-    return NextResponse.json(
-      { error: "Failed to initiate Steam authentication" },
-      { status: 500 }
+    console.error("Error initiating Steam auth:", error);
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    return NextResponse.redirect(
+      new URL("/dashboard?error=steam_auth_failed", baseUrl)
     );
   }
 }
