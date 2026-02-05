@@ -84,6 +84,7 @@ export function LessonSidebarNav({
 
   const isCompleted = lessonData?.status === "completed";
   const isFeedback = lessonData?.status === "feedback";
+  const isPreparing = lessonData?.status === "preparing";
   const canProvideFeedback = isCompleted || isFeedback;
 
   // Debug logging (can be removed later)
@@ -100,28 +101,43 @@ export function LessonSidebarNav({
 
   const baseUrl = `/schools/${schoolId}/lessons/${lessonId}`;
 
-  const navItems = navItemsConfig.map((item) => ({
-    title: item.title,
-    url: item.url ? `${baseUrl}${item.url}` : baseUrl,
-    icon: iconMap[item.iconName],
-    exact: (item as { exact?: boolean }).exact ?? false,
-    // Disable Run Lesson if user is not the lesson creator
-    // Enable feedback button if lesson is feedback or completed
-    disabled:
-      item.disabled ||
-      (item.title === "Run Lesson" && !canRunLesson) ||
-      (item.title === "Feedback" && !canProvideFeedback),
-    // Show appropriate disabled messages
-    disabledMessage:
-      item.disabledMessage ||
-      (item.title === "Run Lesson" && !canRunLesson
-        ? "Unauthorized"
-        : item.title === "Feedback" && !canProvideFeedback
-          ? "Locked"
-          : item.disabled
-            ? "Under Construction"
-            : undefined),
-  }));
+  const navItems = navItemsConfig.map((item) => {
+    // When lesson is in feedback or completed stage, mark Prepare and Run Lesson as completed
+    const isLessonFinished = isFeedback || isCompleted;
+    const shouldMarkAsCompleted =
+      isLessonFinished && (item.title === "Prepare" || item.title === "Run Lesson");
+
+    return {
+      title: item.title,
+      url: item.url ? `${baseUrl}${item.url}` : baseUrl,
+      // Use CheckCircle2 icon for completed items
+      icon: shouldMarkAsCompleted ? CheckCircle2 : iconMap[item.iconName],
+      exact: (item as { exact?: boolean }).exact ?? false,
+      // Disable Run Lesson if user is not the lesson creator or lesson is still preparing
+      // Enable feedback button if lesson is feedback or completed
+      // Lock Prepare and Run Lesson when in feedback/completed stage
+      disabled:
+        item.disabled ||
+        shouldMarkAsCompleted ||
+        (item.title === "Run Lesson" && !canRunLesson) ||
+        (item.title === "Run Lesson" && isPreparing) ||
+        (item.title === "Feedback" && !canProvideFeedback),
+      // Show appropriate disabled messages
+      disabledMessage:
+        item.disabledMessage ||
+        (shouldMarkAsCompleted
+          ? "Completed"
+          : item.title === "Run Lesson" && isPreparing
+            ? "Complete preparation first"
+            : item.title === "Run Lesson" && !canRunLesson
+              ? "Unauthorized"
+              : item.title === "Feedback" && !canProvideFeedback
+                ? "Locked"
+                : item.disabled
+                  ? "Under Construction"
+                  : undefined),
+    };
+  });
 
   return <NavMain items={navItems} />;
 }

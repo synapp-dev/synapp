@@ -1,9 +1,12 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
+import { topicsApi } from "@/entities/topics/api/endpoints";
 import { Badge } from "@workspace/ui/components/badge";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { getDisplayStatus } from "@/utils/lesson-status";
+import { SlideRenderer, type SlideData } from "@/components/organisms/slide-renderer";
 
 interface LessonHeaderProps {
   lessonId: string;
@@ -11,16 +14,55 @@ interface LessonHeaderProps {
 
 export function LessonHeader({ lessonId }: LessonHeaderProps) {
   const { data: lessonData, isLoading } = useLessonById(lessonId);
+  const [firstSlide, setFirstSlide] = useState<SlideData | null>(null);
+  const [isLoadingSlides, setIsLoadingSlides] = useState(false);
+
+  // Fetch first slide for thumbnail
+  const fetchFirstSlide = useCallback(async (topicId: string) => {
+    try {
+      setIsLoadingSlides(true);
+      const topicResult = await topicsApi.get.byId(topicId);
+      if (topicResult.data?.slides && topicResult.data.slides.length > 0) {
+        const sortedSlides = topicResult.data.slides.sort(
+          (a, b) => a.orderIndex - b.orderIndex
+        );
+        const slide = sortedSlides[0];
+        setFirstSlide({
+          id: slide.id,
+          kind: slide.kind as "text" | "image" | "video",
+          orderIndex: slide.orderIndex,
+          textHtml: slide.textHtml ?? null,
+          imageUrl: slide.imageUrl ?? null,
+          videoUrl: slide.videoUrl ?? null,
+          videoStartS: slide.videoStartS ?? null,
+          videoEndS: slide.videoEndS ?? null,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to fetch first slide:", err);
+    } finally {
+      setIsLoadingSlides(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (lessonData?.topicId) {
+      fetchFirstSlide(lessonData.topicId);
+    }
+  }, [lessonData?.topicId, fetchFirstSlide]);
 
   if (isLoading || !lessonData) {
     return (
       <div className="border-b pb-4 mb-6">
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-6 w-64" />
-          <div className="flex gap-2">
-            <Skeleton className="h-6 w-20" />
-            <Skeleton className="h-6 w-20" />
+        <div className="flex gap-4">
+          <Skeleton className="w-32 aspect-video rounded-lg flex-shrink-0" />
+          <div className="space-y-3 flex-1">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-6 w-64" />
+            <div className="flex gap-2">
+              <Skeleton className="h-6 w-20" />
+              <Skeleton className="h-6 w-20" />
+            </div>
           </div>
         </div>
       </div>
@@ -57,8 +99,21 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
   };
 
   return (
-    
-      <div className="space-y-3 bg-muted p-6 rounded-lg">
+    <div className="flex gap-4 bg-muted p-6 rounded-lg">
+      {/* First slide thumbnail */}
+      {firstSlide ? (
+        <div className="flex-shrink-0 w-32 aspect-video rounded-lg overflow-hidden shadow-sm border">
+          <SlideRenderer
+            slide={firstSlide}
+            className="w-full h-full"
+            thumbnailOnly={true}
+          />
+        </div>
+      ) : isLoadingSlides ? (
+        <Skeleton className="w-32 aspect-video rounded-lg flex-shrink-0" />
+      ) : null}
+
+      <div className="space-y-3 flex-1">
         {/* Lesson Label */}
         <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
           Lesson
@@ -106,6 +161,6 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
           </Badge>
         </div>
       </div>
-   
+    </div>
   );
 }
