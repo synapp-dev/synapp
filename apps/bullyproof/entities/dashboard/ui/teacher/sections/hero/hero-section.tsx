@@ -22,6 +22,8 @@ import {
 } from "@workspace/ui/components/dialog";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { LessonFeedbackForm, type LessonForFeedback } from "@/components/organisms/lesson-feedback-form";
+import { checkFeatureAccessAndVisibleCached } from "@/utils/check-feature-access-cached";
 
 type LessonWithDetails = {
   id: string;
@@ -43,6 +45,8 @@ export function TeacherHeroSection() {
   const [date, setDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const [isSchoolDialogOpen, setIsSchoolDialogOpen] = useState(false);
+  const [isPendingFeedbackOpen, setIsPendingFeedbackOpen] = useState(false);
+  const [hasShownFeedbackDialog, setHasShownFeedbackDialog] = useState(false);
   const currentUser = useMeStore((s) => s.currentUser);
   const teacherId = currentUser?.id;
 
@@ -50,6 +54,85 @@ export function TeacherHeroSection() {
   const { data: schools = [], isLoading: isLoadingSchools } = useMySchoolsQuery({
     limit: 50,
   });
+
+  // Check if lessons feature is enabled for any of the user's schools
+  const hasLessonsFeature = useMemo(() => {
+    if (!currentUser?.featurePermissions || schools.length === 0) return false;
+    
+    // Check each school to see if lessons feature is enabled
+    return schools.some((school) => {
+      const { hasAccess } = checkFeatureAccessAndVisibleCached(
+        currentUser.featurePermissions,
+        "lessons",
+        school.id,
+        currentUser.roleIds
+      );
+      return hasAccess;
+    });
+  }, [currentUser?.featurePermissions, currentUser?.roleIds, schools]);
+
+  // Fetch lessons in feedback status for the current teacher
+  const { data: feedbackLessons = [], isLoading: isLoadingFeedbackLessons } = useQuery({
+    queryKey: ["teacher-lessons-feedback", teacherId],
+    queryFn: async () => {
+      if (!teacherId) return [];
+      
+      const result = await lessonsApi.get.list({
+        teacherId,
+        status: "feedback",
+        limit: 50,
+      });
+
+      if (result.error || !result.data) return [];
+
+      // Fetch details for each lesson to get topic and classes info
+      const lessonsWithDetails = await Promise.all(
+        result.data.map(async (lesson) => {
+          const lessonDetailResult = await lessonsApi.get.byId(lesson.id);
+          if (lessonDetailResult.error || !lessonDetailResult.data) {
+            return {
+              id: lesson.id,
+              topicId: lesson.topicId,
+              topicTitle: "Untitled Lesson",
+              stageOrder: null,
+              stageName: undefined,
+              assignedClasses: [],
+            } as LessonForFeedback;
+          }
+          
+          const detail = lessonDetailResult.data;
+          return {
+            id: lesson.id,
+            topicId: lesson.topicId,
+            topicTitle: detail.topic?.title || "Untitled Lesson",
+            stageOrder: detail.topic?.stageOrder ?? null,
+            stageName: detail.topic?.stageName,
+            assignedClasses: detail.assignedClasses?.map((c) => ({
+              classId: c.classId,
+              className: c.className,
+            })) || [],
+          } as LessonForFeedback;
+        })
+      );
+
+      return lessonsWithDetails;
+    },
+    enabled: !!teacherId && hasLessonsFeature,
+    staleTime: 60 * 1000, // 1 minute
+  });
+
+  // Auto-open pending feedback dialog when there are lessons and feature is enabled
+  useEffect(() => {
+    if (
+      !hasShownFeedbackDialog &&
+      !isLoadingFeedbackLessons &&
+      feedbackLessons.length > 0 &&
+      hasLessonsFeature
+    ) {
+      setIsPendingFeedbackOpen(true);
+      setHasShownFeedbackDialog(true);
+    }
+  }, [feedbackLessons, hasLessonsFeature, isLoadingFeedbackLessons, hasShownFeedbackDialog]);
 
   // Fetch lessons for the current teacher
   const { data: lessonsData, isLoading: isLoadingLessons } = useQuery({
@@ -429,6 +512,20 @@ export function TeacherHeroSection() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+
+      {/* Pending Feedback Dialog */}
+      {feedbackLessons.length > 0 && (
+        <LessonFeedbackForm
+          lessons={feedbackLessons}
+          open={isPendingFeedbackOpen}
+          onOpenChange={setIsPendingFeedbackOpen}
+          onComplete={() => {
+            setIsPendingFeedbackOpen(false);
+            router.refresh();
+          }}
+          hideClosedState={true}
+        />
+      )}
     </section>
   );
 }

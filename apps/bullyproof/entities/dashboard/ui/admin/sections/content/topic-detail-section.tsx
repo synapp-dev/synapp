@@ -436,6 +436,7 @@ export function TopicDetailSection({
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [isEditTopicDrawerOpen, setIsEditTopicDrawerOpen] = useState(false);
   const [isEditCurriculumTopicDrawerOpen, setIsEditCurriculumTopicDrawerOpen] = useState(false);
+  const [showLessonPlanDialog, setShowLessonPlanDialog] = useState(false);
 
   // @dnd-kit sensors
   const sensors = useSensors(
@@ -2856,6 +2857,20 @@ export function TopicDetailSection({
         <div className="flex items-center justify-end gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={() => setShowLessonPlanDialog(true)}
+              >
+                <FileText className="h-4 w-4" />
+                Lesson Plan
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p>View lesson plan for this topic</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
               <div className="inline-block">
                 <Button
                   variant={
@@ -3572,6 +3587,31 @@ export function TopicDetailSection({
         }
         allowMultipleSelection={insertAfterIndexForDialog !== null}
       />
+
+      {/* Lesson Plan Dialog */}
+      <Dialog open={showLessonPlanDialog} onOpenChange={setShowLessonPlanDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Lesson Plan</DialogTitle>
+            <DialogDescription>
+              Lesson plan for {topic?.name || "this topic"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-muted-foreground text-center py-8">
+              Lesson plan content will be displayed here.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowLessonPlanDialog(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Certification Topic Drawer */}
       {isCertification && topic && (
