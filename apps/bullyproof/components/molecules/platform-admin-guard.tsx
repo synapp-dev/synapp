@@ -1,43 +1,25 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { useIsPlatformAdmin } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 
 /**
  * PlatformAdminGuard component
  *
- * Client-side guard that checks if the user is a platform admin
- * and redirects to /dashboard if they are not.
- *
- * This ensures that only platform admins can access protected routes.
+ * Client-side guard that checks if the user is a platform admin.
+ * This component no longer redirects - it simply performs the access check
+ * and allows users with access to view the page.
  */
 export function PlatformAdminGuard() {
-  const router = useRouter();
-  const pathname = usePathname();
   const isPlatformAdmin = useIsPlatformAdmin();
   const { isLoading } = useCurrentUser();
 
-  useEffect(() => {
-    // Don't check on public routes or while loading
-    const isPublicRoute =
-      pathname.startsWith("/api") ||
-      pathname.startsWith("/auth") ||
-      pathname === "/welcome" ||
-      pathname === "/logout" ||
-      pathname === "/dashboard" ||
-      pathname.startsWith("/courses");
+  // Debug logging
+  console.log("[PlatformAdminGuard]:", {
+    isPlatformAdmin,
+    isLoading,
+  });
 
-    if (isPublicRoute || isLoading) {
-      return;
-    }
-
-    // If user is not a platform admin, redirect to dashboard
-    if (!isPlatformAdmin) {
-      router.replace("/dashboard");
-    }
-  }, [isPlatformAdmin, pathname, router, isLoading]);
-
+  // No redirect - users with access can view the page
   return null;
 }
