@@ -11,10 +11,10 @@ export type ApiResult<T> = ApiOk<T> | ApiErr;
 async function withAuth(init?: RequestInit): Promise<RequestInit> {
   const headers = new Headers(init?.headers);
 
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { session },
-  } = await (await supabase).auth.getSession();
+  } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
