@@ -53,16 +53,23 @@ export function ResponsiveSidebarProvider({
   defaultOpen = true,
   ...props
 }: ResponsiveSidebarProviderProps) {
-  // Determine initial open state based on window width (2xl = 1536px)
-  // Calculate on client-side only to avoid hydration mismatches
-  const [initialOpen] = React.useState(() => {
-    if (typeof window === "undefined") return defaultOpen;
+  // Always start with defaultOpen on both server and client to avoid hydration mismatch
+  // Then update after mount based on window width
+  const [open, setOpen] = React.useState(defaultOpen);
+  const [mounted, setMounted] = React.useState(false);
+
+  // Update state after mount to avoid hydration mismatch
+  React.useEffect(() => {
+    setMounted(true);
+    // Determine initial open state based on window width (2xl = 1536px)
     const isBelow2xl = window.innerWidth < 1536;
-    return isBelow2xl ? false : defaultOpen;
-  });
+    if (isBelow2xl) {
+      setOpen(false);
+    }
+  }, []);
 
   return (
-    <SidebarProvider defaultOpen={initialOpen} {...props}>
+    <SidebarProvider open={open} onOpenChange={setOpen} {...props}>
       <ResponsiveSidebarProviderInner>
         {props.children}
       </ResponsiveSidebarProviderInner>

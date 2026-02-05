@@ -41,7 +41,7 @@ export function NavUser() {
     currentUser?.email ||
     "User";
   const email = currentUser?.email || "";
-  const avatar = currentUser?.avatarUrl || "/images/default-avatar.svg";
+  const avatar = currentUser?.avatarUrl || "/images/bp-small-logo.svg";
   const initials = (name || "U")
     .split(" ")
     .map((n) => n[0])

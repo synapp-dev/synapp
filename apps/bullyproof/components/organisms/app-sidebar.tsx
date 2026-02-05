@@ -38,9 +38,10 @@ import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useSchoolStore } from "@/stores/school-store";
 import { usePathname, useRouter } from "next/navigation";
-import { useIsPlatformAdmin, useMeStore, useIsSchoolStaff, useIsTeacher } from "@/entities/me/model/store";
+import { useMeStore } from "@/entities/me/model/store";
+import { useFeaturesAccess } from "@/hooks/use-features-access";
+import { MAINTENANCE_FEATURE_KEY } from "@/lib/feature-keys";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
-import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
 import { useUserLessonsStatusRealtime } from "@/hooks/use-lesson-status-realtime";
 
 // This is sample data.
@@ -51,24 +52,28 @@ const data = {
       url: "/admin",
       icon: ShieldCheck,
       isActive: false,
+      feature: "admin", // Feature key for access control
     },
     {
       title: "AP Certification",
       url: "/courses/amayda-program",
       icon: BadgeCheck,
       isActive: false,
+      feature: "ap_certification", // Feature key for access control
     },
     {
       title: "Welcome",
       url: "/welcome",
       icon: Apple,
       isActive: false,
+      feature: "welcome", // Feature key for access control
     },
     {
       title: "Dashboard",
       url: "/dashboard",
       icon: LayoutDashboard,
       isActive: false,
+      feature: "dashboard", // Feature key for access control
     },
     {
       title: "Support",
@@ -76,6 +81,7 @@ const data = {
       icon: HelpingHand,
       isActive: false,
       disabled: true,
+      feature: "support", // Feature key for access control
     },
   ],
   navSchoolMain: [
@@ -84,18 +90,21 @@ const data = {
       url: "/home",
       icon: House,
       isActive: false,
+      feature: "home", // Feature key for access control
     },
     {
       title: "Teachers",
       url: "/teachers",
       icon: Users,
       isActive: false,
+      feature: "teachers", // Feature key for access control
     },
     {
       title: "Classes",
       url: "/classes",
       icon: GraduationCap,
       isActive: false,
+      feature: "classes", // Feature key for access control
     },
     {
       title: "Performance",
@@ -103,6 +112,7 @@ const data = {
       icon: TrendingUp,
       isActive: false,
       disabled: true,
+      feature: "performance", // Feature key for access control
     },
     {
       title: "Settings",
@@ -110,6 +120,7 @@ const data = {
       icon: Settings,
       isActive: false,
       disabled: true,
+      feature: "settings", // Feature key for access control
     },
   ],
   navCurriculum: [
@@ -118,18 +129,21 @@ const data = {
       url: "/lessons",
       icon: Presentation,
       isActive: false,
+      feature: "lessons", // Feature key for access control
     },
     {
       title: "Content",
       url: "/content",
       icon: BookOpenText,
       isActive: false,
+      feature: "content", // Feature key for access control
     },
     {
       title: "Resources",
       url: "/resources",
       icon: LibraryBig,
       isActive: false,
+      feature: "resources", // Feature key for access control
     },
   ],
   navData: [
@@ -139,9 +153,19 @@ const data = {
       icon: FileText,
       isActive: false,
       disabled: true,
+      feature: "reports", // Feature key for access control
     },
   ],
 };
+
+const maintenanceNavItems = [
+  {
+    title: "Maintenance",
+    url: "/maintenance",
+    icon: Wrench,
+    isActive: false,
+  },
+];
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, isMobile } = useSidebar();
@@ -149,12 +173,50 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const displayState = isMobile ? "expanded" : state;
   const pathname = usePathname();
   const router = useRouter();
-  const isPlatformAdmin = useIsPlatformAdmin();
   const currentUser = useMeStore((s) => s.currentUser);
-  const isSchoolStaff = useIsSchoolStaff();
-  const isTeacher = useIsTeacher();
+  const maintenanceFeaturesAccess = useFeaturesAccess([MAINTENANCE_FEATURE_KEY]);
+  const hasMaintenanceAccess = maintenanceFeaturesAccess[MAINTENANCE_FEATURE_KEY]?.hasAccess ?? false;
+  const effectiveMaintenanceMode = hasMaintenanceAccess && !currentUser?.maintenanceBypass;
   // Listen for real-time status changes to user's lessons
   useUserLessonsStatusRealtime(currentUser?.id);
+
+  // When maintenance mode is enabled for the user (and not bypassed), show only the maintenance menu
+  if (effectiveMaintenanceMode) {
+    return (
+      <Sidebar collapsible="icon" {...props}>
+        <SidebarHeader className="mb-2">
+          <Link href="/" className="block">
+            {displayState === "expanded" ? (
+              <Image
+                src="/images/bullyproof-logo.svg"
+                alt="Bullyproof Logo"
+                width={500}
+                height={500}
+                className="h-16 mt-4"
+              />
+            ) : (
+              <Image
+                src="/images/bp-small-logo.svg"
+                alt="Bullyproof Small Logo"
+                width={500}
+                height={500}
+                className="h-10 mt-4"
+              />
+            )}
+          </Link>
+        </SidebarHeader>
+        <SidebarContent>
+          <ScrollArea className="h-full">
+            <NavMain items={maintenanceNavItems} title="Platform" />
+          </ScrollArea>
+        </SidebarContent>
+        <SidebarFooter>
+          <NavUser />
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+    );
+  }
 
   // Check if welcome tutorial is completed
   const isWelcomeCompleted = React.useMemo(() => {
@@ -170,17 +232,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
 
     // If welcome is completed, show all items except Welcome
-    // Filter out Admin menu if user is not a platform admin
     return data.navBullyproof.filter((item) => {
       if (item.title === "Welcome") {
         return false; // Hide Welcome after completion
       }
-      if (item.title === "Admin" && !isPlatformAdmin) {
-        return false;
-      }
       return true;
     });
-  }, [isPlatformAdmin, isWelcomeCompleted]);
+  }, [isWelcomeCompleted]);
 
   const schoolSlugFromPath = React.useMemo(() => {
     // Match /schools/{slug}/...
@@ -234,62 +292,110 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     [activeSchoolSlug]
   );
 
-  // Use shared navigation permissions hook
-  const { filterItems } = useSchoolNavigationPermissions();
+  // Get all feature keys from navigation items
+  const allFeatureKeys = React.useMemo(() => {
+    const keys = new Set<string>();
+    [...data.navBullyproof, ...data.navSchoolMain, ...data.navCurriculum, ...data.navData].forEach(
+      (item: any) => {
+        if (item.feature) {
+          keys.add(item.feature);
+        }
+      }
+    );
+    return Array.from(keys);
+  }, []);
 
-  // Filter school navigation items based on teacher role
-  const filteredNavSchoolMain = React.useMemo(
-    () => {
-      const filtered = filterItems(data.navSchoolMain);
-      // Hide Performance and Settings for staff-only members (SCHOOL_STAFF without TEACHER)
-      const isStaffOnly = isSchoolStaff && !isTeacher;
-      const visibleItems = isStaffOnly
-        ? filtered.filter((item) => item.title !== "Performance" && item.title !== "Settings")
-        : filtered;
-      
-      // Lock Home, Teachers, and Classes for non-platform admins
-      return visibleItems.map((item) => {
-        if ((item.title === "Home" || item.title === "Teachers" || item.title === "Classes") && !isPlatformAdmin) {
-          return {
-            ...item,
-            disabled: true,
-            disabledMessage: "Locked",
-          };
+  // Check feature access for all navigation features
+  // Use school ID from activeSchool if available, otherwise from path
+  const schoolIdForFeatures = React.useMemo(() => {
+    return activeSchool?.id || (schoolSlugFromPath ? undefined : activeSchool?.id);
+  }, [activeSchool, schoolSlugFromPath]);
+
+  const featuresAccess = useFeaturesAccess(allFeatureKeys, schoolIdForFeatures);
+
+  // Resolve platform items: include when visible; lock when visible && !hasAccess
+  const filteredPlatformItems = React.useMemo(() => {
+    return platformItems
+      .filter((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          return access?.visible ?? false;
+        }
+        return true;
+      })
+      .map((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          if (access?.visible && !access?.hasAccess) {
+            return { ...item, disabled: true, disabledMessage: "Locked" };
+          }
         }
         return item;
       });
-    },
-    [filterItems, isPlatformAdmin, isSchoolStaff, isTeacher]
-  );
+  }, [platformItems, featuresAccess]);
 
-  // Lock curriculum items (Lessons, Content, Resources) for non-platform admins
-  const filteredNavCurriculum = React.useMemo(
-    () => {
-      return data.navCurriculum.map((item) => {
-        if (!isPlatformAdmin) {
-          return {
-            ...item,
-            disabled: true,
-            disabledMessage: "Locked",
-          };
+  // Resolve school main: include when visible; lock when visible && !hasAccess
+  const filteredNavSchoolMain = React.useMemo(() => {
+    return data.navSchoolMain
+      .filter((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          return access?.visible ?? false;
+        }
+        return true;
+      })
+      .map((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          if (access?.visible && !access?.hasAccess) {
+            return { ...item, disabled: true, disabledMessage: "Locked" };
+          }
         }
         return item;
       });
-    },
-    [isPlatformAdmin]
-  );
+  }, [featuresAccess]);
 
-  const filteredNavData = React.useMemo(
-    () => {
-      const filtered = filterItems(data.navData);
-      // Hide Reports for staff-only members (SCHOOL_STAFF without TEACHER)
-      const isStaffOnly = isSchoolStaff && !isTeacher;
-      return isStaffOnly
-        ? filtered.filter((item) => item.title !== "Reports")
-        : filtered;
-    },
-    [filterItems, isSchoolStaff, isTeacher]
-  );
+  // Resolve curriculum: include when visible; lock when visible && !hasAccess
+  const filteredNavCurriculum = React.useMemo(() => {
+    return data.navCurriculum
+      .filter((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          return access?.visible ?? false;
+        }
+        return true;
+      })
+      .map((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          if (access?.visible && !access?.hasAccess) {
+            return { ...item, disabled: true, disabledMessage: "Locked" };
+          }
+        }
+        return item;
+      });
+  }, [featuresAccess]);
+
+  // Resolve data: include when visible; lock when visible && !hasAccess
+  const filteredNavData = React.useMemo(() => {
+    return data.navData
+      .filter((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          return access?.visible ?? false;
+        }
+        return true;
+      })
+      .map((item: any) => {
+        if (item.feature) {
+          const access = featuresAccess[item.feature];
+          if (access?.visible && !access?.hasAccess) {
+            return { ...item, disabled: true, disabledMessage: "Locked" };
+          }
+        }
+        return item;
+      });
+  }, [featuresAccess]);
 
   // Track if component has mounted to prevent hydration mismatch
   const [mounted, setMounted] = React.useState(false);
@@ -368,20 +474,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const platformItemsWithLive = React.useMemo(() => {
     // Don't show live lesson if welcome is not completed
     if (!isWelcomeCompleted) {
-      return platformItems;
+      return filteredPlatformItems;
     }
 
     // Only add live lesson item after component has mounted to prevent hydration mismatch
     // This ensures server and client render the same initial HTML
-    if (!mounted || !isLive || !liveUrl) return platformItems;
+    if (!mounted || !isLive || !liveUrl) return filteredPlatformItems;
     
-    const items = [...platformItems];
+    const items = [...filteredPlatformItems];
     const dashboardIndex = items.findIndex((i) => i.title === "Dashboard");
     const liveItem = {
       title: liveLessonCount > 1 ? "Live Lessons" : "Live Lesson",
       url: liveUrl,
       icon: TvMinimalPlay,
       isActive: false,
+      disabled: false,
+      feature: "live_lesson",
       disableActiveStyle: true,
       liveStyle: true,
       badge: liveLessonCount > 1 ? liveLessonCount : undefined,
@@ -393,7 +501,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       items.unshift(liveItem);
     }
     return items;
-  }, [platformItems, isLive, liveUrl, liveLessonCount, isWelcomeCompleted, mounted, needsSchoolSelection, handleLiveLessonClick]);
+  }, [filteredPlatformItems, isLive, liveUrl, liveLessonCount, isWelcomeCompleted, mounted, needsSchoolSelection, handleLiveLessonClick]);
 
   return (
     <Sidebar collapsible="icon" {...props}>

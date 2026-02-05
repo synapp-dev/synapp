@@ -11,7 +11,7 @@ import { HelpCircle } from "lucide-react";
 import { CommandMenu } from "@/components/molecules/command-menu";
 import { Breadcrumb } from "@/components/molecules/breadcrumb";
 import { ImpersonateMenu } from "@/components/molecules/impersonate-menu";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { RoleGuard } from "@/components/molecules/role-guard";
 import { useMeStore } from "@/entities/me/model/store";
 import {
   getTutorialForPathname,
@@ -20,7 +20,6 @@ import {
 import { SchoolPageTutorialDialog } from "@/components/molecules/school-page-tutorial-dialog";
 
 export function AppHeader() {
-  const isPlatformAdmin = useIsPlatformAdmin();
   const pathname = usePathname();
   const currentUser = useMeStore((s) => s.currentUser);
   const [tutorialConfig, setTutorialConfig] = useState<TutorialConfig | null>(
@@ -67,12 +66,12 @@ export function AppHeader() {
           <Breadcrumb />
         </div>
         <div className="flex items-center gap-2 px-4">
-          {isPlatformAdmin && (
+          <RoleGuard roles={["PLATFORM_ADMIN"]}>
             <>
               <ImpersonateMenu />
               <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             </>
-          )}
+          </RoleGuard>
           {tutorialConfig && (
             <>
               <Button

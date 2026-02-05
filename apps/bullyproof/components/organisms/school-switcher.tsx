@@ -43,7 +43,7 @@ import {
   useSearchSchoolsQuery,
   type School as SchoolServiceSchool,
 } from "@/entities/school/model/useListSchoolsQuery";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useSchoolStore } from "@/stores/school-store";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -72,23 +72,27 @@ function extractSchoolMetadata(school: School | null) {
         ? (sector as any)?.name || ""
         : "";
 
-  // Handle levels: can be string[] (vSchoolsReadable) or object[] (vSchoolsEnriched)
-  const lvls = (school as any)?.levels;
+  // Prefer levelBadge (from school_year_assignments: P-10, P-12, Primary, Secondary, Custom)
+  const levelBadge = (school as any)?.levelBadge ?? (school as any)?.level_badge;
   let levelsText = "";
-  if (Array.isArray(lvls) && lvls.length > 0) {
-    // Extract names if objects, or use strings directly
-    const levelNames = lvls.map((lvl) =>
-      typeof lvl === "string"
-        ? lvl
-        : (lvl as any)?.name || (lvl as any)?.key || ""
-    );
-    const lower = levelNames.map((s) => s.toLowerCase());
-    const hasPrimary = lower.some((s) => s.includes("primary"));
-    const hasSecondary = lower.some((s) => s.includes("secondary"));
-    if (hasPrimary && hasSecondary) levelsText = "P-12";
-    else if (hasPrimary) levelsText = "Primary";
-    else if (hasSecondary) levelsText = "Secondary";
-    else levelsText = levelNames.join(", ");
+  if (levelBadge && typeof levelBadge === "string") {
+    levelsText = levelBadge;
+  } else {
+    const lvls = (school as any)?.levels;
+    if (Array.isArray(lvls) && lvls.length > 0) {
+      const levelNames = lvls.map((lvl) =>
+        typeof lvl === "string"
+          ? lvl
+          : (lvl as any)?.name || (lvl as any)?.key || ""
+      );
+      const lower = levelNames.map((s) => s.toLowerCase());
+      const hasPrimary = lower.some((s) => s.includes("primary"));
+      const hasSecondary = lower.some((s) => s.includes("secondary"));
+      if (hasPrimary && hasSecondary) levelsText = "P-12";
+      else if (hasPrimary) levelsText = "Primary";
+      else if (hasSecondary) levelsText = "Secondary";
+      else levelsText = levelNames.join(", ");
+    }
   }
 
   return { stateText, sectorText, levelsText };
@@ -188,19 +192,17 @@ export function SchoolSwitcher() {
     }
   }, [selectedSchool, clearCurrentSchool, clearLastAccessedSchool, router]);
 
-  // Check if user is platform admin or support
-  const isPlatformAdmin = useIsPlatformAdmin();
+  // Users with admin_schools can load and search all schools; others see only their schools
+  const { hasAccess: canAccessAllSchools } = useFeatureAccess("admin_schools");
 
-  // no-op mount debug previously present
-
-  // Fetch schools using TanStack Query based on user role
+  // Fetch schools using TanStack Query based on feature access
   const {
     data: mySchools = [],
     isLoading: mySchoolsLoading,
     error: mySchoolsError,
   } = useMySchoolsQuery(
     { limit: 5, random: true },
-    { enabled: !isPlatformAdmin }
+    { enabled: !canAccessAllSchools }
   );
 
   // Default list (no search)
@@ -209,24 +211,24 @@ export function SchoolSwitcher() {
     isLoading: allSchoolsLoading,
     isFetching: allSchoolsFetching,
     error: allSchoolsError,
-  } = useListSchoolsQuery({ limit: 5 }, { enabled: isPlatformAdmin });
+  } = useListSchoolsQuery({ limit: 5 }, { enabled: canAccessAllSchools });
 
   // Search list (separate cache and hook)
   const { data: searchedSchools = [], isFetching: searching } =
     useSearchSchoolsQuery(
       { query: debouncedSearch, limit: 5 },
-      { enabled: isPlatformAdmin }
+      { enabled: canAccessAllSchools }
     );
 
-  // Use the appropriate data based on role
+  // Use the appropriate data based on feature access
   const adminSchools = debouncedSearch ? searchedSchools : allSchools;
-  const schools = isPlatformAdmin ? adminSchools : mySchools;
-  const isLoading = isPlatformAdmin ? allSchoolsLoading : mySchoolsLoading;
-  const error = isPlatformAdmin ? allSchoolsError : mySchoolsError;
+  const schools = canAccessAllSchools ? adminSchools : mySchools;
+  const isLoading = canAccessAllSchools ? allSchoolsLoading : mySchoolsLoading;
+  const error = canAccessAllSchools ? allSchoolsError : mySchoolsError;
 
   // Check if user has access to only one school (based on base list, not search results)
   // This prevents the component from switching between popover and simple button during search
-  const baseSchools = isPlatformAdmin ? allSchools : mySchools;
+  const baseSchools = canAccessAllSchools ? allSchools : mySchools;
   const hasOnlyOneSchool = baseSchools.length === 1;
 
   // Ensure component is mounted on client side
@@ -301,20 +303,6 @@ export function SchoolSwitcher() {
     mounted,
     isLoading,
   ]);
-
-  // Debug: log whenever the selected school changes
-  useEffect(() => {
-    if (selectedSchool) {
-      console.log("SchoolSwitcher selectedSchool:", {
-        id: (selectedSchool as any).id,
-        name: (selectedSchool as any).name,
-        slug: (selectedSchool as any).slug ?? null,
-      });
-      console.log(selectedSchool);
-    } else {
-      console.log("SchoolSwitcher selectedSchool: null");
-    }
-  }, [selectedSchool]);
 
   // Debounce search input by 300ms and only enable when length >= 2
   useEffect(() => {
@@ -394,10 +382,10 @@ export function SchoolSwitcher() {
   }
 
   // Show no schools state only when not searching
-  const isSearchingAdmin = isPlatformAdmin && debouncedSearch.length > 0;
+  const isSearchingAdmin = canAccessAllSchools && debouncedSearch.length > 0;
   if (!isSearchingAdmin) {
-    const noAdminSchools = isPlatformAdmin && allSchools.length === 0;
-    const noUserSchools = !isPlatformAdmin && mySchools.length === 0;
+    const noAdminSchools = canAccessAllSchools && allSchools.length === 0;
+    const noUserSchools = !canAccessAllSchools && mySchools.length === 0;
     if (noAdminSchools || noUserSchools) {
       return (
         <StateWrapper>
@@ -511,7 +499,7 @@ export function SchoolSwitcher() {
               <Command className="[&_[data-slot=command-input-wrapper]_svg]:hidden">
                 {(() => {
                   const showSpinner =
-                    isPlatformAdmin &&
+                    canAccessAllSchools &&
                     search.trim().length >= 2 &&
                     (search !== debouncedSearch || searching);
                   const hasText = search.length > 0;
@@ -549,7 +537,7 @@ export function SchoolSwitcher() {
                   {(() => {
                     // Check if we're currently searching/loading
                     const isSearching =
-                      isPlatformAdmin &&
+                      canAccessAllSchools &&
                       search.trim().length >= 2 &&
                       (search !== debouncedSearch || searching);
                     return (

@@ -16,7 +16,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { useRouter } from "next/navigation";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { useSchoolStore } from "@/stores/school-store";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import type { vSchoolsReadable } from "@/drizzle/schema";
 
 type School = typeof vSchoolsReadable.$inferSelect;
@@ -27,7 +27,8 @@ export function CommandMenu() {
   const [loadingSchools, setLoadingSchools] = useState<boolean>(false);
   const router = useRouter();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
-  const isPlatformAdmin = useIsPlatformAdmin();
+  const { hasAccess: hasAdminSchools } = useFeatureAccess("admin_schools");
+  const { hasAccess: hasAdminLessons } = useFeatureAccess("admin_lessons");
   const isMac =
     typeof navigator !== "undefined"
       ? navigator.platform.toUpperCase().indexOf("MAC") >= 0
@@ -85,14 +86,14 @@ export function CommandMenu() {
           <CommandGroup heading="Actions">
             <CommandItem
               onSelect={() => {
-                if (currentSchool?.slug && isPlatformAdmin) {
+                if (currentSchool?.slug && hasAdminLessons) {
                   router.push(
                     `/schools/${currentSchool.slug}/lessons?startingYourLesson=true`
                   );
                   setOpen(false);
                 }
               }}
-              disabled={!currentSchool?.slug || !isPlatformAdmin}
+              disabled={!currentSchool?.slug || !hasAdminLessons}
             >
               <div className="flex w-full items-center justify-between gap-2">
                 <span>Start new lesson</span>
@@ -102,7 +103,7 @@ export function CommandMenu() {
                 </Badge>
               </div>
             </CommandItem>
-            {isPlatformAdmin && (
+            {hasAdminSchools && (
               <CommandItem
                 onSelect={() => {
                   router.push("/admin/schools?modal=add-new-school");
