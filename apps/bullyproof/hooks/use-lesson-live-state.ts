@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { SlideData } from "@/components/organisms/slide-renderer";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
@@ -35,7 +35,8 @@ export function useLessonLiveState(
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createBrowserClient();
+  // Use useMemo to ensure stable reference (createBrowserClient is now a singleton)
+  const supabase = useMemo(() => createBrowserClient(), []);
   const apiUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdateRef = useRef<{ slideId: string; index: number } | null>(null);
 

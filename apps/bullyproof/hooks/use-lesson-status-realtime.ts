@@ -1,23 +1,32 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { useMeStore } from "@/entities/me/model/store";
+
+interface LessonStatusRealtimeOptions {
+  onStatusChange?: (newStatus: string, oldStatus: string) => void;
+}
 
 /**
  * Hook to listen for real-time changes to lesson status
  * This will invalidate relevant queries and update the live lesson store
  * when a lesson's status changes (e.g., from 'in_progress' to 'pending_review' or 'completed')
  */
-export function useLessonStatusRealtime(lessonId?: string) {
+export function useLessonStatusRealtime(
+  lessonId?: string,
+  options?: LessonStatusRealtimeOptions
+) {
   const queryClient = useQueryClient();
-  const supabase = createBrowserClient();
+  // Use useMemo to ensure stable reference (createBrowserClient is now a singleton)
+  const supabase = useMemo(() => createBrowserClient(), []);
   const currentUser = useMeStore((s) => s.currentUser);
   const fetchInProgressLesson = useLiveLessonStore(
     (s) => s.fetchInProgressLesson
   );
+  const onStatusChange = options?.onStatusChange;
 
   useEffect(() => {
     if (!lessonId) return;
@@ -41,6 +50,9 @@ export function useLessonStatusRealtime(lessonId?: string) {
             console.log(
               `Lesson ${lessonId} status changed from ${oldLesson.status} to ${updatedLesson.status}`
             );
+
+            // Call the optional callback if provided
+            onStatusChange?.(updatedLesson.status, oldLesson.status);
 
             // Invalidate all lesson-related queries and refetch immediately
             // Use pattern matching to catch all lesson queries
@@ -101,7 +113,7 @@ export function useLessonStatusRealtime(lessonId?: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [lessonId, queryClient, supabase, fetchInProgressLesson, currentUser?.id]);
+  }, [lessonId, queryClient, supabase, fetchInProgressLesson, currentUser?.id, onStatusChange]);
 }
 
 /**
@@ -110,7 +122,8 @@ export function useLessonStatusRealtime(lessonId?: string) {
  */
 export function useUserLessonsStatusRealtime(userId?: string) {
   const queryClient = useQueryClient();
-  const supabase = createBrowserClient();
+  // Use useMemo to ensure stable reference (createBrowserClient is now a singleton)
+  const supabase = useMemo(() => createBrowserClient(), []);
   const fetchInProgressLesson = useLiveLessonStore(
     (s) => s.fetchInProgressLesson
   );
