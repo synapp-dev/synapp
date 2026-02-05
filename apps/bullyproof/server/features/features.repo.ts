@@ -160,7 +160,7 @@ export const featuresRepo = {
         return updated;
       }
       // No row yet: insert global permission
-      const values: Record<string, unknown> = {
+      const values: any = {
         featureId: data.featureId,
         level: "global",
         targetId: null,

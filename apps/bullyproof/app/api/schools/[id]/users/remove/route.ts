@@ -74,7 +74,6 @@ export async function POST(
         "[REMOVE USERS FROM SCHOOL] Step 2: Unauthorized - insufficient permissions:",
         {
           userId,
-          platformRoles: roles.platform,
         }
       );
       return NextResponse.json(

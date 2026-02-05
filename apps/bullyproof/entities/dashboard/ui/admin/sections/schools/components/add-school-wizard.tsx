@@ -191,10 +191,9 @@ export function AddSchoolWizard({
           return;
         }
         const p10Years = yearsResult.data
-          .map((item: { year: { id: string; sortIndex: number } }) => item.year)
-          .filter((y: { sortIndex: number }) => y != null && y.sortIndex >= 0 && y.sortIndex <= 10)
-          .sort((a: { sortIndex: number }, b: { sortIndex: number }) => a.sortIndex - b.sortIndex);
-        yearIds = p10Years.map((y: { id: string }) => y.id);
+          .filter((y) => y.sortIndex >= 0 && y.sortIndex <= 10)
+          .sort((a, b) => a.sortIndex - b.sortIndex);
+        yearIds = p10Years.map((y) => y.id);
         if (yearIds.length === 0) {
           setError("Invalid P-10 year configuration");
           setLoading(false);
