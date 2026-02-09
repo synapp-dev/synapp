@@ -67,7 +67,7 @@ export async function POST(
 
     // Step 2: Check permissions
     console.log("[REMOVE USERS FROM SCHOOL] Step 2: Checking permissions...");
-    const isPlatformAdmin = await checkFeatureAccess(userId, "admin_schools");
+    const isPlatformAdmin = await checkFeatureAccess(userId, "/admin/schools");
 
     if (!isPlatformAdmin) {
       console.error(

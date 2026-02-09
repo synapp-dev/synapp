@@ -168,7 +168,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminContent = await checkFeatureAccess(userId, "admin_content");
+    const hasAdminContent = await checkFeatureAccess(userId, "/admin/content");
     if (!hasAdminContent) {
       return NextResponse.json(
         { error: "Unauthorized to manage topics" },
