@@ -8,39 +8,40 @@ async function seedFeatures() {
   try {
     // Define initial features
     const featuresData = [
-      // System features (maintenance first)
-      { key: 'maintenance', name: 'Maintenance mode', description: 'When enabled, user is redirected to the maintenance page and sees only the maintenance menu', category: 'system' },
-      // Navigation features
-      { key: 'lessons', name: 'Lessons Page', description: 'Access to the lessons page', category: 'navigation' },
-      { key: 'content', name: 'Content Page', description: 'Access to the content page', category: 'navigation' },
-      { key: 'resources', name: 'Resources Page', description: 'Access to the resources page', category: 'navigation' },
-      { key: 'dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'navigation' },
-      { key: 'admin', name: 'Admin Panel', description: 'Access to the admin panel', category: 'navigation' },
-      { key: 'ap_certification', name: 'AP Certification', description: 'Access to AP Certification', category: 'navigation' },
-      { key: 'welcome', name: 'Welcome Page', description: 'Access to the welcome page', category: 'navigation' },
-      { key: 'support', name: 'Support Page', description: 'Access to the support page', category: 'navigation' },
-      { key: 'teachers', name: 'Teachers Page', description: 'Access to the teachers page', category: 'navigation' },
-      { key: 'classes', name: 'Classes Page', description: 'Access to the classes page', category: 'navigation' },
-      { key: 'performance', name: 'Performance Page', description: 'Access to the performance page', category: 'navigation' },
-      { key: 'settings', name: 'Settings Page', description: 'Access to the settings page', category: 'navigation' },
-      { key: 'reports', name: 'Reports Page', description: 'Access to the reports page', category: 'navigation' },
-      { key: 'home', name: 'Home Page', description: 'Access to the home page', category: 'navigation' },
-      
-      // Role-based access features
-      { key: 'admin_access', name: 'Admin Access', description: 'General admin functionality access', category: 'role' },
-      { key: 'teacher_access', name: 'Teacher Access', description: 'General teacher functionality access', category: 'role' },
-      { key: 'school_admin_access', name: 'School Admin Access', description: 'School admin functionality access', category: 'role' },
+      // System features
+      { key: 'system:maintenance', name: 'Maintenance mode', description: 'When enabled, user is redirected to the maintenance page and sees only the maintenance menu', category: 'system', section: 'system' },
+      { key: 'system:admin-access', name: 'Admin Access', description: 'General admin functionality access', category: 'system', section: 'system' },
+      { key: 'system:teacher-access', name: 'Teacher Access', description: 'General teacher functionality access', category: 'system', section: 'system' },
+      { key: 'system:school-admin-access', name: 'School Admin Access', description: 'School admin functionality access', category: 'system', section: 'system' },
 
-      // Admin section features (granular toggles per admin area)
-      { key: 'admin_content', name: 'Admin: Content', description: 'Access to admin content section', category: 'admin_section' },
-      { key: 'admin_schools', name: 'Admin: Schools', description: 'Access to admin schools section', category: 'admin_section' },
-      { key: 'admin_users', name: 'Admin: Users', description: 'Access to admin users section', category: 'admin_section' },
-      { key: 'admin_features', name: 'Admin: Features', description: 'Access to admin features section', category: 'admin_section' },
-      { key: 'admin_classes', name: 'Admin: Classes', description: 'Access to admin classes section', category: 'admin_section' },
-      { key: 'admin_lessons', name: 'Admin: Lessons', description: 'Access to admin lessons section', category: 'admin_section' },
-      { key: 'admin_culture_ratings', name: 'Admin: Culture Ratings', description: 'Access to admin culture ratings section', category: 'admin_section' },
-      { key: 'admin_audit_logs', name: 'Admin: Audit Logs', description: 'Access to admin audit logs section', category: 'admin_section' },
-      { key: 'admin_support_tools', name: 'Admin: Support Tools', description: 'Access to admin support tools section', category: 'admin_section' },
+      // Page features – top-level
+      { key: '/dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'page', section: 'dashboard' },
+      { key: '/welcome', name: 'Welcome Page', description: 'Access to the welcome page', category: 'page', section: 'welcome' },
+      { key: '/support', name: 'Support Page', description: 'Access to the support page', category: 'page', section: 'support' },
+      { key: '/settings', name: 'Settings Page', description: 'Access to the settings page', category: 'page', section: 'dashboard' },
+      { key: '/ap-certification', name: 'AP Certification', description: 'Access to AP Certification', category: 'page', section: 'certification' },
+
+      // Page features – school-scoped
+      { key: '/school/home', name: 'Home Page', description: 'Access to the home page', category: 'page', section: 'schools-home' },
+      { key: '/school/lessons', name: 'Lessons Page', description: 'Access to the lessons page', category: 'page', section: 'schools-lessons' },
+      { key: '/school/content', name: 'Content Page', description: 'Access to the content page', category: 'page', section: 'schools-content' },
+      { key: '/school/resources', name: 'Resources Page', description: 'Access to the resources page', category: 'page', section: 'schools-resources' },
+      { key: '/school/teachers', name: 'Teachers Page', description: 'Access to the teachers page', category: 'page', section: 'schools-teachers' },
+      { key: '/school/classes', name: 'Classes Page', description: 'Access to the classes page', category: 'page', section: 'schools-classes' },
+      { key: '/school/performance', name: 'Performance Page', description: 'Access to the performance page', category: 'page', section: 'schools-performance' },
+      { key: '/school/reports', name: 'Reports Page', description: 'Access to the reports page', category: 'page', section: 'schools-reports' },
+
+      // Page features – admin
+      { key: '/admin', name: 'Admin Panel', description: 'Access to the admin panel', category: 'page', section: 'admin' },
+      { key: '/admin/content', name: 'Admin: Content', description: 'Access to admin content section', category: 'page', section: 'admin' },
+      { key: '/admin/schools', name: 'Admin: Schools', description: 'Access to admin schools section', category: 'page', section: 'admin' },
+      { key: '/admin/users', name: 'Admin: Users', description: 'Access to admin users section', category: 'page', section: 'admin' },
+      { key: '/admin/features', name: 'Admin: Features', description: 'Access to admin features section', category: 'page', section: 'admin' },
+      { key: '/admin/classes', name: 'Admin: Classes', description: 'Access to admin classes section', category: 'page', section: 'admin' },
+      { key: '/admin/lessons', name: 'Admin: Lessons', description: 'Access to admin lessons section', category: 'page', section: 'admin' },
+      { key: '/admin/culture-ratings', name: 'Admin: Culture Ratings', description: 'Access to admin culture ratings section', category: 'page', section: 'admin' },
+      { key: '/admin/audit-logs', name: 'Admin: Audit Logs', description: 'Access to admin audit logs section', category: 'page', section: 'admin' },
+      { key: '/admin/support-tools', name: 'Admin: Support Tools', description: 'Access to admin support tools section', category: 'page', section: 'admin' },
     ];
     
     // Insert features
@@ -95,11 +96,11 @@ async function seedFeatures() {
     // Enable features for roles globally to maintain backward compatibility
     const permissionsToCreate = [];
     
-    // Platform Admin gets admin_access, admin feature, and all admin section features
+    // Platform Admin gets admin-access, admin feature, and all admin page features
     if (platformAdminRole.length > 0) {
-      const adminAccessFeature = insertedFeatures.find(f => f.key === 'admin_access');
-      const adminFeature = insertedFeatures.find(f => f.key === 'admin');
-      const adminSectionFeatures = insertedFeatures.filter(f => f.category === 'admin_section');
+      const adminAccessFeature = insertedFeatures.find(f => f.key === 'system:admin-access');
+      const adminFeature = insertedFeatures.find(f => f.key === '/admin');
+      const adminSectionFeatures = insertedFeatures.filter(f => f.key.startsWith('/admin/'));
 
       if (adminAccessFeature) {
         permissionsToCreate.push({
@@ -129,10 +130,10 @@ async function seedFeatures() {
       }
     }
     
-    // Teacher gets teacher_access and lessons feature
+    // Teacher gets teacher-access and lessons feature
     if (teacherRole.length > 0) {
-      const teacherAccessFeature = insertedFeatures.find(f => f.key === 'teacher_access');
-      const lessonsFeature = insertedFeatures.find(f => f.key === 'lessons');
+      const teacherAccessFeature = insertedFeatures.find(f => f.key === 'system:teacher-access');
+      const lessonsFeature = insertedFeatures.find(f => f.key === '/school/lessons');
       
       if (teacherAccessFeature) {
         permissionsToCreate.push({
@@ -153,9 +154,9 @@ async function seedFeatures() {
       }
     }
     
-    // School Admin gets school_admin_access
+    // School Admin gets school-admin-access
     if (schoolAdminRole.length > 0) {
-      const schoolAdminAccessFeature = insertedFeatures.find(f => f.key === 'school_admin_access');
+      const schoolAdminAccessFeature = insertedFeatures.find(f => f.key === 'system:school-admin-access');
       
       if (schoolAdminAccessFeature) {
         permissionsToCreate.push({
@@ -187,9 +188,8 @@ async function seedFeatures() {
     // Enable all navigation and admin_section features globally by default (for backward compatibility)
     // This can be overridden at role/school/user level
     console.log('🌍 Setting up global permissions (all enabled by default for backward compatibility)...');
-    const navigationFeatures = insertedFeatures.filter(f => f.category === 'navigation');
-    const adminSectionFeatures = insertedFeatures.filter(f => f.category === 'admin_section');
-    const featuresForGlobal = [...navigationFeatures, ...adminSectionFeatures];
+    const pageFeatures = insertedFeatures.filter(f => f.category === 'page');
+    const featuresForGlobal = [...pageFeatures];
 
     let globalPermissionsCreated = 0;
     for (const feature of featuresForGlobal) {
