@@ -2,7 +2,7 @@ import { db } from "@/server/db/drizzle";
 import { features, featurePermissions, roles, userRoles, schools } from "@/server/db/schema";
 import { eq, and, or, isNull, sql, inArray, desc } from "drizzle-orm";
 
-export type FeaturePermissionLevel = "global" | "role" | "school" | "user";
+export type FeaturePermissionLevel = "global" | "role" | "school" | "school_role" | "user";
 
 export const featuresRepo = {
   /**
@@ -30,6 +30,7 @@ export const featuresRepo = {
     name: string;
     description?: string;
     category?: string;
+    section?: string;
   }) =>
     db
       .insert(features)
@@ -45,6 +46,7 @@ export const featuresRepo = {
       name?: string;
       description?: string;
       category?: string;
+      section?: string;
     }
   ) =>
     db
@@ -70,14 +72,19 @@ export const featuresRepo = {
 
   /**
    * Get all permissions at a level in one query (for admin bulk load).
-   * level=global → all global permissions; level=role/school/user + targetId → all for that target.
+   * level=global -> all global permissions; level=role/school/user + targetId -> all for that target.
+   * level=school_role -> requires both targetId (roleId) and schoolId.
    */
   getAllPermissionsByLevel: (
     level: FeaturePermissionLevel,
-    targetId?: string
+    targetId?: string,
+    schoolId?: string
   ) => {
     const conditions = [eq(featurePermissions.level, level)];
-    if (targetId) {
+    if (level === "school_role") {
+      if (targetId) conditions.push(eq(featurePermissions.targetId, targetId));
+      if (schoolId) conditions.push(eq(featurePermissions.schoolId, schoolId));
+    } else if (targetId) {
       conditions.push(eq(featurePermissions.targetId, targetId));
     } else if (level === "global") {
       conditions.push(isNull(featurePermissions.targetId));
@@ -95,20 +102,21 @@ export const featuresRepo = {
   getPermissionsByLevel: (
     featureId: string,
     level: FeaturePermissionLevel,
-    targetId?: string
+    targetId?: string,
+    schoolId?: string
   ) => {
     const conditions = [
       eq(featurePermissions.featureId, featureId),
       eq(featurePermissions.level, level),
     ];
 
-    if (targetId) {
+    if (level === "school_role") {
+      if (targetId) conditions.push(eq(featurePermissions.targetId, targetId));
+      if (schoolId) conditions.push(eq(featurePermissions.schoolId, schoolId));
+    } else if (targetId) {
       conditions.push(eq(featurePermissions.targetId, targetId));
     } else if (level === "global") {
       conditions.push(isNull(featurePermissions.targetId));
-    } else {
-      // For non-global levels, targetId should be provided
-      // If not provided, we'll return all permissions at that level
     }
 
     return db
@@ -120,13 +128,14 @@ export const featuresRepo = {
 
   /**
    * Set a permission for a feature at a specific level.
-   * For global level we update-then-insert because UNIQUE(feature_id, level, target_id)
+   * For global level we update-then-insert because UNIQUE(feature_id, level, target_id, school_id)
    * does not match when target_id is NULL (PostgreSQL treats NULLs as distinct in unique).
    */
   setPermission: async (data: {
     featureId: string;
     level: FeaturePermissionLevel;
     targetId?: string;
+    schoolId?: string;
     enabled: boolean;
     visible?: boolean | null;
     createdBy?: string;
@@ -164,6 +173,7 @@ export const featuresRepo = {
         featureId: data.featureId,
         level: "global",
         targetId: null,
+        schoolId: null,
         enabled: data.enabled,
         updatedAt,
       };
@@ -172,7 +182,45 @@ export const featuresRepo = {
       return db.insert(featurePermissions).values(values).returning();
     }
 
-    // Non-global: targetId required; upsert matches on (featureId, level, targetId)
+    // school_role: requires targetId (roleId) and schoolId
+    if (data.level === "school_role") {
+      if (!data.targetId || !data.schoolId) {
+        throw new Error("targetId (roleId) and schoolId are required for school_role level permissions");
+      }
+      const values: any = {
+        featureId: data.featureId,
+        level: data.level,
+        targetId: data.targetId,
+        schoolId: data.schoolId,
+        enabled: data.enabled,
+        updatedAt,
+      };
+      if (data.visible !== undefined) values.visible = data.visible;
+      if (data.createdBy) values.createdBy = data.createdBy;
+      const setClause: Record<string, any> = {
+        enabled: sql`excluded.enabled`,
+        updatedAt: sql`excluded.updated_at`,
+        createdBy: sql`excluded.created_by`,
+      };
+      if (data.visible !== undefined) {
+        setClause.visible = sql`excluded.visible`;
+      }
+      return db
+        .insert(featurePermissions)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [
+            featurePermissions.featureId,
+            featurePermissions.level,
+            featurePermissions.targetId,
+            featurePermissions.schoolId,
+          ],
+          set: setClause,
+        })
+        .returning();
+    }
+
+    // Non-global, non-school_role: targetId required; upsert matches on (featureId, level, targetId, schoolId)
     if (!data.targetId) {
       throw new Error(`targetId is required for ${data.level} level permissions`);
     }
@@ -180,6 +228,7 @@ export const featuresRepo = {
       featureId: data.featureId,
       level: data.level,
       targetId: data.targetId,
+      schoolId: null,
       enabled: data.enabled,
       updatedAt,
     };
@@ -201,6 +250,7 @@ export const featuresRepo = {
           featurePermissions.featureId,
           featurePermissions.level,
           featurePermissions.targetId,
+          featurePermissions.schoolId,
         ],
         set: setClause,
       })
@@ -213,14 +263,18 @@ export const featuresRepo = {
   removePermission: (
     featureId: string,
     level: FeaturePermissionLevel,
-    targetId?: string
+    targetId?: string,
+    schoolId?: string
   ) => {
     const conditions = [
       eq(featurePermissions.featureId, featureId),
       eq(featurePermissions.level, level),
     ];
 
-    if (targetId) {
+    if (level === "school_role" && schoolId) {
+      conditions.push(eq(featurePermissions.schoolId, schoolId));
+      if (targetId) conditions.push(eq(featurePermissions.targetId, targetId));
+    } else if (targetId) {
       conditions.push(eq(featurePermissions.targetId, targetId));
     } else {
       conditions.push(isNull(featurePermissions.targetId));
@@ -231,7 +285,7 @@ export const featuresRepo = {
 
   /**
    * Get all permissions for a user (across all features)
-   * This includes user-level, school-level, role-level, and global permissions
+   * This includes user-level, school_role-level, school-level, role-level, and global permissions
    */
   getUserPermissions: async (userId: string, schoolId?: string) => {
     // Get user's roles
@@ -260,6 +314,16 @@ export const featuresRepo = {
         eq(featurePermissions.level, "user"),
         eq(featurePermissions.targetId, userId)
       ),
+      // School Role permissions (for user's roles at specific schools)
+      ...(roleIds.length > 0 && relevantSchoolIds.length > 0
+        ? [
+            and(
+              eq(featurePermissions.level, "school_role"),
+              inArray(featurePermissions.targetId, roleIds),
+              inArray(featurePermissions.schoolId, relevantSchoolIds)
+            ),
+          ]
+        : []),
       // School-level permissions (for user's schools)
       ...(relevantSchoolIds.length > 0
         ? [
@@ -269,7 +333,7 @@ export const featuresRepo = {
             ),
           ]
         : []),
-      // Role-level permissions (for user's roles)
+      // Role-level permissions (for user's roles - platform roles)
       ...(roleIds.length > 0
         ? [
             and(
@@ -297,7 +361,7 @@ export const featuresRepo = {
 
   /**
    * Get permissions for a specific feature and user
-   * Returns permissions at all relevant levels (user, school, role, global)
+   * Returns permissions at all relevant levels (user, school_role, school, role, global)
    */
   getFeaturePermissionsForUser: async (
     featureKey: string,
@@ -339,6 +403,16 @@ export const featuresRepo = {
           eq(featurePermissions.level, "user"),
           eq(featurePermissions.targetId, userId)
         ),
+        // School Role (role within a specific school)
+        ...(roleIds.length > 0 && relevantSchoolIds.length > 0
+          ? [
+              and(
+                eq(featurePermissions.level, "school_role"),
+                inArray(featurePermissions.targetId, roleIds),
+                inArray(featurePermissions.schoolId, relevantSchoolIds)
+              ),
+            ]
+          : []),
         // School-level
         ...(relevantSchoolIds.length > 0
           ? [
@@ -348,7 +422,7 @@ export const featuresRepo = {
               ),
             ]
           : []),
-        // Role-level
+        // Role-level (platform roles)
         ...(roleIds.length > 0
           ? [
               and(
@@ -370,12 +444,13 @@ export const featuresRepo = {
       .from(featurePermissions)
       .where(and(...conditions))
       .orderBy(
-        // Order by priority: user > school > role > global
+        // Order by priority: user > school_role > school > role > global
         sql`CASE 
           WHEN level = 'user' THEN 1
-          WHEN level = 'school' THEN 2
-          WHEN level = 'role' THEN 3
-          WHEN level = 'global' THEN 4
+          WHEN level = 'school_role' THEN 2
+          WHEN level = 'school' THEN 3
+          WHEN level = 'role' THEN 4
+          WHEN level = 'global' THEN 5
         END`
       );
   },

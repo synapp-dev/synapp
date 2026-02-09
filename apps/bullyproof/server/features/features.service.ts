@@ -1,8 +1,9 @@
 import { featuresRepo } from "./features.repo";
+import type { FeaturePermissionLevel } from "./features.repo";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { MAINTENANCE_FEATURE_KEY, MAINTENANCE_BYPASS_ROLE_KEY } from "@/lib/feature-keys";
 
-// Auth context for feature management; authorization is from feature_permissions (admin_features)
+// Auth context for feature management; authorization is from feature_permissions (/admin/features)
 type AuthContext = {
   userId: string | null;
   roles?: string[];
@@ -10,7 +11,7 @@ type AuthContext = {
 
 /**
  * Check if a user has access to a feature using hierarchical resolution.
- * Priority: User > School > Role > Global (most specific wins)
+ * Priority: User > School Role > School > Role > Global (most specific wins)
  * 
  * Default behavior: Features are disabled by default (allow-list)
  * Returns true only if explicitly enabled at any level
@@ -32,12 +33,15 @@ export async function checkFeatureAccess(
     return false;
   }
 
-  // Permissions are already ordered by priority (user > school > role > global)
-  // The first permission found determines access (most specific wins)
-  // If any permission at a higher level exists, it overrides lower levels
+  // Permissions are already ordered by priority (user > school_role > school > role > global)
   const userLevel = permissions.find((p) => p.level === "user");
   if (userLevel) {
     return userLevel.enabled;
+  }
+
+  const schoolRoleLevel = permissions.find((p) => p.level === "school_role");
+  if (schoolRoleLevel) {
+    return schoolRoleLevel.enabled;
   }
 
   const schoolLevel = permissions.find((p) => p.level === "school");
@@ -100,32 +104,35 @@ export async function getUserFeaturePermissions(
  */
 export async function getFeaturePermissions(
   featureId: string,
-  level?: "global" | "role" | "school" | "user",
-  targetId?: string
+  level?: FeaturePermissionLevel,
+  targetId?: string,
+  schoolId?: string
 ) {
   if (level) {
-    return featuresRepo.getPermissionsByLevel(featureId, level, targetId);
+    return featuresRepo.getPermissionsByLevel(featureId, level, targetId, schoolId);
   }
   return featuresRepo.getFeaturePermissions(featureId);
 }
 
 /**
  * Get all permissions at a level in one query (bulk for admin).
- * level=global → all global; level=role/school/user requires targetId.
+ * level=global -> all global; level=role/school/user requires targetId.
+ * level=school_role requires targetId (roleId) and schoolId.
  */
 export async function getAllPermissionsByLevel(
-  level: "global" | "role" | "school" | "user",
-  targetId?: string
+  level: FeaturePermissionLevel,
+  targetId?: string,
+  schoolId?: string
 ) {
-  return featuresRepo.getAllPermissionsByLevel(level, targetId);
+  return featuresRepo.getAllPermissionsByLevel(level, targetId, schoolId);
 }
 
 /** Feature key that grants access to the admin Features section (list/set permissions, etc.) */
-const ADMIN_FEATURES_KEY = "admin_features";
+const ADMIN_FEATURES_KEY = "/admin/features";
 
 /**
  * Assert that user can manage features.
- * Uses feature_permissions only: user must have admin_features enabled (user > school > role > global).
+ * Uses feature_permissions only: user must have /admin/features enabled (user > school > role > global).
  */
 async function assertCanManageFeatures(ctx: AuthContext) {
   if (!ctx.userId) {
@@ -175,6 +182,7 @@ export const featuresService = {
       name: string;
       description?: string;
       category?: string;
+      section?: string;
     }
   ) {
     await assertCanManageFeatures(ctx);
@@ -199,6 +207,7 @@ export const featuresService = {
       name?: string;
       description?: string;
       category?: string;
+      section?: string;
     }
   ) {
     await assertCanManageFeatures(ctx);
@@ -220,11 +229,12 @@ export const featuresService = {
   async getFeaturePermissions(
     ctx: AuthContext,
     featureId: string,
-    level?: "global" | "role" | "school" | "user",
-    targetId?: string
+    level?: FeaturePermissionLevel,
+    targetId?: string,
+    schoolId?: string
   ) {
     await assertCanManageFeatures(ctx);
-    return getFeaturePermissions(featureId, level, targetId);
+    return getFeaturePermissions(featureId, level, targetId, schoolId);
   },
 
   /**
@@ -232,11 +242,12 @@ export const featuresService = {
    */
   async getAllPermissionsByLevel(
     ctx: AuthContext,
-    level: "global" | "role" | "school" | "user",
-    targetId?: string
+    level: FeaturePermissionLevel,
+    targetId?: string,
+    schoolId?: string
   ) {
     await assertCanManageFeatures(ctx);
-    return getAllPermissionsByLevel(level, targetId);
+    return getAllPermissionsByLevel(level, targetId, schoolId);
   },
 
   /**
@@ -246,8 +257,9 @@ export const featuresService = {
     ctx: AuthContext,
     data: {
       featureId: string;
-      level: "global" | "role" | "school" | "user";
+      level: FeaturePermissionLevel;
       targetId?: string;
+      schoolId?: string;
       enabled: boolean;
       visible?: boolean | null;
     }
@@ -294,11 +306,12 @@ export const featuresService = {
   async removeFeaturePermission(
     ctx: AuthContext,
     featureId: string,
-    level: "global" | "role" | "school" | "user",
-    targetId?: string
+    level: FeaturePermissionLevel,
+    targetId?: string,
+    schoolId?: string
   ) {
     await assertCanManageFeatures(ctx);
-    await featuresRepo.removePermission(featureId, level, targetId);
+    await featuresRepo.removePermission(featureId, level, targetId, schoolId);
   },
 
   /**
