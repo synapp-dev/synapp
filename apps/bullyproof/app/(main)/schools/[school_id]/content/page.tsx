@@ -18,7 +18,7 @@ export default function ContentPage({
   if (!schoolId) {
     return (
       <>
-        <FeatureGuard feature="content" />
+        <FeatureGuard feature="/school/content" />
         {null}
       </>
     );
@@ -26,7 +26,7 @@ export default function ContentPage({
 
   return (
     <>
-      <FeatureGuard feature="content" schoolId={schoolId} />
+      <FeatureGuard feature="/school/content" schoolId={schoolId} />
       <ContentSectionReadonly schoolId={schoolId} />
     </>
   );

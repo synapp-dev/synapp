@@ -17,7 +17,7 @@ export function TeachersPageWrapper({
 
   return (
     <>
-      <FeatureGuard feature="teachers" schoolId={schoolId} />
+      <FeatureGuard feature="/school/teachers" schoolId={schoolId} />
       <TeachersPageClient />
     </>
   );

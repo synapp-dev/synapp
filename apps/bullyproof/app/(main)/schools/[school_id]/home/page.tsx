@@ -254,7 +254,7 @@ export default function HomePage({
   if (loading) {
     return (
       <>
-        <FeatureGuard feature="home" schoolId={schoolId} />
+        <FeatureGuard feature="/school/home" schoolId={schoolId} />
         <div className="space-y-8">
         {/* Hero Section Skeleton */}
         <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-8 border border-border">
@@ -320,7 +320,7 @@ export default function HomePage({
 
   return (
     <>
-      <FeatureGuard feature="home" schoolId={schoolId} />
+      <FeatureGuard feature="/school/home" schoolId={schoolId} />
       <div className="space-y-8">
         {/* Hero Section */}
         {currentSchool && (

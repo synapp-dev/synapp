@@ -82,7 +82,7 @@ export default function WelcomePage() {
 
   return (
     <>
-      <FeatureGuard feature="welcome" />
+      <FeatureGuard feature="/welcome" />
       <div className="min-h-fit bg-background flex items-start justify-center">
       <div className="container max-w-5xl mx-auto px-4">
         {/* Intro Step */}

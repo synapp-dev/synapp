@@ -26,7 +26,7 @@ export default function DashboardPage() {
   // Fallback for users without specific roles
   return (
     <>
-      <FeatureGuard feature="dashboard" />
+      <FeatureGuard feature="/dashboard" />
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">
           No dashboard available for your role.

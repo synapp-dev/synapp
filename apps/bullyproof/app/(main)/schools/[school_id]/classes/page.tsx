@@ -243,7 +243,7 @@ export default function ClassesPage({
   if (!currentSchool) {
     return (
       <>
-        <FeatureGuard feature="classes" schoolId={schoolId} />
+        <FeatureGuard feature="/school/classes" schoolId={schoolId} />
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold">School not found</h1>
@@ -258,7 +258,7 @@ export default function ClassesPage({
 
   return (
     <>
-      <FeatureGuard feature="classes" schoolId={schoolId} />
+      <FeatureGuard feature="/school/classes" schoolId={schoolId} />
       <div className="space-y-6">
       {/* Header */}
       {/* <div className="flex items-center gap-2">
