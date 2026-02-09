@@ -96,3 +96,8 @@ export const useIsSchoolStaff = () => {
   return hasSchoolStaffRole;
 };
 
+export const useIsIntradarkDev = () => {
+  const currentUser = useMeStore((s) => s.currentUser);
+  return currentUser?.platformRoles?.includes("INTRADARK_DEV") ?? false;
+};
+

@@ -23,6 +23,7 @@ import { NextResponse } from "next/server";
 import { meService } from "@/server/me/me.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { checkFeatureAccess } from "@/server/features/features.service";
+import { createServerAdminClient } from "@/utils/supabase/admin";
 import { db } from "@/server/db/drizzle";
 import { userProfile } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -222,6 +223,30 @@ export async function PATCH(
         ...currentMetadata,
         updateLogs,
       };
+    }
+
+    // If email changed, update it in auth.users via Supabase admin API
+    // This ensures the auth identity stays in sync with user_profiles
+    if (data.email !== undefined && data.email !== existingUser[0].email) {
+      const adminClient = await createServerAdminClient();
+      const { error: authUpdateError } =
+        await adminClient.auth.admin.updateUserById(targetUserId, {
+          email: data.email,
+          email_confirm: true, // Skip confirmation email since admin is making the change
+        });
+
+      if (authUpdateError) {
+        console.error("[USER UPDATE] Failed to update auth email:", {
+          targetUserId,
+          error: authUpdateError.message,
+        });
+        return NextResponse.json(
+          { error: `Failed to update auth email: ${authUpdateError.message}` },
+          { status: 500 }
+        );
+      }
+
+      console.log("[USER UPDATE] Auth email updated successfully for:", targetUserId);
     }
 
     // Update user profile using Drizzle (bypasses RLS) and return updated data
