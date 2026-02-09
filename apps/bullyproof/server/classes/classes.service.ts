@@ -20,10 +20,10 @@ type AuthContext = {
 
 async function assertCanManageClasses(ctx: AuthContext, schoolId?: string) {
   if (!ctx.userId) throw new Error("Unauthorized");
-  const hasAdminClasses = await checkFeatureAccess(ctx.userId, "admin_classes");
+  const hasAdminClasses = await checkFeatureAccess(ctx.userId, "/admin/classes");
   if (hasAdminClasses) return;
   if (schoolId) {
-    const hasClasses = await checkFeatureAccess(ctx.userId, "classes", schoolId);
+    const hasClasses = await checkFeatureAccess(ctx.userId, "/school/classes", schoolId);
     const roles = await getUserScopedRoles(ctx.userId);
     if (hasClasses && roles.school.some((r) => r.schoolId === schoolId)) return;
   }
@@ -32,10 +32,10 @@ async function assertCanManageClasses(ctx: AuthContext, schoolId?: string) {
 
 async function assertCanViewClasses(ctx: AuthContext, schoolId?: string) {
   if (!ctx.userId) throw new Error("Unauthorized");
-  const hasAdminClasses = await checkFeatureAccess(ctx.userId, "admin_classes");
+  const hasAdminClasses = await checkFeatureAccess(ctx.userId, "/admin/classes");
   if (hasAdminClasses) return;
   if (schoolId) {
-    const hasClasses = await checkFeatureAccess(ctx.userId, "classes", schoolId);
+    const hasClasses = await checkFeatureAccess(ctx.userId, "/school/classes", schoolId);
     const roles = await getUserScopedRoles(ctx.userId);
     if (hasClasses && roles.school.some((r) => r.schoolId === schoolId)) return;
   }

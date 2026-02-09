@@ -37,7 +37,7 @@ async function assertCanViewCurriculum(ctx: AuthContext) {
 }
 
 async function assertCanManageCurriculum(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_content");
+  await assertFeature(ctx, "/admin/content");
 }
 
 export const curriculumService = {

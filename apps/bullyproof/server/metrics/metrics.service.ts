@@ -62,7 +62,7 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_schools");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "/admin/schools");
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
@@ -165,7 +165,7 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_schools");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "/admin/schools");
     const { previousMonthEnd } = getDateRanges();
 
     let currentWhereConditions = [eq(roles.key, "TEACHER")];
@@ -227,7 +227,7 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_lessons");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "/admin/lessons");
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
@@ -293,7 +293,7 @@ export const metricsService = {
       throw new Error("Unauthorized");
     }
 
-    const hasScopeAll = await checkFeatureAccess(ctx.userId, "admin_lessons");
+    const hasScopeAll = await checkFeatureAccess(ctx.userId, "/admin/lessons");
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 

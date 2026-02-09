@@ -23,7 +23,7 @@ type AuthContext = {
 
 async function assertCanManageInvites(ctx: AuthContext, schoolId?: string) {
   if (!ctx.userId) throw new Error("Unauthorized");
-  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "/admin/schools");
   if (hasAdminSchools) return;
   if (schoolId) {
     const roles = await getUserScopedRoles(ctx.userId);
@@ -39,7 +39,7 @@ async function assertCanManageInvites(ctx: AuthContext, schoolId?: string) {
 
 async function assertCanViewInvites(ctx: AuthContext, schoolId?: string) {
   if (!ctx.userId) throw new Error("Unauthorized");
-  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "/admin/schools");
   if (hasAdminSchools) return;
   if (schoolId) {
     const roles = await getUserScopedRoles(ctx.userId);

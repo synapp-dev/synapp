@@ -25,7 +25,7 @@ async function assertCanAccessUserProfile(
     throw new Error("Unauthorized");
   }
   if (ctx.userId === targetUserId) return;
-  await assertFeature(ctx, "admin_users");
+  await assertFeature(ctx, "/admin/users");
 }
 
 export const meService = {
@@ -39,7 +39,7 @@ export const meService = {
 
   async getUserByEmail(ctx: AuthContext, params: unknown) {
     const { email } = getUserByEmailSchema.parse(params);
-    await assertFeature(ctx, "admin_users");
+    await assertFeature(ctx, "/admin/users");
     const rows = await meRepo.getProfileByUserEmail(email);
     return rows[0] ?? null;
   },
@@ -79,13 +79,14 @@ export const meService = {
         
         const userRoleIds = userRolesData.map((ur) => ur.roleId);
 
-        // Build a map: featureKey -> { global?, schools, roles, user? } with { enabled, visible } per level
+        // Build a map: featureKey -> { global?, schools, roles, schoolRoles, user? } with { enabled, visible } per level
         const featurePermissionsMap: Record<
           string,
           {
             global?: { enabled: boolean; visible: boolean | null };
             schools: Record<string, { enabled: boolean; visible: boolean | null }>;
             roles: Record<string, { enabled: boolean; visible: boolean | null }>;
+            schoolRoles: Record<string, Record<string, { enabled: boolean; visible: boolean | null }>>;
             user?: { enabled: boolean; visible: boolean | null };
           }
         > = {};
@@ -96,6 +97,7 @@ export const meService = {
             featurePermissionsMap[featureKey] = {
               schools: {},
               roles: {},
+              schoolRoles: {},
             };
           }
 
@@ -108,6 +110,12 @@ export const meService = {
             featurePermissionsMap[featureKey].global = levelValue;
           } else if (level === "school" && p.permission.targetId) {
             featurePermissionsMap[featureKey].schools[p.permission.targetId] = levelValue;
+          } else if (level === "school_role" && p.permission.targetId && (p.permission as any).schoolId) {
+            const schoolId = (p.permission as any).schoolId as string;
+            if (!featurePermissionsMap[featureKey].schoolRoles[schoolId]) {
+              featurePermissionsMap[featureKey].schoolRoles[schoolId] = {};
+            }
+            featurePermissionsMap[featureKey].schoolRoles[schoolId][p.permission.targetId] = levelValue;
           } else if (level === "role" && p.permission.targetId) {
             featurePermissionsMap[featureKey].roles[p.permission.targetId] = levelValue;
           } else if (level === "user") {
@@ -125,12 +133,12 @@ export const meService = {
         };
 
         // Debug logging for lessons
-        if (featurePermissionsMap["lessons"]) {
-          console.log("[lessons] User feature permissions loaded:", {
+        if (featurePermissionsMap["/school/lessons"]) {
+          console.log("[/school/lessons] User feature permissions loaded:", {
             userId: ctx.userId,
             schoolIds: userSchoolIds,
             roleIds: userRoleIds,
-            lessonsPermission: featurePermissionsMap["lessons"],
+            lessonsPermission: featurePermissionsMap["/school/lessons"],
           });
         }
 
@@ -166,7 +174,7 @@ export const meService = {
     const { id, limit } = getSchoolsByUserIdSchema.parse(params);
 
     if (ctx.userId !== id) {
-      await assertFeature(ctx, "admin_users");
+      await assertFeature(ctx, "/admin/users");
     }
 
     return await meRepo.getAssignedSchoolsByUserId(id, limit);

@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { roles, userRoles, userProfile, schools } from "@/server/db/schema";
+import { roles, userRoles, userProfile, schools, scopes } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc, isNull } from "drizzle-orm";
 
 export const rolesRepo = {
@@ -8,12 +8,24 @@ export const rolesRepo = {
   getById: (id: string) =>
     db.select().from(roles).where(eq(roles.id, id)).limit(1),
 
-  getByScope: (scope: string) =>
-    db
+  getByScope: async (scope: string) => {
+    // Look up the scope UUID by name first, since scopeId is a UUID FK to the scopes table
+    const scopeRecord = await db
+      .select({ id: scopes.id })
+      .from(scopes)
+      .where(eq(scopes.name, scope))
+      .limit(1);
+
+    if (scopeRecord.length === 0) {
+      return [];
+    }
+
+    return db
       .select()
       .from(roles)
-      .where(eq(roles.scopeId, scope))
-      .orderBy(asc(roles.name)),
+      .where(eq(roles.scopeId, scopeRecord[0].id))
+      .orderBy(asc(roles.name));
+  },
 
   getByKey: (key: string) =>
     db

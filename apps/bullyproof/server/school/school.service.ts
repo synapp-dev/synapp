@@ -28,7 +28,7 @@ async function assertCanListSchools(ctx: AuthContext) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
-  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "/admin/schools");
   if (hasAdminSchools) return;
   const roles = await getUserScopedRoles(ctx.userId);
   if (roles.school.length > 0) return;
@@ -43,7 +43,7 @@ async function assertCanListSchools(ctx: AuthContext) {
 async function getUserAccessibleSchoolIds(
   userId: string
 ): Promise<string[] | undefined> {
-  const hasAdminSchools = await checkFeatureAccess(userId, "admin_schools");
+  const hasAdminSchools = await checkFeatureAccess(userId, "/admin/schools");
   if (hasAdminSchools) return undefined;
 
   const roles = await getUserScopedRoles(userId);
@@ -64,22 +64,22 @@ async function getUserAccessibleSchoolIds(
 }
 
 async function assertCanCreateSchool(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_schools");
+  await assertFeature(ctx, "/admin/schools");
 }
 
 async function assertCanUpdateSchool(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_schools");
+  await assertFeature(ctx, "/admin/schools");
 }
 
 async function assertCanDeleteSchool(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_schools");
+  await assertFeature(ctx, "/admin/schools");
 }
 
 async function assertCanViewSchool(ctx: AuthContext, schoolId: string) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
-  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "admin_schools");
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "/admin/schools");
   if (hasAdminSchools) return;
   const roles = await getUserScopedRoles(ctx.userId);
   if (roles.school.some((role) => role.schoolId === schoolId)) return;

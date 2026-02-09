@@ -32,11 +32,11 @@ async function assertCanManageLessons(
   schoolId?: string
 ) {
   if (!ctx.userId) throw new Error("Unauthorized");
-  const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+  const hasAdminLessons = await checkFeatureAccess(ctx.userId, "/admin/lessons");
   if (hasAdminLessons) return;
   if (teacherId && ctx.userId === teacherId) return;
   if (schoolId) {
-    const hasLessons = await checkFeatureAccess(ctx.userId, "lessons", schoolId);
+    const hasLessons = await checkFeatureAccess(ctx.userId, "/school/lessons", schoolId);
     const roles = await getUserScopedRoles(ctx.userId);
     if (
       hasLessons &&
@@ -55,11 +55,11 @@ async function assertCanViewLessons(
   schoolId?: string
 ) {
   if (!ctx.userId) throw new Error("Unauthorized");
-  const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+  const hasAdminLessons = await checkFeatureAccess(ctx.userId, "/admin/lessons");
   if (hasAdminLessons) return;
   if (teacherId && ctx.userId === teacherId) return;
   if (schoolId) {
-    const hasLessons = await checkFeatureAccess(ctx.userId, "lessons", schoolId);
+    const hasLessons = await checkFeatureAccess(ctx.userId, "/school/lessons", schoolId);
     const roles = await getUserScopedRoles(ctx.userId);
     if (
       hasLessons &&
@@ -94,7 +94,7 @@ export const lessonsService = {
     }
 
     if (ctx.userId) {
-      const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+      const hasAdminLessons = await checkFeatureAccess(ctx.userId, "/admin/lessons");
       if (hasAdminLessons) {
         return await lessonsRepo.getAll(params.status);
       }
@@ -241,11 +241,11 @@ export const lessonsService = {
       }
 
       const schoolIds = [...new Set(classData.map((c) => c.schoolId))];
-      const hasAdminLessons = await checkFeatureAccess(ctx.userId, "admin_lessons");
+      const hasAdminLessons = await checkFeatureAccess(ctx.userId, "/admin/lessons");
       if (!hasAdminLessons) {
         const roles = await getUserScopedRoles(ctx.userId);
         for (const schoolId of schoolIds) {
-          const hasLessons = await checkFeatureAccess(ctx.userId, "lessons", schoolId);
+          const hasLessons = await checkFeatureAccess(ctx.userId, "/school/lessons", schoolId);
           const hasMembership = roles.school.some((r) => r.schoolId === schoolId);
           if (!hasLessons || !hasMembership) {
             throw new Error("Unauthorized to access one or more classes");

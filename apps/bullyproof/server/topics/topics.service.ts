@@ -31,7 +31,7 @@ type AuthContext = {
 };
 
 async function assertCanManageTopics(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_content");
+  await assertFeature(ctx, "/admin/content");
 }
 
 async function assertCanViewTopics(ctx: AuthContext) {

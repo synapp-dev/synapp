@@ -30,7 +30,7 @@ async function assertCanListAllUsers(ctx: AuthContext, schoolId?: string) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }
-  const hasAdminUsers = await checkFeatureAccess(ctx.userId, "admin_users");
+  const hasAdminUsers = await checkFeatureAccess(ctx.userId, "/admin/users");
   if (hasAdminUsers) return;
   if (schoolId) {
     const roles = await getUserScopedRoles(ctx.userId);
@@ -40,7 +40,7 @@ async function assertCanListAllUsers(ctx: AuthContext, schoolId?: string) {
 }
 
 async function assertCanCreateUsers(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_users");
+  await assertFeature(ctx, "/admin/users");
 }
 
 /**

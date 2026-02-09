@@ -35,7 +35,7 @@ async function assertCanViewCertificationTopics(ctx: AuthContext) {
 }
 
 async function assertCanManageCertificationTopics(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_content");
+  await assertFeature(ctx, "/admin/content");
 }
 
 export const courseTopicsService = {

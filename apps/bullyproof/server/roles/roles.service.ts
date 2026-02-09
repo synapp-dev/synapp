@@ -28,7 +28,7 @@ type AuthContext = {
 };
 
 async function assertCanManageRoles(ctx: AuthContext) {
-  await assertFeature(ctx, "admin_features");
+  await assertFeature(ctx, "/admin/features");
 }
 
 async function assertCanViewRoles(ctx: AuthContext) {
@@ -37,7 +37,7 @@ async function assertCanViewRoles(ctx: AuthContext) {
   }
 
   // Anyone with admin_features (from feature_permissions) can view roles, e.g. for the Features admin Role tab
-  const hasAdminFeatures = await checkFeatureAccess(ctx.userId, "admin_features");
+  const hasAdminFeatures = await checkFeatureAccess(ctx.userId, "/admin/features");
   if (hasAdminFeatures) {
     return;
   }
