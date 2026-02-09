@@ -27,8 +27,8 @@ export function CommandMenu() {
   const [loadingSchools, setLoadingSchools] = useState<boolean>(false);
   const router = useRouter();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
-  const { hasAccess: hasAdminSchools } = useFeatureAccess("admin_schools");
-  const { hasAccess: hasAdminLessons } = useFeatureAccess("admin_lessons");
+  const { hasAccess: hasAdminSchools } = useFeatureAccess("/admin/schools");
+  const { hasAccess: hasAdminLessons } = useFeatureAccess("/admin/lessons");
   const isMac =
     typeof navigator !== "undefined"
       ? navigator.platform.toUpperCase().indexOf("MAC") >= 0

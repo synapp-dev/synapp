@@ -52,36 +52,35 @@ const data = {
       url: "/admin",
       icon: ShieldCheck,
       isActive: false,
-      feature: "admin", // Feature key for access control
+      feature: "/admin", // Feature key for access control
     },
     {
       title: "AP Certification",
       url: "/courses/amayda-program",
       icon: BadgeCheck,
       isActive: false,
-      feature: "ap_certification", // Feature key for access control
+      feature: "/ap-certification", // Feature key for access control
     },
     {
       title: "Welcome",
       url: "/welcome",
       icon: Apple,
       isActive: false,
-      feature: "welcome", // Feature key for access control
+      feature: "/welcome", // Feature key for access control
     },
     {
       title: "Dashboard",
       url: "/dashboard",
       icon: LayoutDashboard,
       isActive: false,
-      feature: "dashboard", // Feature key for access control
+      feature: "/dashboard", // Feature key for access control
     },
     {
       title: "Support",
       url: "/support",
       icon: HelpingHand,
       isActive: false,
-      disabled: true,
-      feature: "support", // Feature key for access control
+      feature: "/support", // Feature key for access control
     },
   ],
   navSchoolMain: [
@@ -90,37 +89,35 @@ const data = {
       url: "/home",
       icon: House,
       isActive: false,
-      feature: "home", // Feature key for access control
+      feature: "/school/home", // Feature key for access control
     },
     {
       title: "Teachers",
       url: "/teachers",
       icon: Users,
       isActive: false,
-      feature: "teachers", // Feature key for access control
+      feature: "/school/teachers", // Feature key for access control
     },
     {
       title: "Classes",
       url: "/classes",
       icon: GraduationCap,
       isActive: false,
-      feature: "classes", // Feature key for access control
+      feature: "/school/classes", // Feature key for access control
     },
     {
       title: "Performance",
       url: "/performance",
       icon: TrendingUp,
       isActive: false,
-      disabled: true,
-      feature: "performance", // Feature key for access control
+      feature: "/school/performance", // Feature key for access control
     },
     {
       title: "Settings",
       url: "/settings",
       icon: Settings,
       isActive: false,
-      disabled: true,
-      feature: "settings", // Feature key for access control
+      feature: "/settings", // Feature key for access control
     },
   ],
   navCurriculum: [
@@ -129,21 +126,21 @@ const data = {
       url: "/lessons",
       icon: Presentation,
       isActive: false,
-      feature: "lessons", // Feature key for access control
+      feature: "/school/lessons", // Feature key for access control
     },
     {
       title: "Content",
       url: "/content",
       icon: BookOpenText,
       isActive: false,
-      feature: "content", // Feature key for access control
+      feature: "/school/content", // Feature key for access control
     },
     {
       title: "Resources",
       url: "/resources",
       icon: LibraryBig,
       isActive: false,
-      feature: "resources", // Feature key for access control
+      feature: "/school/resources", // Feature key for access control
     },
   ],
   navData: [
@@ -152,8 +149,7 @@ const data = {
       url: "/reports",
       icon: FileText,
       isActive: false,
-      disabled: true,
-      feature: "reports", // Feature key for access control
+      feature: "/school/reports", // Feature key for access control
     },
   ],
 };

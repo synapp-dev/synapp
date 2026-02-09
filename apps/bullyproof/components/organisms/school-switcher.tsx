@@ -193,7 +193,7 @@ export function SchoolSwitcher() {
   }, [selectedSchool, clearCurrentSchool, clearLastAccessedSchool, router]);
 
   // Users with admin_schools can load and search all schools; others see only their schools
-  const { hasAccess: canAccessAllSchools } = useFeatureAccess("admin_schools");
+  const { hasAccess: canAccessAllSchools } = useFeatureAccess("/admin/schools");
 
   // Fetch schools using TanStack Query based on feature access
   const {

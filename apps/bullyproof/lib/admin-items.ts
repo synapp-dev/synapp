@@ -35,7 +35,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: BookOpenText,
     iconName: "BookOpenText",
     description: "Manage curriculum content and resources",
-    featureKey: "admin_content",
+    featureKey: "/admin/content",
     enabled: true,
   },
   {
@@ -44,7 +44,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: School,
     iconName: "School",
     description: "View and manage school accounts",
-    featureKey: "admin_schools",
+    featureKey: "/admin/schools",
     enabled: true,
   },
   {
@@ -53,7 +53,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: Users,
     iconName: "Users",
     description: "Manage user accounts and permissions",
-    featureKey: "admin_users",
+    featureKey: "/admin/users",
     enabled: true,
   },
   {
@@ -62,7 +62,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: Component,
     iconName: "Component",
     description: "Manage feature access control and permissions",
-    featureKey: "admin_features",
+    featureKey: "/admin/features",
     enabled: true,
   },
   {
@@ -71,7 +71,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: GraduationCap,
     iconName: "GraduationCap",
     description: "View and manage class rosters",
-    featureKey: "admin_classes",
+    featureKey: "/admin/classes",
     enabled: false,
   },
   {
@@ -80,7 +80,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: Presentation,
     iconName: "Presentation",
     description: "Monitor and manage lesson delivery",
-    featureKey: "admin_lessons",
+    featureKey: "/admin/lessons",
     enabled: false,
   },
   {
@@ -89,7 +89,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: BarChart3,
     iconName: "BarChart3",
     description: "View culture rating analytics and reports",
-    featureKey: "admin_culture_ratings",
+    featureKey: "/admin/culture-ratings",
     enabled: true,
     disabled: true,
   },
@@ -99,7 +99,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: FileText,
     iconName: "FileText",
     description: "Review system activity and changes",
-    featureKey: "admin_audit_logs",
+    featureKey: "/admin/audit-logs",
     enabled: true,
     disabled: true,
   },
@@ -109,7 +109,7 @@ export const adminItemsConfig: AdminItem[] = [
     icon: HelpCircle,
     iconName: "HelpCircle",
     description: "Access support and troubleshooting tools",
-    featureKey: "admin_support_tools",
+    featureKey: "/admin/support-tools",
     enabled: true,
     disabled: true,
   },
@@ -120,15 +120,15 @@ export const adminItemsConfig: AdminItem[] = [
  * Used by AdminRouteGuard to protect sub-routes.
  */
 export const adminSegmentToFeatureKey: Record<string, string> = {
-  content: "admin_content",
-  schools: "admin_schools",
-  users: "admin_users",
-  features: "admin_features",
-  classes: "admin_classes",
-  lessons: "admin_lessons",
-  "culture-ratings": "admin_culture_ratings",
-  "audit-logs": "admin_audit_logs",
-  "support-tools": "admin_support_tools",
+  content: "/admin/content",
+  schools: "/admin/schools",
+  users: "/admin/users",
+  features: "/admin/features",
+  classes: "/admin/classes",
+  lessons: "/admin/lessons",
+  "culture-ratings": "/admin/culture-ratings",
+  "audit-logs": "/admin/audit-logs",
+  "support-tools": "/admin/support-tools",
 };
 
 /**
