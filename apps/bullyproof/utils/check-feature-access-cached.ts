@@ -2,7 +2,7 @@ import type { FeaturePermissions } from "@/entities/me/model/store";
 
 /**
  * Resolved access and visibility for a feature.
- * Same hierarchical resolution: User > School > Role > Global.
+ * Hierarchical resolution: User > School Role > School > Platform Role > Global.
  * visible: when DB visible is null, resolved visible = enabled (backward compat).
  */
 export function checkFeatureAccessAndVisibleCached(
@@ -29,7 +29,32 @@ export function checkFeatureAccessAndVisibleCached(
     };
   }
 
-  // Priority 2: School-level
+  // Priority 2: School Role (role-specific within a school)
+  if (schoolId && userRoleIds && userRoleIds.length > 0 && permissions.schoolRoles) {
+    const schoolRolePerms = permissions.schoolRoles[schoolId];
+    if (schoolRolePerms) {
+      const enabledRoleId = userRoleIds.find(
+        (roleId) => schoolRolePerms[roleId]?.enabled === true
+      );
+      if (enabledRoleId !== undefined) {
+        const level = schoolRolePerms[enabledRoleId];
+        return {
+          hasAccess: true,
+          visible: visibleAt(level) ?? true,
+        };
+      }
+      const anyRoleId = userRoleIds.find((roleId) => schoolRolePerms[roleId] !== undefined);
+      if (anyRoleId !== undefined) {
+        const level = schoolRolePerms[anyRoleId];
+        return {
+          hasAccess: false,
+          visible: visibleAt(level) ?? false,
+        };
+      }
+    }
+  }
+
+  // Priority 3: School-level
   if (schoolId && permissions.schools[schoolId] !== undefined) {
     const level = permissions.schools[schoolId];
     return {
@@ -38,7 +63,7 @@ export function checkFeatureAccessAndVisibleCached(
     };
   }
 
-  // Priority 3: Role-level
+  // Priority 4: Platform Role-level
   if (userRoleIds && userRoleIds.length > 0) {
     const enabledRoleId = userRoleIds.find(
       (roleId) => permissions.roles[roleId]?.enabled === true
@@ -60,7 +85,7 @@ export function checkFeatureAccessAndVisibleCached(
     }
   }
 
-  // Priority 4: Global-level
+  // Priority 5: Global-level
   if (permissions.global !== undefined) {
     return {
       hasAccess: permissions.global.enabled,
@@ -74,10 +99,10 @@ export function checkFeatureAccessAndVisibleCached(
 /**
  * Check if a user has access to a feature using cached permissions.
  * Implements the same hierarchical resolution as the server:
- * Priority: User > School > Role > Global (most specific wins)
+ * Priority: User > School Role > School > Platform Role > Global (most specific wins)
  *
  * @param featurePermissions - The cached feature permissions map from the user store
- * @param featureKey - The feature key to check (e.g., "lessons", "content", "admin")
+ * @param featureKey - The feature key to check (e.g., "/school/lessons", "/school/content", "/admin")
  * @param schoolId - Optional school ID for school-specific feature checks
  * @param userRoleIds - Optional array of role IDs the user has (for role-level checks)
  * @returns boolean indicating if the user has access

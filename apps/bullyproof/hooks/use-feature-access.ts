@@ -8,7 +8,7 @@ import { checkFeatureAccessAndVisibleCached } from "@/utils/check-feature-access
 /**
  * Hook to check if the current user has access to a feature and whether it is visible in nav.
  *
- * @param featureKey - The feature key to check (e.g., "lessons", "content", "admin")
+ * @param featureKey - The feature key to check (e.g., "/school/lessons", "/admin/content", "/admin")
  * @param schoolId - Optional school ID for school-specific feature checks
  * @returns Object with hasAccess, visible, isLoading, and error states
  */
@@ -29,9 +29,9 @@ export function useFeatureAccess(
     if (!currentUser || !featureKey) {
       return { hasAccess: false, visible: false };
     }
-    // Admin panel and admin section features are platform-level; never use school context
+    // Platform-level features (/admin*, system:*) never use school context
     const effectiveSchoolId =
-      featureKey === "admin" || featureKey.startsWith("admin_")
+      featureKey.startsWith("/admin") || featureKey.startsWith("system:")
         ? undefined
         : schoolId;
     return checkFeatureAccessAndVisibleCached(
