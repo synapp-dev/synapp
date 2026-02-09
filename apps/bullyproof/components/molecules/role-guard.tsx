@@ -70,12 +70,12 @@ export interface RoleGuardProps {
  * </RoleGuard>
  * 
  * // Check feature access
- * <RoleGuard feature="lessons" schoolId={currentSchoolId}>
+ * <RoleGuard feature="/school/lessons" schoolId={currentSchoolId}>
  *   <LessonsPage />
  * </RoleGuard>
  * 
  * // Both role and feature must pass
- * <RoleGuard roles={["TEACHER"]} feature="lessons" schoolId={currentSchoolId}>
+ * <RoleGuard roles={["TEACHER"]} feature="/school/lessons" schoolId={currentSchoolId}>
  *   <EditButton />
  * </RoleGuard>
  * 

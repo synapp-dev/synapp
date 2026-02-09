@@ -1,61 +1,114 @@
 "use client";
 
+import * as React from "react";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { useSchoolStore } from "@/stores/school-store";
+import { cn } from "@workspace/ui/lib/utils";
 
 /**
  * FeatureGuard component
  *
  * Client-side guard that checks if the user has access to a feature.
- * This component no longer redirects - it simply performs the access check
- * and allows users with access to view the page.
+ *
+ * When used **without children** (legacy mode), it simply performs the access check
+ * and returns null. Existing call-sites that render `<FeatureGuard feature="x" />`
+ * as a standalone element continue to work as before.
+ *
+ * When used **with children** (new mode), it controls visibility and interactivity:
+ * - `enabled` + `visible` -> renders children normally (full access)
+ * - `visible` but not `enabled` -> renders children disabled (pointer-events-none, reduced opacity)
+ * - not `visible` -> hides children entirely (renders fallback or nothing)
  *
  * @example
  * ```tsx
- * // Platform-level feature
- * <FeatureGuard feature="admin" />
+ * // Legacy: standalone access check (returns null)
+ * <FeatureGuard feature="/admin" />
  *
- * // School-scoped feature
- * <FeatureGuard feature="lessons" schoolId={schoolId} />
+ * // New: wrap a page
+ * <FeatureGuard feature="/dashboard" schoolId={schoolId}>
+ *   <DashboardContent />
+ * </FeatureGuard>
+ *
+ * // New: wrap a button (disabled when no access)
+ * <FeatureGuard feature="/admin/users.edit-button">
+ *   <Button onClick={handleEdit}>Edit User</Button>
+ * </FeatureGuard>
+ *
+ * // New: with fallback
+ * <FeatureGuard feature="/school/reports" fallback={<UpgradeBanner />}>
+ *   <ReportsPanel />
+ * </FeatureGuard>
  * ```
  */
 export function FeatureGuard({
   feature,
   schoolId,
+  children,
+  fallback,
+  className,
 }: {
+  /** Feature key, e.g. "/admin", "/dashboard", "/admin/users.edit-button" */
   feature: string;
+  /** Optional school context for school-scoped features */
   schoolId?: string;
+  /** Content to wrap and guard. If omitted, component returns null (legacy mode). */
+  children?: React.ReactNode;
+  /** Content shown when feature is not visible (only used when children are provided). */
+  fallback?: React.ReactNode;
+  /** Additional className for the disabled wrapper (only in wrapping mode). */
+  className?: string;
 }) {
   const { isLoading: isLoadingUser } = useCurrentUser();
   const currentSchool = useSchoolStore((s) => s.currentSchool);
 
-  // Determine effective schoolId: platform-level features (admin panel and admin_* sections)
-  // must not use school context; for others use prop > store
+  // Platform-level features (/admin*, system:*) must not use school context
   const effectiveSchoolId =
-    feature === "admin" || feature.startsWith("admin_")
+    feature.startsWith("/admin") || feature.startsWith("system:")
       ? undefined
       : schoolId || currentSchool?.id;
 
-  // Check feature access (no redirect, just validates access)
-  const { hasAccess, isLoading: isLoadingFeature } = useFeatureAccess(
+  const { hasAccess, visible, isLoading: isLoadingFeature } = useFeatureAccess(
     feature,
     effectiveSchoolId
   );
 
-  // Debug logging for lessons
-  if (feature === "lessons") {
-    console.log("[lessons] FeatureGuard:", {
-      feature,
-      schoolIdProp: schoolId,
-      currentSchoolId: currentSchool?.id,
-      effectiveSchoolId,
-      hasAccess,
-      isLoadingFeature,
-      isLoadingUser,
-    });
+  // ------------------------------------------------------------------
+  // Legacy mode: no children -> just perform the check, return nothing
+  // ------------------------------------------------------------------
+  if (children === undefined) {
+    return null;
   }
 
-  // No redirect - users with access can view the page
-  return null;
+  // ------------------------------------------------------------------
+  // Wrapping mode: control children visibility / interactivity
+  // ------------------------------------------------------------------
+
+  // While loading, render nothing to prevent content flash
+  if (isLoadingUser || isLoadingFeature) {
+    return null;
+  }
+
+  // Not visible at all -> hide completely (show fallback if provided)
+  if (!visible) {
+    return <>{fallback ?? null}</>;
+  }
+
+  // Visible but not enabled -> render disabled
+  if (!hasAccess) {
+    return (
+      <div
+        className={cn(
+          "pointer-events-none opacity-50 cursor-not-allowed select-none",
+          className
+        )}
+        aria-disabled="true"
+      >
+        {children}
+      </div>
+    );
+  }
+
+  // Full access -> render normally
+  return <>{children}</>;
 }
