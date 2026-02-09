@@ -9,13 +9,14 @@ export type FeaturePermissionLevel = {
   visible: boolean | null;
 };
 
-// Feature permissions structure: featureKey -> { global?, schools, roles, user? } with enabled + visible per level
+// Feature permissions structure: featureKey -> { global?, schools, roles, schoolRoles, user? } with enabled + visible per level
 export type FeaturePermissions = Record<
   string,
   {
     global?: FeaturePermissionLevel;
     schools: Record<string, FeaturePermissionLevel>;
-    roles: Record<string, FeaturePermissionLevel>;
+    roles: Record<string, FeaturePermissionLevel>; // platform roles
+    schoolRoles: Record<string, Record<string, FeaturePermissionLevel>>; // schoolId -> roleId -> permission
     user?: FeaturePermissionLevel;
   }
 >;
