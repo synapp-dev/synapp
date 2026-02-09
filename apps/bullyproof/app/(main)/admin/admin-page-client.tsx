@@ -32,7 +32,7 @@ export function AdminPageClient() {
 
   return (
     <>
-      <FeatureGuard feature="admin" />
+      <FeatureGuard feature="/admin" />
       <div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {itemsWithAccess.map((item) => (

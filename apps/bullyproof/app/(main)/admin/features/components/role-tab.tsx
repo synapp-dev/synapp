@@ -100,9 +100,9 @@ export function RoleTab({
   const pending = isMutationPending || isRemovePending;
 
   const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
-    queryKey: ["roles"],
+    queryKey: ["roles", "platform"],
     queryFn: async () => {
-      const result = await rolesApi.get.list();
+      const result = await rolesApi.get.list({ scope: "platform" });
       if (result.error) throw new Error(result.error.message);
       return result.data ?? [];
     },

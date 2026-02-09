@@ -21,6 +21,7 @@ export type Feature = {
   name: string;
   description: string | null;
   category: string | null;
+  section: string | null;
   createdAt: string;
   updatedAt: string;
 };

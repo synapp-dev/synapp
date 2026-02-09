@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiFetch } from "@/lib/api/fetcher.client";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import {
@@ -15,51 +15,53 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
-import { Badge } from "@workspace/ui/components/badge";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
-import { Plus, Loader2, AlertCircle, Globe, Users, School, User } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  AlertCircle,
+  ChevronRight,
+} from "lucide-react";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
-import { toast } from "sonner";
-import { featurePermissionsKeys } from "@/entities/feature-permissions/model/keys";
-import { useFeaturePermissionsStore } from "@/entities/feature-permissions/model/store";
-import { MAINTENANCE_FEATURE_KEY } from "@/lib/feature-keys";
-import { GlobalTab, type Feature } from "./components/global-tab";
-import { RoleTab } from "./components/role-tab";
-import { SchoolTab } from "./components/school-tab";
-import { UserTab } from "./components/user-tab";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import { Badge } from "@workspace/ui/components/badge";
+import {
+  FEATURE_SECTIONS,
+  SECTION_GROUPS,
+  getSectionsByGroup,
+} from "@/lib/feature-sections";
+import { FEATURE_CATEGORIES } from "@/lib/feature-keys";
+import type { Feature } from "./components/global-tab";
 
-type FeaturePermission = {
-  id: string;
-  featureId: string;
-  level: "global" | "role" | "school" | "user";
-  targetId: string | null;
-  enabled: boolean;
-  visible?: boolean | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-function AdminFeaturesPageContent() {
+function AdminFeaturesDashboardContent() {
   usePageTitle(["admin", "features"]);
-  const queryClient = useQueryClient();
+  const router = useRouter();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newFeature, setNewFeature] = useState({
     key: "",
     name: "",
     description: "",
-    category: "",
+    category: "page",
+    section: "",
   });
 
   const {
     data: features = [],
     isLoading: isLoadingFeatures,
     error: featuresError,
+    refetch,
   } = useQuery<Feature[]>({
     queryKey: ["features"],
     queryFn: async () => {
@@ -71,233 +73,59 @@ function AdminFeaturesPageContent() {
     },
   });
 
-  // Sort so maintenance feature always appears at the top in all tabs
-  const sortedFeatures = useMemo(
-    () =>
-      [...features].sort((a, b) =>
-        a.key === MAINTENANCE_FEATURE_KEY
-          ? -1
-          : b.key === MAINTENANCE_FEATURE_KEY
-            ? 1
-            : (a.name || a.key).localeCompare(b.name || b.key)
-      ),
-    [features]
-  );
+  const [isCreating, setIsCreating] = useState(false);
 
-  const createFeatureMutation = useMutation({
-    mutationFn: async (data: {
-      key: string;
-      name: string;
-      description?: string;
-      category?: string;
-    }) => {
+  const handleCreateFeature = async () => {
+    if (!newFeature.key || !newFeature.name || !newFeature.section) return;
+    setIsCreating(true);
+    try {
       const result = await apiFetch<Feature>("/features", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          key: newFeature.key,
+          name: newFeature.name,
+          description: newFeature.description || undefined,
+          category: newFeature.category || undefined,
+          section: newFeature.section,
+        }),
       });
-      if (result.error) {
+      if (result.error)
         throw new Error(result.error.message || "Failed to create feature");
-      }
-      return result.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["features"] });
       setIsCreateDialogOpen(false);
-      setNewFeature({ key: "", name: "", description: "", category: "" });
-    },
-  });
-
-  const setPermissionMutation = useMutation({
-    mutationFn: async (data: {
-      featureId: string;
-      level: "global" | "role" | "school" | "user";
-      targetId?: string;
-      enabled: boolean;
-      visible?: boolean | null;
-    }) => {
-      const body: Record<string, unknown> = {
-        featureId: data.featureId,
-        level: data.level,
-        enabled: data.enabled,
-      };
-      if (data.targetId) body.targetId = data.targetId;
-      if (data.visible !== undefined) body.visible = data.visible;
-
-      const result = await apiFetch<FeaturePermission>(
-        `/features/${data.featureId}/permissions`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }
-      );
-      if (result.error) {
-        throw new Error(result.error.message || "Failed to set permission");
-      }
-      return result.data;
-    },
-    onMutate: (variables) => {
-      const store = useFeaturePermissionsStore.getState();
-      const { featureId, level, targetId, enabled, visible } = variables;
-      const patch = {
-        enabled,
-        visible: visible !== undefined ? visible : enabled,
-      };
-      let previous: { enabled: boolean; visible: boolean | null } | null = null;
-      let wasNew = false;
-
-      if (level === "global") {
-        const list = store.globalPermissions;
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateGlobalPermission(featureId, patch);
-        } else {
-          wasNew = true;
-          store.setGlobalPermissionOptimistic(featureId, patch);
-        }
-      } else if (level === "role" && targetId) {
-        const list = store.rolePermissions[targetId] ?? [];
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateRolePermission(targetId, featureId, patch);
-        } else {
-          wasNew = true;
-          store.setRolePermissionOptimistic(targetId, featureId, patch);
-        }
-      } else if (level === "school" && targetId) {
-        const list = store.schoolPermissions[targetId] ?? [];
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateSchoolPermission(targetId, featureId, patch);
-        } else {
-          wasNew = true;
-          store.setSchoolPermissionOptimistic(targetId, featureId, patch);
-        }
-      } else if (level === "user" && targetId) {
-        const list = store.userPermissions[targetId] ?? [];
-        const userRow = list.find(
-          (r) => r.feature.id === featureId && r.permission.level === "user"
-        );
-        if (userRow) {
-          previous = {
-            enabled: userRow.permission.enabled,
-            visible: userRow.permission.visible ?? null,
-          };
-          store.updateUserPermission(targetId, featureId, patch);
-        } else {
-          store.updateUserPermission(targetId, featureId, patch);
-        }
-      }
-
-      return {
-        previous,
-        wasNew,
-        level,
-        featureId,
-        targetId,
-      };
-    },
-    onError: (err, variables, context) => {
-      if (!context) return;
-      const store = useFeaturePermissionsStore.getState();
-      const { previous, wasNew, level, featureId, targetId } = context;
-      if (level === "global") {
-        if (wasNew) store.removeGlobalPermissionOptimistic(featureId);
-        else if (previous)
-          store.updateGlobalPermission(featureId, previous);
-      } else if (level === "role" && targetId) {
-        if (wasNew) store.removeRolePermissionOptimistic(targetId, featureId);
-        else if (previous)
-          store.updateRolePermission(targetId, featureId, previous);
-      } else if (level === "school" && targetId) {
-        if (wasNew) store.removeSchoolPermissionOptimistic(targetId, featureId);
-        else if (previous)
-          store.updateSchoolPermission(targetId, featureId, previous);
-      } else if (level === "user" && targetId && previous) {
-        store.updateUserPermission(targetId, featureId, previous);
-      }
-      toast.error(
-        err instanceof Error ? err.message : "Failed to update permission"
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: featurePermissionsKeys.all });
-    },
-  });
-
-  const removePermissionMutation = useMutation({
-    mutationFn: async (data: {
-      featureId: string;
-      level: "role" | "school" | "user";
-      targetId: string;
-    }) => {
-      const params = new URLSearchParams({ level: data.level });
-      params.set("targetId", data.targetId);
-      const result = await apiFetch(
-        `/features/${data.featureId}/permissions?${params.toString()}`,
-        { method: "DELETE" }
-      );
-      if (result.error) {
-        throw new Error(result.error.message || "Failed to remove permission");
-      }
-    },
-    onMutate: (variables) => {
-      const store = useFeaturePermissionsStore.getState();
-      const { featureId, level, targetId } = variables;
-      if (level === "role" && targetId) {
-        store.removeRolePermissionOptimistic(targetId, featureId);
-      } else if (level === "school" && targetId) {
-        store.removeSchoolPermissionOptimistic(targetId, featureId);
-      } else if (level === "user" && targetId) {
-        const list = store.userPermissions[targetId] ?? [];
-        const next = list.filter(
-          (r) => !(r.feature.id === featureId && r.permission.level === "user")
-        );
-        store.setUserPermissions(targetId, next);
-      }
-    },
-    onError: (err) => {
-      queryClient.invalidateQueries({ queryKey: featurePermissionsKeys.all });
-      toast.error(
-        err instanceof Error ? err.message : "Failed to remove permission"
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: featurePermissionsKeys.all });
-    },
-  });
-
-  const handleCreateFeature = () => {
-    if (!newFeature.key || !newFeature.name) return;
-    createFeatureMutation.mutate({
-      key: newFeature.key,
-      name: newFeature.name,
-      description: newFeature.description || undefined,
-      category: newFeature.category || undefined,
-    });
+      setNewFeature({
+        key: "",
+        name: "",
+        description: "",
+        category: "page",
+        section: "",
+      });
+      refetch();
+    } catch {
+      // error handled by toast in the future
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleSetPermission = (data: {
-    featureId: string;
-    level: "global" | "role" | "school" | "user";
-    targetId?: string;
-    enabled: boolean;
-    visible?: boolean | null;
-  }) => {
-    setPermissionMutation.mutate(data);
-  };
+  // Count features per section
+  const sectionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const sec of FEATURE_SECTIONS) {
+      counts[sec.key] = 0;
+    }
+    counts["uncategorized"] = 0;
 
-  const handleRemovePermission = (data: {
-    featureId: string;
-    level: "role" | "school" | "user";
-    targetId: string;
-  }) => {
-    removePermissionMutation.mutate(data);
-  };
+    for (const feature of features) {
+      const sec = feature.section || "uncategorized";
+      if (counts[sec] !== undefined) {
+        counts[sec]++;
+      } else {
+        counts["uncategorized"]++;
+      }
+    }
+    return counts;
+  }, [features]);
 
   if (featuresError) {
     return (
@@ -317,11 +145,13 @@ function AdminFeaturesPageContent() {
 
   return (
     <div className="flex flex-col h-full p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Feature Access Control</h1>
           <p className="text-muted-foreground">
-            Manage feature permissions at global, role, school, and user levels
+            Manage feature permissions across the platform. Select a section to
+            configure features and permissions.
           </p>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -330,98 +160,155 @@ function AdminFeaturesPageContent() {
         </Button>
       </div>
 
-      <Tabs defaultValue="global" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-4">
-          <TabsTrigger value="global" className="flex items-center gap-2">
-            <Globe className="h-4 w-4" />
-            Global
-          </TabsTrigger>
-          <TabsTrigger value="role" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Role
-          </TabsTrigger>
-          <TabsTrigger value="school" className="flex items-center gap-2">
-            <School className="h-4 w-4" />
-            School
-          </TabsTrigger>
-          <TabsTrigger value="user" className="flex items-center gap-2">
-            <User className="h-4 w-4" />
-            User
-          </TabsTrigger>
-        </TabsList>
+      {/* Summary stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Total Features</p>
+          <div className="text-2xl font-bold">
+            {isLoadingFeatures ? (
+              <Skeleton className="h-8 w-12 inline-block" />
+            ) : (
+              features.length
+            )}
+          </div>
+        </div>
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Sections</p>
+          <div className="text-2xl font-bold">{FEATURE_SECTIONS.length}</div>
+        </div>
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">Admin Features</p>
+          <div className="text-2xl font-bold">
+            {isLoadingFeatures ? (
+              <Skeleton className="h-8 w-12 inline-block" />
+            ) : (
+              sectionCounts["admin"] ?? 0
+            )}
+          </div>
+        </div>
+        <div className="border rounded-lg p-4">
+          <p className="text-sm text-muted-foreground">School Features</p>
+          <div className="text-2xl font-bold">
+            {isLoadingFeatures ? (
+              <Skeleton className="h-8 w-12 inline-block" />
+            ) : (
+              Object.entries(sectionCounts)
+                .filter(([key]) => key.startsWith("schools-"))
+                .reduce((sum, [, count]) => sum + count, 0)
+            )}
+          </div>
+        </div>
+      </div>
 
-        <TabsContent value="global" className="mt-6">
-          <GlobalTab
-            features={sortedFeatures}
-            isLoadingFeatures={isLoadingFeatures}
-            onSetPermission={(data) =>
-              handleSetPermission({
-                ...data,
-                level: "global",
-              })
-            }
-            isMutationPending={setPermissionMutation.isPending}
-          />
-        </TabsContent>
+      {/* Section cards grouped by category */}
+      {SECTION_GROUPS.map((group) => {
+        const groupSections = getSectionsByGroup(group.key);
 
-        <TabsContent value="role" className="mt-6">
-          <RoleTab
-            features={sortedFeatures}
-            onSetPermission={(data) =>
-              handleSetPermission({
-                ...data,
-                level: "role",
-                targetId: data.targetId,
-              })
-            }
-            onRemovePermission={handleRemovePermission}
-            isMutationPending={setPermissionMutation.isPending}
-            isRemovePending={removePermissionMutation.isPending}
-          />
-        </TabsContent>
+        return (
+          <div key={group.key} className="space-y-3">
+            <div>
+              <h2 className="text-lg font-semibold">{group.label}</h2>
+              <p className="text-sm text-muted-foreground">
+                {group.description}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {groupSections.map((section) => {
+                const Icon = section.icon;
+                const count = sectionCounts[section.key] ?? 0;
 
-        <TabsContent value="school" className="mt-6">
-          <SchoolTab
-            features={sortedFeatures}
-            onSetPermission={(data) =>
-              handleSetPermission({
-                ...data,
-                level: "school",
-                targetId: data.targetId,
-              })
-            }
-            onRemovePermission={handleRemovePermission}
-            isMutationPending={setPermissionMutation.isPending}
-            isRemovePending={removePermissionMutation.isPending}
-          />
-        </TabsContent>
+                return (
+                  <button
+                    key={section.key}
+                    onClick={() =>
+                      router.push(`/admin/features/${section.key}`)
+                    }
+                    className="group border rounded-lg p-5 text-left hover:border-primary/50 hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold">{section.label}</h3>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                            {section.description}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <Badge variant="secondary">
+                          {isLoadingFeatures ? "..." : count}
+                        </Badge>
+                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
-        <TabsContent value="user" className="mt-6">
-          <UserTab
-            features={sortedFeatures}
-            onSetPermission={(data) =>
-              handleSetPermission({
-                ...data,
-                level: "user",
-                targetId: data.targetId,
-              })
-            }
-            onRemovePermission={handleRemovePermission}
-            isMutationPending={setPermissionMutation.isPending}
-            isRemovePending={removePermissionMutation.isPending}
-          />
-        </TabsContent>
-      </Tabs>
-
+      {/* Create Feature Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Feature</DialogTitle>
             <DialogDescription>
-              Add a new feature that can be controlled via permissions
+              Add a new feature that can be controlled via permissions.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="section">Section</Label>
+              <Select
+                value={newFeature.section}
+                onValueChange={(v) =>
+                  setNewFeature({ ...newFeature, section: v })
+                }
+              >
+                <SelectTrigger id="section">
+                  <SelectValue placeholder="Select site section" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECTION_GROUPS.map((group) => (
+                    <React.Fragment key={group.key}>
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        {group.label}
+                      </div>
+                      {getSectionsByGroup(group.key).map((sec) => (
+                        <SelectItem key={sec.key} value={sec.key}>
+                          {sec.label}
+                        </SelectItem>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="category">Type</Label>
+              <Select
+                value={newFeature.category}
+                onValueChange={(v) =>
+                  setNewFeature({ ...newFeature, category: v })
+                }
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FEATURE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label htmlFor="key">Key (machine-readable)</Label>
               <Input
@@ -430,7 +317,7 @@ function AdminFeaturesPageContent() {
                 onChange={(e) =>
                   setNewFeature({ ...newFeature, key: e.target.value })
                 }
-                placeholder="e.g., lessons, content, admin"
+                placeholder="e.g., /admin/users, school:create-lesson"
                 className="font-mono"
               />
             </div>
@@ -442,18 +329,7 @@ function AdminFeaturesPageContent() {
                 onChange={(e) =>
                   setNewFeature({ ...newFeature, name: e.target.value })
                 }
-                placeholder="e.g., Lessons Page"
-              />
-            </div>
-            <div>
-              <Label htmlFor="category">Category (optional)</Label>
-              <Input
-                id="category"
-                value={newFeature.category}
-                onChange={(e) =>
-                  setNewFeature({ ...newFeature, category: e.target.value })
-                }
-                placeholder="e.g., navigation, admin"
+                placeholder="e.g., Edit User Details"
               />
             </div>
             <div>
@@ -481,10 +357,11 @@ function AdminFeaturesPageContent() {
               disabled={
                 !newFeature.key ||
                 !newFeature.name ||
-                createFeatureMutation.isPending
+                !newFeature.section ||
+                isCreating
               }
             >
-              {createFeatureMutation.isPending && (
+              {isCreating && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               )}
               Create
@@ -506,7 +383,7 @@ export default function AdminFeaturesPage() {
         </div>
       }
     >
-      <AdminFeaturesPageContent />
+      <AdminFeaturesDashboardContent />
     </React.Suspense>
   );
 }
