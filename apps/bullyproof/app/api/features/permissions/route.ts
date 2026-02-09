@@ -4,6 +4,7 @@
  * GET /api/features/permissions?level=global
  * GET /api/features/permissions?level=role&targetId=...
  * GET /api/features/permissions?level=school&targetId=...
+ * GET /api/features/permissions?level=school_role&targetId=...&schoolId=...
  * GET /api/features/permissions?level=user&targetId=...
  *
  * Returns all permissions at the given level in one response (no per-feature calls).
@@ -24,17 +25,25 @@ export async function GET(request: Request) {
       | "global"
       | "role"
       | "school"
+      | "school_role"
       | "user"
       | null;
     const targetId = searchParams.get("targetId") || undefined;
+    const schoolId = searchParams.get("schoolId") || undefined;
 
     if (!level) {
       return NextResponse.json(
-        { error: "level is required (global, role, school, user)" },
+        { error: "level is required (global, role, school, school_role, user)" },
         { status: 400 }
       );
     }
-    if (level !== "global" && !targetId) {
+    if (level === "school_role" && !schoolId) {
+      return NextResponse.json(
+        { error: "schoolId is required for school_role level" },
+        { status: 400 }
+      );
+    }
+    if (level !== "global" && level !== "school_role" && !targetId) {
       return NextResponse.json(
         { error: "targetId is required for role, school, and user levels" },
         { status: 400 }
@@ -44,7 +53,8 @@ export async function GET(request: Request) {
     const permissions = await featuresService.getAllPermissionsByLevel(
       { userId },
       level,
-      targetId
+      targetId,
+      schoolId
     );
     return NextResponse.json(permissions, { status: 200 });
   } catch (e: unknown) {

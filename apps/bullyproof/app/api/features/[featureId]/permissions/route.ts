@@ -48,15 +48,18 @@ export async function GET(
       | "global"
       | "role"
       | "school"
+      | "school_role"
       | "user"
       | null;
     const targetId = searchParams.get("targetId") || undefined;
+    const schoolId = searchParams.get("schoolId") || undefined;
 
     const permissions = await featuresService.getFeaturePermissions(
       { userId },
       featureId,
       level || undefined,
-      targetId
+      targetId,
+      schoolId
     );
 
     return NextResponse.json(permissions, { status: 200 });
@@ -92,7 +95,7 @@ export async function POST(
 
     const { featureId } = await params;
     const body = await request.json();
-    const { level, targetId, enabled, visible } = body;
+    const { level, targetId, schoolId, enabled, visible } = body;
 
     if (!level || typeof enabled !== "boolean") {
       return NextResponse.json(
@@ -107,6 +110,7 @@ export async function POST(
         featureId,
         level,
         targetId,
+        schoolId,
         enabled,
         ...(visible !== undefined && { visible: visible === null ? null : !!visible }),
       }
@@ -149,9 +153,11 @@ export async function DELETE(
       | "global"
       | "role"
       | "school"
+      | "school_role"
       | "user"
       | null;
     const targetId = searchParams.get("targetId") || undefined;
+    const schoolId = searchParams.get("schoolId") || undefined;
 
     if (!level) {
       return NextResponse.json(
@@ -164,7 +170,8 @@ export async function DELETE(
       { userId },
       featureId,
       level,
-      targetId
+      targetId,
+      schoolId
     );
 
     return NextResponse.json({ success: true }, { status: 200 });

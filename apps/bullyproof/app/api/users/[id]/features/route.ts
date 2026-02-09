@@ -49,7 +49,7 @@ export async function GET(
     const schoolId = searchParams.get("schoolId") || undefined;
 
     if (userId !== currentUserId) {
-      const hasAdminUsers = await checkFeatureAccess(currentUserId, "admin_users");
+      const hasAdminUsers = await checkFeatureAccess(currentUserId, "/admin/users");
       if (!hasAdminUsers) {
         return NextResponse.json(
           { error: "Unauthorized to view other user's permissions" },
