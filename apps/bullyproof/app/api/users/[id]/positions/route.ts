@@ -63,7 +63,7 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -123,7 +123,7 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -235,7 +235,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -356,7 +356,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },

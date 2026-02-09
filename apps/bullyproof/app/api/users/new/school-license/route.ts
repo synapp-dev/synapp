@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     }
 
     // Check if user has admin_schools feature (licences/invites are school-related admin)
-    const hasAdminSchools = await checkFeatureAccess(userId, "admin_schools");
+    const hasAdminSchools = await checkFeatureAccess(userId, "/admin/schools");
     if (!hasAdminSchools) {
       console.error(
         "[SCHOOL LICENSE CREATE] Unauthorized - admin_schools required:",

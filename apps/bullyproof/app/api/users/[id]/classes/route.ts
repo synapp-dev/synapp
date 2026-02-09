@@ -46,7 +46,7 @@ export async function GET(
     const { id: targetUserId } = await params;
 
     // Check permissions - platform admins can view any user's classes
-    const isPlatformAdmin = await checkFeatureAccess(userId, "admin_users");
+    const isPlatformAdmin = await checkFeatureAccess(userId, "/admin/users");
 
     if (!isPlatformAdmin && userId !== targetUserId) {
       return NextResponse.json(

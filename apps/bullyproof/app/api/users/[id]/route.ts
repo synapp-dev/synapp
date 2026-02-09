@@ -114,7 +114,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },

@@ -145,7 +145,7 @@ export async function POST(request: Request) {
 
     // Step 4: Check permissions
     console.log("[BULK USER CREATE] Step 4: Checking permissions...");
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },

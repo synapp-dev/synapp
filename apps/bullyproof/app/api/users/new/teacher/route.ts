@@ -62,10 +62,10 @@ export async function POST(request: Request) {
     const data = createTeacherSchema.parse(body);
 
     // Check permissions: admin_users (platform) OR teachers feature at this school + membership
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     const roles = await getUserScopedRoles(userId);
     const hasTeachersAtSchool =
-      await checkFeatureAccess(userId, "teachers", data.schoolId);
+      await checkFeatureAccess(userId, "/school/teachers", data.schoolId);
     const isMemberOfSchool = roles.school.some(
       (r) => r.schoolId === data.schoolId
     );

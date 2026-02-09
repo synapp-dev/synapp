@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     // Check permissions: must have admin_users feature
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       console.error(
         "[PLATFORM ADMIN CREATE] Unauthorized - insufficient permissions:",

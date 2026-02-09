@@ -55,7 +55,7 @@ export async function DELETE(request: Request) {
 
     console.log("[BULK USER DELETE] Step 1: Success, userId:", userId);
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "admin_users");
+    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
     if (!hasAdminUsers) {
       return NextResponse.json(
         { error: "Unauthorized" },
