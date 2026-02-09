@@ -37,7 +37,7 @@ async function assertCanViewCertificationTopics(ctx: AuthContext) {
 }
 
 async function assertCanManageCertificationTopics(ctx: AuthContext) {
-  await assertFeature(ctx, "ap_certification");
+  await assertFeature(ctx, "/ap-certification");
 }
 
 export const certificationTopicsService = {

@@ -21,7 +21,7 @@ type AuthContext = {
 };
 
 async function assertCanManageCertificationSlides(ctx: AuthContext) {
-  await assertFeature(ctx, "ap_certification");
+  await assertFeature(ctx, "/ap-certification");
 }
 
 async function assertCanViewCertificationSlides(ctx: AuthContext) {
