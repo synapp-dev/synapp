@@ -64,7 +64,7 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    const hasAccess = await checkFeatureAccess(userId, "/ap-certification");
     if (!hasAccess) {
       return NextResponse.json(
         { error: "Unauthorized to manage quizzes" },
@@ -97,7 +97,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAccess = await checkFeatureAccess(userId, "ap_certification");
+    const hasAccess = await checkFeatureAccess(userId, "/ap-certification");
     if (!hasAccess) {
       return NextResponse.json(
         { error: "Unauthorized to manage quizzes" },
