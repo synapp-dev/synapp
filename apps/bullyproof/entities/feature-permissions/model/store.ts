@@ -4,10 +4,11 @@ import type { FeaturePermissionRow } from "../api/endpoints";
 /** User features API returns { permission, feature } per row (for inherited + user override) */
 export type UserFeaturePermissionRow = {
   permission: {
-    level: "global" | "role" | "school" | "user";
+    level: "global" | "role" | "school" | "school_role" | "user";
     enabled: boolean;
     visible?: boolean | null;
     featureId: string;
+    schoolId?: string | null;
   };
   feature: { id: string; key: string; name: string };
 };
@@ -15,16 +16,19 @@ export type UserFeaturePermissionRow = {
 interface FeaturePermissionsState {
   /** Global: all global permissions (one per feature) */
   globalPermissions: FeaturePermissionRow[];
-  /** Role: keyed by roleId */
+  /** Role: keyed by roleId (platform roles) */
   rolePermissions: Record<string, FeaturePermissionRow[]>;
   /** School: keyed by schoolId */
   schoolPermissions: Record<string, FeaturePermissionRow[]>;
+  /** School Role: keyed by "schoolId:roleId" composite key */
+  schoolRolePermissions: Record<string, FeaturePermissionRow[]>;
   /** User: GET /users/[id]/features shape (permission + feature for inherited) */
   userPermissions: Record<string, UserFeaturePermissionRow[]>;
 
   setGlobalPermissions: (perms: FeaturePermissionRow[]) => void;
   setRolePermissions: (roleId: string, perms: FeaturePermissionRow[]) => void;
   setSchoolPermissions: (schoolId: string, perms: FeaturePermissionRow[]) => void;
+  setSchoolRolePermissions: (schoolId: string, roleId: string, perms: FeaturePermissionRow[]) => void;
   setUserPermissions: (userId: string, perms: UserFeaturePermissionRow[]) => void;
 
   /** Update a single permission in store after mutation (e.g. global) */
@@ -39,6 +43,12 @@ interface FeaturePermissionsState {
   ) => void;
   updateSchoolPermission: (
     schoolId: string,
+    featureId: string,
+    patch: { enabled?: boolean; visible?: boolean | null }
+  ) => void;
+  updateSchoolRolePermission: (
+    schoolId: string,
+    roleId: string,
     featureId: string,
     patch: { enabled?: boolean; visible?: boolean | null }
   ) => void;
@@ -65,10 +75,23 @@ interface FeaturePermissionsState {
     featureId: string,
     value: { enabled: boolean; visible?: boolean | null }
   ) => void;
+  /** Optimistic: add or update school role permission */
+  setSchoolRolePermissionOptimistic: (
+    schoolId: string,
+    roleId: string,
+    featureId: string,
+    value: { enabled: boolean; visible?: boolean | null }
+  ) => void;
   /** Remove global permission (rollback when was optimistically added) */
   removeGlobalPermissionOptimistic: (featureId: string) => void;
   removeRolePermissionOptimistic: (roleId: string, featureId: string) => void;
   removeSchoolPermissionOptimistic: (schoolId: string, featureId: string) => void;
+  removeSchoolRolePermissionOptimistic: (schoolId: string, roleId: string, featureId: string) => void;
+}
+
+/** Helper: composite key for school_role store entries */
+function schoolRoleKey(schoolId: string, roleId: string) {
+  return `${schoolId}:${roleId}`;
 }
 
 export const useFeaturePermissionsStore = create<FeaturePermissionsState>(
@@ -76,6 +99,7 @@ export const useFeaturePermissionsStore = create<FeaturePermissionsState>(
     globalPermissions: [],
     rolePermissions: {},
     schoolPermissions: {},
+    schoolRolePermissions: {},
     userPermissions: {},
 
     setGlobalPermissions: (perms) =>
@@ -89,6 +113,14 @@ export const useFeaturePermissionsStore = create<FeaturePermissionsState>(
     setSchoolPermissions: (schoolId, perms) =>
       set((state) => ({
         schoolPermissions: { ...state.schoolPermissions, [schoolId]: perms },
+      })),
+
+    setSchoolRolePermissions: (schoolId, roleId, perms) =>
+      set((state) => ({
+        schoolRolePermissions: {
+          ...state.schoolRolePermissions,
+          [schoolRoleKey(schoolId, roleId)]: perms,
+        },
       })),
 
     setUserPermissions: (userId, perms) =>
@@ -128,6 +160,20 @@ export const useFeaturePermissionsStore = create<FeaturePermissionsState>(
         next[idx] = { ...next[idx], ...patch };
         return {
           schoolPermissions: { ...state.schoolPermissions, [schoolId]: next },
+        };
+      }),
+
+    updateSchoolRolePermission: (schoolId, roleId, featureId, patch) =>
+      set((state) => {
+        const key = schoolRoleKey(schoolId, roleId);
+        const list = state.schoolRolePermissions[key];
+        if (!list) return state;
+        const idx = list.findIndex((p) => p.featureId === featureId);
+        if (idx === -1) return state;
+        const next = [...list];
+        next[idx] = { ...next[idx], ...patch };
+        return {
+          schoolRolePermissions: { ...state.schoolRolePermissions, [key]: next },
         };
       }),
 
@@ -203,6 +249,27 @@ export const useFeaturePermissionsStore = create<FeaturePermissionsState>(
         };
       }),
 
+    setSchoolRolePermissionOptimistic: (schoolId, roleId, featureId, value) =>
+      set((state) => {
+        const key = schoolRoleKey(schoolId, roleId);
+        const list = [...(state.schoolRolePermissions[key] ?? [])];
+        const idx = list.findIndex((p) => p.featureId === featureId);
+        const row = {
+          featureId,
+          level: "school_role" as const,
+          targetId: roleId,
+          schoolId,
+          enabled: value.enabled,
+          visible: value.visible ?? value.enabled,
+          id: "",
+        };
+        if (idx >= 0) list[idx] = { ...list[idx], ...row };
+        else list.push(row as FeaturePermissionRow);
+        return {
+          schoolRolePermissions: { ...state.schoolRolePermissions, [key]: list },
+        };
+      }),
+
     removeGlobalPermissionOptimistic: (featureId) =>
       set((state) => ({
         globalPermissions: state.globalPermissions.filter(
@@ -227,6 +294,17 @@ export const useFeaturePermissionsStore = create<FeaturePermissionsState>(
         ) ?? [];
         return {
           schoolPermissions: { ...state.schoolPermissions, [schoolId]: list },
+        };
+      }),
+
+    removeSchoolRolePermissionOptimistic: (schoolId, roleId, featureId) =>
+      set((state) => {
+        const key = schoolRoleKey(schoolId, roleId);
+        const list = state.schoolRolePermissions[key]?.filter(
+          (p) => p.featureId !== featureId
+        ) ?? [];
+        return {
+          schoolRolePermissions: { ...state.schoolRolePermissions, [key]: list },
         };
       }),
   })

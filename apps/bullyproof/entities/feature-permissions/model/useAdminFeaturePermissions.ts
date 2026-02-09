@@ -10,6 +10,11 @@ import {
   type UserFeaturePermissionRow,
 } from "./store";
 
+/** Composite key helper matching the store */
+function schoolRoleKey(schoolId: string, roleId: string) {
+  return `${schoolId}:${roleId}`;
+}
+
 /**
  * Fetch global permissions in one request and populate the store.
  * Admin/features page reads from store; if store is empty, this hook triggers the fetch.
@@ -94,6 +99,38 @@ export function useSchoolPermissionsQuery(schoolId: string | null) {
     ...query,
     byFeatureId: permissionsByFeatureId(
       query.data ?? (schoolId ? schoolPermissions[schoolId] ?? [] : [])
+    ),
+  };
+}
+
+/**
+ * Fetch school role permissions for a role within a school.
+ * level=school_role, schoolId required, targetId = roleId.
+ */
+export function useSchoolRolePermissionsQuery(schoolId: string | null, roleId: string | null) {
+  const { schoolRolePermissions, setSchoolRolePermissions } = useFeaturePermissionsStore();
+  const key = schoolId && roleId ? schoolRoleKey(schoolId, roleId) : null;
+
+  const query = useQuery({
+    queryKey: featurePermissionsKeys.bulk("school_role", roleId ?? undefined, schoolId ?? undefined),
+    queryFn: async () => {
+      if (!schoolId || !roleId) return [];
+      const result = await featurePermissionsApi.getBulkByLevel("school_role", roleId, schoolId);
+      if (result.error) throw new Error(result.error.message ?? "Failed to fetch");
+      const data = result.data ?? [];
+      setSchoolRolePermissions(schoolId, roleId, data);
+      return data;
+    },
+    enabled: !!schoolId && !!roleId,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    initialData: () => (key ? schoolRolePermissions[key] : undefined),
+  });
+
+  return {
+    ...query,
+    byFeatureId: permissionsByFeatureId(
+      query.data ?? (key ? schoolRolePermissions[key] ?? [] : [])
     ),
   };
 }
