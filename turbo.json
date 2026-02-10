@@ -11,7 +11,13 @@
         "POSTGRES_*",
         "SUPABASE_*",
         "DATABASE_URL",
-        "DATABASE_URL_POOLER"
+        "DATABASE_URL_POOLER",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USER",
+        "SMTP_PASS",
+        "SMTP_FROM",
+        "TICKET_NOTIFY_EMAIL"
       ]
     },
     "lint": {
