@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
@@ -144,10 +144,12 @@ export default function CoursePage() {
   }>>([]);
 
   // Calculate current topic and slide URL BEFORE early returns to ensure consistent hook ordering
-  const currentTopic = topicsList.find((topic) => {
-    const progress = topicProgress.get(topic.id);
-    return !progress || (progress.status !== "completed" && progress.status !== "passed");
-  });
+  const currentTopic = useMemo(() => {
+    return topicsList.find((topic) => {
+      const progress = topicProgress.get(topic.id);
+      return !progress || (progress.status !== "completed" && progress.status !== "passed");
+    });
+  }, [topicsList, topicProgress]);
 
   // Helper function to extract image slides from a topic
   const getImageSlidesForTopic = (topic: Topic): TopicSlide[] => {
@@ -195,21 +197,23 @@ export default function CoursePage() {
   }, [course]);
 
   // Fetch in-progress quiz attempts for topics with quizzes
+  const currentTopicId = currentTopic?.id;
+  const currentTopicHasQuiz = currentTopic?.hasQuiz;
   useEffect(() => {
     const fetchInProgressAttempts = async () => {
-      if (!currentTopic || !currentTopic.hasQuiz) return;
+      if (!currentTopicId || !currentTopicHasQuiz) return;
 
       try {
         const result = await certificationApi.topics.progress.getQuizInProgress(
-          currentTopic.id
+          currentTopicId
         );
         if (result.data) {
           setInProgressQuizAttempts((prev) => {
             const newMap = new Map(prev);
             if (result.data) {
-              newMap.set(currentTopic.id, result.data);
+              newMap.set(currentTopicId, result.data);
             } else {
-              newMap.delete(currentTopic.id);
+              newMap.delete(currentTopicId);
             }
             return newMap;
           });
@@ -220,7 +224,7 @@ export default function CoursePage() {
     };
 
     fetchInProgressAttempts();
-  }, [currentTopic]);
+  }, [currentTopicId, currentTopicHasQuiz]);
 
   // Helper function to animate a value
   const animateValue = useCallback((
@@ -312,9 +316,10 @@ export default function CoursePage() {
   // Sequential animation for progress bars and radial chart
   useEffect(() => {
     if (isLoadingTopics || isLoadingProgress || topicsList.length === 0) {
-      setAnimatedProgress([]);
+      // Use functional updates to avoid creating new array references when already empty
+      setAnimatedProgress(prev => prev.length === 0 ? prev : []);
       setCertificationProgress(0);
-      setAnimatedRadialChartData([]);
+      setAnimatedRadialChartData(prev => prev.length === 0 ? prev : []);
       return;
     }
 
@@ -366,6 +371,9 @@ export default function CoursePage() {
     setCertificationProgress(0);
     setAnimatedRadialChartData(initialRadialData);
 
+    // Cancellation flag for cleanup
+    let cancelled = false;
+
     // Animate each bar sequentially
     const animationDuration = 800; // ms per bar
     const delayBetweenBars = 250; // ms delay between bars
@@ -373,12 +381,13 @@ export default function CoursePage() {
     let currentIndex = 0;
     
     const animateBar = (index: number) => {
+      if (cancelled) return;
       if (index >= topicsList.length) {
         // All topic bars done, animate certification
         const certTarget = completedTopicsCount === totalTopicsCount && totalTopicsCount > 0 ? 100 : 0;
         animateValue(
           certTarget,
-          (value) => setCertificationProgress(value),
+          (value) => { if (!cancelled) setCertificationProgress(value); },
           animationDuration
         );
         return;
@@ -391,6 +400,7 @@ export default function CoursePage() {
       animateValue(
         target,
         (value) => {
+          if (cancelled) return;
           setAnimatedProgress((prev) => {
             const newProgress = [...prev];
             newProgress[index] = value;
@@ -404,6 +414,7 @@ export default function CoursePage() {
       animateValue(
         targetCompletion,
         (value) => {
+          if (cancelled) return;
           setAnimatedRadialChartData((prev) => {
             const newData = [...prev];
             if (newData[index]) {
@@ -417,6 +428,7 @@ export default function CoursePage() {
         },
         animationDuration,
         () => {
+          if (cancelled) return;
           // On complete, start next bar after delay
           setTimeout(() => {
             currentIndex++;
@@ -427,10 +439,15 @@ export default function CoursePage() {
     };
 
     // Start animation after a short delay
-    setTimeout(() => {
+    const startTimeout = setTimeout(() => {
       animateBar(0);
     }, 100);
-  }, [topicsList, topicProgress, currentTopic, isLoadingTopics, isLoadingProgress, animateValue, topicStatuses, calculateTopicCompletion]);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(startTimeout);
+    };
+  }, [topicsList, topicProgress, isLoadingTopics, isLoadingProgress, animateValue, topicStatuses, calculateTopicCompletion]);
 
   // Calculate progress data from topics and progress (must be before early returns for hook order)
   const completedTopics = Array.from(topicProgress.values()).filter(

@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type { courseTopics, topicSlides } from "@/server/db/schema";
@@ -46,12 +47,14 @@ export function useCertificationTopicsByCourseCode(
     gcTime: 10 * 60 * 1000,
   });
 
-  // Sort topics by courseOrder
-  const sortedTopics = (query.data || []).slice().sort((a, b) => {
-    if (a.courseOrder === null) return 1;
-    if (b.courseOrder === null) return -1;
-    return a.courseOrder - b.courseOrder;
-  });
+  // Sort topics by courseOrder — memoized to keep a stable reference
+  const sortedTopics = useMemo(() => {
+    return (query.data || []).slice().sort((a, b) => {
+      if (a.courseOrder === null) return 1;
+      if (b.courseOrder === null) return -1;
+      return a.courseOrder - b.courseOrder;
+    });
+  }, [query.data]);
 
   return {
     ...query,
