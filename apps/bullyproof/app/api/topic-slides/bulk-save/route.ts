@@ -45,96 +45,29 @@ export const maxDuration = 60; // 60 seconds for large uploads
  * Helper function to check if a slide has valid content
  * Returns true if the slide has content, false if it's empty
  */
-async function slideHasContent(
+/**
+ * Checks if a slide has valid content (no storage API calls needed).
+ * If imageUrl/videoUrl is set, we trust the file exists — no storage.list() check.
+ */
+function slideHasContent(
   slide: {
     id: string;
     kind: string;
     imageUrl?: string | null;
     videoUrl?: string | null;
     textHtml?: string | null;
-  },
-  supabase: any,
-  stageNumber?: number,
-  topicNumber?: number
-): Promise<boolean> {
-  // Text slides must have textHtml
+  }
+): boolean {
   if (slide.kind === "text") {
-    const hasText = !!slide.textHtml && slide.textHtml.trim() !== "";
-    if (!hasText) {
-      console.log(`[bulk-save] [cleanup] Text slide ${slide.id} has no textHtml`);
-    }
-    return hasText;
+    return !!slide.textHtml && slide.textHtml.trim() !== "";
   }
-
-  // Video slides must have videoUrl
   if (slide.kind === "video") {
-    const hasVideo = !!slide.videoUrl && slide.videoUrl.trim() !== "";
-    if (!hasVideo) {
-      console.log(`[bulk-save] [cleanup] Video slide ${slide.id} has no videoUrl`);
-    }
-    return hasVideo;
+    return !!slide.videoUrl && slide.videoUrl.trim() !== "";
   }
-
-  // Image slides must have imageUrl AND the file must exist in storage
   if (slide.kind === "image") {
-    if (!slide.imageUrl || slide.imageUrl.trim() === "") {
-      console.log(`[bulk-save] [cleanup] Image slide ${slide.id} has no imageUrl`);
-      return false;
-    }
-
-    // If we have stage and topic info, verify the file exists in storage
-    if (stageNumber !== undefined && topicNumber !== undefined) {
-      try {
-        // Extract file extension from URL or use default
-        let fileExtension = "jpg";
-        const urlMatch = slide.imageUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
-        if (urlMatch) {
-          fileExtension = urlMatch[1];
-        }
-
-        const fileName = `${slide.id}.${fileExtension}`;
-        const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-        // Check if file exists in storage
-        const { data: fileList, error: listError } = await supabase.storage
-          .from("content")
-          .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
-
-        if (listError) {
-          console.warn(
-            `[bulk-save] [cleanup] Error checking file existence for slide ${slide.id}:`,
-            listError.message
-          );
-          // If we can't check, assume it exists (don't delete on uncertainty)
-          return true;
-        }
-
-        const fileExists =
-          fileList && fileList.some((file) => file.name === fileName);
-
-        if (!fileExists) {
-          console.log(
-            `[bulk-save] [cleanup] Image slide ${slide.id} has imageUrl but file doesn't exist in storage: ${filePath}`
-          );
-          return false;
-        }
-
-        return true;
-      } catch (error: any) {
-        console.warn(
-          `[bulk-save] [cleanup] Error verifying file for slide ${slide.id}:`,
-          error.message
-        );
-        // If we can't verify, assume it exists (don't delete on uncertainty)
-        return true;
-      }
-    }
-
-    // If we don't have stage/topic info, just check if imageUrl exists
-    return true;
+    return !!slide.imageUrl && slide.imageUrl.trim() !== "";
   }
-
-  // Unknown slide kind - assume it's valid
+  // Unknown kind — assume valid
   return true;
 }
 
@@ -293,31 +226,18 @@ export async function POST(request: Request) {
           textHtml: slideData?.slide?.textHtml ? "exists" : "missing",
         });
 
-        // Delete file if it exists
-        if (
-          slideData?.slide.imageUrl &&
-          slideData.stage &&
-          slideData.topic.stageOrder !== null &&
-          slideData.topic.stageOrder !== undefined
-        ) {
+        // Delete file from storage if it exists
+        if (slideData?.slide.imageUrl && !slideData.slide.imageUrl.startsWith("blob:")) {
           try {
-            const stageNumberMatch = slideData.stage.code.match(/^S(\d+)$/);
-            if (stageNumberMatch) {
-              const stageNumber = parseInt(stageNumberMatch[1], 10);
-              const topicNumber = slideData.topic.stageOrder;
-
-              let fileExtension = "jpg";
-              const urlMatch = slideData.slide.imageUrl.match(
-                /\.([a-zA-Z0-9]+)(?:\?|$)/
-              );
-              if (urlMatch) {
-                fileExtension = urlMatch[1];
-              }
-
-              const fileName = `${slideId}.${fileExtension}`;
-              const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-              await supabase.storage.from("content").remove([filePath]);
+            // Extract storage path from URL if needed (legacy data has full public URLs)
+            let storagePath = slideData.slide.imageUrl;
+            if (storagePath.startsWith("http")) {
+              const publicUrlPattern = /\/storage\/v1\/object\/public\/[^/]+\/(.+)$/;
+              const match = storagePath.match(publicUrlPattern);
+              storagePath = match ? match[1] : "";
+            }
+            if (storagePath) {
+              await supabase.storage.from("content").remove([storagePath]);
             }
           } catch (error) {
             // File deletion is best effort - log but don't fail
@@ -538,14 +458,9 @@ export async function POST(request: Request) {
             );
           }
 
-          // Get public URL
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("content").getPublicUrl(filePath);
-
-          if (publicUrl) {
-            uploadedUrls[slideId] = publicUrl;
-          }
+          // Store the storage path directly (not the public URL)
+          // The signed URL helper will use this path to generate signed URLs on demand
+          uploadedUrls[slideId] = filePath;
         }
       }
     }
@@ -603,14 +518,8 @@ export async function POST(request: Request) {
           );
         }
 
-        // Get public URL
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("content").getPublicUrl(filePath);
-
-        if (publicUrl) {
-          uploadedUrls[slideId] = publicUrl;
-        }
+        // Store the storage path directly (not the public URL)
+        uploadedUrls[slideId] = filePath;
       }
     }
 
@@ -917,12 +826,7 @@ export async function POST(request: Request) {
         }
 
         // For slides with URLs, verify they're actually empty
-        const hasContent = await slideHasContent(
-          slide,
-          supabase,
-          stageNumber,
-          topicNumber
-        );
+        const hasContent = slideHasContent(slide);
         
         if (!hasContent) {
           // Double-check: Only delete if we're CERTAIN it's empty
@@ -974,37 +878,25 @@ export async function POST(request: Request) {
 
             // Final safety check: Verify slide is still empty before deleting
             // slideHasContent returns true if slide HAS content, false if empty
-            const hasContent = await slideHasContent(
-              slideData.slide,
-              supabase,
-              stageNumber,
-              topicNumber
-            );
+            const hasContent = slideHasContent(slideData.slide);
             
             // Only delete if we're CERTAIN it's empty (hasContent === false)
             if (!hasContent) {
-              // Delete file if it exists - only for image slides
+              // Delete file if it exists — imageUrl is the storage path
               if (
                 slideData.slide.kind === "image" &&
                 slideData.slide.imageUrl &&
-                stageNumber !== undefined &&
-                topicNumber !== undefined
+                !slideData.slide.imageUrl.startsWith("blob:")
               ) {
                 try {
-                  let fileExtension = "jpg";
-                  const urlMatch = slideData.slide.imageUrl.match(
-                    /\.([a-zA-Z0-9]+)(?:\?|$)/
-                  );
-                  if (urlMatch) {
-                    fileExtension = urlMatch[1];
-                  }
+                  // Extract storage path from URL if needed (legacy data has full URLs)
+                  const publicUrlPattern = /\/storage\/v1\/object\/public\/[^/]+\/(.+)$/;
+                  const match = slideData.slide.imageUrl.match(publicUrlPattern);
+                  const storagePath = match ? match[1] : slideData.slide.imageUrl;
 
-                  const fileName = `${slideId}.${fileExtension}`;
-                  const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-                  await supabase.storage.from("content").remove([filePath]);
+                  await supabase.storage.from("content").remove([storagePath]);
                   console.log(
-                    `[bulk-save] [cleanup] Deleted file for empty slide: ${filePath}`
+                    `[bulk-save] [cleanup] Deleted file for empty slide: ${storagePath}`
                   );
                 } catch (fileError: any) {
                   // File deletion is best effort - log but don't fail
@@ -1073,12 +965,7 @@ export async function POST(request: Request) {
       if (finalTopicData?.slides) {
         const remainingEmptySlides = [];
         for (const slide of finalTopicData.slides) {
-          const hasContent = await slideHasContent(
-            slide,
-            supabase,
-            stageNumber,
-            topicNumber
-          );
+          const hasContent = slideHasContent(slide);
           if (!hasContent) {
             remainingEmptySlides.push(slide);
           }
