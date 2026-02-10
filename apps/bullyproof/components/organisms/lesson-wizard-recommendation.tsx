@@ -27,7 +27,6 @@ import { Separator } from "@workspace/ui/components/separator";
 import Image from "next/image";
 import type { ClassOption } from "@/types/lesson-wizard";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { useStages } from "@/entities/stages/model/store";
@@ -135,9 +134,8 @@ function TopicThumbnail({ topic, horizontal = false }: { topic: TopicWithSlides;
   const firstImageSlide = imageSlides[0];
   const slideId = firstImageSlide?.id;
 
-  // Prefer signedUrl from API response, fall back to cached URL from store
-  const cachedUrl = useSlideUrl(slideId);
-  const imageUrl = firstImageSlide?.signedUrl || cachedUrl;
+  // Use signedUrl from API response (DB-cached)
+  const imageUrl = firstImageSlide?.signedUrl || null;
 
   if (hasError || !imageUrl) {
     return (

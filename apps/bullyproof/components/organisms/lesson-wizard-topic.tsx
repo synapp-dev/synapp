@@ -14,10 +14,6 @@ import type { TopicOption, ClassOption } from "@/types/lesson-wizard";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { classesApi } from "@/entities/classes/api/endpoints";
-import {
-  useTopicsStore,
-  useSlideUrl,
-} from "@/entities/topics/model/store-enhanced";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { useStages } from "@/entities/stages/model/store";
 import { Alert, AlertTitle, AlertDescription } from "@workspace/ui/components/alert";
@@ -56,9 +52,8 @@ function TopicThumbnail({ topic }: { topic: TopicWithSlides }) {
   const firstImageSlide = imageSlides[0];
   const slideId = firstImageSlide?.id;
 
-  // Prefer signedUrl from API response, fall back to cached URL from store
-  const cachedUrl = useSlideUrl(slideId);
-  const imageUrl = firstImageSlide?.signedUrl || cachedUrl;
+  // Use signedUrl from API response (DB-cached)
+  const imageUrl = firstImageSlide?.signedUrl || null;
 
   if (hasError || !imageUrl) {
     return (
