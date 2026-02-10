@@ -28,6 +28,16 @@ type AuthContext = {
 };
 
 async function assertCanManageRoles(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  // Platform admins can always manage roles
+  const scopedRoles = await getUserScopedRoles(ctx.userId);
+  if (scopedRoles.platform.includes("PLATFORM_ADMIN")) {
+    return;
+  }
+
   await assertFeature(ctx, "/admin/features");
 }
 
@@ -36,14 +46,19 @@ async function assertCanViewRoles(ctx: AuthContext) {
     throw new Error("Unauthorized");
   }
 
+  // Any user with a platform role can view roles
+  const scopedRoles = await getUserScopedRoles(ctx.userId);
+  if (scopedRoles.platform.length > 0) {
+    return;
+  }
+
   // Anyone with admin_features (from feature_permissions) can view roles, e.g. for the Features admin Role tab
   const hasAdminFeatures = await checkFeatureAccess(ctx.userId, "/admin/features");
   if (hasAdminFeatures) {
     return;
   }
 
-  const roles = await getUserScopedRoles(ctx.userId);
-  if (roles.school.some((role) => role.roleKey === "SCHOOL_ADMIN")) {
+  if (scopedRoles.school.some((role) => role.roleKey === "SCHOOL_ADMIN")) {
     return;
   }
 
