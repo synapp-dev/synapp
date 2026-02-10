@@ -1,5 +1,6 @@
 -- Storage policies for the 'content' bucket
--- Allows authenticated users to read, and PLATFORM_ADMIN to read/write
+-- Allows authenticated users to read and write.
+-- Authorization is enforced at the API layer via feature access checks (/admin/content).
 --
 -- To run this script:
 -- 1. Make sure the 'content' bucket exists in Supabase Storage
@@ -21,36 +22,24 @@ FOR SELECT
 TO authenticated
 USING (bucket_id = 'content');
 
--- Policy: Allow PLATFORM_ADMIN to INSERT (upload) to content bucket
+-- Policy: Allow all authenticated users to INSERT (upload) to content bucket
 CREATE POLICY "content_bucket_insert_policy"
 ON storage.objects
 FOR INSERT
 TO authenticated
-WITH CHECK (
-  bucket_id = 'content' 
-  AND has_any_role(ARRAY['PLATFORM_ADMIN'::text], NULL::uuid)
-);
+WITH CHECK (bucket_id = 'content');
 
--- Policy: Allow PLATFORM_ADMIN to UPDATE files in content bucket
+-- Policy: Allow all authenticated users to UPDATE files in content bucket
 CREATE POLICY "content_bucket_update_policy"
 ON storage.objects
 FOR UPDATE
 TO authenticated
-USING (
-  bucket_id = 'content' 
-  AND has_any_role(ARRAY['PLATFORM_ADMIN'::text], NULL::uuid)
-)
-WITH CHECK (
-  bucket_id = 'content' 
-  AND has_any_role(ARRAY['PLATFORM_ADMIN'::text], NULL::uuid)
-);
+USING (bucket_id = 'content')
+WITH CHECK (bucket_id = 'content');
 
--- Policy: Allow PLATFORM_ADMIN to DELETE files from content bucket
+-- Policy: Allow all authenticated users to DELETE files from content bucket
 CREATE POLICY "content_bucket_delete_policy"
 ON storage.objects
 FOR DELETE
 TO authenticated
-USING (
-  bucket_id = 'content' 
-  AND has_any_role(ARRAY['PLATFORM_ADMIN'::text], NULL::uuid)
-);
+USING (bucket_id = 'content');
