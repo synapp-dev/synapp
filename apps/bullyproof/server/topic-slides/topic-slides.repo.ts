@@ -39,18 +39,45 @@ export const topicSlidesRepo = {
       videoEndS?: number | null;
       orderIndex?: number;
     }
-  ) =>
-    db
+  ) => {
+    // Invalidate cached signed URL when media changes
+    const setData: Record<string, any> = {
+      ...data,
+      updatedAt: sql`now()`,
+    };
+    if ("imageUrl" in data || "videoUrl" in data) {
+      setData.signedUrl = null;
+      setData.signedUrlUpdatedAt = null;
+    }
+    return db
       .update(topicSlides)
-      .set({
-        ...data,
-        updatedAt: sql`now()`,
-      })
+      .set(setData)
       .where(eq(topicSlides.id, id))
-      .returning(),
+      .returning();
+  },
 
   deleteSlide: (id: string) =>
     db.delete(topicSlides).where(eq(topicSlides.id, id)),
+
+  updateSignedUrl: async (id: string, signedUrl: string) => {
+    await db
+      .update(topicSlides)
+      .set({
+        signedUrl,
+        signedUrlUpdatedAt: new Date().toISOString(),
+      })
+      .where(eq(topicSlides.id, id));
+  },
+
+  clearSignedUrl: async (id: string) => {
+    await db
+      .update(topicSlides)
+      .set({
+        signedUrl: null,
+        signedUrlUpdatedAt: null,
+      })
+      .where(eq(topicSlides.id, id));
+  },
 
   normalizeSlideOrder: async (topicId: string) => {
     const allSlides = await db

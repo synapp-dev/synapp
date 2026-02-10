@@ -234,15 +234,22 @@ export const topicsRepo = {
       videoEndS?: number | null;
       orderIndex?: number;
     }
-  ) =>
-    db
+  ) => {
+    // Invalidate cached signed URL when media changes
+    const setData: Record<string, any> = {
+      ...data,
+      updatedAt: sql`now()`,
+    };
+    if ("imageUrl" in data || "videoUrl" in data) {
+      setData.signedUrl = null;
+      setData.signedUrlUpdatedAt = null;
+    }
+    return db
       .update(topicSlides)
-      .set({
-        ...data,
-        updatedAt: sql`now()`,
-      })
+      .set(setData)
       .where(eq(topicSlides.id, id))
-      .returning(),
+      .returning();
+  },
 
   deleteSlide: (id: string) =>
     db.delete(topicSlides).where(eq(topicSlides.id, id)),

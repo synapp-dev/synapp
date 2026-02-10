@@ -17,12 +17,10 @@ import {
   type ReorderTopicsParams,
 } from "./topics.validators";
 import { topicsRepo } from "./topics.repo";
+import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
 import { assertFeature } from "@/server/features/features.service";
 import { createServerClient } from "@/utils/supabase/server";
-import { toStorageUrl } from "@/utils/supabase/storage-url";
-import { db } from "@/server/db/drizzle";
-import { curriculumStages } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { refreshSignedUrlIfStale } from "@/server/lib/signed-url";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -60,87 +58,28 @@ export const topicsService = {
           params.stageId
         );
 
-        // If includeUrls is true, generate signed URLs for image slides
+        // If includeUrls is true, resolve signed URLs for image slides
         if ((params as any).includeUrls) {
-          const supabase = await createServerClient();
+          const updateFn = topicSlidesRepo.updateSignedUrl;
           const topicsWithUrls = await Promise.all(
             topicsWithSlides.map(async (topic) => {
               if (!topic.slides || topic.slides.length === 0) {
                 return topic;
               }
 
-              // Get stage info for URL generation
-              const stageData = await db
-                .select()
-                .from(curriculumStages)
-                .where(eq(curriculumStages.id, topic.stageId))
-                .limit(1);
-
-              if (stageData.length === 0) {
-                return topic;
-              }
-
-              const stage = stageData[0];
-              const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-              if (!stageNumberMatch) {
-                return topic;
-              }
-              const stageNumber = parseInt(stageNumberMatch[1], 10);
-              const topicNumber = topic.stageOrder;
-
-              if (topicNumber === null || topicNumber === undefined) {
-                return topic;
-              }
-
-              // Generate signed URLs for image slides
               const slidesWithUrls = await Promise.all(
                 topic.slides.map(async (slide) => {
                   if (slide.kind !== "image" || !slide.imageUrl) {
                     return slide;
                   }
 
-                  // Extract file extension
-                  let fileExtension = "jpg";
-                  if (slide.imageUrl) {
-                    const urlMatch = slide.imageUrl.match(
-                      /\.([a-zA-Z0-9]+)(?:\?|$)/
-                    );
-                    if (urlMatch) {
-                      fileExtension = urlMatch[1];
-                    }
-                  }
+                  const signedUrl = await refreshSignedUrlIfStale(
+                    slide,
+                    slide.imageUrl,
+                    updateFn
+                  );
 
-                  // Construct file path
-                  const fileName = `${slide.id}.${fileExtension}`;
-                  const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-                  // Check if file exists
-                  const { data: fileList } = await supabase.storage
-                    .from("content")
-                    .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
-
-                  const fileExists =
-                    fileList &&
-                    fileList.some((file) => file.name === fileName);
-
-                  if (!fileExists) {
-                    return { ...slide, signedUrl: null };
-                  }
-
-                  // Generate signed URL with 1-week expiry
-                  const { data, error } = await supabase.storage
-                    .from("content")
-                    .createSignedUrl(filePath, 604800);
-
-                  if (error) {
-                    console.warn(
-                      `Failed to generate signed URL for slide ${slide.id}:`,
-                      error.message
-                    );
-                    return { ...slide, signedUrl: null };
-                  }
-
-                  return { ...slide, signedUrl: toStorageUrl(data.signedUrl) ?? data.signedUrl };
+                  return { ...slide, signedUrl };
                 })
               );
 
@@ -173,69 +112,22 @@ export const topicsService = {
     const topicData = await topicsRepo.getWithDetails(id);
     if (!topicData) return null;
 
-    // If includeUrls is true, generate signed URLs for image slides
+    // If includeUrls is true, resolve signed URLs for image slides
     if (includeUrls && topicData.slides && topicData.slides.length > 0) {
-      const supabase = await createServerClient();
-      const stage = topicData.stage;
-      
-      if (!stage) return topicData;
-
-      const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-      if (!stageNumberMatch) return topicData;
-      
-      const stageNumber = parseInt(stageNumberMatch[1], 10);
-      const topicNumber = topicData.stageOrder;
-
-      if (topicNumber === null || topicNumber === undefined) {
-        return topicData;
-      }
-
-      // Generate signed URLs for image slides
+      const updateFn = topicSlidesRepo.updateSignedUrl;
       const slidesWithUrls = await Promise.all(
         topicData.slides.map(async (slide) => {
           if (slide.kind !== "image" || !slide.imageUrl) {
             return slide;
           }
 
-          // Extract file extension
-          let fileExtension = "jpg";
-          if (slide.imageUrl) {
-            const urlMatch = slide.imageUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
-            if (urlMatch) {
-              fileExtension = urlMatch[1];
-            }
-          }
+          const signedUrl = await refreshSignedUrlIfStale(
+            slide,
+            slide.imageUrl,
+            updateFn
+          );
 
-          // Construct file path
-          const fileName = `${slide.id}.${fileExtension}`;
-          const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-          // Check if file exists
-          const { data: fileList } = await supabase.storage
-            .from("content")
-            .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
-
-          const fileExists =
-            fileList && fileList.some((file) => file.name === fileName);
-
-          if (!fileExists) {
-            return { ...slide, signedUrl: null };
-          }
-
-          // Generate signed URL with 1-week expiry
-          const { data, error } = await supabase.storage
-            .from("content")
-            .createSignedUrl(filePath, 604800);
-
-          if (error) {
-            console.warn(
-              `Failed to generate signed URL for slide ${slide.id}:`,
-              error.message
-            );
-            return { ...slide, signedUrl: null };
-          }
-
-          return { ...slide, signedUrl: toStorageUrl(data.signedUrl) ?? data.signedUrl };
+          return { ...slide, signedUrl };
         })
       );
 
@@ -339,63 +231,43 @@ export const topicsService = {
 
     const topicId = slideData.topic.id;
 
-    // Step 1: Check storage and delete image file if it exists
-    // Only attempt file deletion if the slide has an imageUrl set
-    if (slideData.slide.imageUrl) {
+    // Step 1: Delete image file from storage if it exists
+    if (slideData.slide.imageUrl && !slideData.slide.imageUrl.startsWith("blob:") && !slideData.slide.imageUrl.startsWith("data:")) {
       try {
-        const supabase = await createServerClient();
-        const stage = slideData.stage;
-        const topic = slideData.topic;
+        // Extract storage path from URL if needed (legacy data has full public URLs)
+        let storagePath = slideData.slide.imageUrl;
+        if (storagePath.startsWith("http")) {
+          const publicUrlPattern = /\/storage\/v1\/object\/public\/[^/]+\/(.+)$/;
+          const match = storagePath.match(publicUrlPattern);
+          if (match) {
+            storagePath = match[1];
+          } else {
+            // Not a Supabase storage URL — skip deletion
+            storagePath = "";
+          }
+        }
 
-        if (
-          stage &&
-          topic.stageOrder !== null &&
-          topic.stageOrder !== undefined
-        ) {
-          // Extract stage number from stage.code (e.g., "S1" -> 1)
-          const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-          if (stageNumberMatch) {
-            const stageNumber = parseInt(stageNumberMatch[1], 10);
-            const topicNumber = topic.stageOrder;
+        if (storagePath) {
+          const supabase = await createServerClient();
+          const { error: deleteError } = await supabase.storage
+            .from("content")
+            .remove([storagePath]);
 
-            // Extract file extension from imageUrl
-            let fileExtension = "jpg"; // default fallback
-            const urlMatch = slideData.slide.imageUrl.match(
-              /\.([a-zA-Z0-9]+)(?:\?|$)/
+          if (deleteError) {
+            console.warn(
+              `Failed to delete image file for slide ${slideId}:`,
+              deleteError.message
             );
-            if (urlMatch) {
-              fileExtension = urlMatch[1];
-            }
-
-            // Construct file path: slides/topics/s{stage}/t{topic}/{slideId}.{extension}
-            const fileName = `${slideId}.${fileExtension}`;
-            const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-            // Try to delete the file - if it doesn't exist, that's fine
-            // We use remove() which won't error if the file doesn't exist
-            const { error: deleteError } = await supabase.storage
-              .from("content")
-              .remove([filePath]);
-
-            if (deleteError) {
-              // Only log if it's not a "file not found" type error
-              // Storage errors for non-existent files are expected and can be ignored
-              console.warn(
-                `Failed to delete image file for slide ${slideId}:`,
-                deleteError.message
-              );
-            }
           }
         }
       } catch (error) {
-        // Log error but don't fail the deletion - file deletion is best effort
+        // Log error but don't fail the deletion — file deletion is best effort
         console.warn(
-          `Error checking/deleting image file for slide ${slideId}:`,
+          `Error deleting image file for slide ${slideId}:`,
           error
         );
       }
     }
-    // If slide has no imageUrl, skip file deletion entirely
 
     // Step 2: Delete the slide from database
     console.log(`[topics.service] Deleting slide from database: ${slideId}`);
@@ -441,72 +313,20 @@ export const topicsService = {
       throw new Error("Slide not found");
     }
 
-    const { slide, topic, stage } = slideData;
+    const { slide } = slideData;
 
     // Only generate URL for image slides
     if (slide.kind !== "image") {
       throw new Error("Slide is not an image slide");
     }
 
-    // Extract stage number from stage.code (e.g., "S1" -> 1)
-    const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-    if (!stageNumberMatch) {
-      throw new Error("Invalid stage code format");
-    }
-    const stageNumber = parseInt(stageNumberMatch[1], 10);
+    // Use image_url directly as storage path — no path reconstruction needed
+    const url = await refreshSignedUrlIfStale(
+      slide,
+      slide.imageUrl,
+      topicSlidesRepo.updateSignedUrl
+    );
 
-    // Get topic number from topic.stageOrder
-    const topicNumber = topic.stageOrder;
-    if (topicNumber === null || topicNumber === undefined) {
-      throw new Error("Topic stageOrder is missing");
-    }
-
-    // Extract file extension from stored imageUrl or use default
-    // If imageUrl exists and has an extension, extract it
-    let fileExtension = "jpg"; // default
-    if (slide.imageUrl) {
-      const urlMatch = slide.imageUrl.match(/\.([a-zA-Z0-9]+)(?:\?|$)/);
-      if (urlMatch) {
-        fileExtension = urlMatch[1];
-      }
-    }
-
-    // Construct file path: slides/topics/s{stage}/t{topic}/{slideId}.{extension}
-    const fileName = `${slideId}.${fileExtension}`;
-    const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
-
-    // Check if file exists in storage before generating signed URL
-    const supabase = await createServerClient();
-
-    // First, check if the file exists by listing files in the directory
-    const { data: fileList, error: listError } = await supabase.storage
-      .from("content")
-      .list(`slides/topics/s${stageNumber}/t${topicNumber}/`);
-
-    // Check if the file exists in the list
-    const fileExists =
-      !listError && fileList && fileList.some((file) => file.name === fileName);
-
-    if (!fileExists) {
-      // File doesn't exist in bucket, return null to indicate no image
-      return { url: null };
-    }
-
-    // File exists, generate signed URL with 1-week expiry (604800 seconds)
-    const { data, error } = await supabase.storage
-      .from("content")
-      .createSignedUrl(filePath, 604800); // 1 week in seconds
-
-    if (error) {
-      // If there's an error generating the signed URL, return null instead of throwing
-      // This handles cases where the file might have been deleted between checking and generating
-      console.warn(
-        `Failed to generate signed URL for slide ${slideId}:`,
-        error.message
-      );
-      return { url: null };
-    }
-
-    return { url: toStorageUrl(data.signedUrl) ?? data.signedUrl };
+    return { url };
   },
 };
