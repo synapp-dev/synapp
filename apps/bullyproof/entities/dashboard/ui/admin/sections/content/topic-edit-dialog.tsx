@@ -158,6 +158,8 @@ export function TopicEditDialog({
       videoEndS: null,
       officialNotes: null,
       durationSec: null,
+      signedUrl: null,
+      signedUrlUpdatedAt: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
