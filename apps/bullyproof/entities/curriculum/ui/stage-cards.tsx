@@ -21,11 +21,9 @@ import { BookOpen } from "lucide-react";
 import type { curriculumStages, certificationCourses, topics, courseTopics } from "@/server/db/schema";
 import {
   useTopicsByStage,
-  useTopicsStore,
 } from "@/entities/topics/model/store-enhanced";
 import {
   useCertificationTopicsByStageCode,
-  useCertificationTopicsStore,
 } from "@/entities/certification/model/topics-store";
 
 // Base stage types
@@ -88,39 +86,15 @@ function TopicImageThumbnail({
       .sort((a, b) => a.orderIndex - b.orderIndex);
   }, [topic.slides]);
 
-  // Access appropriate store based on type
-  const { slideUrls: curriculumSlideUrls } = useTopicsStore();
-  // Note: certification topics store doesn't have slideUrls - URLs are in topic.slides[].signedUrl
-  const storeSlideUrls = type === "certification" ? undefined : curriculumSlideUrls;
-
-  // Get URLs for all image slides
+  // Get URLs for all image slides (signed URLs come from the API / DB cache)
   const slideUrls = useMemo(() => {
     return imageSlides
       .map((slide) => {
         if (!slide || !slide.id) return null;
-        
-        // Prefer direct signedUrl or signedImageUrl from API (works for both curriculum and certification)
-        // API may return signedImageUrl for certification topics
-        const directUrl = slide.signedUrl || (slide as any).signedImageUrl;
-        if (directUrl) {
-          return directUrl;
-        }
-        
-        // Fall back to cached URL from store (only for curriculum topics)
-        if (storeSlideUrls) {
-          const cached = storeSlideUrls[slide.id];
-          if (cached) {
-            // Check if expired (1 week)
-            const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-            if (Date.now() - cached.timestamp <= CACHE_EXPIRY_MS) {
-              return cached.url;
-            }
-          }
-        }
-        return null;
+        return slide.signedUrl || (slide as any).signedImageUrl || null;
       })
       .filter((url): url is string => url !== null);
-  }, [imageSlides, storeSlideUrls]);
+  }, [imageSlides]);
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
