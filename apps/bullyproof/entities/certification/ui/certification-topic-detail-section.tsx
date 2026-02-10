@@ -51,7 +51,6 @@ import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
-import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 
 type Topic = typeof courseTopics.$inferSelect & {
   slides?: Array<typeof courseTopicSlides.$inferSelect>;
@@ -111,17 +110,10 @@ export function CertificationTopicDetailSection({
         // Fetch slides separately (this includes signedUrl from batch fetch)
         const slidesResult = await certificationApi.topics.slides.list(topicId);
         if (slidesResult.data) {
-          const cacheStore = useCertificationSlidesCacheStore.getState();
-          
           const initialSlides = slidesResult.data
             .sort((a, b) => a.orderIndex - b.orderIndex)
             .map((slide) => {
-              // Extract signedImageUrl from API response and cache it
               const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
-              if (slideWithUrl.signedImageUrl && slide.kind === "image") {
-                cacheStore.setSlideUrl(slide.id, slideWithUrl.signedImageUrl);
-              }
-              
               return {
                 id: slide.id,
                 kind: slide.kind as "image" | "video" | "quiz" | "test",
