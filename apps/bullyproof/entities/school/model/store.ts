@@ -1,8 +1,6 @@
-import { create } from "zustand";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { schoolApi } from "../api/endpoints";
 import { schoolKeys } from "./keys";
-import type { vSchoolsReadable } from "@/drizzle/schema";
 
 // School type matching the admin schools page format
 export type School = {
@@ -21,56 +19,6 @@ export type School = {
   levels?: string[] | null;
   levelBadge?: string | null;
 };
-
-interface SchoolsState {
-  // Normalized cache: schoolId -> School
-  schools: Record<string, School>;
-  // List of school IDs (for maintaining order)
-  schoolIds: string[];
-
-  // Actions
-  setSchools: (schools: School[]) => void;
-  setSchool: (school: School) => void;
-  removeSchool: (schoolId: string) => void;
-  clearSchools: () => void;
-}
-
-export const useSchoolsStore = create<SchoolsState>((set) => ({
-  schools: {},
-  schoolIds: [],
-
-  setSchools: (schools) =>
-    set({
-      schools: schools.reduce(
-        (acc, school) => {
-          acc[school.id] = school;
-          return acc;
-        },
-        {} as Record<string, School>
-      ),
-      schoolIds: schools.map((s) => s.id),
-    }),
-
-  setSchool: (school) =>
-    set((state) => {
-      const newSchools = { ...state.schools, [school.id]: school };
-      const newSchoolIds = state.schoolIds.includes(school.id)
-        ? state.schoolIds
-        : [...state.schoolIds, school.id];
-      return { schools: newSchools, schoolIds: newSchoolIds };
-    }),
-
-  removeSchool: (schoolId) =>
-    set((state) => {
-      const { [schoolId]: removed, ...schools } = state.schools;
-      return {
-        schools,
-        schoolIds: state.schoolIds.filter((id) => id !== schoolId),
-      };
-    }),
-
-  clearSchools: () => set({ schools: {}, schoolIds: [] }),
-}));
 
 // Helper function to transform API school data to School type
 function transformSchoolData(school: any): School {
@@ -109,8 +57,6 @@ function transformSchoolData(school: any): School {
 }
 
 // React Query hook for fetching all schools (with pagination support)
-// Note: Client-side filtering is handled by the component, so we fetch all schools
-// and cache them. Only search filter is passed to the API for server-side filtering.
 export function useSchools(filters?: {
   search?: string;
   state?: string;
@@ -118,11 +64,7 @@ export function useSchools(filters?: {
   status?: string;
   type?: string;
 }) {
-  const queryClient = useQueryClient();
-  const { schools, schoolIds, setSchools } = useSchoolsStore();
-
   // Only use search filter for API call (server-side filtering)
-  // Other filters (state, sector, status, type) are handled client-side by the component
   const searchFilter = filters?.search && filters.search !== "" ? filters.search : undefined;
   const hasSearchFilter = !!searchFilter;
 
@@ -150,7 +92,6 @@ export function useSchools(filters?: {
           const mappedSchools = result.data.map(transformSchoolData);
           allSchools.push(...mappedSchools);
 
-          // If we got fewer than the limit, we've fetched all schools
           if (mappedSchools.length < limit) {
             hasMore = false;
           } else {
@@ -161,20 +102,11 @@ export function useSchools(filters?: {
         }
       }
 
-      // Update Zustand store with normalized data
-      setSchools(allSchools);
       return allSchools;
     },
-    staleTime: hasSearchFilter ? 0 : 2 * 60 * 1000, // Always refetch when search filter changes, cache unfiltered for 2 minutes
-    gcTime: 5 * 60 * 1000, // 5 minutes
-    refetchOnMount: true, // Always refetch when component mounts
-    // Use initialData from Zustand if available for immediate display (only if no search filter)
-    initialData: hasSearchFilter
-      ? undefined
-      : () => {
-          const zustandSchools = schoolIds.map((id) => schools[id]).filter(Boolean);
-          return zustandSchools.length > 0 ? zustandSchools : undefined;
-        },
+    staleTime: hasSearchFilter ? 0 : 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: true,
   });
 
   return {

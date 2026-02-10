@@ -20,7 +20,6 @@ import {
 import { Loader2, CheckCheck } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
-import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { getDisplayStatus } from "@/utils/lesson-status";
 
@@ -211,9 +210,8 @@ export function LessonTopicThumbnail({
   const firstImageSlide = imageSlides[0];
   const slideId = firstImageSlide?.id;
 
-  // Prefer signedUrl from API response, fall back to cached URL from store
-  const cachedUrl = useSlideUrl(slideId);
-  const imageUrl = firstImageSlide?.signedUrl || cachedUrl;
+  // Use signedUrl from API response (DB-cached)
+  const imageUrl = firstImageSlide?.signedUrl || null;
 
   if (isLoading) {
     return (
