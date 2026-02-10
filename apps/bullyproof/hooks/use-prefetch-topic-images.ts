@@ -1,13 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
-import { topicsApi } from "@/entities/topics/api/endpoints";
+import { useEffect, useRef } from "react";
 import type { SlideData } from "@/components/organisms/slide-renderer";
+import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 /**
  * Pre-fetches all image URLs for topic slides in the background.
- * Populates the topic slides cache store so images can be loaded instantly.
+ * Since slides now come with signedUrl from the API (DB-cached),
+ * this simply preloads the images into the browser cache.
  * 
  * @param slides - Array of slides to pre-fetch images for
  * @param enabled - Whether to enable the pre-fetching (defaults to true)
@@ -16,78 +16,37 @@ export function usePrefetchTopicImages(
   slides: SlideData[],
   enabled: boolean = true
 ) {
-  // Filter to only image slides that need URLs fetched
-  const imageSlideIds = slides
-    .filter(
-      (slide) =>
+  const preloadedRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!enabled || slides.length === 0) return;
+
+    for (const slide of slides) {
+      if (
         slide.kind === "image" &&
         slide.id &&
         !slide.id.startsWith("temp_") &&
-        slide.imageUrl &&
-        !slide.imageUrl.startsWith("blob:")
-    )
-    .map((slide) => slide.id);
+        !preloadedRef.current.has(slide.id)
+      ) {
+        const url = slide.signedUrl || slide.signedImageUrl;
+        if (!url) continue;
 
-  // Use React Query to fetch all image URLs in parallel
-  const { isLoading, isError } = useQuery({
-    queryKey: ["prefetch-topic-images", imageSlideIds.sort().join(",")],
-    queryFn: async () => {
-      // Access store state directly using getState()
-      const storeState = useTopicSlidesCacheStore.getState();
-      const setSlideUrl = storeState.setSlideUrl;
-      const cache = storeState.cache;
-      
-      // Check cache first - only fetch URLs that aren't already cached
-      const uncachedSlideIds = imageSlideIds.filter((slideId) => {
-        const cached = cache[slideId];
-        if (!cached) return true;
-        // Check if cache is expired (older than 7 days)
-        const CACHE_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
-        return Date.now() - cached.timestamp > CACHE_EXPIRY_MS;
-      });
+        preloadedRef.current.add(slide.id);
 
-      if (uncachedSlideIds.length === 0) {
-        return { fetched: 0, cached: imageSlideIds.length };
+        const resolvedUrl = toStorageUrl(url) ?? url;
+        const img = new Image();
+        img.src = resolvedUrl;
       }
+    }
+  }, [slides, enabled]);
 
-      // Fetch all uncached URLs in parallel
-      const results = await Promise.allSettled(
-        uncachedSlideIds.map(async (slideId) => {
-          try {
-            const result = await topicsApi.slides.getImageUrl(slideId);
-            if (result.data?.url) {
-              // Populate the store cache immediately
-              setSlideUrl(slideId, result.data.url);
-              return { slideId, success: true };
-            }
-            return { slideId, success: false };
-          } catch (error) {
-            console.error(`Failed to fetch image URL for slide ${slideId}:`, error);
-            return { slideId, success: false };
-          }
-        })
-      );
-
-      const successful = results.filter(
-        (r) => r.status === "fulfilled" && r.value.success
-      ).length;
-
-      return {
-        fetched: successful,
-        cached: imageSlideIds.length - uncachedSlideIds.length,
-      };
-    },
-    enabled: enabled && imageSlideIds.length > 0,
-    staleTime: Infinity, // Never consider stale since we're pre-fetching
-    gcTime: Infinity, // Keep in cache indefinitely
-    refetchOnMount: false,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: false,
-  });
+  const imageSlideCount = slides.filter(
+    (s) => s.kind === "image" && s.id && !s.id.startsWith("temp_")
+  ).length;
 
   return {
-    isLoading,
-    isError,
-    imageSlideCount: imageSlideIds.length,
+    isLoading: false,
+    isError: false,
+    imageSlideCount,
   };
 }
