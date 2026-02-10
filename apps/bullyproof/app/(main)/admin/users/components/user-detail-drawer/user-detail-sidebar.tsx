@@ -17,11 +17,13 @@ import type { TabType } from "./types";
 interface UserDetailSidebarProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  canManageFeatures?: boolean;
 }
 
 export function UserDetailSidebar({
   activeTab,
   onTabChange,
+  canManageFeatures,
 }: UserDetailSidebarProps) {
   return (
     <div className="hidden md:flex flex-col w-48 shrink-0 bg-transparent">
@@ -108,7 +110,8 @@ export function UserDetailSidebar({
                     <SidebarMenuItem>
                       <SidebarMenuButton
                         isActive={activeTab === "features"}
-                        onClick={() => onTabChange("features")}
+                        onClick={canManageFeatures ? () => onTabChange("features") : undefined}
+                        disabled={!canManageFeatures}
                         className={
                           activeTab === "features"
                             ? "!bg-[var(--brand-bullyproof-primary)] !text-white hover:!bg-[var(--brand-bullyproof-primary)]/90 hover:!text-white data-[active=true]:!bg-[var(--brand-bullyproof-primary)] data-[active=true]:!text-white"

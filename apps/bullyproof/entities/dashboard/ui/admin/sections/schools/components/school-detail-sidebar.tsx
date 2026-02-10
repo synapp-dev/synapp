@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import {
   Sidebar,
   SidebarContent,
@@ -56,6 +57,8 @@ export function SchoolDetailSidebar({
   onTabChange,
   onDeleteClick,
 }: SchoolDetailSidebarProps) {
+  const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
+
   return (
     <div className="hidden md:flex flex-col w-48 shrink-0 bg-transparent">
       <div className="h-fit">
@@ -71,7 +74,7 @@ export function SchoolDetailSidebar({
                     {navItems.map((item, index) => {
                       const Icon = item.icon;
                       const isOnboarding = item.id === "onboarding";
-                      const isDisabled = item.disabled;
+                      const isDisabled = item.disabled || (item.id === "features" && !canManageFeatures);
                       
                       return (
                         <SidebarMenuItem key={item.id}>

@@ -167,6 +167,7 @@ import { ImportUsersDialog } from "./import-users-dialog";
 import { ImportClassesDialog } from "./import-classes-dialog";
 import { BulkRoleDialog } from "./bulk-role-dialog";
 import { SchoolFeaturesTab } from "./school-features-tab";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import {
@@ -2788,7 +2789,9 @@ function SchoolDetailDrawerContent({
 
               {/* Features Section */}
               {activeSection === "features" && school && (
-                <SchoolFeaturesTab school={school} />
+                <FeatureGuard feature="/admin/features">
+                  <SchoolFeaturesTab school={school} />
+                </FeatureGuard>
               )}
             </div>
           </main>

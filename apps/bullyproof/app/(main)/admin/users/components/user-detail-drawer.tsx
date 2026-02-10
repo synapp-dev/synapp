@@ -133,6 +133,8 @@ import {
   isSchoolLicenceAccount,
   PLATFORM_ROLE_KEYS,
 } from "./user-detail-drawer/utils";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import type {
   UserDetailDrawerProps,
   TabType,
@@ -220,6 +222,9 @@ function UserDetailDrawerContent({
     isPlatform?: boolean;
   } | null>(null);
   const [isTogglingRole, setIsTogglingRole] = useState(false);
+
+  // Check if current user has access to manage features
+  const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
 
   // Get active tab from query params only - no local state
   const activeTab = (searchParams.get("tab") as TabType) || "details";
@@ -730,7 +735,7 @@ function UserDetailDrawerContent({
         {/* Sidebar and Content Area */}
         <div className="flex flex-1 overflow-hidden min-h-0 gap-0">
           {/* Left Sidebar */}
-          <UserDetailSidebar activeTab={activeTab} onTabChange={updateTab} />
+          <UserDetailSidebar activeTab={activeTab} onTabChange={updateTab} canManageFeatures={canManageFeatures} />
 
           {/* Right Content Area */}
           <main className="flex flex-1 flex-col overflow-hidden min-h-0 pt-2 pr-6 pl-4">
@@ -1257,7 +1262,11 @@ function UserDetailDrawerContent({
                 />
               )}
 
-              {activeTab === "features" && <UserFeaturesTab user={user} />}
+              {activeTab === "features" && (
+                <FeatureGuard feature="/admin/features">
+                  <UserFeaturesTab user={user} />
+                </FeatureGuard>
+              )}
             </div>
           </main>
         </div>
