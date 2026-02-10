@@ -1,7 +1,0 @@
-# ── SMTP (Ticket Email Notifications) ─────────────────────────────────────────
-SMTP_HOST=mail.authsmtp.com
-SMTP_PORT=587
-SMTP_USER=ac79514
-SMTP_PASS=c17-BWR-9Bm-P5B
-SMTP_FROM="Bullyproof Tickets <donotreply@bullyproofaustralia.org.au>"
-TICKET_NOTIFY_EMAIL=agirton@intradark.com,aarongirton@gmail.com
