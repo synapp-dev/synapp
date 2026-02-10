@@ -334,7 +334,7 @@ export function FeedbackDialog({
   );
 
   const form = useForm<FeedbackFormValues>({
-    resolver: zodResolver(feedbackSchema),
+    resolver: zodResolver(feedbackSchema as any),
     defaultValues: {
       type: "bug",
       pagePath: pathname,
