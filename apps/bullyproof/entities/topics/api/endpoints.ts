@@ -164,4 +164,58 @@ export const topicsApi = {
       body: JSON.stringify(payload),
     });
   },
+  lessonPlans: {
+    list(topicId: string): Promise<
+      ApiResult<
+        Array<{
+          id: string;
+          topicId: string;
+          fileName: string;
+          fileUrl: string;
+          fileSize: number | null;
+          uploadedBy: string | null;
+          createdAt: string;
+        }>
+      >
+    > {
+      return apiFetch(
+        `/topic-lesson-plans?topicId=${encodeURIComponent(topicId)}`
+      );
+    },
+    upload(
+      topicId: string,
+      file: File
+    ): Promise<
+      ApiResult<{
+        id: string;
+        topicId: string;
+        fileName: string;
+        fileUrl: string;
+        fileSize: number | null;
+        uploadedBy: string | null;
+        createdAt: string;
+      }>
+    > {
+      const formData = new FormData();
+      formData.append("topicId", topicId);
+      formData.append("file", file);
+      return apiFetch("/topic-lesson-plans", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    getUrl(
+      planId: string
+    ): Promise<ApiResult<{ url: string; fileName: string }>> {
+      return apiFetch(
+        `/topic-lesson-plans/${encodeURIComponent(planId)}`
+      );
+    },
+    delete(planId: string): Promise<ApiResult<{ success: boolean }>> {
+      return apiFetch(
+        `/topic-lesson-plans/${encodeURIComponent(planId)}`,
+        { method: "DELETE" }
+      );
+    },
+  },
 };
