@@ -13,6 +13,8 @@ async function seedFeatures() {
       { key: 'system:admin-access', name: 'Admin Access', description: 'General admin functionality access', category: 'system', section: 'system' },
       { key: 'system:teacher-access', name: 'Teacher Access', description: 'General teacher functionality access', category: 'system', section: 'system' },
       { key: 'system:school-admin-access', name: 'School Admin Access', description: 'School admin functionality access', category: 'system', section: 'system' },
+      { key: 'system:impersonate', name: 'Impersonate Users', description: 'Access to the impersonate user menu in the app header', category: 'system', section: 'system' },
+      { key: 'system:feedback-button', name: 'Feedback Button', description: 'Access to the feedback/bug report button in the app header', category: 'system', section: 'system' },
 
       // Page features – top-level
       { key: '/dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'page', section: 'dashboard' },
@@ -93,6 +95,24 @@ async function seedFeatures() {
       .where(eq(roles.key, 'SCHOOL_ADMIN'))
       .limit(1);
     
+    const intradarkDevRole = await db
+      .select()
+      .from(roles)
+      .where(eq(roles.key, 'INTRADARK_DEV'))
+      .limit(1);
+    
+    const platformModeratorRole = await db
+      .select()
+      .from(roles)
+      .where(eq(roles.key, 'PLATFORM_MODERATOR'))
+      .limit(1);
+    
+    const platformStaffRole = await db
+      .select()
+      .from(roles)
+      .where(eq(roles.key, 'PLATFORM_STAFF'))
+      .limit(1);
+    
     // Enable features for roles globally to maintain backward compatibility
     const permissionsToCreate = [];
     
@@ -168,6 +188,52 @@ async function seedFeatures() {
       }
     }
     
+    // Impersonate: only INTRADARK_DEV gets access; PLATFORM_ADMIN/MODERATOR/STAFF can see but not use
+    const impersonateFeature = insertedFeatures.find(f => f.key === 'system:impersonate');
+    if (impersonateFeature) {
+      if (intradarkDevRole.length > 0) {
+        permissionsToCreate.push({
+          featureId: impersonateFeature.id,
+          level: 'role' as const,
+          targetId: intradarkDevRole[0].id,
+          enabled: true,
+        });
+      }
+      const visibleOnlyRoles = [platformAdminRole, platformModeratorRole, platformStaffRole];
+      for (const role of visibleOnlyRoles) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: impersonateFeature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: false,
+            visible: true,
+          });
+        }
+      }
+    }
+    
+    // Feedback button: enabled for INTRADARK_DEV and PLATFORM_ADMIN
+    const feedbackFeature = insertedFeatures.find(f => f.key === 'system:feedback-button');
+    if (feedbackFeature) {
+      if (intradarkDevRole.length > 0) {
+        permissionsToCreate.push({
+          featureId: feedbackFeature.id,
+          level: 'role' as const,
+          targetId: intradarkDevRole[0].id,
+          enabled: true,
+        });
+      }
+      if (platformAdminRole.length > 0) {
+        permissionsToCreate.push({
+          featureId: feedbackFeature.id,
+          level: 'role' as const,
+          targetId: platformAdminRole[0].id,
+          enabled: true,
+        });
+      }
+    }
+    
     // Insert permissions
     let permissionsCreated = 0;
     for (const permission of permissionsToCreate) {
@@ -200,6 +266,44 @@ async function seedFeatures() {
           level: 'global',
           targetId: null,
           enabled: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+    
+    // Impersonate: globally hidden (not visible, not enabled)
+    if (impersonateFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: impersonateFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: false,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+    
+    // Feedback button: globally visible but not enabled (users can see it but not interact)
+    if (feedbackFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: feedbackFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
         })
         .onConflictDoNothing()
         .returning();
