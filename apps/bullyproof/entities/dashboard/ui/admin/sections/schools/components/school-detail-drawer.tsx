@@ -95,9 +95,6 @@ import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
 import { statesApi } from "@/entities/states/api/endpoints";
 import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
-import { useStatesStore } from "@/entities/states/model/store";
-import { useSchoolSectorsStore } from "@/entities/school-sectors/model/store";
-import { useSchoolLevelsStore } from "@/entities/school-levels/model/store";
 import { useRoles, useUsers } from "@/entities/users/model/store";
 import { userKeys } from "@/entities/users/model/keys";
 import { UsersTable } from "@/entities/users/ui/users-table";
@@ -268,11 +265,6 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
   const [sectorComboboxOpen, setSectorComboboxOpen] = useState(false);
   const [levelsComboboxOpen, setLevelsComboboxOpen] = useState(false);
 
-  // React Query hooks with Zustand caching
-  const { states, setStates } = useStatesStore();
-  const { schoolSectors, setSchoolSectors } = useSchoolSectorsStore();
-  const { schoolLevels, setSchoolLevels } = useSchoolLevelsStore();
-
   const { data: statesData = [], isLoading: loadingStates } = useQuery({
     queryKey: ["states"],
     queryFn: async () => {
@@ -281,17 +273,12 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
         throw new Error(result.error.message || "Failed to fetch states");
       }
       if (result.data) {
-        const sorted = [...result.data].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
-        setStates(sorted);
-        return sorted;
+        return [...result.data].sort((a, b) => a.name.localeCompare(b.name));
       }
       return [];
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    initialData: () => (states.length > 0 ? states : undefined),
   });
 
   const { data: sectorsData = [], isLoading: loadingSectors } = useQuery({
@@ -302,17 +289,12 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
         throw new Error(result.error.message || "Failed to fetch sectors");
       }
       if (result.data) {
-        const sorted = [...result.data].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
-        setSchoolSectors(sorted);
-        return sorted;
+        return [...result.data].sort((a, b) => a.name.localeCompare(b.name));
       }
       return [];
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    initialData: () => (schoolSectors.length > 0 ? schoolSectors : undefined),
   });
 
   const { data: levelsData = [], isLoading: loadingLevels } = useQuery({
@@ -325,17 +307,12 @@ function SchoolDetailsCard({ school, onSchoolUpdate }: SchoolDetailsCardProps) {
         );
       }
       if (result.data) {
-        const sorted = [...result.data].sort((a, b) =>
-          a.key.localeCompare(b.key)
-        );
-        setSchoolLevels(sorted);
-        return sorted;
+        return [...result.data].sort((a, b) => a.key.localeCompare(b.key));
       }
       return [];
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    initialData: () => (schoolLevels.length > 0 ? schoolLevels : undefined),
   });
 
   // Map school data to IDs

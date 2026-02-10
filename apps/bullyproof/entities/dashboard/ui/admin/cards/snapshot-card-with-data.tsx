@@ -8,7 +8,7 @@ import {
   metricsApi,
   type MetricResponse,
 } from "@/entities/dashboard/api/endpoints";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import Link from "next/link";
 
 interface SnapshotCardWithDataProps {
@@ -32,11 +32,11 @@ export function SnapshotCardWithData({
   subtitle,
   scope = "school",
 }: SnapshotCardWithDataProps) {
-  // Client-side token validation using useIsPlatformAdmin hook
-  const isPlatformAdmin = useIsPlatformAdmin();
+  // Client-side validation using feature access
+  const { hasAccess: isAdmin } = useFeatureAccess("system:admin-access");
 
-  // Validate scope parameter - if 'all' requested but not platform admin, default to 'school'
-  const validatedScope = scope === "all" && isPlatformAdmin ? "all" : "school";
+  // Validate scope parameter - if 'all' requested but not admin, default to 'school'
+  const validatedScope = scope === "all" && isAdmin ? "all" : "school";
 
   // Determine which API method to call based on metricKey
   const getApiCall = () => {

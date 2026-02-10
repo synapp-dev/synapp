@@ -31,7 +31,6 @@ import {
 } from "@workspace/ui/components/select";
 import {
   useTopicsByStage,
-  useSlideUrl,
 } from "@/entities/topics/model/store-enhanced";
 import { useStageByCode } from "@/entities/stages/model/store";
 import type { topics, topicSlides } from "@/server/db/schema";

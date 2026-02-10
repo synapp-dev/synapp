@@ -54,6 +54,8 @@ import {
   Save,
   GripHorizontal,
   Pencil,
+  Download,
+  ExternalLink,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import {
@@ -101,14 +103,11 @@ import {
   RadioGroupItem,
 } from "@workspace/ui/components/radio-group";
 import { uploadSlideImage } from "@/utils/supabase/upload";
-import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import {
-  useTopicsStore,
   useTopicsByStage,
   useInvalidateTopics,
 } from "@/entities/topics/model/store-enhanced";
 import { useStageByCode, useInvalidateStage } from "@/entities/stages/model/store";
-import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import { useMutationInvalidation } from "@/hooks/use-mutation-invalidation";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
@@ -437,6 +436,21 @@ export function TopicDetailSection({
   const [isEditTopicDrawerOpen, setIsEditTopicDrawerOpen] = useState(false);
   const [isEditCurriculumTopicDrawerOpen, setIsEditCurriculumTopicDrawerOpen] = useState(false);
   const [showLessonPlanDialog, setShowLessonPlanDialog] = useState(false);
+  const [lessonPlans, setLessonPlans] = useState<
+    Array<{
+      id: string;
+      topicId: string;
+      fileName: string;
+      fileUrl: string;
+      fileSize: number | null;
+      uploadedBy: string | null;
+      createdAt: string;
+    }>
+  >([]);
+  const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
+  const [isUploadingLessonPlan, setIsUploadingLessonPlan] = useState(false);
+  const [isDeletingLessonPlan, setIsDeletingLessonPlan] = useState<string | null>(null);
+  const lessonPlanFileInputRef = useRef<HTMLInputElement>(null);
 
   // @dnd-kit sensors
   const sensors = useSensors(
@@ -576,26 +590,11 @@ export function TopicDetailSection({
     setPendingNavigation(null);
   };
 
-  // Cache store methods
-  const invalidateSlide = useTopicSlidesCacheStore(
-    (state) => state.invalidateSlide
-  );
-  const getSlideUrl = useTopicSlidesCacheStore((state) => state.getSlideUrl);
-  const setSlideUrlOldStore = useTopicSlidesCacheStore(
-    (state) => state.setSlideUrl
-  );
-  const setSlideUrlNewStore = useTopicsStore((state) => state.setSlideUrl);
-
-  // Helper to set URL in both stores
-  const setSlideUrl = (slideId: string, url: string) => {
-    setSlideUrlOldStore(slideId, url);
-    setSlideUrlNewStore(slideId, url);
-  };
-
-  // Certification cache store methods
-  const invalidateCertificationSlide = useCertificationSlidesCacheStore(
-    (state) => state.invalidateSlide
-  );
+  // No-op: signed URLs are managed by the API/DB cache
+  const setSlideUrl = (_slideId: string, _url: string) => {};
+  // No-op invalidation stubs – TQ invalidation handles freshness
+  const invalidateSlide = (_slideId: string) => {};
+  const invalidateCertificationSlide = (_slideId: string) => {};
 
   // Parse topic slug (e.g., "T1" -> order 1) - only for curriculum
   const topicOrder = topicSlug?.startsWith("T")
@@ -628,11 +627,7 @@ export function TopicDetailSection({
   // Invalidation hooks for curriculum topics
   const { invalidateTopicsByStage, invalidateTopic } = useInvalidateTopics();
   const { invalidateStage } = useInvalidateStage();
-  const { removeTopic, setTopic: setTopicInStore } = useTopicsStore();
   const { invalidateAfterMutation } = useMutationInvalidation();
-  
-  // Get topic from Zustand store to sync with updates
-  const { topics: storeTopics } = useTopicsStore();
 
   // Extract fetchData function so it can be reused after save (for certification and manual refetch)
   const fetchTopicData = useCallback(
@@ -662,17 +657,10 @@ export function TopicDetailSection({
           const slidesResult =
             await certificationApi.topics.slides.list(topicId);
           if (slidesResult.data) {
-            const cacheStore = useCertificationSlidesCacheStore.getState();
-            
             const allSlides: ExtendedSlideData[] = slidesResult.data
               .sort((a, b) => a.orderIndex - b.orderIndex)
               .map((slide) => {
-                // Extract signedImageUrl from API response and cache it
                 const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
-                if (slideWithUrl.signedImageUrl && slide.kind === "image") {
-                  cacheStore.setSlideUrl(slide.id, slideWithUrl.signedImageUrl);
-                }
-                
                 return {
                   id: slide.id,
                   kind: slide.kind as SlideData["kind"],
@@ -848,15 +836,13 @@ export function TopicDetailSection({
     const isNewTopic = lastProcessedTopicIdRef.current !== foundTopic.id;
 
     if (!isNewTopic) {
-      // Same topic - sync title/status from store if it changed, but don't reset slides
-      const storeTopic = storeTopics[foundTopic.id];
-      if (storeTopic && topic) {
-        // Only update if title or status changed
-        if (storeTopic.title !== topic.title || storeTopic.status !== topic.status) {
+      // Same topic - sync title/status from TQ cache if it changed, but don't reset slides
+      if (foundTopic && topic) {
+        if (foundTopic.title !== topic.title || foundTopic.status !== topic.status) {
           setTopic({
             ...topic,
-            title: storeTopic.title,
-            status: storeTopic.status,
+            title: foundTopic.title,
+            status: foundTopic.status,
           });
         }
       }
@@ -976,23 +962,20 @@ export function TopicDetailSection({
     // Note: setSlideUrl is stable from Zustand, cachedTopics is tracked via foundTopic
   ]);
 
-  // Sync local topic state with store when topic is updated (for same topic ID)
+  // Sync local topic state with TQ cache when topic is updated (for same topic ID)
   useEffect(() => {
     if (isCertification || !foundTopic || !topic) return;
     
-    // Check if the topic in the store has been updated
-    const storeTopic = storeTopics[foundTopic.id];
-    if (storeTopic && storeTopic.id === topic.id) {
-      // Only update title and status, preserve slides and other local state
-      if (storeTopic.title !== topic.title || storeTopic.status !== topic.status) {
+    if (foundTopic.id === topic.id) {
+      if (foundTopic.title !== topic.title || foundTopic.status !== topic.status) {
         setTopic({
           ...topic,
-          title: storeTopic.title,
-          status: storeTopic.status,
+          title: foundTopic.title,
+          status: foundTopic.status,
         });
       }
     }
-  }, [foundTopic, storeTopics, isCertification, topic]);
+  }, [foundTopic, isCertification, topic]);
 
   // Use local slides instead of topic.slides
   const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
@@ -2658,6 +2641,93 @@ export function TopicDetailSection({
     performSave();
   };
 
+  // ── Lesson Plan handlers ──────────────────────────────────────────
+  const fetchLessonPlans = useCallback(async () => {
+    if (!topic?.id) return;
+    setIsLoadingLessonPlans(true);
+    try {
+      const result = await topicsApi.lessonPlans.list(topic.id);
+      if (result.data) {
+        setLessonPlans(result.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch lesson plans:", err);
+    } finally {
+      setIsLoadingLessonPlans(false);
+    }
+  }, [topic?.id]);
+
+  // Fetch lesson plans when topic loads
+  useEffect(() => {
+    if (topic?.id) {
+      fetchLessonPlans();
+    }
+  }, [topic?.id, fetchLessonPlans]);
+
+  const handleLessonPlanUpload = async (file: File) => {
+    if (!topic?.id) return;
+    setIsUploadingLessonPlan(true);
+    try {
+      const result = await topicsApi.lessonPlans.upload(topic.id, file);
+      if (result.data) {
+        toast.success("Lesson plan uploaded", {
+          description: file.name,
+        });
+        await fetchLessonPlans();
+      } else {
+        toast.error("Upload failed", {
+          description: result.error?.message ?? "Unknown error",
+        });
+      }
+    } catch (err: any) {
+      toast.error("Upload failed", {
+        description: err.message ?? "Unknown error",
+      });
+    } finally {
+      setIsUploadingLessonPlan(false);
+      if (lessonPlanFileInputRef.current) {
+        lessonPlanFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleLessonPlanDownload = async (planId: string) => {
+    try {
+      const result = await topicsApi.lessonPlans.getUrl(planId);
+      if (result.data?.url) {
+        window.open(result.data.url, "_blank");
+      } else {
+        toast.error("Failed to get download link");
+      }
+    } catch (err: any) {
+      toast.error("Failed to get download link", {
+        description: err.message ?? "Unknown error",
+      });
+    }
+  };
+
+  const handleLessonPlanDelete = async (planId: string, fileName: string) => {
+    if (!window.confirm(`Delete "${fileName}"? This cannot be undone.`)) return;
+    setIsDeletingLessonPlan(planId);
+    try {
+      const result = await topicsApi.lessonPlans.delete(planId);
+      if (result.data?.success) {
+        toast.success("Lesson plan deleted", { description: fileName });
+        await fetchLessonPlans();
+      } else {
+        toast.error("Delete failed", {
+          description: result.error?.message ?? "Unknown error",
+        });
+      }
+    } catch (err: any) {
+      toast.error("Delete failed", {
+        description: err.message ?? "Unknown error",
+      });
+    } finally {
+      setIsDeletingLessonPlan(null);
+    }
+  };
+
   // Show skeleton loaders while loading
   if (isLoading) {
     return (
@@ -2860,13 +2930,22 @@ export function TopicDetailSection({
               <Button
                 variant="outline"
                 onClick={() => setShowLessonPlanDialog(true)}
+                className="relative"
               >
                 <FileText className="h-4 w-4" />
-                Lesson Plan
+                Lesson Plans
+                {lessonPlans.length > 0 && (
+                  <Badge
+                    variant="secondary"
+                    className="ml-1.5 h-5 min-w-[20px] px-1.5 text-xs"
+                  >
+                    {lessonPlans.length}
+                  </Badge>
+                )}
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">
-              <p>View lesson plan for this topic</p>
+              <p>Manage lesson plans for this topic</p>
             </TooltipContent>
           </Tooltip>
           <Tooltip>
@@ -3592,16 +3671,120 @@ export function TopicDetailSection({
       <Dialog open={showLessonPlanDialog} onOpenChange={setShowLessonPlanDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Lesson Plan</DialogTitle>
+            <DialogTitle>Lesson Plans</DialogTitle>
             <DialogDescription>
-              Lesson plan for {topic?.title || "this topic"}
+              Manage lesson plan PDFs for{" "}
+              {topic?.title || "this topic"}
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <p className="text-muted-foreground text-center py-8">
-              Lesson plan content will be displayed here.
-            </p>
+
+          <div className="space-y-4 py-2">
+            {/* Upload area */}
+            <div className="flex items-center gap-3">
+              <input
+                ref={lessonPlanFileInputRef}
+                type="file"
+                accept=".pdf,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLessonPlanUpload(file);
+                }}
+              />
+              <Button
+                variant="outline"
+                onClick={() => lessonPlanFileInputRef.current?.click()}
+                disabled={isUploadingLessonPlan}
+              >
+                {isUploadingLessonPlan ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {isUploadingLessonPlan ? "Uploading..." : "Upload PDF"}
+              </Button>
+              <p className="text-muted-foreground text-sm">
+                PDF files only
+              </p>
+            </div>
+
+            {/* Plans list */}
+            {isLoadingLessonPlans ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="text-muted-foreground h-6 w-6 animate-spin" />
+              </div>
+            ) : lessonPlans.length === 0 ? (
+              <div className="text-muted-foreground rounded-md border border-dashed py-8 text-center">
+                <FileText className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p className="text-sm">No lesson plans uploaded yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {lessonPlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className="flex items-center justify-between gap-3 rounded-md border px-3 py-2"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">
+                          {plan.fileName}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {plan.fileSize
+                            ? `${(plan.fileSize / 1024).toFixed(0)} KB`
+                            : "Unknown size"}
+                          {" · "}
+                          {new Date(plan.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleLessonPlanDownload(plan.id)}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Open PDF</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive h-8 w-8"
+                            onClick={() =>
+                              handleLessonPlanDelete(plan.id, plan.fileName)
+                            }
+                            disabled={isDeletingLessonPlan === plan.id}
+                          >
+                            {isDeletingLessonPlan === plan.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete lesson plan</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+
           <DialogFooter>
             <Button
               variant="outline"
@@ -3670,11 +3853,7 @@ export function TopicDetailSection({
             refetchStage();
           }}
           onTopicDeleted={async () => {
-            // Remove topic from Zustand store
-            if (topic.id) {
-              removeTopic(topic.id);
-            }
-            // Invalidate React Query cache automatically
+            // Invalidate React Query cache
             if (cachedStage.id) {
               invalidateAfterMutation(`/stages/${cachedStage.id}`, { id: cachedStage.id });
             }

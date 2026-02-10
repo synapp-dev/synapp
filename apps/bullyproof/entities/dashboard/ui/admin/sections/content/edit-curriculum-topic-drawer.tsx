@@ -32,7 +32,6 @@ import { Loader2, Trash2 } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics } from "@/server/db/schema";
 import {
-  useTopicsStore,
   useInvalidateTopics,
 } from "@/entities/topics/model/store-enhanced";
 import { useQueryClient } from "@tanstack/react-query";
@@ -65,8 +64,7 @@ export function EditCurriculumTopicDrawer({
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
-  // Zustand store and invalidation hooks
-  const { setTopic, removeTopic } = useTopicsStore();
+  // TQ invalidation hooks
   const { invalidateTopic, invalidateTopicsByStage } = useInvalidateTopics();
   const queryClient = useQueryClient();
 
@@ -104,11 +102,6 @@ export function EditCurriculumTopicDrawer({
         return;
       }
 
-      // Update Zustand store with the returned topic data
-      if (result.data) {
-        setTopic(result.data as any);
-      }
-
       // Invalidate React Query cache
       invalidateTopic(topic.id);
       if (topic.stageId) {
@@ -144,9 +137,6 @@ export function EditCurriculumTopicDrawer({
         setShowDeleteDialog(false);
         return;
       }
-
-      // Remove topic from Zustand store
-      removeTopic(topic.id);
 
       // Invalidate React Query cache
       invalidateTopic(topic.id);

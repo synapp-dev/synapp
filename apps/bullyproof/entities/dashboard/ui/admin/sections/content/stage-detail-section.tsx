@@ -31,9 +31,7 @@ import {
 } from "@/entities/stages/model/store";
 import {
   useTopicsByStage,
-  useSlideUrl,
   useInvalidateTopics,
-  useTopicsStore,
 } from "@/entities/topics/model/store-enhanced";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
@@ -80,11 +78,10 @@ import { AnimatedThumbnail } from "@/components/organisms/animated-thumbnail";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 // Component to handle thumbnail image with error fallback
-function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
+function ThumbnailImage({ signedUrl, alt }: { signedUrl: string | null; alt: string }) {
   const [hasError, setHasError] = useState(false);
-  const imageUrl = useSlideUrl(slideId);
 
-  if (hasError || !imageUrl) {
+  if (hasError || !signedUrl) {
     return (
       <div className="w-24 h-14 flex-shrink-0 rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center aspect-video">
         <FileText className="h-5 w-5 text-muted-foreground" />
@@ -95,7 +92,7 @@ function ThumbnailImage({ slideId, alt }: { slideId: string; alt: string }) {
   return (
     <div className="relative w-24 h-14 flex-shrink-0 rounded-md overflow-hidden bg-muted aspect-video">
       <Image
-        src={toStorageUrl(imageUrl) ?? imageUrl}
+        src={toStorageUrl(signedUrl) ?? signedUrl}
         alt={alt}
         fill
         className="object-cover"
@@ -771,7 +768,6 @@ export function StageDetailSection({
 
   const { invalidateStage } = useInvalidateStage();
   const { invalidateTopicsByStage } = useInvalidateTopics();
-  const { setTopic } = useTopicsStore();
 
   // Trigger background refetch on mount to ensure complete data
   // This ensures that even if we navigated from a topic page that only cached
@@ -1003,8 +999,8 @@ export function StageDetailSection({
   const handleTopicAdded = async (newTopic: TopicWithSlides) => {
     // Optimistically add to Zustand store for immediate UI update
     if (stage?.id && newTopic) {
-      // Type assertion needed because the store expects the full database schema type
-      setTopic(newTopic as any);
+      // Invalidate TQ cache so the new topic appears in the list
+      invalidateTopicsByStage(stage.id);
     }
     
     // Invalidate React Query cache
