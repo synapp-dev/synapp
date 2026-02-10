@@ -25,7 +25,7 @@ import type { Feature } from "./global-tab";
 import { meApi } from "@/entities/me/api/endpoints";
 import { useUserPermissionsQuery } from "@/entities/feature-permissions/model/useAdminFeaturePermissions";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import type { UserFeaturePermissionRow } from "@/entities/feature-permissions/model/store";
+import type { UserFeaturePermissionRow } from "@/entities/feature-permissions/model/useAdminFeaturePermissions";
 import type { ComboboxOption } from "@/components/molecules/combobox";
 
 type PermissionRow = UserFeaturePermissionRow;

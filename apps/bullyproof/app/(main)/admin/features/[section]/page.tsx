@@ -50,7 +50,8 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { toast } from "sonner";
 import { featurePermissionsKeys } from "@/entities/feature-permissions/model/keys";
-import { useFeaturePermissionsStore } from "@/entities/feature-permissions/model/store";
+import type { FeaturePermissionRow } from "@/entities/feature-permissions/api/endpoints";
+import type { UserFeaturePermissionRow } from "@/entities/feature-permissions/model/useAdminFeaturePermissions";
 import { MAINTENANCE_FEATURE_KEY, FEATURE_CATEGORIES } from "@/lib/feature-keys";
 import {
   VALID_SECTION_SLUGS,
@@ -370,125 +371,89 @@ function SectionPageContent({ sectionSlug }: { sectionSlug: string }) {
       }
       return result.data;
     },
-    onMutate: (variables) => {
-      const store = useFeaturePermissionsStore.getState();
+    onMutate: async (variables) => {
       const { featureId, level, targetId, schoolId, enabled, visible } =
         variables;
       const patch = {
         enabled,
         visible: visible !== undefined ? visible : enabled,
       };
-      let previous: { enabled: boolean; visible: boolean | null } | null = null;
-      let wasNew = false;
 
-      if (level === "global") {
-        const list = store.globalPermissions;
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateGlobalPermission(featureId, patch);
-        } else {
-          wasNew = true;
-          store.setGlobalPermissionOptimistic(featureId, patch);
-        }
-      } else if (level === "role" && targetId) {
-        const list = store.rolePermissions[targetId] ?? [];
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateRolePermission(targetId, featureId, patch);
-        } else {
-          wasNew = true;
-          store.setRolePermissionOptimistic(targetId, featureId, patch);
-        }
-      } else if (level === "school" && targetId) {
-        const list = store.schoolPermissions[targetId] ?? [];
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateSchoolPermission(targetId, featureId, patch);
-        } else {
-          wasNew = true;
-          store.setSchoolPermissionOptimistic(targetId, featureId, patch);
-        }
-      } else if (level === "school_role" && targetId && schoolId) {
-        const key = `${schoolId}:${targetId}`;
-        const list = store.schoolRolePermissions[key] ?? [];
-        const row = list.find((p) => p.featureId === featureId);
-        if (row) {
-          previous = { enabled: row.enabled, visible: row.visible ?? null };
-          store.updateSchoolRolePermission(
-            schoolId,
-            targetId,
-            featureId,
-            patch
+      if (level === "user" && targetId) {
+        // User permissions use a different shape (UserFeaturePermissionRow[])
+        const queryKey = featurePermissionsKeys.userFeatures(targetId);
+        await queryClient.cancelQueries({ queryKey });
+        const previous = queryClient.getQueryData<UserFeaturePermissionRow[]>(queryKey);
+        queryClient.setQueryData<UserFeaturePermissionRow[]>(queryKey, (old = []) => {
+          const idx = old.findIndex(
+            (r) => r.feature.id === featureId && r.permission.level === "user"
           );
-        } else {
-          wasNew = true;
-          store.setSchoolRolePermissionOptimistic(
-            schoolId,
-            targetId,
-            featureId,
-            patch
+          if (idx >= 0) {
+            const next = [...old];
+            next[idx] = {
+              ...next[idx],
+              permission: { ...next[idx].permission, ...patch },
+            };
+            return next;
+          }
+          // User-level row doesn't exist yet - update inherited row if present
+          return old.map((r) =>
+            r.feature.id === featureId
+              ? { ...r, permission: { ...r.permission, ...patch, level: "user" as const } }
+              : r
           );
-        }
-      } else if (level === "user" && targetId) {
-        const list = store.userPermissions[targetId] ?? [];
-        const userRow = list.find(
-          (r) => r.feature.id === featureId && r.permission.level === "user"
-        );
-        if (userRow) {
-          previous = {
-            enabled: userRow.permission.enabled,
-            visible: userRow.permission.visible ?? null,
-          };
-          store.updateUserPermission(targetId, featureId, patch);
-        } else {
-          store.updateUserPermission(targetId, featureId, patch);
-        }
+        });
+        return { queryKey, previous };
       }
 
-      return { previous, wasNew, level, featureId, targetId, schoolId };
-    },
-    onError: (err, variables, context) => {
-      if (!context) return;
-      const store = useFeaturePermissionsStore.getState();
-      const { previous, wasNew, level, featureId, targetId, schoolId } =
-        context;
-      if (level === "global") {
-        if (wasNew) store.removeGlobalPermissionOptimistic(featureId);
-        else if (previous) store.updateGlobalPermission(featureId, previous);
-      } else if (level === "role" && targetId) {
-        if (wasNew) store.removeRolePermissionOptimistic(targetId, featureId);
-        else if (previous)
-          store.updateRolePermission(targetId, featureId, previous);
-      } else if (level === "school" && targetId) {
-        if (wasNew)
-          store.removeSchoolPermissionOptimistic(targetId, featureId);
-        else if (previous)
-          store.updateSchoolPermission(targetId, featureId, previous);
-      } else if (level === "school_role" && targetId && schoolId) {
-        if (wasNew)
-          store.removeSchoolRolePermissionOptimistic(
-            schoolId,
-            targetId,
-            featureId
-          );
-        else if (previous)
-          store.updateSchoolRolePermission(
-            schoolId,
-            targetId,
+      // Bulk permission levels (global, role, school, school_role)
+      const queryKey =
+        level === "global"
+          ? featurePermissionsKeys.bulk("global")
+          : level === "role" && targetId
+            ? featurePermissionsKeys.bulk("role", targetId)
+            : level === "school" && targetId
+              ? featurePermissionsKeys.bulk("school", targetId)
+              : level === "school_role" && targetId && schoolId
+                ? featurePermissionsKeys.bulk("school_role", targetId, schoolId)
+                : null;
+
+      if (!queryKey) return {};
+
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<FeaturePermissionRow[]>(queryKey);
+      queryClient.setQueryData<FeaturePermissionRow[]>(queryKey, (old = []) => {
+        const idx = old.findIndex((p) => p.featureId === featureId);
+        if (idx >= 0) {
+          const next = [...old];
+          next[idx] = { ...next[idx], ...patch };
+          return next;
+        }
+        // New optimistic row
+        return [
+          ...old,
+          {
+            id: "",
             featureId,
-            previous
-          );
-      } else if (level === "user" && targetId && previous) {
-        store.updateUserPermission(targetId, featureId, previous);
+            level,
+            targetId: targetId ?? null,
+            schoolId: schoolId ?? null,
+            enabled: patch.enabled,
+            visible: patch.visible,
+          } as FeaturePermissionRow,
+        ];
+      });
+      return { queryKey, previous };
+    },
+    onError: (err, _variables, context) => {
+      if (context?.queryKey && context.previous !== undefined) {
+        queryClient.setQueryData(context.queryKey, context.previous);
       }
       toast.error(
         err instanceof Error ? err.message : "Failed to update permission"
       );
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: featurePermissionsKeys.all });
     },
   });
@@ -511,34 +476,49 @@ function SectionPageContent({ sectionSlug }: { sectionSlug: string }) {
         throw new Error(result.error.message || "Failed to remove permission");
       }
     },
-    onMutate: (variables) => {
-      const store = useFeaturePermissionsStore.getState();
+    onMutate: async (variables) => {
       const { featureId, level, targetId, schoolId } = variables;
-      if (level === "role" && targetId) {
-        store.removeRolePermissionOptimistic(targetId, featureId);
-      } else if (level === "school" && targetId) {
-        store.removeSchoolPermissionOptimistic(targetId, featureId);
-      } else if (level === "school_role" && targetId && schoolId) {
-        store.removeSchoolRolePermissionOptimistic(
-          schoolId,
-          targetId,
-          featureId
+
+      if (level === "user" && targetId) {
+        const queryKey = featurePermissionsKeys.userFeatures(targetId);
+        await queryClient.cancelQueries({ queryKey });
+        const previous = queryClient.getQueryData<UserFeaturePermissionRow[]>(queryKey);
+        queryClient.setQueryData<UserFeaturePermissionRow[]>(queryKey, (old = []) =>
+          old.filter(
+            (r) => !(r.feature.id === featureId && r.permission.level === "user")
+          )
         );
-      } else if (level === "user" && targetId) {
-        const list = store.userPermissions[targetId] ?? [];
-        const next = list.filter(
-          (r) => !(r.feature.id === featureId && r.permission.level === "user")
-        );
-        store.setUserPermissions(targetId, next);
+        return { queryKey, previous };
       }
+
+      // Bulk permission levels (role, school, school_role)
+      const queryKey =
+        level === "role"
+          ? featurePermissionsKeys.bulk("role", targetId)
+          : level === "school"
+            ? featurePermissionsKeys.bulk("school", targetId)
+            : level === "school_role" && schoolId
+              ? featurePermissionsKeys.bulk("school_role", targetId, schoolId)
+              : null;
+
+      if (!queryKey) return {};
+
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<FeaturePermissionRow[]>(queryKey);
+      queryClient.setQueryData<FeaturePermissionRow[]>(queryKey, (old = []) =>
+        old.filter((p) => p.featureId !== featureId)
+      );
+      return { queryKey, previous };
     },
-    onError: (err) => {
-      queryClient.invalidateQueries({ queryKey: featurePermissionsKeys.all });
+    onError: (err, _variables, context) => {
+      if (context?.queryKey && context.previous !== undefined) {
+        queryClient.setQueryData(context.queryKey, context.previous);
+      }
       toast.error(
         err instanceof Error ? err.message : "Failed to remove permission"
       );
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: featurePermissionsKeys.all });
     },
   });
