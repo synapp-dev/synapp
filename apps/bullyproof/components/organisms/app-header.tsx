@@ -160,36 +160,38 @@ export function AppHeader() {
           )}
           <CommandMenu />
           <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleFeedbackClick}
-                disabled={isCapturingScreenshot}
-                className={`h-9 w-9 relative transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive ${isCapturingScreenshot ? "animate-pulse border border-destructive bg-destructive/10 text-destructive" : "text-muted-foreground"}`}
-              >
-                <Bug
-                  className={`h-4 w-4 ${isCapturingScreenshot ? "animate-shake-twice" : ""}`}
-                />
-                {unreadTicketCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white pointer-events-none">
-                    {unreadTicketCount > 9 ? "9+" : unreadTicketCount}
-                  </span>
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p>
-                Send Feedback
-                {unreadTicketCount > 0 && (
-                  <span className="ml-1 text-blue-400">
-                    ({unreadTicketCount} unread)
-                  </span>
-                )}
-              </p>
-            </TooltipContent>
-          </Tooltip>
+          <FeatureGuard feature="system:feedback-button">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleFeedbackClick}
+                  disabled={isCapturingScreenshot}
+                  className={`h-9 w-9 relative transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive ${isCapturingScreenshot ? "animate-pulse border border-destructive bg-destructive/10 text-destructive" : "text-muted-foreground"}`}
+                >
+                  <Bug
+                    className={`h-4 w-4 ${isCapturingScreenshot ? "animate-shake-twice" : ""}`}
+                  />
+                  {unreadTicketCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white pointer-events-none">
+                      {unreadTicketCount > 9 ? "9+" : unreadTicketCount}
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="left">
+                <p>
+                  Send Feedback
+                  {unreadTicketCount > 0 && (
+                    <span className="ml-1 text-blue-400">
+                      ({unreadTicketCount} unread)
+                    </span>
+                  )}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </FeatureGuard>
           <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
           <ThemeToggle />
         </div>
