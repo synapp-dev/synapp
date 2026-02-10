@@ -10,10 +10,8 @@ export function clearAllUserData(queryClient: QueryClient) {
   // Clear all TanStack Query cache
   queryClient.clear();
   
-  // Clear all stores
+  // Clear essential stores
   useMeStore.getState().setCurrentUser(null);
-  useMeStore.getState().clearUsers();
-  useMeStore.getState().setLoading(false);
   
   useSchoolStore.getState().clearCurrentSchool();
   useSchoolStore.getState().clearLastAccessedSchool();
