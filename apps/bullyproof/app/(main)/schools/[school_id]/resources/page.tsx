@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { LibraryBig, FileText, Video, Lock } from "lucide-react";
 import {
   Card,
@@ -19,7 +19,7 @@ export default function ResourcesPage({
 }) {
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="/school/resources" />
       <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">

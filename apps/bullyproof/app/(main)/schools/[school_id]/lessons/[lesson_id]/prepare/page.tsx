@@ -45,7 +45,6 @@ import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
-import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
 import type { topics } from "@/server/db/schema";
 
 type Topic = typeof topics.$inferSelect & { slides?: any[] };
@@ -107,9 +106,8 @@ export default function LessonPreparePage() {
   const [slides, setSlides] = useState<SlideData[]>([]);
   const galleryRef = useRef<HTMLDivElement>(null);
 
-  const invalidateSlide = useTopicSlidesCacheStore(
-    (state) => state.invalidateSlide
-  );
+  // No-op: signed URL invalidation is handled by TQ/DB cache
+  const invalidateSlide = (_slideId: string) => {};
 
   const fetchTopicData = useCallback(async () => {
     if (!lessonData?.topicId) return;

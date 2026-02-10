@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
 import { useRouter } from "next/navigation";
 import { Video, Lock, ArrowLeft } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";

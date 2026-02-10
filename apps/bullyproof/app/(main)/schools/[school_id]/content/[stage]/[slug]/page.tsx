@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { TopicDetailSectionReadonly } from "@/entities/dashboard/ui/resources/sections/topic-detail-section-readonly";
 
 export default function ContentTopicPage({
@@ -24,7 +24,7 @@ export default function ContentTopicPage({
   if (!schoolId || !stageSlug || !topicSlug) {
     return (
       <>
-        <PlatformAdminGuard />
+        <FeatureGuard feature="/school/content" schoolId={schoolId} />
         {null}
       </>
     );
@@ -32,7 +32,7 @@ export default function ContentTopicPage({
 
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="/school/content" schoolId={schoolId} />
       <TopicDetailSectionReadonly
         stageSlug={stageSlug}
         topicSlug={topicSlug}

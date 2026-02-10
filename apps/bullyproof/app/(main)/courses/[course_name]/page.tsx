@@ -50,7 +50,7 @@ import { useMeStore } from "@/entities/me/model/store";
 import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
 import { createSlug } from "@/utils/slug";
 import { AnimatedThumbnail, type TopicSlide } from "@/components/organisms/animated-thumbnail";
-import { useCertificationTopicsReactive, useCertificationSlideUrl } from "@/entities/certification/model/topics-store";
+import { useCertificationTopicsByCourseCode } from "@/entities/certification/model/topics-store";
 import { useCertificationCourseByCode } from "@/entities/certification/model/store";
 import Image from "next/image";
 import { StarRating } from "@/components/atoms/star-rating";
@@ -115,8 +115,8 @@ export default function CoursePage() {
     fetchCourse();
   }, [courseNameSlug]);
 
-  // Use reactive hook to get topics from store (auto-fetches if missing)
-  const { topics: topicsList, isLoading: isLoadingTopics } = useCertificationTopicsReactive(
+  // Use TQ hook to get topics (auto-fetches and caches)
+  const { topics: topicsList, isLoading: isLoadingTopics } = useCertificationTopicsByCourseCode(
     course?.code || null,
     { includeSlides: true, includeUrls: true }
   );
@@ -167,7 +167,7 @@ export default function CoursePage() {
 
   const currentTopicImageSlides = currentTopic ? getImageSlidesForTopic(currentTopic) : [];
   const currentTopicFirstSlide = currentTopicImageSlides[0];
-  const currentTopicSlideUrl = useCertificationSlideUrl(currentTopicFirstSlide?.id);
+  const currentTopicSlideUrl = currentTopicFirstSlide?.signedUrl || null;
 
   useEffect(() => {
     const fetchProgress = async () => {

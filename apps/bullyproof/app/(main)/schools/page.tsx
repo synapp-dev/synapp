@@ -19,7 +19,7 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { School, Search, X, Loader2 } from "lucide-react";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import {
   useListSchoolsQuery,
   type School as SchoolServiceSchool,
@@ -100,7 +100,7 @@ function SchoolsPageContent() {
   usePageTitle(["schools"]);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const isPlatformAdmin = useIsPlatformAdmin();
+  const { hasAccess: isAdmin } = useFeatureAccess("system:admin-access");
 
   // Initialize state from URL params
   const [searchQuery, setSearchQuery] = useState(
@@ -180,7 +180,7 @@ function SchoolsPageContent() {
     error: adminError,
   } = useListSchoolsQuery(
     { limit: 100 }, // Maximum allowed limit
-    { enabled: isPlatformAdmin }
+    { enabled: isAdmin }
   );
 
   const {
@@ -189,12 +189,12 @@ function SchoolsPageContent() {
     error: mySchoolsError,
   } = useMySchoolsQuery(
     { limit: 100 }, // Maximum allowed limit
-    { enabled: !isPlatformAdmin }
+    { enabled: !isAdmin }
   );
 
-  const schools = isPlatformAdmin ? adminSchools : mySchools;
-  const isLoading = isPlatformAdmin ? adminLoading : mySchoolsLoading;
-  const error = isPlatformAdmin ? adminError : mySchoolsError;
+  const schools = isAdmin ? adminSchools : mySchools;
+  const isLoading = isAdmin ? adminLoading : mySchoolsLoading;
+  const error = isAdmin ? adminError : mySchoolsError;
 
   // Filter schools based on search and filters
   const filteredSchools = useMemo(() => {

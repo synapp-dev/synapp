@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { PlatformAdminGuard } from "@/components/molecules/platform-admin-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useRouter } from "next/navigation";
 import { StageDetailSection } from "@/entities/dashboard/ui/admin/sections/content/stage-detail-section";
 
@@ -24,7 +24,7 @@ export default function ContentStagePage({
   if (!schoolId || !stageSlug) {
     return (
       <>
-        <PlatformAdminGuard />
+        <FeatureGuard feature="/school/content" schoolId={schoolId} />
         {null}
       </>
     );
@@ -32,7 +32,7 @@ export default function ContentStagePage({
 
   return (
     <>
-      <PlatformAdminGuard />
+      <FeatureGuard feature="/school/content" schoolId={schoolId} />
       <StageDetailSection
         slug={stageSlug}
         readonly={true}

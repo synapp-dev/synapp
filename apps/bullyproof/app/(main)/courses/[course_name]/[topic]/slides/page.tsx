@@ -43,8 +43,6 @@ import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
-import { useCertificationTopicStore } from "@/stores/certification-topic-store";
-import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
 import { usePreloadAllSlideImages } from "@/hooks/use-preload-all-slide-images";
 import { createSlug } from "@/utils/slug";
 import { cn } from "@workspace/ui/lib/utils";
@@ -88,19 +86,9 @@ function CourseTopicSlidesPageContent() {
   const redirectCountdownRef = useRef<NodeJS.Timeout | null>(null);
   const pendingSlideRef = useRef<string | null>(null);
 
-  // Zustand store
-  const {
-    getTopic,
-    setTopic,
-    setAttempt,
-    setSlides,
-  } = useCertificationTopicStore();
-
-  // Get data from store
+  // Local state for topic, slides, and attempt
   const [foundTopicId, setFoundTopicId] = useState<string | null>(null);
-  const topic = foundTopicId ? getTopic(foundTopicId) : null;
-  
-  // Local state for slides and attempt (from single API call)
+  const [topic, setTopicState] = useState<any | null>(null);
   const [slides, setSlidesState] = useState<ExtendedSlideData[]>([]);
   const [currentAttempt, setCurrentAttemptState] = useState<any | null>(null);
 
@@ -166,22 +154,15 @@ function CourseTopicSlidesPageContent() {
           setIsLoading(false);
           // Still set topic for display
           setFoundTopicId(topicData.id);
-          setTopic(topicData.id, topicData);
+          setTopicState(topicData);
           return;
         }
 
-        // Process slides to match ExtendedSlideData format and cache signed URLs
-        const cacheStore = useCertificationSlidesCacheStore.getState();
+        // Process slides to match ExtendedSlideData format
         const processedSlides: ExtendedSlideData[] = slidesData
           .sort((a, b) => a.orderIndex - b.orderIndex)
           .map((slide) => {
-            // Extract signedUrl from API response and cache it
             const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
-            if (slideWithUrl.signedUrl && slide.kind === "image") {
-              // Cache the signed URL so prefetch hook doesn't fetch it again
-              cacheStore.setSlideUrl(slide.id, slideWithUrl.signedUrl);
-            }
-            
             return {
               id: slide.id,
               kind: slide.kind as SlideData["kind"],
@@ -199,15 +180,13 @@ function CourseTopicSlidesPageContent() {
             };
           });
 
-        // Set topic and slides in store
+        // Set topic and slides in local state
         setFoundTopicId(topicData.id);
-        setTopic(topicData.id, topicData);
-        setSlides(topicData.id, processedSlides);
+        setTopicState(topicData);
         setSlidesState(processedSlides);
 
         // Set attempt
         if (attemptData) {
-          setAttempt(topicData.id, attemptData as any);
           setCurrentAttemptState(attemptData);
         }
 
@@ -223,7 +202,7 @@ function CourseTopicSlidesPageContent() {
     };
 
     fetchTopicData();
-  }, [courseNameSlug, topicSlug, setTopic, setAttempt, setSlides]);
+  }, [courseNameSlug, topicSlug]);
 
   // Update current slide on page exit
   const updateCurrentSlideOnExit = useCallback(async () => {
@@ -242,12 +221,12 @@ function CourseTopicSlidesPageContent() {
 
       // Update local state with server response
       if (result.data?.attempt && foundTopicId) {
-        setAttempt(foundTopicId, result.data.attempt);
+        setCurrentAttemptState(result.data.attempt);
       }
     } catch (err) {
       console.error("Failed to update current slide on exit:", err);
     }
-  }, [foundTopicId, topic, setAttempt]);
+  }, [foundTopicId, topic]);
 
 
 
@@ -311,7 +290,7 @@ function CourseTopicSlidesPageContent() {
           });
           
           if (result.data) {
-            setAttempt(foundTopicId, result.data.attempt);
+            setCurrentAttemptState(result.data.attempt);
             setHasQuizzes(result.data.hasQuiz);
             setShowCompletionModal(true);
           } else {
@@ -346,7 +325,6 @@ function CourseTopicSlidesPageContent() {
     currentAttempt,
     currentSlideId,
     foundTopicId,
-    setAttempt,
     isFullscreen,
     router,
   ]);

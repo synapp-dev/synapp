@@ -2,25 +2,30 @@
 
 import { AdminDashboard } from "@/entities/dashboard/ui/admin/admin-dashboard";
 import { TeacherDashboard } from "@/entities/dashboard/ui/teacher/teacher-dashboard";
-import { useIsIntradarkDev, useIsPlatformAdmin, useIsSchoolStaff, useIsTeacher } from "@/entities/me/model/store";
+import { StaffDashboard } from "@/entities/dashboard/ui/staff/staff-dashboard";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 
 export default function DashboardPage() {
   usePageTitle(["dashboard"]);
-  const isPlatformAdmin = useIsPlatformAdmin();
-  const isIntradarkDev = useIsIntradarkDev();
-  const isTeacher = useIsTeacher();
-  const isSchoolStaff = useIsSchoolStaff();
+  const { hasAccess: isAdmin } = useFeatureAccess("system:admin-access");
+  const { hasAccess: isTeacher } = useFeatureAccess("system:teacher-access");
+  const { hasAccess: isStaff } = useFeatureAccess("system:school-staff-access");
 
-  // Render admin dashboard if user is a platform admin
-  if (isPlatformAdmin || isIntradarkDev) {
+  // Render admin dashboard if user has admin access
+  if (isAdmin) {
     return <AdminDashboard />;
   }
 
-  // Render teacher dashboard if user is a teacher
-  if (isTeacher || isSchoolStaff) {
+  // Render teacher dashboard if user has teacher access
+  if (isTeacher) {
     return <TeacherDashboard />;
+  }
+
+  // Render staff dashboard if user has school staff access
+  if (isStaff) {
+    return <StaffDashboard />;
   }
 
   // Fallback for users without specific roles
