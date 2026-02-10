@@ -63,6 +63,8 @@ export const SYSTEM_FEATURES = {
   ADMIN_ACCESS: "system:admin-access",
   TEACHER_ACCESS: "system:teacher-access",
   SCHOOL_ADMIN_ACCESS: "system:school-admin-access",
+  IMPERSONATE: "system:impersonate",
+  FEEDBACK_BUTTON: "system:feedback-button",
 } as const;
 
 // ─── Component Features ──────────────────────────────────────────────────────
