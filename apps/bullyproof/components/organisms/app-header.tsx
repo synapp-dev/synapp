@@ -1,17 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { toBlob } from "html-to-image";
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
 import { Button } from "@workspace/ui/components/button";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, Bug } from "lucide-react";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@workspace/ui/components/tooltip";
 
 import { CommandMenu } from "@/components/molecules/command-menu";
 import { Breadcrumb } from "@/components/molecules/breadcrumb";
 import { ImpersonateMenu } from "@/components/molecules/impersonate-menu";
-import { RoleGuard } from "@/components/molecules/role-guard";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
+import { FeedbackDialog } from "@/components/organisms/feedback-dialog";
 import { useMeStore } from "@/entities/me/model/store";
 import {
   getTutorialForPathname,
@@ -27,6 +34,49 @@ export function AppHeader() {
   );
   const [showTutorialDialog, setShowTutorialDialog] = useState(false);
   const [isSchoolPage, setIsSchoolPage] = useState(false);
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
+  const [screenshotBlob, setScreenshotBlob] = useState<Blob | null>(null);
+  const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
+  const [unreadTicketCount, setUnreadTicketCount] = useState(0);
+  const unreadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch unread ticket note count
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const { createBrowserClient } = await import("@/utils/supabase/client");
+      const supabase = createBrowserClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const res = await fetch("/api/feedback-tickets/unread-count", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadTicketCount(data.count ?? 0);
+      }
+    } catch {
+      // Silently ignore — badge is non-critical
+    }
+  }, []);
+
+  // Poll for unread count on mount and every 60 seconds
+  useEffect(() => {
+    fetchUnreadCount();
+    unreadPollRef.current = setInterval(fetchUnreadCount, 60_000);
+    return () => {
+      if (unreadPollRef.current) clearInterval(unreadPollRef.current);
+    };
+  }, [fetchUnreadCount]);
+
+  // Re-fetch when dialog closes (user may have read notes)
+  useEffect(() => {
+    if (!showFeedbackDialog) {
+      fetchUnreadCount();
+    }
+  }, [showFeedbackDialog, fetchUnreadCount]);
 
   useEffect(() => {
     const isSchool = pathname.startsWith("/schools/");
@@ -42,6 +92,30 @@ export function AppHeader() {
       setShowTutorialDialog(true);
     }
   };
+
+  const handleFeedbackClick = useCallback(async () => {
+    setIsCapturingScreenshot(true);
+    try {
+      const blob = await toBlob(document.body, {
+        pixelRatio: window.devicePixelRatio > 1 ? 1.5 : 1,
+        filter: (element) => {
+          // Skip iframes which can cause capture failures
+          if (element instanceof HTMLIFrameElement) return false;
+          return true;
+        },
+      });
+
+      setScreenshotBlob(blob);
+      setShowFeedbackDialog(true);
+    } catch (err) {
+      console.error("[FeedbackDialog] Screenshot capture failed:", err);
+      // If screenshot fails, still open the dialog without a screenshot
+      setScreenshotBlob(null);
+      setShowFeedbackDialog(true);
+    } finally {
+      setIsCapturingScreenshot(false);
+    }
+  }, []);
 
   // Determine if tutorial is completed (to hide "Don't show again" checkbox)
   const isTutorialCompleted = tutorialConfig
@@ -66,12 +140,10 @@ export function AppHeader() {
           <Breadcrumb />
         </div>
         <div className="flex items-center gap-2 px-4">
-          <RoleGuard roles={["PLATFORM_ADMIN"]}>
-            <>
-              <ImpersonateMenu />
-              <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
-            </>
-          </RoleGuard>
+          <FeatureGuard feature="system:impersonate">
+            <ImpersonateMenu />
+            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
+          </FeatureGuard>
           {tutorialConfig && (
             <>
               <Button
@@ -88,6 +160,37 @@ export function AppHeader() {
           )}
           <CommandMenu />
           <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleFeedbackClick}
+                disabled={isCapturingScreenshot}
+                className={`h-9 w-9 relative transition-all hover:bg-destructive/10 hover:text-destructive hover:border-destructive ${isCapturingScreenshot ? "animate-pulse border border-destructive bg-destructive/10 text-destructive" : "text-muted-foreground"}`}
+              >
+                <Bug
+                  className={`h-4 w-4 ${isCapturingScreenshot ? "animate-shake-twice" : ""}`}
+                />
+                {unreadTicketCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-500 px-1 text-[10px] font-bold text-white pointer-events-none">
+                    {unreadTicketCount > 9 ? "9+" : unreadTicketCount}
+                  </span>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>
+                Send Feedback
+                {unreadTicketCount > 0 && (
+                  <span className="ml-1 text-blue-400">
+                    ({unreadTicketCount} unread)
+                  </span>
+                )}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+          <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
           <ThemeToggle />
         </div>
       </header>
@@ -101,6 +204,12 @@ export function AppHeader() {
           showDontShowAgain={!isTutorialCompleted}
         />
       )}
+      <FeedbackDialog
+        open={showFeedbackDialog}
+        onOpenChange={setShowFeedbackDialog}
+        screenshotBlob={screenshotBlob}
+        onUnreadCountChange={fetchUnreadCount}
+      />
     </>
   );
 }

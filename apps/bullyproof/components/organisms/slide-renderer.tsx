@@ -2,15 +2,11 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { cn } from "@workspace/ui/lib/utils";
-import { useTopicSlidesCacheStore } from "@/stores/topic-slides-cache-store";
-import { useCertificationSlidesCacheStore } from "@/stores/certification-slides-cache-store";
-import { useTopicsStore } from "@/entities/topics/model/store-enhanced";
 import {
   isYouTubeUrl,
   isVimeoUrl,
   isVideoUrl,
   getVideoEmbedUrl,
-  getVideoThumbnailUrl,
   getYouTubeThumbnailUrl,
 } from "@/utils/video";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
@@ -30,6 +26,10 @@ export interface SlideData {
   videoEndS?: number | null;
   effectiveNotes?: string | null;
   quizData?: QuizData | null;
+  // Signed URLs from the API (DB-cached, resolved server-side)
+  signedUrl?: string | null;
+  signedImageUrl?: string | null;
+  signedVideoUrl?: string | null;
 }
 
 interface SlideRendererProps {
@@ -39,7 +39,7 @@ interface SlideRendererProps {
   forceRefresh?: boolean;
   // If true, shows thumbnail/preview only (no controls, no playback) - useful for galleries
   thumbnailOnly?: boolean;
-  // If true, uses certification slides cache store instead of topic slides cache store
+  // If true, uses certification slides (no-op now, kept for API compat)
   isCertification?: boolean;
 }
 
@@ -50,146 +50,64 @@ export function SlideRenderer({
   thumbnailOnly = false,
   isCertification = false,
 }: SlideRendererProps) {
-  // Use appropriate cache store based on context
-  const topicGetSlideUrl = useTopicSlidesCacheStore(
-    (state) => state.getSlideUrl
-  );
-  const certificationGetSlideUrl = useCertificationSlidesCacheStore(
-    (state) => state.getSlideUrl
-  );
-  const getSlideUrl = isCertification
-    ? certificationGetSlideUrl
-    : topicGetSlideUrl;
+  // ─── Resolve the image URL ───
+  // Priority:
+  //   1. blob: URLs (local file preview during upload)
+  //   2. signedUrl / signedImageUrl from the API response (DB-cached, cheap)
 
-  // Subscribe to cache changes for this specific slide
-  // Check new store first (from API responses with includeUrls)
-  const newStoreCachedUrl = useTopicsStore(
-    (state) => (!isCertification ? state.slideUrls[slide.id]?.url ?? null : null)
-  );
-  const topicCachedUrl = useTopicSlidesCacheStore(
-    (state) => state.cache[slide.id]?.url ?? null
-  );
-  const certificationCachedUrl = useCertificationSlidesCacheStore(
-    (state) => state.cache[slide.id]?.url ?? null
-  );
-  // Prefer new store URL if available, otherwise fall back to old store
-  const cachedUrl = isCertification 
-    ? certificationCachedUrl 
-    : (newStoreCachedUrl || topicCachedUrl);
+  // Resolve initial image URL from the slide data directly
+  const resolvedSignedUrl =
+    slide.signedUrl || slide.signedImageUrl || null;
 
-  // Initialize imageUrl from cache immediately if available
   const [imageUrl, setImageUrl] = useState<string | null>(() => {
-    // If we have a cached URL, use it immediately to avoid showing loader
-    if (slide.kind === "image" && slide.id && !slide.id.startsWith("temp_") && !slide.imageUrl?.startsWith("blob:")) {
-      if (isCertification) {
-        const certCache = useCertificationSlidesCacheStore.getState().cache[slide.id];
-        if (certCache?.url) {
-          return toStorageUrl(certCache.url) ?? certCache.url;
-        }
-      } else {
-        // Check new store first
-        const topicsStoreState = useTopicsStore.getState();
-        const newStoreUrl = topicsStoreState.slideUrls[slide.id];
-        if (newStoreUrl && Date.now() - newStoreUrl.timestamp < 7 * 24 * 60 * 60 * 1000) {
-          return toStorageUrl(newStoreUrl.url) ?? newStoreUrl.url;
-        }
-        // Fall back to old store
-        const topicCache = useTopicSlidesCacheStore.getState().cache[slide.id];
-        if (topicCache?.url) {
-          return toStorageUrl(topicCache.url) ?? topicCache.url;
-        }
-      }
+    if (slide.kind !== "image") return null;
+    // Blob URLs are used during upload preview — use directly
+    if (slide.imageUrl?.startsWith("blob:")) return slide.imageUrl;
+    // Temp slides have no server-side URL yet
+    if (slide.id.startsWith("temp_")) return null;
+    // Use the signed URL from the API response if available
+    if (resolvedSignedUrl) {
+      return toStorageUrl(resolvedSignedUrl) ?? resolvedSignedUrl;
     }
     return null;
   });
 
-  const topicLoading = useTopicSlidesCacheStore(
-    (state) => state.loading[slide.id] ?? false
-  );
-  const certificationLoading = useCertificationSlidesCacheStore(
-    (state) => state.loading[slide.id] ?? false
-  );
-  const loading = isCertification ? certificationLoading : topicLoading;
+  const [loading] = useState(false);
+  const [error] = useState<string | null>(null);
 
-  const topicError = useTopicSlidesCacheStore(
-    (state) => state.errors[slide.id] ?? null
-  );
-  const certificationError = useCertificationSlidesCacheStore(
-    (state) => state.errors[slide.id] ?? null
-  );
-  const error = isCertification ? certificationError : topicError;
-
-  // Fetch signed URL for image slides using cache
+  // Effect: resolve signed URL for image slides
   useEffect(() => {
-    if (slide.kind === "image" && slide.id) {
-      // Skip fetching for temp slides (new slides not yet saved)
-      // Also skip if imageUrl is already a blob URL (preview from file upload)
-      if (slide.id.startsWith("temp_") || slide.imageUrl?.startsWith("blob:")) {
-        // Use the blob URL directly or set to null for temp slides
-        setImageUrl(slide.imageUrl || null);
-        return;
-      }
+    if (slide.kind !== "image" || !slide.id) return;
 
-      // Only fetch signed URL for existing slides with actual image URLs
-      if (slide.imageUrl && !slide.imageUrl.startsWith("blob:")) {
-        // Check cached URL first (from cache store, populated by batch fetch)
-        if (!forceRefresh && cachedUrl) {
-          setImageUrl(toStorageUrl(cachedUrl) ?? cachedUrl);
-          return;
-        }
+    // Blob URLs — use directly
+    if (slide.id.startsWith("temp_") || slide.imageUrl?.startsWith("blob:")) {
+      setImageUrl(slide.imageUrl || null);
+      return;
+    }
 
-        // Check new store first (from API responses with includeUrls) - only for non-certification
-        if (!isCertification && !forceRefresh) {
-          const topicsStoreState = useTopicsStore.getState();
-          const newStoreUrl = topicsStoreState.slideUrls[slide.id];
-          if (newStoreUrl && Date.now() - newStoreUrl.timestamp < 7 * 24 * 60 * 60 * 1000) {
-            const url = toStorageUrl(newStoreUrl.url) ?? newStoreUrl.url;
-            setImageUrl(url);
-            // Also populate old store for consistency
-            if (!topicCachedUrl) {
-              useTopicSlidesCacheStore.getState().setSlideUrl(slide.id, newStoreUrl.url);
-            }
-            return;
-          }
-        }
+    // If we have a signed URL from the API, use it
+    if (resolvedSignedUrl) {
+      setImageUrl(toStorageUrl(resolvedSignedUrl) ?? resolvedSignedUrl);
+      return;
+    }
 
-        // Fall back to fetching from API if not in cache
-        let cancelled = false;
-        getSlideUrl(slide.id, forceRefresh).then((url) => {
-          if (!cancelled && url) {
-            setImageUrl(toStorageUrl(url) ?? url);
-          } else if (!cancelled) {
-            setImageUrl(null);
-          }
-        });
-
-        return () => {
-          cancelled = true;
-        };
-      } else {
-        // No image URL, show placeholder
-        setImageUrl(null);
-      }
-    } else {
-      // Reset state for non-image slides
+    // No signed URL available — nothing to display
+    if (!slide.imageUrl) {
       setImageUrl(null);
     }
-  }, [slide.kind, slide.id, slide.imageUrl, getSlideUrl, forceRefresh, cachedUrl, isCertification, topicCachedUrl]);
+  }, [slide.kind, slide.id, slide.imageUrl, resolvedSignedUrl, forceRefresh]);
 
-  // Also update immediately when cached URL changes (for instant updates after cache updates)
+  // Update when the signed URL changes (e.g., after a re-fetch with updated data)
   useEffect(() => {
-    // Skip for temp slides or blob URLs
     if (
       slide.kind === "image" &&
-      slide.id &&
       !slide.id.startsWith("temp_") &&
       !slide.imageUrl?.startsWith("blob:") &&
-      cachedUrl &&
-      !loading
+      resolvedSignedUrl
     ) {
-      setImageUrl(toStorageUrl(cachedUrl) ?? cachedUrl);
+      setImageUrl(toStorageUrl(resolvedSignedUrl) ?? resolvedSignedUrl);
     }
-  }, [slide.kind, slide.id, slide.imageUrl, cachedUrl, loading]);
+  }, [resolvedSignedUrl, slide.kind, slide.id, slide.imageUrl]);
 
   // Determine if video URL is YouTube or Vimeo and convert to embed URL if needed
   const videoEmbedUrl = useMemo(() => {
@@ -231,7 +149,7 @@ export function SlideRenderer({
 
         return (
           <div className="flex items-center justify-center h-full w-full">
-            {!isTempSlide && loading && !cachedUrl ? (
+            {!isTempSlide && loading ? (
               <div className="flex items-center justify-center">
                 <img
                   src="/images/bp-small-logo.svg"

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSchoolStore } from "@/stores/school-store";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
 import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
 import {
@@ -42,7 +42,7 @@ function truncateBreadcrumbLabel(label: string): string {
 export function Breadcrumb() {
   const pathname = usePathname();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
-  const isPlatformAdmin = useIsPlatformAdmin();
+  const { hasAccess: isAdmin } = useFeatureAccess("system:admin-access");
   const [isMounted, setIsMounted] = useState(false);
 
   // Ensure component only renders DropdownMenu on client to avoid hydration errors
@@ -53,15 +53,15 @@ export function Breadcrumb() {
   // Fetch schools to check if user has only one school
   const { data: mySchools = [] } = useMySchoolsQuery(
     { limit: 5, random: true },
-    { enabled: !isPlatformAdmin }
+    { enabled: !isAdmin }
   );
   const { data: allSchools = [] } = useListSchoolsQuery(
     { limit: 5 },
-    { enabled: isPlatformAdmin }
+    { enabled: isAdmin }
   );
 
   // Check if user has access to only one school
-  const baseSchools = isPlatformAdmin ? allSchools : mySchools;
+  const baseSchools = isAdmin ? allSchools : mySchools;
   const hasOnlyOneSchool = baseSchools.length === 1;
 
   // Split the pathname into segments

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { useMeStore, useIsTeacher, useIsPlatformAdmin } from "@/entities/me/model/store";
+import { useMeStore } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useQuery } from "@tanstack/react-query";
 import { meApi } from "@/entities/me/api/endpoints";
 import { AddClassesDialog } from "./add-classes-dialog";
@@ -12,8 +13,8 @@ import { AddClassesDialog } from "./add-classes-dialog";
  *
  * Client-side guard that checks if a teacher user should see the "Add Your Classes" dialog.
  * Shows the dialog if:
- * - User is a teacher
- * - Classes feature is enabled in sidebar (user is platform admin)
+ * - User has teacher access (system:teacher-access)
+ * - Classes feature is enabled (/school/classes)
  * - Welcome tutorial is completed
  * - Dashboard dialog has been dismissed
  * - User has no classes in teacher_classes table
@@ -22,8 +23,8 @@ import { AddClassesDialog } from "./add-classes-dialog";
 export function TeacherClassesGuard() {
   const currentUser = useMeStore((s) => s.currentUser);
   const { isLoading } = useCurrentUser();
-  const isTeacher = useIsTeacher();
-  const isPlatformAdmin = useIsPlatformAdmin();
+  const { hasAccess: isTeacher } = useFeatureAccess("system:teacher-access");
+  const { hasAccess: hasClassesFeature } = useFeatureAccess("/school/classes");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Check if welcome tutorial is completed
@@ -70,9 +71,8 @@ export function TeacherClassesGuard() {
       return;
     }
 
-    // Don't show dialog if Classes is disabled in sidebar (i.e., user is not platform admin)
-    // Classes feature is disabled in sidebar when !isPlatformAdmin
-    if (!isPlatformAdmin) {
+    // Don't show dialog if Classes feature is not enabled
+    if (!hasClassesFeature) {
       return;
     }
 
@@ -106,7 +106,7 @@ export function TeacherClassesGuard() {
     isLoading,
     isLoadingClasses,
     isTeacher,
-    isPlatformAdmin,
+    hasClassesFeature,
     isWelcomeCompleted,
     isDashboardDialogDismissed,
     teacherClassesData,
@@ -116,9 +116,8 @@ export function TeacherClassesGuard() {
     return null;
   }
 
-  // Don't render dialog if Classes is disabled in sidebar (i.e., user is not platform admin)
-  // Classes feature is disabled in sidebar when !isPlatformAdmin
-  if (!isPlatformAdmin) {
+  // Don't render dialog if Classes feature is not enabled
+  if (!hasClassesFeature) {
     return null;
   }
 

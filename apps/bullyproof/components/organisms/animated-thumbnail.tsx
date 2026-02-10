@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { FileText } from "lucide-react";
-import { useSlideUrl } from "@/entities/topics/model/store-enhanced";
-import { useCertificationSlideUrl as useCertificationSlideUrlFromStore } from "@/entities/certification/model/topics-store";
 
 export type TopicSlide = {
   id: string;
@@ -23,12 +21,6 @@ interface AnimatedThumbnailProps {
   cardIndex?: number;
   isPaused?: boolean;
   isCertification?: boolean;
-}
-
-// Hook to get slide URL for certification slides - uses store's nested slide structure
-function useCertificationSlideUrl(slideId: string | null | undefined) {
-  // Use the hook from the store which reads from nested slide structure
-  return useCertificationSlideUrlFromStore(slideId);
 }
 
 export function AnimatedThumbnail({
@@ -50,22 +42,9 @@ export function AnimatedThumbnail({
   const nextIndex = (currentIndex + 1) % imageSlidesList.length;
   const nextSlide = imageSlidesList[nextIndex];
 
-  // Only fetch URLs individually if signedUrl is missing from slide data (batch fetch should provide it)
-  // For certification slides, only fetch if signedUrl is not already present
-  const shouldFetchCurrentCertification = isCertification && currentSlide && !currentSlide.signedUrl;
-  const shouldFetchNextCertification = isCertification && nextSlide && !nextSlide.signedUrl;
-  
-  // Use appropriate hook based on context - only fetch if needed
-  const curriculumSlideUrl = useSlideUrl(isCertification ? null : currentSlide?.id);
-  const certificationSlideUrl = useCertificationSlideUrl(shouldFetchCurrentCertification ? currentSlide?.id : null);
-  const curriculumNextSlideUrl = useSlideUrl(isCertification ? null : nextSlide?.id);
-  const certificationNextSlideUrl = useCertificationSlideUrl(shouldFetchNextCertification ? nextSlide?.id : null);
-
-  // Get URLs - prioritize signedUrl from slide data (from batch fetch), then fall back to hook result
-  const currentImageUrl = isCertification ? certificationSlideUrl : curriculumSlideUrl;
-  const nextImageUrl = isCertification ? certificationNextSlideUrl : curriculumNextSlideUrl;
-  const currentUrl = currentSlide?.signedUrl || currentImageUrl;
-  const nextUrl = nextSlide?.signedUrl || nextImageUrl;
+  // Get URLs directly from slide data (signedUrl comes from API / DB cache)
+  const currentUrl = currentSlide?.signedUrl || null;
+  const nextUrl = nextSlide?.signedUrl || null;
 
   // Clear all timers helper
   const clearAllTimers = () => {

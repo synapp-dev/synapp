@@ -17,7 +17,6 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
-import { useIsPlatformAdmin } from "@/entities/me/model/store";
 
 // Dummy user data
 const dummyUsers = [
@@ -77,12 +76,7 @@ export function ImpersonateMenu() {
     (typeof dummyUsers)[0] | null
   >(null);
 
-  // Disable impersonation for admin logins
-  const isPlatformAdmin = useIsPlatformAdmin();
-  const isDisabled = isPlatformAdmin;
-
   const handleUserSelect = (user: (typeof dummyUsers)[0]) => {
-    if (isDisabled) return;
     console.log("Impersonating user:", user);
     setSelectedUser(user);
     setOpen(false);
@@ -90,19 +84,13 @@ export function ImpersonateMenu() {
   };
 
   const handleStopImpersonating = () => {
-    if (isDisabled) return;
     setSelectedUser(null);
     setOpen(false);
     // TODO: Implement stop impersonation logic
   };
 
   const handleImpersonatingButtonClick = () => {
-    if (isDisabled) return;
-    if (selectedUser) {
-      setOpen(true);
-    } else {
-      setOpen(true);
-    }
+    setOpen(true);
   };
 
   return (
@@ -110,86 +98,44 @@ export function ImpersonateMenu() {
       {selectedUser ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            {isDisabled ? (
-              <span className="inline-block">
-                <Button
-                  variant="outline"
-                  onClick={handleImpersonatingButtonClick}
-                  disabled={isDisabled}
-                  className={cn(
-                    "h-9 gap-2 justify-start text-orange-800 transition-all duration-300 animate-pulse-subtle border-orange-200",
-                    "hover:bg-orange-100",
-                    "opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <VenetianMask className="h-5 w-5 animate-float-gentle" />
-                  <span className="truncate max-w-[120px]">
-                    {selectedUser.name}
-                  </span>
-                </Button>
+            <Button
+              variant="outline"
+              onClick={handleImpersonatingButtonClick}
+              className={cn(
+                "h-9 gap-2 justify-start text-orange-800 transition-all duration-300 animate-pulse-subtle border-orange-200",
+                "hover:bg-orange-100"
+              )}
+            >
+              <VenetianMask className="h-5 w-5 animate-float-gentle" />
+              <span className="truncate max-w-[120px]">
+                {selectedUser.name}
               </span>
-            ) : (
-              <Button
-                variant="outline"
-                onClick={handleImpersonatingButtonClick}
-                disabled={isDisabled}
-                className={cn(
-                  "h-9 gap-2 justify-start text-orange-800 transition-all duration-300 animate-pulse-subtle border-orange-200",
-                  "hover:bg-orange-100"
-                )}
-              >
-                <VenetianMask className="h-5 w-5 animate-float-gentle" />
-                <span className="truncate max-w-[120px]">
-                  {selectedUser.name}
-                </span>
-              </Button>
-            )}
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="left">
-            <p>
-              {isDisabled
-                ? "Impersonation is currently disabled!"
-                : "Impersonating user"}
-            </p>
+            <p>Impersonating user</p>
           </TooltipContent>
         </Tooltip>
       ) : (
         <Tooltip>
           <TooltipTrigger asChild>
-            {isDisabled ? (
-              <span className="inline-block">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={undefined}
-                  disabled={isDisabled}
-                  className="h-9 gap-2 justify-center items-center opacity-50 cursor-not-allowed"
-                >
-                  <Drama className="h-4 w-4" />
-                </Button>
-              </span>
-            ) : (
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setOpen(true)}
-                disabled={isDisabled}
-                className="h-9 gap-2 justify-center items-center"
-              >
-                <Drama className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setOpen(true)}
+              className="h-9 gap-2 justify-center items-center"
+            >
+              <Drama className="h-4 w-4" />
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="left">
-            <p>
-              {isDisabled ? "Impersonation is disabled!" : "Impersonate User"}
-            </p>
+            <p>Impersonate User</p>
           </TooltipContent>
         </Tooltip>
       )}
       <CommandDialog
-        open={isDisabled ? false : open}
-        onOpenChange={isDisabled ? undefined : setOpen}
+        open={open}
+        onOpenChange={setOpen}
       >
         {selectedUser ? (
           // Impersonation Status View
