@@ -33,3 +33,20 @@ export async function getUserScopedRoles(
   }
   return result;
 }
+
+/** All platform-level role keys that grant admin panel access. */
+export const ALL_PLATFORM_ADMIN_KEYS = [
+  "INTRADARK_DEV",
+  "PLATFORM_ADMIN",
+  "PLATFORM_MODERATOR",
+  "PLATFORM_STAFF",
+  "GOVERNMENT_VIEWER",
+] as const;
+
+/** Check whether the user holds at least one of the specified platform role keys. */
+export function hasPlatformRole(
+  scopedRoles: UserScopedRoles,
+  ...keys: string[]
+): boolean {
+  return keys.some((k) => scopedRoles.platform.includes(k));
+}
