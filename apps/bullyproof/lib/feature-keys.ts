@@ -52,6 +52,7 @@ export const PAGE_FEATURES = {
   ADMIN_CULTURE_RATINGS: "/admin/culture-ratings",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
   ADMIN_SUPPORT_TOOLS: "/admin/support-tools",
+  ADMIN_TICKETS: "/admin/tickets",
 } as const;
 
 // ─── System Features (expanded) ─────────────────────────────────────────────

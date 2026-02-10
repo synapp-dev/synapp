@@ -10,6 +10,7 @@ import {
   Settings,
   type LucideIcon,
   Component,
+  Ticket,
 } from "lucide-react";
 
 export interface AdminItem {
@@ -113,6 +114,15 @@ export const adminItemsConfig: AdminItem[] = [
     enabled: true,
     disabled: true,
   },
+  {
+    title: "Tickets",
+    url: "/admin/tickets",
+    icon: Ticket,
+    iconName: "Ticket",
+    description: "View and manage user feedback tickets",
+    featureKey: "/admin/tickets",
+    enabled: true,
+  },
 ];
 
 /**
@@ -129,6 +139,7 @@ export const adminSegmentToFeatureKey: Record<string, string> = {
   "culture-ratings": "/admin/culture-ratings",
   "audit-logs": "/admin/audit-logs",
   "support-tools": "/admin/support-tools",
+  tickets: "/admin/tickets",
 };
 
 /**
@@ -171,6 +182,8 @@ export function getAdminItemsByCategory() {
     } else if (item.title === "Audit Logs") {
       categoryMap["System Settings"].push(item);
     } else if (item.title === "Support Tools") {
+      categoryMap["Support Tools"].push(item);
+    } else if (item.title === "Tickets") {
       categoryMap["Support Tools"].push(item);
     }
   });

@@ -252,6 +252,7 @@ export const SECTION_SUB_GROUPS: Record<string, FeatureSubSection[]> = {
     { key: "culture-ratings", label: "Culture Ratings" },
     { key: "audit-logs", label: "Audit Logs" },
     { key: "support-tools", label: "Support Tools" },
+    { key: "tickets", label: "Tickets" },
   ],
 };
 
