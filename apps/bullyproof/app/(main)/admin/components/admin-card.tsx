@@ -12,6 +12,7 @@ import {
   HelpCircle,
   BookOpenText,
   Component,
+  TicketCheck,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -41,6 +42,7 @@ const iconMap: Record<string, LucideIcon> = {
   FileText,
   HelpCircle,
   Component,
+  TicketCheck,
 };
 
 export function AdminCard({
@@ -70,17 +72,12 @@ export function AdminCard({
       onMouseLeave={() => isDisabled && setIsHovered(false)}
     >
       <CardHeader className={cn(isDisabled && "opacity-50")}>
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-muted">
-            {Icon && <Icon className="h-5 w-5" />}
-          </div>
-          <CardTitle className={cn(isDisabled && "text-muted-foreground")}>
+       
+          <CardTitle className={cn(isDisabled && "text-muted-foreground", "flex-row flex items-center gap-2")}>
+          {Icon && <Icon className="h-5 w-5" />}
             {title}
           </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <CardDescription
+          <CardDescription
           className={cn(isDisabled && !isHovered && "opacity-50")}
         >
           {isDisabled && isHovered ? (
@@ -93,7 +90,9 @@ export function AdminCard({
             </p>
           )}
         </CardDescription>
-      </CardContent>
+    
+      </CardHeader>
+     
     </Card>
   );
 

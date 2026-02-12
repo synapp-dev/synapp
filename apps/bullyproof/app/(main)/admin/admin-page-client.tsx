@@ -27,14 +27,15 @@ export function AdminPageClient() {
           ...item,
           disabled: item.disabled === true || locked,
         };
-      });
+      })
+      .sort((a, b) => Number(a.disabled) - Number(b.disabled));
   }, [adminItems, featuresAccess]);
 
   return (
     <>
       <FeatureGuard feature="/admin" />
       <div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {itemsWithAccess.map((item) => (
             <AdminCard
               key={item.title}
