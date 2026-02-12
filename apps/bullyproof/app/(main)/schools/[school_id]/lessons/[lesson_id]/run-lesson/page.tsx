@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Presentation, Settings, Loader2, CalendarIcon, Clock, AlertCircle } from "lucide-react";
+import { Presentation, Settings, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -37,6 +37,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useMeStore } from "@/entities/me/model/store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { lessonsKeys } from "@/entities/lessons/model/keys";
+import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
+import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 
 // Live countdown component for scheduled lessons
@@ -112,6 +115,8 @@ export default function LessonRunLessonPage({
   const [scheduleTime, setScheduleTime] = useState("09:00");
   const [isScheduling, setIsScheduling] = useState(false);
   const [pendingSchedule, setPendingSchedule] = useState<{ date: Date; time: string } | null>(null);
+  const [showTakeOverDialog, setShowTakeOverDialog] = useState(false);
+  const [isTakingOver, setIsTakingOver] = useState(false);
 
   // Check if user is the lesson creator
   const { data: lessonData, isLoading: isLoadingLesson } = useLessonById(lesson_id);
@@ -126,14 +131,11 @@ export default function LessonRunLessonPage({
     ? new Date(lessonData.scheduledFor) <= new Date() 
     : false;
 
-  // Redirect if user is not the creator
-  useEffect(() => {
-    if (!isLoadingLesson && lessonData && currentUser) {
-      if (!isLessonCreator) {
-        router.replace(`/schools/${school_id}/lessons/${lesson_id}`);
-      }
-    }
-  }, [isLoadingLesson, lessonData, currentUser, isLessonCreator, router, school_id, lesson_id]);
+  const takeOverableStatuses = ["preparing", "ready", "in_progress"];
+  const canShowTakeOver =
+    !isLessonCreator &&
+    lessonData?.status &&
+    takeOverableStatuses.includes(lessonData.status);
 
   // Check for query param to auto-open dialog
   useEffect(() => {
@@ -155,18 +157,71 @@ export default function LessonRunLessonPage({
     );
   }
 
-  // Show unauthorized message if not creator (will redirect, but show message briefly)
+  // Non-owner: show Take Over CTA instead of redirecting
   if (!isLessonCreator) {
+    const handleTakeOver = async () => {
+      setIsTakingOver(true);
+      try {
+        const result = await lessonsApi.post.takeOver(lesson_id);
+        if (result.error) {
+          throw new Error(result.error.message ?? "Failed to take over lesson");
+        }
+        queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
+        queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
+        toast.success("You have taken over this lesson");
+        setShowTakeOverDialog(false);
+      } catch (err) {
+        toast.error("Failed to take over lesson", {
+          description: err instanceof Error ? err.message : "Unknown error",
+        });
+      } finally {
+        setIsTakingOver(false);
+      }
+    };
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <p className="text-destructive font-medium">
-            Only the teacher can run this lesson
-          </p>
-          <p className="text-muted-foreground mt-2">
-            Redirecting...
+      <div className="space-y-6">
+        <Button
+          variant="ghost"
+          onClick={() => router.push(`/schools/${school_id}/lessons/${lesson_id}`)}
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to lesson
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Run Lesson</h1>
+          <p className="text-muted-foreground">
+            {canShowTakeOver
+              ? "You need to take over this lesson to run it."
+              : "Only the lesson owner can run this lesson."}
           </p>
         </div>
+        {canShowTakeOver && (
+        <Card>
+          <CardContent className="pt-6 flex flex-col items-center gap-4">
+            <p className="text-muted-foreground text-center">
+              Take over this lesson to access presentation mode and deliver it to the class.
+            </p>
+            <Button onClick={() => setShowTakeOverDialog(true)}>
+              <HandMetal className="h-4 w-4 mr-2" />
+              Take Over Lesson
+            </Button>
+          </CardContent>
+        </Card>
+        )}
+        {canShowTakeOver && (
+        <TakeOverLessonDialog
+          open={showTakeOverDialog}
+          onOpenChange={setShowTakeOverDialog}
+          lesson={{
+            id: lesson_id,
+            assignedClasses: lessonData?.assignedClasses,
+            teacher: lessonData?.teacher,
+            createdByUserId: lessonData?.createdByUserId,
+          }}
+          onConfirm={handleTakeOver}
+          isTakingOver={isTakingOver}
+        />
+        )}
       </div>
     );
   }
