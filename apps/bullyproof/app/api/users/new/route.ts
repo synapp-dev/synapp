@@ -19,6 +19,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { checkFeatureAccess } from "@/server/features/features.service";
+import { getUserScopedRoles } from "@/server/auth/rbac";
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { db } from "@/server/db/drizzle";
@@ -96,11 +97,34 @@ export async function POST(request: Request) {
     }
 
     const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
+
+    // SCHOOL_ADMIN: allow when roleScope is school, schoolId matches their school, and roleName is school role
+    const allowedSchoolRoleNames = ["SCHOOL_STAFF", "TEACHER", "SCHOOL_ADMIN"];
+    const isSchoolScopeWithSchoolRole =
+      data.roleScope === "school" &&
+      data.schoolId &&
+      allowedSchoolRoleNames.includes(data.roleName);
+
     if (!hasAdminUsers) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
+      if (isSchoolScopeWithSchoolRole) {
+        const roles = await getUserScopedRoles(userId);
+        const isSchoolAdminAtSchool = roles.school.some(
+          (r) => r.schoolId === data.schoolId && r.roleKey === "SCHOOL_ADMIN"
+        );
+        const hasSchoolManageRoles = await checkFeatureAccess(
+          userId,
+          "school:manage-school-user-roles",
+          data.schoolId ?? undefined
+        );
+        if (!isSchoolAdminAtSchool || !hasSchoolManageRoles) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+        }
+      } else {
+        return NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 403 }
+        );
+      }
     }
 
     // Get scope ID from scope name

@@ -20,6 +20,7 @@
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { checkFeatureAccess } from "@/server/features/features.service";
+import { getUserScopedRoles } from "@/server/auth/rbac";
 import { db } from "@/server/db/drizzle";
 import {
   userRoles,
@@ -65,30 +66,31 @@ export async function POST(
 
     console.log("[REMOVE USERS FROM SCHOOL] Step 1: Success, userId:", userId);
 
-    // Step 2: Check permissions
+    // Step 2: Get school ID from params (needed for permission check)
+    const { id: schoolId } = await params;
+
+    // Step 3: Check permissions - platform admin OR school admin at this school
     console.log("[REMOVE USERS FROM SCHOOL] Step 2: Checking permissions...");
     const isPlatformAdmin = await checkFeatureAccess(userId, "/admin/schools");
+    const roles = await getUserScopedRoles(userId);
+    const isSchoolAdminAtSchool = roles.school.some(
+      (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+    );
 
-    if (!isPlatformAdmin) {
+    if (!isPlatformAdmin && !isSchoolAdminAtSchool) {
       console.error(
         "[REMOVE USERS FROM SCHOOL] Step 2: Unauthorized - insufficient permissions:",
-        {
-          userId,
-        }
+        { userId, schoolId }
       );
       return NextResponse.json(
-        { error: "Unauthorized - Platform admin role required" },
+        { error: "Unauthorized - Platform admin or school admin role required" },
         { status: 403 }
       );
     }
 
     console.log(
-      "[REMOVE USERS FROM SCHOOL] Step 2: Success, user is platform admin"
+      "[REMOVE USERS FROM SCHOOL] Step 2: Success, user has permission"
     );
-
-    // Step 3: Get school ID from params
-    const { id: schoolId } = await params;
-    console.log("[REMOVE USERS FROM SCHOOL] Step 3: School ID:", schoolId);
 
     // Step 4: Parse request body
     console.log("[REMOVE USERS FROM SCHOOL] Step 4: Parsing request body...");
