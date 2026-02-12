@@ -17,6 +17,8 @@ export type School = {
   slug: string | null;
   levels?: string[] | null; // Array of level names (e.g., ["Primary", "Secondary"])
   levelBadge?: string | null; // From school_year_assignments: "Primary" | "Secondary" | "P–12" | "P–10" | "Custom"
+  bannerUrl?: string | null;
+  avatarUrl?: string | null;
 }
 
 // Helper function to format school levels
