@@ -91,6 +91,8 @@ export function useLessonLiveState(
             videoStartS: slide.videoStartS,
             videoEndS: slide.videoEndS,
             effectiveNotes: slide.effectiveNotes,
+            signedUrl: slide.signedUrl ?? null,
+            signedImageUrl: slide.signedImageUrl ?? slide.signedUrl ?? null,
           }))
           .sort((a, b) => a.orderIndex - b.orderIndex);
 

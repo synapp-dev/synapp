@@ -89,6 +89,9 @@ export const lessonLiveStateRepo = {
         videoEndS: slide.videoEndS,
         effectiveNotes,
         teacherUserId: lessonData.createdByUserId,
+        signedUrl: slide.signedUrl ?? null,
+        signedImageUrl: slide.signedUrl ?? null,
+        signedUrlUpdatedAt: slide.signedUrlUpdatedAt ?? null,
       };
     });
   },

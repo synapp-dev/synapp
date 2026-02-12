@@ -17,12 +17,15 @@
  */
 import { NextResponse } from "next/server";
 import { lessonLiveStateRepo } from "@/server/lessons/lesson-live-state.repo";
+import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
+import { refreshSignedUrlIfStale } from "@/server/lib/signed-url";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
  * Handle GET /api/lessons/[id]/live-state
  *
  * Gets the current live state and slides for a lesson.
+ * Resolves signed URLs for image slides so presentation mode can display them.
  *
  * @param request The incoming HTTP request.
  * @param params The route parameters containing the lesson ID.
@@ -47,10 +50,33 @@ export async function GET(
       lessonLiveStateRepo.getLessonSlides(lessonId),
     ]);
 
+    // Resolve signed URLs for image slides (same pattern as topics service)
+    const slidesWithUrls =
+      slides.length === 0
+        ? slides
+        : await Promise.all(
+            slides.map(async (slide) => {
+              if (slide.kind !== "image" || !slide.imageUrl) {
+                return slide;
+              }
+              const slideForRefresh = {
+                id: slide.topicSlideId,
+                signedUrl: slide.signedUrl,
+                signedUrlUpdatedAt: slide.signedUrlUpdatedAt,
+              };
+              const signedUrl = await refreshSignedUrlIfStale(
+                slideForRefresh,
+                slide.imageUrl,
+                topicSlidesRepo.updateSignedUrl
+              );
+              return { ...slide, signedUrl, signedImageUrl: signedUrl };
+            })
+          );
+
     return NextResponse.json(
       {
         liveState,
-        slides,
+        slides: slidesWithUrls,
       },
       { status: 200 }
     );
