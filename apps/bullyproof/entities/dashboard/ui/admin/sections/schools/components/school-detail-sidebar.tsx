@@ -2,6 +2,7 @@
 
 import React from "react";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import {
   Sidebar,
   SidebarContent,
@@ -106,13 +107,15 @@ export function SchoolDetailSidebar({
                     })}
                     <SidebarSeparator className="!mx-0 !ml-0 my-1" />
                     <SidebarMenuItem>
-                      <SidebarMenuButton
-                        onClick={onDeleteClick}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete School</span>
-                      </SidebarMenuButton>
+                      <FeatureGuard feature="admin:delete-school">
+                        <SidebarMenuButton
+                          onClick={onDeleteClick}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete School</span>
+                        </SidebarMenuButton>
+                      </FeatureGuard>
                     </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>

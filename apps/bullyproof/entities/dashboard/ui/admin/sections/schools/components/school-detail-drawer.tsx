@@ -161,6 +161,7 @@ import { AddManualUserDialog } from "./add-manual-user-dialog";
 import { SchoolDetailHeader } from "./school-detail-header";
 import { SchoolDetailSidebar } from "./school-detail-sidebar";
 import { ImportUsersDialog } from "./import-users-dialog";
+import { UserDetailDrawer } from "@/app/(main)/admin/users/components/user-detail-drawer";
 import { ImportClassesDialog } from "./import-classes-dialog";
 import { BulkRoleDialog } from "./bulk-role-dialog";
 import { SchoolFeaturesTab } from "./school-features-tab";
@@ -1087,6 +1088,11 @@ function SchoolDetailDrawerContent({
   // Row selection state (if needed for future bulk actions)
   const [rowSelection, setRowSelection] = useState({});
 
+  // User detail drawer state (for clicking user rows in Users tab)
+  const [selectedUser, setSelectedUser] =
+    useState<UserWithRolesAndSchools | null>(null);
+  const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
+
   // Dialog states
   const [addLicenceDialogOpen, setAddLicenceDialogOpen] = useState(false);
   const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
@@ -1211,6 +1217,21 @@ function SchoolDetailDrawerContent({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSection, school?.id]);
+
+  // Sync URL (id param) to user detail drawer state - open when id in URL and user found
+  const userIdFromUrl = searchParams?.get("id") || null;
+  useEffect(() => {
+    if (userIdFromUrl && activeSection === "users" && users.length > 0) {
+      const user = users.find((u) => u.id === userIdFromUrl);
+      if (user) {
+        setSelectedUser(user);
+        setIsUserDrawerOpen(true);
+      }
+    } else if (!userIdFromUrl) {
+      setIsUserDrawerOpen(false);
+      setSelectedUser(null);
+    }
+  }, [userIdFromUrl, users, activeSection]);
 
   // Fetch classes function - reusable for initial load and refetch after bulk edit
   const fetchClasses = useCallback(async () => {
@@ -1702,6 +1723,27 @@ function SchoolDetailDrawerContent({
 
   const handleBulkRoleClick = () => {
     setBulkRoleDialogOpen(true);
+  };
+
+  const handleUserClick = (user: UserWithRolesAndSchools) => {
+    setSelectedUser(user);
+    setIsUserDrawerOpen(true);
+    const params = new URLSearchParams(searchParams?.toString() || "");
+    params.set("id", user.id);
+    params.set("userTab", "details");
+    router.push(`/admin/schools?${params.toString()}`, { scroll: false });
+  };
+
+  const handleUserDrawerClose = (open: boolean) => {
+    setIsUserDrawerOpen(open);
+    if (!open) {
+      setSelectedUser(null);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.delete("id");
+      params.delete("userTab");
+      params.delete("userHistoryTab");
+      router.push(`/admin/schools?${params.toString()}`, { scroll: false });
+    }
   };
 
   if (!school) return null;
@@ -2301,6 +2343,7 @@ function SchoolDetailDrawerContent({
                       error={usersError?.message || null}
                       schoolId={school?.id}
                       showSelection={true}
+                      onUserClick={handleUserClick}
                       onRowSelectionChange={setRowSelection}
                     />
                     {Object.keys(rowSelection).length > 0 && (
@@ -4637,6 +4680,15 @@ function SchoolDetailDrawerContent({
           setClassesRowSelection({});
           // Refetch classes to show updated values
           fetchClasses();
+        }}
+      />
+
+      <UserDetailDrawer
+        user={selectedUser}
+        open={isUserDrawerOpen}
+        onOpenChange={handleUserDrawerClose}
+        onUserUpdate={async () => {
+          await refetchUsers();
         }}
       />
     </Sheet>
