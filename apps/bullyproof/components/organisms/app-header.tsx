@@ -159,8 +159,8 @@ export function AppHeader() {
             </>
           )}
           <CommandMenu />
-          <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
           <FeatureGuard feature="system:feedback-button">
+            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

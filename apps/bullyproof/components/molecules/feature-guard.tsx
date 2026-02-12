@@ -62,9 +62,11 @@ export function FeatureGuard({
   const { isLoading: isLoadingUser } = useCurrentUser();
   const currentSchool = useSchoolStore((s) => s.currentSchool);
 
-  // Platform-level features (/admin*, system:*) must not use school context
+  // Platform-level features (/admin*, system:*, admin:*) must not use school context
   const effectiveSchoolId =
-    feature.startsWith("/admin") || feature.startsWith("system:")
+    feature.startsWith("/admin") ||
+    feature.startsWith("system:") ||
+    feature.startsWith("admin:")
       ? undefined
       : schoolId || currentSchool?.id;
 
