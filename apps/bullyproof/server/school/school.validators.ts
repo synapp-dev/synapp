@@ -63,8 +63,26 @@ export const updateSchoolSchema = z.object({
   sectorId: z.string().uuid("Invalid sector ID").optional(),
   emailDomain: z.string().trim().max(255).optional().nullable(),
   address: z.string().trim().max(1000).optional().nullable(),
-  bannerUrl: z.string().url("Invalid banner URL").optional().nullable(),
-  avatarUrl: z.string().url("Invalid avatar URL").optional().nullable(),
+  bannerUrl: z
+    .union([
+      z.string().url("Invalid banner URL"),
+      z.string().regex(
+        /^schools\/(images\/banner\/|[a-f0-9-]+\/images\/banner\.)/,
+        "Invalid storage path"
+      ),
+    ])
+    .optional()
+    .nullable(),
+  avatarUrl: z
+    .union([
+      z.string().url("Invalid avatar URL"),
+      z.string().regex(
+        /^schools\/(images\/avatar\/|[a-f0-9-]+\/images\/avatar\.)/,
+        "Invalid storage path"
+      ),
+    ])
+    .optional()
+    .nullable(),
   levelIds: z.array(z.string().uuid("Invalid level ID")).optional(),
   yearIds: z.array(z.string().uuid("Invalid year ID")).optional(),
 });

@@ -43,6 +43,9 @@ export const ALL_PLATFORM_ADMIN_KEYS = [
   "GOVERNMENT_VIEWER",
 ] as const;
 
+/** Re-export for server use; source of truth in lib/role-keys.ts */
+export { ADMIN_CANNOT_CREATE_LESSON_KEYS } from "@/lib/role-keys";
+
 /** Check whether the user holds at least one of the specified platform role keys. */
 export function hasPlatformRole(
   scopedRoles: UserScopedRoles,

@@ -18,6 +18,8 @@ import { rolesRepo } from "./roles.repo";
 import { getUserScopedRoles } from "../auth/rbac";
 import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
+
+const SCHOOL_ROLE_KEYS = ["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF"] as const;
 import { userProfile, userRoles } from "@/server/db/schema";
 import { eq, and, inArray, sql, ilike, or } from "drizzle-orm";
 
@@ -39,6 +41,41 @@ async function assertCanManageRoles(ctx: AuthContext) {
   }
 
   await assertFeature(ctx, "/admin/features");
+}
+
+/**
+ * For school-scoped role assign/remove: allow SCHOOL_ADMIN at the given school
+ * to manage only school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) at that school.
+ * Call after assertCanManageRoles fails - this is the fallback for school-admin.
+ */
+async function assertCanManageRolesForSchool(
+  ctx: AuthContext,
+  schoolId: string,
+  roleKey: string
+): Promise<void> {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+  if (!SCHOOL_ROLE_KEYS.includes(roleKey as (typeof SCHOOL_ROLE_KEYS)[number])) {
+    throw new Error(
+      "School admin can only manage TEACHER, SCHOOL_ADMIN, and SCHOOL_STAFF roles"
+    );
+  }
+  const scopedRoles = await getUserScopedRoles(ctx.userId);
+  const isSchoolAdminAtSchool = scopedRoles.school.some(
+    (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+  );
+  if (!isSchoolAdminAtSchool) {
+    throw new Error("Unauthorized to manage roles at this school");
+  }
+  const hasFeature = await checkFeatureAccess(
+    ctx.userId,
+    "school:manage-school-user-roles",
+    schoolId
+  );
+  if (!hasFeature) {
+    throw new Error("Unauthorized to manage roles at this school");
+  }
 }
 
 async function assertCanViewRoles(ctx: AuthContext) {
@@ -117,7 +154,21 @@ export const rolesService = {
 
   async assignRole(ctx: AuthContext, params: unknown, tx?: typeof db) {
     const data: AssignRoleParams = assignRoleSchema.parse(params);
-    await assertCanManageRoles(ctx);
+
+    try {
+      await assertCanManageRoles(ctx);
+    } catch {
+      if (data.schoolId) {
+        const [roleRow] = await rolesRepo.getById(data.roleId);
+        if (roleRow?.key) {
+          await assertCanManageRolesForSchool(ctx, data.schoolId, roleRow.key);
+        } else {
+          throw new Error("Role not found");
+        }
+      } else {
+        throw new Error("Unauthorized");
+      }
+    }
 
     const assignment = await rolesRepo.assignRole(data, tx);
     return assignment[0];
@@ -125,7 +176,21 @@ export const rolesService = {
 
   async removeRole(ctx: AuthContext, params: unknown, tx?: typeof db) {
     const data: RemoveRoleParams = removeRoleSchema.parse(params);
-    await assertCanManageRoles(ctx);
+
+    try {
+      await assertCanManageRoles(ctx);
+    } catch {
+      if (data.schoolId) {
+        const [roleRow] = await rolesRepo.getById(data.roleId);
+        if (roleRow?.key) {
+          await assertCanManageRolesForSchool(ctx, data.schoolId, roleRow.key);
+        } else {
+          throw new Error("Role not found");
+        }
+      } else {
+        throw new Error("Unauthorized");
+      }
+    }
 
     await rolesRepo.removeRole(data.userId, data.roleId, data.schoolId, tx);
     return { success: true };

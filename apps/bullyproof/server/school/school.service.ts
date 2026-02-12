@@ -67,8 +67,18 @@ async function assertCanCreateSchool(ctx: AuthContext) {
   await assertFeature(ctx, "/admin/schools");
 }
 
-async function assertCanUpdateSchool(ctx: AuthContext) {
-  await assertFeature(ctx, "/admin/schools");
+async function assertCanUpdateSchool(ctx: AuthContext, schoolId: string) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+  const hasAdminSchools = await checkFeatureAccess(ctx.userId, "/admin/schools");
+  if (hasAdminSchools) return;
+  const roles = await getUserScopedRoles(ctx.userId);
+  const isSchoolAdminAtSchool = roles.school.some(
+    (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
+  );
+  if (isSchoolAdminAtSchool) return;
+  throw new Error("Unauthorized to update school");
 }
 
 async function assertCanDeleteSchool(ctx: AuthContext) {
@@ -173,7 +183,7 @@ export const schoolService = {
     return createdSchool;
   },
   async updateSchool(ctx: AuthContext, schoolId: string, params: unknown) {
-    await assertCanUpdateSchool(ctx);
+    await assertCanUpdateSchool(ctx, schoolId);
     const data: UpdateSchoolParams = updateSchoolSchema.parse(params);
 
     const { levelIds, yearIds, ...schoolData } = data;
