@@ -21,6 +21,9 @@ async function seedFeatures() {
       { key: 'admin:delete-user', name: 'Delete User', description: 'Delete users from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
       { key: 'admin:delete-school', name: 'Delete School', description: 'Delete schools from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
 
+      // Action features – lessons
+      { key: 'lessons:cancel-lesson', name: 'Cancel Lesson', description: 'Cancel lessons from the lesson sidebar (owner, or INTRADARK_DEV/PLATFORM_ADMIN). Sets status to cancelled for data persistence.', category: 'action', section: 'schools-lessons' },
+
       // Page features – top-level
       { key: '/dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'page', section: 'dashboard' },
       { key: '/welcome', name: 'Welcome Page', description: 'Access to the welcome page', category: 'page', section: 'welcome' },
@@ -281,6 +284,21 @@ async function seedFeatures() {
         enabled: true,
       });
     }
+
+    // Cancel lesson: TEACHER, SCHOOL_ADMIN, INTRADARK_DEV, PLATFORM_ADMIN get access
+    const cancelLessonFeature = insertedFeatures.find(f => f.key === 'lessons:cancel-lesson');
+    if (cancelLessonFeature) {
+      for (const role of [teacherRole, schoolAdminRole, intradarkDevRole, platformAdminRole]) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: cancelLessonFeature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: true,
+          });
+        }
+      }
+    }
     
     // Insert permissions
     let permissionsCreated = 0;
@@ -405,6 +423,25 @@ async function seedFeatures() {
         .insert(featurePermissions)
         .values({
           featureId: deleteSchoolFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // Cancel lesson: globally visible but not enabled (owner/platform roles can use via role override)
+    if (cancelLessonFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: cancelLessonFeature.id,
           level: 'global',
           targetId: null,
           enabled: false,

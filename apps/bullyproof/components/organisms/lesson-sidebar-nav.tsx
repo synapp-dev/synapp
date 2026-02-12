@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BookOpen,
   Users,
@@ -8,12 +9,36 @@ import {
   MessageSquare,
   History,
   CheckCircle2,
+  XCircle,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog";
+import {
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from "@workspace/ui/components/sidebar";
 import { NavMain } from "@/components/organisms/nav-main";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { useLessonStatusRealtime } from "@/hooks/use-lesson-status-realtime";
 import { useMeStore } from "@/entities/me/model/store";
+import { useFeaturesAccess } from "@/hooks/use-features-access";
+import { ACTION_FEATURES } from "@/lib/feature-keys";
 
 interface LessonSidebarNavProps {
   schoolId: string;
@@ -68,11 +93,17 @@ const navItemsConfig = [
   },
 ];
 
+const CANCEL_LESSON_FEATURE_KEY = ACTION_FEATURES.CANCEL_LESSON;
+
 export function LessonSidebarNav({
   schoolId,
   lessonId,
 }: LessonSidebarNavProps) {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: lessonData, isLoading } = useLessonById(lessonId);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Listen for real-time status changes to enable/disable feedback button
   useLessonStatusRealtime(lessonId);
@@ -81,6 +112,38 @@ export function LessonSidebarNav({
   const currentUser = useMeStore((s) => s.currentUser);
   const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
   const canRunLesson = isLessonCreator;
+
+  // Cancel lesson: feature access + (owner OR platform admin/dev)
+  const featuresAccess = useFeaturesAccess([CANCEL_LESSON_FEATURE_KEY], schoolId);
+  const hasCancelFeature = featuresAccess[CANCEL_LESSON_FEATURE_KEY]?.hasAccess ?? false;
+  const platformRoles = Array.isArray(currentUser?.platformRoles)
+    ? currentUser.platformRoles
+    : [];
+  const isPlatformAdminOrDev =
+    platformRoles.includes("PLATFORM_ADMIN") || platformRoles.includes("INTRADARK_DEV");
+  const canCancelLesson =
+    hasCancelFeature && (isLessonCreator || isPlatformAdminOrDev);
+
+  const handleCancelLesson = async () => {
+    setIsCancelling(true);
+    try {
+      const result = await lessonsApi.put.update(lessonId, { status: "cancelled" });
+      if (result.error) {
+        throw new Error(result.error.message ?? "Failed to cancel lesson");
+      }
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lessonId) });
+      toast.success("Lesson cancelled");
+      setShowCancelDialog(false);
+      router.push(`/schools/${schoolId}/lessons`);
+    } catch (err) {
+      toast.error("Failed to cancel lesson", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const isCompleted = lessonData?.status === "completed";
   const isFeedback = lessonData?.status === "feedback";
@@ -139,5 +202,52 @@ export function LessonSidebarNav({
     };
   });
 
-  return <NavMain items={navItems} />;
+  return (
+    <>
+      <NavMain items={navItems} />
+      {canCancelLesson && (
+        <div className="mt-2 pt-4 border-t px-2">
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                tooltip="Cancel Lesson"
+                className="group text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                onClick={() => setShowCancelDialog(true)}
+              >
+                <XCircle className="h-4 w-4 group-hover:animate-shake-twice" />
+                <span className="group-hover:font-medium">Cancel Lesson</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+          <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel Lesson</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to cancel this lesson? The lesson will be marked as cancelled and removed from active lists, but the data will be preserved.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isCancelling}>Keep Lesson</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCancelLesson}
+                disabled={isCancelling}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isCancelling ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  "Cancel Lesson"
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        </div>
+      )}
+    </>
+  );
 }

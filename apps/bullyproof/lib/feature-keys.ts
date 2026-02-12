@@ -81,6 +81,7 @@ export const COMPONENT_FEATURES = {
 export const ACTION_FEATURES = {
   DELETE_USER: "admin:delete-user",
   DELETE_SCHOOL: "admin:delete-school",
+  CANCEL_LESSON: "lessons:cancel-lesson",
 } as const;
 
 // ─── Valid Categories ────────────────────────────────────────────────────────

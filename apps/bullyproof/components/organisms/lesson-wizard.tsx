@@ -488,9 +488,15 @@ export function LessonWizard({
 
   const handleOptionSelect = (option: "teach" | "view") => {
     if (option === "view") {
-      // Redirect to content page
-      router.push(`/schools/${schoolId}/content`);
-      handleOpenChange(false);
+      if (!schoolId) return;
+      // Prevent the URL-restore useEffect from reopening the drawer
+      isIntentionallyClosingRef.current = true;
+      onOpenChange(false);
+      // Replace URL to content (wipes wizard params) and navigate in one go
+      router.replace(`/schools/${schoolId}/content`);
+      setTimeout(() => {
+        isIntentionallyClosingRef.current = false;
+      }, 300);
     } else {
       // Continue to next step (select classes)
       goToStep(1);
@@ -962,7 +968,7 @@ export function LessonWizard({
                 onCancelLessons={async (lessonIds: string[]) => {
                   try {
                     for (const lessonId of lessonIds) {
-                      const result = await lessonsApi.delete.delete(lessonId);
+                      const result = await lessonsApi.put.update(lessonId, { status: "cancelled" });
                       if (result.error) {
                         throw new Error(result.error.message || "Failed to cancel lesson");
                       }
@@ -977,9 +983,9 @@ export function LessonWizard({
                 }}
                 onCombineLessons={async (lessonIds: string[], allClassIds: string[]) => {
                   try {
-                    // Cancel all existing lessons
+                    // Cancel all existing lessons (set status to cancelled for data persistence)
                     for (const lessonId of lessonIds) {
-                      const result = await lessonsApi.delete.delete(lessonId);
+                      const result = await lessonsApi.put.update(lessonId, { status: "cancelled" });
                       if (result.error) {
                         throw new Error(result.error.message || "Failed to cancel lesson");
                       }
