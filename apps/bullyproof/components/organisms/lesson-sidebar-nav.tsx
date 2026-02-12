@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  HandMetal,
   type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -39,6 +40,8 @@ import { useLessonStatusRealtime } from "@/hooks/use-lesson-status-realtime";
 import { useMeStore } from "@/entities/me/model/store";
 import { useFeaturesAccess } from "@/hooks/use-features-access";
 import { ACTION_FEATURES } from "@/lib/feature-keys";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
+import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
 
 interface LessonSidebarNavProps {
   schoolId: string;
@@ -94,6 +97,7 @@ const navItemsConfig = [
 ];
 
 const CANCEL_LESSON_FEATURE_KEY = ACTION_FEATURES.CANCEL_LESSON;
+const TAKE_OVER_LESSON_FEATURE_KEY = ACTION_FEATURES.TAKE_OVER_LESSON;
 
 export function LessonSidebarNav({
   schoolId,
@@ -104,6 +108,8 @@ export function LessonSidebarNav({
   const { data: lessonData, isLoading } = useLessonById(lessonId);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [showTakeOverDialog, setShowTakeOverDialog] = useState(false);
+  const [isTakingOver, setIsTakingOver] = useState(false);
 
   // Listen for real-time status changes to enable/disable feedback button
   useLessonStatusRealtime(lessonId);
@@ -149,6 +155,11 @@ export function LessonSidebarNav({
   const isFeedback = lessonData?.status === "feedback";
   const isPreparing = lessonData?.status === "preparing";
   const canProvideFeedback = isCompleted || isFeedback;
+  const takeOverableStatuses = ["preparing", "ready", "in_progress"];
+  const canShowTakeOver =
+    !isLessonCreator &&
+    lessonData?.status &&
+    takeOverableStatuses.includes(lessonData.status);
 
   // Debug logging (can be removed later)
   if (process.env.NODE_ENV === "development") {
@@ -182,42 +193,83 @@ export function LessonSidebarNav({
       disabled:
         item.disabled ||
         shouldMarkAsCompleted ||
+        (item.title === "Prepare" && !isLessonCreator && canShowTakeOver) ||
         (item.title === "Run Lesson" && !canRunLesson) ||
         (item.title === "Run Lesson" && isPreparing) ||
-        (item.title === "Feedback" && !canProvideFeedback),
+        (item.title === "Feedback" && (!canProvideFeedback || !isLessonCreator)),
       // Show appropriate disabled messages
       disabledMessage:
         item.disabledMessage ||
         (shouldMarkAsCompleted
           ? "Completed"
-          : item.title === "Run Lesson" && isPreparing
-            ? "Complete preparation first"
-            : item.title === "Run Lesson" && !canRunLesson
-              ? "Unauthorized"
-              : item.title === "Feedback" && !canProvideFeedback
-                ? "Locked"
-                : item.disabled
-                  ? "Under Construction"
-                  : undefined),
+          : item.title === "Prepare" && !isLessonCreator && canShowTakeOver
+            ? "Take over to prepare"
+            : item.title === "Run Lesson" && isPreparing
+              ? "Complete preparation first"
+              : item.title === "Run Lesson" && !canRunLesson
+                ? "Take over to run"
+                : item.title === "Feedback" && (!canProvideFeedback || !isLessonCreator)
+                  ? "Locked"
+                  : item.disabled
+                    ? "Under Construction"
+                    : undefined),
     };
   });
+
+  const handleTakeOver = async () => {
+    setIsTakingOver(true);
+    try {
+      const result = await lessonsApi.post.takeOver(lessonId);
+      if (result.error) {
+        throw new Error(result.error.message ?? "Failed to take over lesson");
+      }
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lessonId) });
+      toast.success("You have taken over this lesson");
+      setShowTakeOverDialog(false);
+    } catch (err) {
+      toast.error("Failed to take over lesson", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setIsTakingOver(false);
+    }
+  };
 
   return (
     <>
       <NavMain items={navItems} />
-      {canCancelLesson && (
+      {(canCancelLesson || canShowTakeOver) && (
         <div className="mt-2 pt-4 border-t px-2">
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton
-                tooltip="Cancel Lesson"
-                className="group text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
-                onClick={() => setShowCancelDialog(true)}
+            {canCancelLesson && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip="Cancel Lesson"
+                  className="group text-destructive hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  onClick={() => setShowCancelDialog(true)}
+                >
+                  <XCircle className="h-4 w-4 group-hover:animate-shake-twice" />
+                  <span className="group-hover:font-medium">Cancel Lesson</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            {canShowTakeOver && (
+              <FeatureGuard
+                feature={TAKE_OVER_LESSON_FEATURE_KEY}
+                schoolId={schoolId}
               >
-                <XCircle className="h-4 w-4 group-hover:animate-shake-twice" />
-                <span className="group-hover:font-medium">Cancel Lesson</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    tooltip="Take Over"
+                    onClick={() => setShowTakeOverDialog(true)}
+                  >
+                    <HandMetal className="h-4 w-4" />
+                    <span className="group-hover:font-medium">Take Over</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </FeatureGuard>
+            )}
           </SidebarMenu>
           <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
           <AlertDialogContent>
@@ -246,6 +298,22 @@ export function LessonSidebarNav({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+        <TakeOverLessonDialog
+          open={showTakeOverDialog}
+          onOpenChange={setShowTakeOverDialog}
+          lesson={
+            lessonData
+              ? {
+                  id: lessonId,
+                  assignedClasses: lessonData.assignedClasses,
+                  teacher: lessonData.teacher,
+                  createdByUserId: lessonData.createdByUserId,
+                }
+              : { id: lessonId }
+          }
+          onConfirm={handleTakeOver}
+          isTakingOver={isTakingOver}
+        />
         </div>
       )}
     </>

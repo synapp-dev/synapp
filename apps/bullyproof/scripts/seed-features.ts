@@ -1,6 +1,9 @@
 import { db } from '../server/db/drizzle';
-import { features, featurePermissions, roles } from '../drizzle/schema';
+import { features, featurePermissions, roles, schools } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
+
+/** Features restricted to intradark_dev, platform_admin, and school_admin (at their school). */
+const RESTRICTED_SCHOOL_FEATURES = ['/settings', '/school/performance', '/school/reports'];
 
 async function seedFeatures() {
   console.log('🌱 Seeding features...');
@@ -23,6 +26,10 @@ async function seedFeatures() {
 
       // Action features – lessons
       { key: 'lessons:cancel-lesson', name: 'Cancel Lesson', description: 'Cancel lessons from the lesson sidebar (owner, or INTRADARK_DEV/PLATFORM_ADMIN). Sets status to cancelled for data persistence.', category: 'action', section: 'schools-lessons' },
+      { key: 'lessons:take-over-lesson', name: 'Take Over Lesson', description: 'Take over ownership of a lesson from another teacher (TEACHER role at school, when status is preparing/ready/in_progress)', category: 'action', section: 'schools-lessons' },
+
+      // Action features – school settings
+      { key: 'school:manage-school-user-roles', name: 'Manage School User Roles', description: 'School admin can assign/remove school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) for users at their school only', category: 'action', section: 'schools-settings' },
 
       // Page features – top-level
       { key: '/dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'page', section: 'dashboard' },
@@ -285,6 +292,17 @@ async function seedFeatures() {
       });
     }
 
+    // School manage user roles: SCHOOL_ADMIN gets access (for settings page role management)
+    const manageSchoolUserRolesFeature = insertedFeatures.find(f => f.key === 'school:manage-school-user-roles');
+    if (manageSchoolUserRolesFeature && schoolAdminRole.length > 0) {
+      permissionsToCreate.push({
+        featureId: manageSchoolUserRolesFeature.id,
+        level: 'role' as const,
+        targetId: schoolAdminRole[0].id,
+        enabled: true,
+      });
+    }
+
     // Cancel lesson: TEACHER, SCHOOL_ADMIN, INTRADARK_DEV, PLATFORM_ADMIN get access
     const cancelLessonFeature = insertedFeatures.find(f => f.key === 'lessons:cancel-lesson');
     if (cancelLessonFeature) {
@@ -295,6 +313,33 @@ async function seedFeatures() {
             level: 'role' as const,
             targetId: role[0].id,
             enabled: true,
+          });
+        }
+      }
+    }
+
+    // Take over lesson: TEACHER gets access
+    const takeOverLessonFeature = insertedFeatures.find(f => f.key === 'lessons:take-over-lesson');
+    if (takeOverLessonFeature && teacherRole.length > 0) {
+      permissionsToCreate.push({
+        featureId: takeOverLessonFeature.id,
+        level: 'role' as const,
+        targetId: teacherRole[0].id,
+        enabled: true,
+      });
+    }
+
+    // Restricted school features (/settings, /school/performance, /school/reports): INTRADARK_DEV and PLATFORM_ADMIN get access globally
+    const restrictedFeatures = insertedFeatures.filter(f => RESTRICTED_SCHOOL_FEATURES.includes(f.key));
+    for (const feature of restrictedFeatures) {
+      for (const role of [intradarkDevRole, platformAdminRole]) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: feature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: true,
+            visible: true,
           });
         }
       }
@@ -318,10 +363,10 @@ async function seedFeatures() {
     console.log(`✅ Created ${permissionsCreated} role-based permissions`);
     
     // Enable all navigation and admin_section features globally by default (for backward compatibility)
-    // This can be overridden at role/school/user level
+    // Exclude restricted features (/settings, /school/performance, /school/reports) - they get global disabled
     console.log('🌍 Setting up global permissions (all enabled by default for backward compatibility)...');
     const pageFeatures = insertedFeatures.filter(f => f.category === 'page');
-    const featuresForGlobal = [...pageFeatures];
+    const featuresForGlobal = pageFeatures.filter(f => !RESTRICTED_SCHOOL_FEATURES.includes(f.key));
 
     let globalPermissionsCreated = 0;
     for (const feature of featuresForGlobal) {
@@ -436,6 +481,24 @@ async function seedFeatures() {
       }
     }
 
+    // School manage user roles: globally visible but not enabled (SCHOOL_ADMIN gets via role)
+    if (manageSchoolUserRolesFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: manageSchoolUserRolesFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
     // Cancel lesson: globally visible but not enabled (owner/platform roles can use via role override)
     if (cancelLessonFeature) {
       const result = await db
@@ -452,6 +515,69 @@ async function seedFeatures() {
       
       if (result.length > 0) {
         globalPermissionsCreated++;
+      }
+    }
+
+    // Take over lesson: globally visible but not enabled (TEACHER gets via role override)
+    if (takeOverLessonFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: takeOverLessonFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // Restricted school features: globally hidden (intradark_dev, platform_admin, school_admin get via role/school_role)
+    for (const feature of restrictedFeatures) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: feature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: false,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // School_role permissions: SCHOOL_ADMIN gets restricted features at each school they are assigned to
+    const allSchools = await db.select({ id: schools.id }).from(schools);
+    if (schoolAdminRole.length > 0) {
+      for (const feature of restrictedFeatures) {
+        for (const school of allSchools) {
+          const result = await db
+            .insert(featurePermissions)
+            .values({
+              featureId: feature.id,
+              level: 'school_role' as const,
+              targetId: schoolAdminRole[0].id,
+              schoolId: school.id,
+              enabled: true,
+              visible: true,
+            })
+            .onConflictDoNothing()
+            .returning();
+          
+          if (result.length > 0) {
+            permissionsCreated++;
+          }
+        }
       }
     }
     

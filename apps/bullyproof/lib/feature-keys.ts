@@ -82,6 +82,9 @@ export const ACTION_FEATURES = {
   DELETE_USER: "admin:delete-user",
   DELETE_SCHOOL: "admin:delete-school",
   CANCEL_LESSON: "lessons:cancel-lesson",
+  TAKE_OVER_LESSON: "lessons:take-over-lesson",
+  /** School-admin can assign/remove school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) for users at their school only */
+  MANAGE_SCHOOL_USER_ROLES: "school:manage-school-user-roles",
 } as const;
 
 // ─── Valid Categories ────────────────────────────────────────────────────────

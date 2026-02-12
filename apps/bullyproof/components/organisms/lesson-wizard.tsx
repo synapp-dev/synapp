@@ -43,6 +43,7 @@ import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
 import { classesApi } from "@/entities/classes/api/endpoints";
+import { useIsAdminRestrictedForLessons } from "@/hooks/use-is-admin-restricted-for-lessons";
 
 interface LessonWizardProps {
   schoolId: string; // This is actually the school slug from the URL
@@ -93,7 +94,10 @@ export function LessonWizard({
   const [shouldFetchRecommendations, setShouldFetchRecommendations] = useState(false);
   const [skippedStep3, setSkippedStep3] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
-  
+  const [onBehalfOfUserId, setOnBehalfOfUserId] = useState<string | null>(null);
+
+  const isAdminRestricted = useIsAdminRestrictedForLessons();
+
   // Ref to track if we're intentionally closing the drawer (to prevent URL sync loop)
   const isIntentionallyClosingRef = useRef(false);
   
@@ -159,6 +163,7 @@ export function LessonWizard({
       setShouldFetchRecommendations(false);
       setSkippedStep3(false);
       setSelectedStageId(null);
+      setOnBehalfOfUserId(null);
       // Reset initialization flag so we can restore from URL on next open
       hasInitializedFromUrlRef.current = false;
       // Reset redirect flag
@@ -480,6 +485,10 @@ export function LessonWizard({
         if (state.selectedClasses.length === 0) {
           return false;
         }
+        // Admin must select a user to create on behalf of
+        if (isAdminRestricted) {
+          return onBehalfOfUserId !== null;
+        }
         return true; // Confirmation step
       default:
         return false;
@@ -669,6 +678,7 @@ export function LessonWizard({
         topicId: state.selectedTopic.id,
         classIds: state.selectedClasses.map((c) => c.id),
         status: "preparing" as const,
+        ...(onBehalfOfUserId && { createdByUserId: onBehalfOfUserId }),
       };
 
       // Call the API to create the lesson
@@ -983,6 +993,12 @@ export function LessonWizard({
                 }}
                 onCombineLessons={async (lessonIds: string[], allClassIds: string[]) => {
                   try {
+                    if (isAdminRestricted && !onBehalfOfUserId) {
+                      throw new Error(
+                        "You must select a user to create the lesson on behalf of. Click Continue to reach the Confirm step, select a user, then return here to combine lessons."
+                      );
+                    }
+
                     // Cancel all existing lessons (set status to cancelled for data persistence)
                     for (const lessonId of lessonIds) {
                       const result = await lessonsApi.put.update(lessonId, { status: "cancelled" });
@@ -1001,6 +1017,7 @@ export function LessonWizard({
                       topicId: state.selectedTopic.id,
                       classIds: allClassIds,
                       status: "preparing" as const,
+                      ...(onBehalfOfUserId && { createdByUserId: onBehalfOfUserId }),
                     };
                     
                     const createResult = await lessonsApi.post.create(payload);
@@ -1063,6 +1080,10 @@ export function LessonWizard({
               <LessonWizardConfirm
                 selectedClasses={state.selectedClasses}
                 selectedTopic={state.selectedTopic}
+                schoolId={schoolUuid}
+                onBehalfOfUserId={onBehalfOfUserId}
+                onOnBehalfOfUserIdChange={setOnBehalfOfUserId}
+                isAdminRestricted={isAdminRestricted}
               />
             </div>
 
