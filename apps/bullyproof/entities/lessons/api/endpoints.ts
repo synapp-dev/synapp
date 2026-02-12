@@ -93,9 +93,16 @@ export const lessonsApi = {
     },
   },
   post: {
+    takeOver(lessonId: string): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
+      return apiFetch<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>(
+        `/lessons/${encodeURIComponent(lessonId)}/take-over`,
+        { method: "POST" }
+      );
+    },
     create(payload: {
       schoolId: string;
       topicId: string;
+      createdByUserId?: string;
       title?: string;
       description?: string;
       scheduledFor?: string;

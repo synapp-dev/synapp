@@ -56,6 +56,22 @@ export const schoolApi = {
         body: JSON.stringify(payload),
       });
     },
+    uploadImage(
+      schoolId: string,
+      type: "avatar" | "banner",
+      file: File
+    ): Promise<ApiResult<{ path: string; school: School }>> {
+      const formData = new FormData();
+      formData.set("type", type);
+      formData.set("file", file);
+      return apiFetch<{ path: string; school: School }>(
+        `/schools/${encodeURIComponent(schoolId)}/images`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+    },
   },
   patch: {
     update(

@@ -18,6 +18,8 @@ export type School = {
   slug: string | null;
   levels?: string[] | null;
   levelBadge?: string | null;
+  bannerUrl?: string | null;
+  avatarUrl?: string | null;
 };
 
 // Helper function to transform API school data to School type
@@ -53,6 +55,8 @@ function transformSchoolData(school: any): School {
     slug: school.slug || null,
     levels: school.levels || null,
     levelBadge: school.levelBadge ?? school.level_badge ?? null,
+    bannerUrl: school.bannerUrl ?? school.banner_url ?? null,
+    avatarUrl: school.avatarUrl ?? school.avatar_url ?? null,
   };
 }
 
