@@ -1039,6 +1039,7 @@ export const lessons = pgTable("lessons", {
 	status: text().default('preparing').notNull(),
 	scheduledFor: timestamp("scheduled_for", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	metadata: jsonb().default({}),
 }, (table) => [
 	index("idx_lessons_school_id").using("btree", table.schoolId.asc().nullsLast().op("uuid_ops")),
 	index("idx_lessons_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
