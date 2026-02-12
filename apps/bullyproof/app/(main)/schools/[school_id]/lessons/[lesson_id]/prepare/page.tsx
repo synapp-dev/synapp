@@ -32,8 +32,9 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Calendar } from "@workspace/ui/components/calendar";
-import { BookOpen, Loader2, ChevronLeft, ChevronRight, CloudDownload, CheckCircle2, PlayCircle, CalendarIcon, FileText, AlertCircle } from "lucide-react";
+import { BookOpen, Loader2, ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, CalendarIcon, FileText, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
+import { toast } from "sonner";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
@@ -102,6 +103,20 @@ export default function LessonPreparePage() {
   const [topic, setTopic] = useState<Topic | null>(null);
   const [isLoadingTopic, setIsLoadingTopic] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
+
+  // Lesson plans for PDF download
+  type LessonPlan = {
+    id: string;
+    topicId: string;
+    fileName: string;
+    fileUrl: string;
+    fileSize: number | null;
+    uploadedBy: string | null;
+    createdAt: string;
+  };
+  const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
+  const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
+  const [lessonPlansError, setLessonPlansError] = useState<string | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [slides, setSlides] = useState<SlideData[]>([]);
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -158,6 +173,52 @@ export default function LessonPreparePage() {
       fetchTopicData();
     }
   }, [lessonData?.topicId, fetchTopicData]);
+
+  // Fetch lesson plans when lesson data loads
+  const fetchLessonPlans = useCallback(async () => {
+    if (!lessonData?.topicId) return;
+    try {
+      setIsLoadingLessonPlans(true);
+      setLessonPlansError(null);
+      const result = await topicsApi.lessonPlans.list(lessonData.topicId);
+      if (result.data) {
+        setLessonPlans(result.data);
+      } else {
+        setLessonPlansError(result.error?.message ?? "Failed to load lesson plans");
+      }
+    } catch (err) {
+      console.error("Failed to fetch lesson plans:", err);
+      setLessonPlansError(err instanceof Error ? err.message : "Failed to load lesson plans");
+    } finally {
+      setIsLoadingLessonPlans(false);
+    }
+  }, [lessonData?.topicId]);
+
+  useEffect(() => {
+    if (lessonData?.topicId) {
+      fetchLessonPlans();
+    } else {
+      setLessonPlans([]);
+      setLessonPlansError(null);
+    }
+  }, [lessonData?.topicId, fetchLessonPlans]);
+
+  const handleLessonPlanDownload = async (planId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      const result = await topicsApi.lessonPlans.getUrl(planId);
+      if (result.data?.url) {
+        window.open(result.data.url, "_blank");
+        setDownloadedPlan(true);
+      } else {
+        toast.error("Failed to get download link");
+      }
+    } catch (err: unknown) {
+      toast.error("Failed to get download link", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  };
 
   // Scroll gallery to show current slide
   useEffect(() => {
@@ -517,7 +578,7 @@ export default function LessonPreparePage() {
           </div>
         </div>
       </Card>
-      <Card 
+      <Card
         className="col-span-1 cursor-pointer hover:shadow-lg transition-shadow gap-2"
         onClick={() => setDownloadedPlan(true)}
       >
@@ -526,11 +587,42 @@ export default function LessonPreparePage() {
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-2 border mx-4 p-2 py-4 bg-muted rounded-lg">
           <FileText className="h-14 w-14" />
-          <div className="flex items-center gap-2">
-          {/* <CloudDownload className="h-5 w-5" /> */}
-          <p className="text-sm font-medium underline text-blue-400">Download PDF</p>
-          </div>
-          
+          {isLoadingLessonPlans ? (
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Loading...</p>
+            </div>
+          ) : lessonPlansError ? (
+            <p className="text-sm text-muted-foreground text-center">
+              Unable to load lesson plans
+            </p>
+          ) : lessonPlans.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center">
+              No lesson plan available
+            </p>
+          ) : lessonPlans.length === 1 ? (
+            <button
+              type="button"
+              onClick={(e) => handleLessonPlanDownload(lessonPlans[0].id, e)}
+              className="text-sm font-medium underline text-blue-400 hover:text-blue-600 focus:outline-none"
+            >
+              Download PDF
+            </button>
+          ) : (
+            <div className="flex flex-col items-center gap-1 w-full">
+              {lessonPlans.map((plan) => (
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={(e) => handleLessonPlanDownload(plan.id, e)}
+                  className="text-sm font-medium underline text-blue-400 hover:text-blue-600 focus:outline-none truncate max-w-full text-center"
+                  title={plan.fileName}
+                >
+                  {plan.fileName}
+                </button>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
       </div>
