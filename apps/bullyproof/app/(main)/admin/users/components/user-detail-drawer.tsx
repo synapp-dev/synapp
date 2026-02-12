@@ -69,19 +69,6 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@workspace/ui/components/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover";
-import {
   Tabs,
   TabsList,
   TabsTrigger,
@@ -112,9 +99,7 @@ import {
   Pencil,
   Save,
   History,
-  Check,
   School as SchoolIcon,
-  ChevronsUpDown,
   X,
   UserPlus,
 } from "lucide-react";
@@ -122,6 +107,7 @@ import {
 // Import extracted components and utilities
 import { UserDetailHeader } from "./user-detail-drawer/user-detail-header";
 import { UserDetailSidebar } from "./user-detail-drawer/user-detail-sidebar";
+import { SchoolRoleAssignmentDialog } from "./user-detail-drawer/school-role-assignment-dialog";
 import { UserDetailsCard } from "./user-detail-drawer/user-details-card";
 import { UserHistoryTab } from "./user-detail-drawer/user-history-tab";
 import { UserPositionsTab } from "./user-detail-drawer/user-positions-tab";
@@ -148,6 +134,7 @@ function UserDetailDrawerContent({
   open,
   onOpenChange,
   onUserUpdate,
+  onDeleteUserClick,
 }: UserDetailDrawerProps) {
   // Use React Query hooks with Zustand caching for roles and schools
   const { roles, isLoading: loadingRoles } = useRoles();
@@ -178,7 +165,6 @@ function UserDetailDrawerContent({
   const [addRoleSelectedRoles, setAddRoleSelectedRoles] = useState<Set<string>>(
     new Set()
   );
-  const [addRoleComboboxOpen, setAddRoleComboboxOpen] = useState(false);
   const [isSavingRoles, setIsSavingRoles] = useState(false);
 
   // Memoize staff role ID to avoid unnecessary re-renders
@@ -209,6 +195,20 @@ function UserDetailDrawerContent({
     }
   }, [addRoleSchoolId, staffRoleId]);
 
+  // Edit school roles dialog state
+  const [editSchoolRolesDialogOpen, setEditSchoolRolesDialogOpen] =
+    useState(false);
+  const [editSchoolRolesSchoolId, setEditSchoolRolesSchoolId] = useState<
+    string | null
+  >(null);
+  const [editSchoolRolesSchoolName, setEditSchoolRolesSchoolName] = useState<
+    string
+  >("");
+  const [editSchoolRolesSelected, setEditSchoolRolesSelected] = useState<
+    Set<string>
+  >(new Set());
+  const [isSavingEditSchoolRoles, setIsSavingEditSchoolRoles] = useState(false);
+
   // Toggle role confirmation dialog
   const [isToggleRoleDialogOpen, setIsToggleRoleDialogOpen] = useState(false);
   const [roleToToggle, setRoleToToggle] = useState<{
@@ -226,64 +226,77 @@ function UserDetailDrawerContent({
   // Check if current user has access to manage features
   const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
 
-  // Get active tab from query params only - no local state
-  const activeTab = (searchParams.get("tab") as TabType) || "details";
+  // Context-aware params: schools page uses "tab" for school section, so we use userTab/userHistoryTab
+  const isSchoolsContext = pathname?.includes("/admin/schools") ?? false;
+  const tabParam = isSchoolsContext ? "userTab" : "tab";
+  const historyParam = isSchoolsContext ? "userHistoryTab" : "historyTab";
+  const VALID_TAB_TYPES: TabType[] = [
+    "details",
+    "roles",
+    "positions",
+    "classes",
+    "history",
+    "features",
+  ];
+  const VALID_HISTORY_SUB_TABS: HistorySubTabType[] = ["details", "roles"];
+
+  // Get active tab from query params - validate and default to "details" if invalid
+  const rawTab = searchParams.get(tabParam) as TabType | null;
+  const activeTab =
+    rawTab && VALID_TAB_TYPES.includes(rawTab) ? rawTab : "details";
+  const rawHistoryTab = searchParams.get(historyParam) as HistorySubTabType | null;
   const historySubTab =
-    (searchParams.get("historyTab") as HistorySubTabType) || "details";
+    rawHistoryTab && VALID_HISTORY_SUB_TABS.includes(rawHistoryTab)
+      ? rawHistoryTab
+      : "details";
+
+  // Params to exclude when preserving (we overwrite these for user drawer)
+  const excludeKeys = isSchoolsContext
+    ? ["id", "userTab", "userHistoryTab"]
+    : ["id", "tab", "historyTab"];
 
   // Simple function to update query params - buttons only call this
-  // Order: id first, then tab, then other params
   const updateTab = (tab: TabType) => {
     const userId = searchParams.get("id");
     const params = new URLSearchParams();
 
-    // Add id first
+    // Preserve all params except user drawer ones
+    for (const [key, value] of searchParams.entries()) {
+      if (!excludeKeys.includes(key)) {
+        params.set(key, value);
+      }
+    }
+
     if (userId) {
       params.set("id", userId);
     }
+    params.set(tabParam, tab);
 
-    // Then tab
-    params.set("tab", tab);
-
-    // Then historyTab if needed
     if (tab === "history") {
-      const currentHistoryTab = searchParams.get("historyTab") || "details";
-      params.set("historyTab", currentHistoryTab);
-    }
-
-    // Preserve other params (search, role, schoolId, etc.)
-    for (const [key, value] of searchParams.entries()) {
-      if (key !== "id" && key !== "tab" && key !== "historyTab") {
-        params.set(key, value);
-      }
+      const currentHistoryTab = searchParams.get(historyParam) || "details";
+      params.set(historyParam, currentHistoryTab);
     }
 
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
 
   // Simple function to update history sub-tab - buttons only call this
-  // Order: id first, then tab, then other params
   const updateHistorySubTab = (subTab: "details" | "roles") => {
     const userId = searchParams.get("id");
     const params = new URLSearchParams();
 
-    // Add id first
-    if (userId) {
-      params.set("id", userId);
-    }
-
-    // Then tab
-    params.set("tab", "history");
-
-    // Then historyTab
-    params.set("historyTab", subTab);
-
-    // Preserve other params (search, role, schoolId, etc.)
+    // Preserve all params except user drawer ones
     for (const [key, value] of searchParams.entries()) {
-      if (key !== "id" && key !== "tab" && key !== "historyTab") {
+      if (!excludeKeys.includes(key)) {
         params.set(key, value);
       }
     }
+
+    if (userId) {
+      params.set("id", userId);
+    }
+    params.set(tabParam, "history");
+    params.set(historyParam, subTab);
 
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
   };
@@ -703,7 +716,6 @@ function UserDetailDrawerContent({
       setIsAddRoleDialogOpen(false);
       setAddRoleSchoolId("");
       setAddRoleSelectedRoles(new Set());
-      setAddRoleComboboxOpen(false);
 
       // Refresh user data
       onUserUpdate?.();
@@ -713,6 +725,133 @@ function UserDetailDrawerContent({
       setToggleRoleError(errorMessage);
     } finally {
       setIsSavingRoles(false);
+    }
+  };
+
+  const handleOpenEditSchoolRoles = (
+    schoolId: string,
+    schoolName: string,
+    schoolRoles: Array<{ roleKey: string | null }>
+  ) => {
+    const roleOrder = ["SCHOOL_STAFF", "SCHOOL_ADMIN", "TEACHER"];
+    const assignedRoleKeys = new Set(
+      schoolRoles.map((sr) => sr.roleKey || "").filter(Boolean)
+    );
+    const selectedRoleIds = new Set<string>();
+    roleOrder.forEach((roleKey) => {
+      if (assignedRoleKeys.has(roleKey)) {
+        const role = roles.find((r) => r.key === roleKey);
+        if (role) selectedRoleIds.add(role.id);
+      }
+    });
+    setEditSchoolRolesSchoolId(schoolId);
+    setEditSchoolRolesSchoolName(schoolName);
+    setEditSchoolRolesSelected(selectedRoleIds);
+    setEditSchoolRolesDialogOpen(true);
+  };
+
+  const applyEditSchoolRolesChanges = async () => {
+    if (!user || !editSchoolRolesSchoolId) return;
+
+    const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
+    const adminRole = roles.find((r) => r.key === "SCHOOL_ADMIN");
+    const teacherRole = roles.find((r) => r.key === "TEACHER");
+    if (!staffRole || !adminRole || !teacherRole) return;
+
+    const roleOrder = [staffRole, adminRole, teacherRole];
+    const currentRoleKeys = new Set(
+      user.schoolRoles
+        .filter((sr) => sr.schoolId === editSchoolRolesSchoolId)
+        .map((sr) => sr.roleKey || "")
+        .filter((key) =>
+          ["SCHOOL_STAFF", "SCHOOL_ADMIN", "TEACHER"].includes(key)
+        )
+    );
+    const selectedRoleKeys = new Set<string>();
+    roleOrder.forEach((role) => {
+      if (editSchoolRolesSelected.has(role.id)) {
+        selectedRoleKeys.add(role.key || "");
+      }
+    });
+
+    try {
+      setIsSavingEditSchoolRoles(true);
+
+      if (!editSchoolRolesSelected.has(staffRole.id)) {
+        const rolesToRemove = user.schoolRoles.filter(
+          (sr) => sr.schoolId === editSchoolRolesSchoolId
+        );
+        for (const schoolRole of rolesToRemove) {
+          const roleToDelete = roles.find((r) => r.key === schoolRole.roleKey);
+          if (roleToDelete) {
+            await rolesApi.delete.removeRole({
+              userId: user.id,
+              roleId: roleToDelete.id,
+              schoolId: editSchoolRolesSchoolId,
+            });
+          }
+        }
+      } else {
+        for (const role of roleOrder) {
+          const roleKey = role.key || "";
+          const shouldHave = selectedRoleKeys.has(roleKey);
+          const hasRole = currentRoleKeys.has(roleKey);
+
+          if (shouldHave && !hasRole) {
+            await rolesApi.post.assignRole({
+              userId: user.id,
+              roleId: role.id,
+              schoolId: editSchoolRolesSchoolId,
+            });
+            if (
+              (roleKey === "TEACHER" || roleKey === "SCHOOL_ADMIN") &&
+              !selectedRoleKeys.has("SCHOOL_STAFF") &&
+              !currentRoleKeys.has("SCHOOL_STAFF")
+            ) {
+              await rolesApi.post.assignRole({
+                userId: user.id,
+                roleId: staffRole.id,
+                schoolId: editSchoolRolesSchoolId,
+              });
+            }
+          } else if (!shouldHave && hasRole) {
+            await rolesApi.delete.removeRole({
+              userId: user.id,
+              roleId: role.id,
+              schoolId: editSchoolRolesSchoolId,
+            });
+            if (
+              (roleKey === "TEACHER" || roleKey === "SCHOOL_ADMIN") &&
+              !selectedRoleKeys.has("TEACHER") &&
+              !selectedRoleKeys.has("SCHOOL_ADMIN") &&
+              !selectedRoleKeys.has("SCHOOL_STAFF")
+            ) {
+              const hasStaff = user.schoolRoles.some(
+                (sr) =>
+                  sr.roleKey === "SCHOOL_STAFF" &&
+                  sr.schoolId === editSchoolRolesSchoolId
+              );
+              if (hasStaff) {
+                await rolesApi.delete.removeRole({
+                  userId: user.id,
+                  roleId: staffRole.id,
+                  schoolId: editSchoolRolesSchoolId,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      setEditSchoolRolesDialogOpen(false);
+      setEditSchoolRolesSchoolId(null);
+      setEditSchoolRolesSchoolName("");
+      setEditSchoolRolesSelected(new Set());
+      onUserUpdate?.();
+    } catch (err: any) {
+      console.error("Failed to save school roles:", err);
+    } finally {
+      setIsSavingEditSchoolRoles(false);
     }
   };
 
@@ -735,7 +874,7 @@ function UserDetailDrawerContent({
         {/* Sidebar and Content Area */}
         <div className="flex flex-1 overflow-hidden min-h-0 gap-0">
           {/* Left Sidebar */}
-          <UserDetailSidebar activeTab={activeTab} onTabChange={updateTab} canManageFeatures={canManageFeatures} />
+          <UserDetailSidebar activeTab={activeTab} onTabChange={updateTab} canManageFeatures={canManageFeatures} onDeleteClick={onDeleteUserClick} />
 
           {/* Right Content Area */}
           <main className="flex flex-1 flex-col overflow-hidden min-h-0 pt-2 pr-6 pl-4">
@@ -782,18 +921,20 @@ function UserDetailDrawerContent({
 
                   {/* Add New Role Button */}
                   {!userHasPlatformRole && (
-                    <Button
-                      onClick={() => {
-                        setIsAddRoleDialogOpen(true);
-                        setAddRoleSchoolId("");
-                        setAddRoleSelectedRoles(new Set());
-                      }}
-                      variant="outline"
-                      className="w-full md:w-auto"
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Add New Role
-                    </Button>
+                    <FeatureGuard feature="system:manage-user-roles">
+                      <Button
+                        onClick={() => {
+                          setIsAddRoleDialogOpen(true);
+                          setAddRoleSchoolId("");
+                          setAddRoleSelectedRoles(new Set());
+                        }}
+                        variant="outline"
+                        className="w-full md:w-auto"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        Add New Role
+                      </Button>
+                    </FeatureGuard>
                   )}
 
                   {/* Platform Roles */}
@@ -1036,194 +1177,124 @@ function UserDetailDrawerContent({
                                         )}
                                       </div>
 
-                                      {/* All Role Checkboxes on Right - Fixed Order: STAFF, SCHOOL_ADMIN, TEACHER */}
-                                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                                      {/* Role badges + separator + Edit button */}
+                                      <div className="flex items-center gap-3 flex-wrap justify-end">
                                         {(() => {
-                                          const assignedRoleKeys = new Set(
-                                            schoolRoles.map(
-                                              (sr) => sr.roleKey || ""
-                                            )
-                                          );
-
-                                          // Define role order: STAFF, SCHOOL_ADMIN, TEACHER
-                                          const roleOrder = [
-                                            "SCHOOL_STAFF",
-                                            "SCHOOL_ADMIN",
-                                            "TEACHER",
-                                          ];
-
-                                          return roleOrder.map((roleKey) => {
-                                            const isAssigned =
-                                              assignedRoleKeys.has(roleKey);
-                                            const schoolRole = schoolRoles.find(
-                                              (sr) => sr.roleKey === roleKey
-                                            );
-                                            const role = roles.find(
-                                              (r) => r.key === roleKey
-                                            );
-
-                                            if (!role) return null;
-
-                                            const roleName =
-                                              schoolRole?.roleName ||
-                                              role.name ||
-                                              roleKey;
-
-                                            let RoleIcon = UsersIcon;
+                                          const getBadgeClasses = (
+                                            roleKey: string
+                                          ) => {
                                             if (roleKey === "TEACHER") {
-                                              RoleIcon = UsersIcon;
-                                            } else if (
-                                              roleKey === "SCHOOL_ADMIN"
-                                            ) {
-                                              RoleIcon = ShieldCheck;
+                                              return "bg-[var(--role-teacher)] text-[var(--role-teacher-text)] border-[var(--role-teacher)]/50";
                                             }
+                                            if (roleKey === "SCHOOL_ADMIN") {
+                                              return "bg-[var(--role-school-admin)] text-[var(--role-school-admin-text)] border-[var(--role-school-admin)]/50";
+                                            }
+                                            if (roleKey === "SCHOOL_STAFF") {
+                                              return "bg-[var(--role-school-staff)] text-[var(--role-school-staff-text)] border-[var(--role-school-staff)]/50";
+                                            }
+                                            if (roleKey === "SCHOOL_LICENCE") {
+                                              return "bg-[var(--role-school-licence)] text-[var(--role-school-licence-text)] border-[var(--role-school-licence)]/50";
+                                            }
+                                            return "";
+                                          };
 
-                                            // Check if removing STAFF will remove all roles
-                                            const isStaff =
-                                              roleKey === "SCHOOL_STAFF";
-                                            const hasTeacherOrAdmin =
-                                              schoolRoles.some((sr) => {
-                                                const key = sr.roleKey || "";
-                                                return (
-                                                  key === "TEACHER" ||
-                                                  key === "SCHOOL_ADMIN"
-                                                );
-                                              });
-                                            const willRemoveAll =
-                                              isStaff && hasTeacherOrAdmin;
-
-                                            // Get role-specific checkbox color classes
-                                            const getCheckboxColorClasses = (
-                                              roleKey: string
-                                            ) => {
-                                              if (roleKey === "TEACHER") {
-                                                return "data-[state=checked]:border-[var(--role-teacher)] data-[state=checked]:bg-[var(--role-teacher)] data-[state=checked]:text-[var(--role-teacher-text)]";
-                                              } else if (
-                                                roleKey === "SCHOOL_ADMIN"
-                                              ) {
-                                                return "data-[state=checked]:border-[var(--role-school-admin)] data-[state=checked]:bg-[var(--role-school-admin)] data-[state=checked]:text-[var(--role-school-admin-text)]";
-                                              } else if (
-                                                roleKey === "SCHOOL_STAFF"
-                                              ) {
-                                                return "data-[state=checked]:border-[var(--role-school-staff)] data-[state=checked]:bg-[var(--role-school-staff)] data-[state=checked]:text-[var(--role-school-staff-text)]";
-                                              }
-                                              return "";
-                                            };
-
-                                            // Get role-specific border and background colors for wrapper
-                                            const getRoleBorderColor = (
-                                              roleKey: string
-                                            ) => {
-                                              if (roleKey === "TEACHER") {
-                                                return "border-[var(--role-teacher)]";
-                                              } else if (
-                                                roleKey === "SCHOOL_ADMIN"
-                                              ) {
-                                                return "border-[var(--role-school-admin)]";
-                                              } else if (
-                                                roleKey === "SCHOOL_STAFF"
-                                              ) {
-                                                return "border-[var(--role-school-staff)]";
-                                              }
-                                              return "";
-                                            };
-
-                                            const getRoleBgColor = (
-                                              roleKey: string
-                                            ) => {
-                                              if (roleKey === "TEACHER") {
-                                                return "bg-[var(--role-teacher)]/5 dark:bg-[var(--role-teacher)]/20";
-                                              } else if (
-                                                roleKey === "SCHOOL_ADMIN"
-                                              ) {
-                                                return "bg-[var(--role-school-admin)]/5 dark:bg-[var(--role-school-admin)]/20";
-                                              } else if (
-                                                roleKey === "SCHOOL_STAFF"
-                                              ) {
-                                                return "bg-[var(--role-school-staff)]/5 dark:bg-[var(--role-school-staff)]/20";
-                                              }
-                                              return "";
-                                            };
-
-                                            // Check if this role is currently being toggled
-                                            const isTogglingThisRole =
-                                              isTogglingRole &&
-                                              roleToToggle?.roleId ===
-                                                role.id &&
-                                              roleToToggle?.schoolId ===
-                                                schoolId;
-
+                                          const sortedRoles = [
+                                            ...schoolRoles,
+                                          ].sort((a, b) => {
+                                            const order: Record<string, number> =
+                                              {
+                                                SCHOOL_STAFF: 1,
+                                                SCHOOL_ADMIN: 2,
+                                                TEACHER: 3,
+                                                SCHOOL_LICENCE: 4,
+                                              };
                                             return (
-                                              <div
-                                                key={`${roleKey}-${schoolId}`}
-                                                className={cn(
-                                                  "flex items-center gap-2 rounded-md border px-2 py-1 transition-colors",
-                                                  isAssigned
-                                                    ? `${getRoleBorderColor(roleKey)} ${getRoleBgColor(roleKey)}`
-                                                    : "border-dashed border-muted-foreground"
-                                                )}
-                                              >
-                                                <Checkbox
-                                                  id={`school-role-${schoolId}-${roleKey}`}
-                                                  checked={isAssigned}
-                                                  disabled={
-                                                    userHasPlatformRole ||
-                                                    isTogglingThisRole
-                                                  }
-                                                  onCheckedChange={(
-                                                    checked
-                                                  ) => {
-                                                    if (!role) return;
-                                                    setRoleToToggle({
-                                                      roleId: role.id,
-                                                      roleKey,
-                                                      roleName,
-                                                      schoolId: schoolId,
-                                                      schoolName: schoolName,
-                                                      isAdding: !!checked,
-                                                      willRemoveAll:
-                                                        !checked &&
-                                                        willRemoveAll,
-                                                    });
-                                                    setIsToggleRoleDialogOpen(
-                                                      true
-                                                    );
-                                                  }}
-                                                  className={cn(
-                                                    "rounded",
-                                                    getCheckboxColorClasses(
-                                                      roleKey
-                                                    )
-                                                  )}
-                                                />
-                                                <Label
-                                                  htmlFor={`school-role-${schoolId}-${roleKey}`}
-                                                  className="flex items-center gap-1.5 cursor-pointer"
-                                                >
-                                                  {isTogglingThisRole ? (
-                                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                                  ) : (
-                                                    <RoleIcon
-                                                      className={cn(
-                                                        "h-3 w-3",
-                                                        !isAssigned &&
-                                                          "text-muted-foreground"
-                                                      )}
-                                                    />
-                                                  )}
-                                                  <span
-                                                    className={cn(
-                                                      "text-xs font-medium",
-                                                      !isAssigned &&
-                                                        "text-muted-foreground"
-                                                    )}
-                                                  >
-                                                    {roleName}
-                                                  </span>
-                                                </Label>
-                                              </div>
+                                              (order[a.roleKey || ""] ?? 5) -
+                                              (order[b.roleKey || ""] ?? 5)
                                             );
                                           });
+
+                                          const roleCount = sortedRoles.length;
+
+                                          return (
+                                            <>
+                                              <div className="flex items-center gap-0 flex-wrap">
+                                                {sortedRoles.map(
+                                                  (role, roleIdx) => {
+                                                    const roleKey =
+                                                      role.roleKey || "";
+                                                    const badgeClasses =
+                                                      getBadgeClasses(roleKey);
+                                                    const isFirst =
+                                                      roleIdx === 0;
+                                                    const isLast =
+                                                      roleIdx === roleCount - 1;
+                                                    const isAdmin =
+                                                      roleKey.includes("ADMIN");
+                                                    let borderRadiusClass = "";
+                                                    if (roleCount === 1) {
+                                                      borderRadiusClass =
+                                                        "rounded-md";
+                                                    } else if (isFirst) {
+                                                      borderRadiusClass =
+                                                        "rounded-l-md rounded-r-none";
+                                                    } else if (isLast) {
+                                                      borderRadiusClass =
+                                                        "rounded-r-md rounded-l-none";
+                                                    } else {
+                                                      borderRadiusClass =
+                                                        "rounded-none";
+                                                    }
+
+                                                    return (
+                                                      <Badge
+                                                        key={`${roleKey}-${roleIdx}`}
+                                                        variant="default"
+                                                        className={cn(
+                                                          "flex items-center gap-1 z-10 border px-2 py-1",
+                                                          badgeClasses,
+                                                          !isLast &&
+                                                            "border-r-0 -mr-[1px]",
+                                                          borderRadiusClass
+                                                        )}
+                                                      >
+                                                        {roleKey ===
+                                                        "SCHOOL_LICENCE" ? (
+                                                          <FileBadge2 className="h-3 w-3" />
+                                                        ) : isAdmin ? (
+                                                          <ShieldCheck className="h-3 w-3" />
+                                                        ) : (
+                                                          <UsersIcon className="h-3 w-3" />
+                                                        )}
+                                                        {role.roleName ||
+                                                          roleKey}
+                                                      </Badge>
+                                                    );
+                                                  }
+                                                )}
+                                              </div>
+                                              <Separator
+                                                orientation="vertical"
+                                                className="h-6"
+                                              />
+                                              <FeatureGuard feature="system:manage-user-roles">
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() =>
+                                                    handleOpenEditSchoolRoles(
+                                                      schoolId,
+                                                      schoolName,
+                                                      schoolRoles
+                                                    )}
+                                                  disabled={userHasPlatformRole}
+                                                >
+                                                  <Pencil className="h-4 w-4" />
+                                                  Edit
+                                                </Button>
+                                              </FeatureGuard>
+                                            </>
+                                          );
                                         })()}
                                       </div>
                                     </CardContent>
@@ -1319,291 +1390,77 @@ function UserDetailDrawerContent({
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Edit School Roles Dialog */}
+      <SchoolRoleAssignmentDialog
+        mode="edit"
+        open={editSchoolRolesDialogOpen}
+        onOpenChange={(open) => {
+          setEditSchoolRolesDialogOpen(open);
+          if (!open) {
+            setEditSchoolRolesSchoolId(null);
+            setEditSchoolRolesSchoolName("");
+            setEditSchoolRolesSelected(new Set());
+          }
+        }}
+        title={`Edit Roles for ${editSchoolRolesSchoolName || "School"}`}
+        description="Manage roles at this school. Unchecking Staff will remove this user from the school entirely."
+        schools={schools}
+        initialSchoolId={editSchoolRolesSchoolId}
+        initialSchoolName={editSchoolRolesSchoolName}
+        selectedSchoolId={editSchoolRolesSchoolId ?? ""}
+        onSchoolIdChange={() => {}}
+        roles={roles}
+        selectedRoleIds={editSchoolRolesSelected}
+        onRoleIdsChange={setEditSchoolRolesSelected}
+        onSubmit={applyEditSchoolRolesChanges}
+        onCancel={() => {
+          setEditSchoolRolesDialogOpen(false);
+          setEditSchoolRolesSchoolId(null);
+          setEditSchoolRolesSchoolName("");
+          setEditSchoolRolesSelected(new Set());
+        }}
+        isSaving={isSavingEditSchoolRoles}
+      />
+
       {/* Add Role Dialog */}
-      <Dialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add Role</DialogTitle>
-            <DialogDescription>
-              Select a school and assign roles to {getDisplayName(user)}.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            {/* School Selection */}
-            <div className="space-y-2">
-              <Label htmlFor="add-role-school-select">School *</Label>
-              <Popover
-                open={addRoleComboboxOpen}
-                onOpenChange={setAddRoleComboboxOpen}
-                modal
-              >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={addRoleComboboxOpen}
-                    className="w-full justify-between"
-                    disabled={loadingSchools}
-                  >
-                    {addRoleSchoolId
-                      ? schools.find((school) => school.id === addRoleSchoolId)
-                          ?.name
-                      : "Select a school..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[var(--radix-popover-trigger-width)] p-0"
-                  align="start"
-                >
-                  <Command>
-                    <CommandInput placeholder="Search school..." />
-                    <CommandList>
-                      <CommandEmpty>No school found.</CommandEmpty>
-                      <CommandGroup>
-                        {schools
-                          .filter((school) => {
-                            // Filter out schools that already have roles assigned
-                            const hasRolesAtSchool = user.schoolRoles.some(
-                              (sr) => sr.schoolId === school.id
-                            );
-                            return !hasRolesAtSchool;
-                          })
-                          .map((school) => {
-                            const { stateText, sectorText, levelsText } =
-                              extractSchoolMetadata(school);
-                            const parts = [
-                              stateText,
-                              sectorText,
-                              levelsText,
-                            ].filter(Boolean);
-                            return (
-                              <CommandItem
-                                key={school.id}
-                                value={`${school.id} ${school.name}`}
-                                onSelect={() => {
-                                  setAddRoleSchoolId(
-                                    school.id === addRoleSchoolId
-                                      ? ""
-                                      : school.id
-                                  );
-                                  setAddRoleComboboxOpen(false);
-                                  // Reset selected roles when school changes
-                                  setAddRoleSelectedRoles(new Set());
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    addRoleSchoolId === school.id
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col -space-y-0.5">
-                                  <span>{school.name}</span>
-                                  {parts.length > 0 && (
-                                    <span className="text-xs text-muted-foreground">
-                                      {parts.join(" • ")}
-                                    </span>
-                                  )}
-                                </div>
-                              </CommandItem>
-                            );
-                          })}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* Role Selection with Checkboxes */}
-            {addRoleSchoolId && (
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground ml-2">
-                  Roles
-                </Label>
-                {(() => {
-                  // Only show STAFF, TEACHER, and SCHOOL_ADMIN
-                  const schoolRoles = roles.filter((role) => {
-                    const roleKey = role.key || "";
-                    return (
-                      roleKey === "TEACHER" ||
-                      roleKey === "SCHOOL_ADMIN" ||
-                      roleKey === "SCHOOL_STAFF"
-                    );
-                  });
-
-                  // Sort: STAFF first, then TEACHER, then SCHOOL_ADMIN
-                  const sortedRoles = [...schoolRoles].sort((a, b) => {
-                    const order: Record<string, number> = {
-                      SCHOOL_STAFF: 1,
-                      TEACHER: 2,
-                      SCHOOL_ADMIN: 3,
-                    };
-                    return (
-                      (order[a.key || ""] || 999) - (order[b.key || ""] || 999)
-                    );
-                  });
-
-                  return sortedRoles.map((role) => {
-                    const roleKey = role.key || "";
-                    const isStaff = roleKey === "SCHOOL_STAFF";
-                    const isSelected = addRoleSelectedRoles.has(role.id);
-
-                    let RoleIcon = UsersIcon;
-                    if (roleKey === "TEACHER") {
-                      RoleIcon = UsersIcon;
-                    } else if (roleKey === "SCHOOL_ADMIN") {
-                      RoleIcon = ShieldCheck;
-                    }
-
-                    // Get role-specific color classes
-                    const getRoleBorderColor = (roleKey: string) => {
-                      if (roleKey === "TEACHER") {
-                        return "border-[var(--role-teacher)]";
-                      } else if (roleKey === "SCHOOL_ADMIN") {
-                        return "border-[var(--role-school-admin)]";
-                      } else if (roleKey === "SCHOOL_STAFF") {
-                        return "border-[var(--role-school-staff)]";
-                      }
-                      return "border-muted";
-                    };
-
-                    const getRoleBgColor = (roleKey: string) => {
-                      if (roleKey === "TEACHER") {
-                        return "bg-[var(--role-teacher)]/10 dark:bg-[var(--role-teacher)]/20";
-                      } else if (roleKey === "SCHOOL_ADMIN") {
-                        return "bg-[var(--role-school-admin)]/10 dark:bg-[var(--role-school-admin)]/20";
-                      } else if (roleKey === "SCHOOL_STAFF") {
-                        return "bg-[var(--role-school-staff)]/10 dark:bg-[var(--role-school-staff)]/20";
-                      }
-                      return "";
-                    };
-
-                    const getCheckboxColorClasses = (roleKey: string) => {
-                      if (roleKey === "TEACHER") {
-                        return "data-[state=checked]:border-[var(--role-teacher)] data-[state=checked]:bg-[var(--role-teacher)] data-[state=checked]:text-[var(--role-teacher-text)]";
-                      } else if (roleKey === "SCHOOL_ADMIN") {
-                        return "data-[state=checked]:border-[var(--role-school-admin)] data-[state=checked]:bg-[var(--role-school-admin)] data-[state=checked]:text-[var(--role-school-admin-text)]";
-                      } else if (roleKey === "SCHOOL_STAFF") {
-                        return "data-[state=checked]:border-[var(--role-school-staff)] data-[state=checked]:bg-[var(--role-school-staff)] data-[state=checked]:text-[var(--role-school-staff-text)]";
-                      }
-                      return "";
-                    };
-
-                    // Staff role is always checked and disabled
-                    if (isStaff) {
-                      return (
-                        <div
-                          key={role.id}
-                          className={cn(
-                            "flex items-center gap-3 rounded-lg border bg-white dark:bg-background p-3 cursor-not-allowed opacity-60 shadow-sm",
-                            `${getRoleBorderColor(roleKey)}/50 ${getRoleBgColor(roleKey)}`
-                          )}
-                        >
-                          <Checkbox
-                            id={`role-${role.id}`}
-                            checked={true}
-                            disabled={true}
-                            className={cn(
-                              "rounded",
-                              getCheckboxColorClasses(roleKey)
-                            )}
-                          />
-                          <div className="flex items-center gap-2 flex-1">
-                            <RoleIcon className="h-4 w-4" />
-                            <span className="text-sm font-medium text-primary">
-                              {role.name} (assigned by default)
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <Label
-                        key={role.id}
-                        htmlFor={`role-${role.id}`}
-                        className={cn(
-                          "hover:bg-accent/50 flex items-center gap-3 rounded-lg border bg-white dark:bg-background p-3 cursor-pointer shadow-sm transition-colors",
-                          isSelected
-                            ? `${getRoleBorderColor(roleKey)} ${getRoleBgColor(roleKey)}`
-                            : "border-muted"
-                        )}
-                      >
-                        <Checkbox
-                          id={`role-${role.id}`}
-                          checked={isSelected}
-                          onCheckedChange={(checked) => {
-                            const newSelected = new Set(addRoleSelectedRoles);
-                            if (checked) {
-                              newSelected.add(role.id);
-                            } else {
-                              newSelected.delete(role.id);
-                            }
-                            setAddRoleSelectedRoles(newSelected);
-                          }}
-                          className={cn(
-                            "rounded",
-                            getCheckboxColorClasses(roleKey)
-                          )}
-                        />
-                        <div className="flex items-center gap-2 flex-1">
-                          <RoleIcon className="h-4 w-4" />
-                          <span className="text-sm font-medium">
-                            {role.name}
-                          </span>
-                        </div>
-                      </Label>
-                    );
-                  });
-                })()}
-              </div>
-            )}
-
-            {toggleRoleError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{toggleRoleError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsAddRoleDialogOpen(false);
-                setAddRoleSchoolId("");
-                setAddRoleSelectedRoles(new Set());
-                setAddRoleComboboxOpen(false);
-                setToggleRoleError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveRolesFromDialog}
-              disabled={
-                !addRoleSchoolId ||
-                addRoleSelectedRoles.size === 0 ||
-                isSavingRoles
-              }
-            >
-              {isSavingRoles ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Assigning...
-                </>
-              ) : (
-                "Assign Roles"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SchoolRoleAssignmentDialog
+        mode="add"
+        open={isAddRoleDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddRoleDialogOpen(open);
+          if (!open) {
+            setAddRoleSchoolId("");
+            setAddRoleSelectedRoles(new Set());
+            setToggleRoleError(null);
+          }
+        }}
+        title="Add Role"
+        description={`Select a school and assign roles to ${getDisplayName(user)}.`}
+        schools={schools}
+        selectedSchoolId={addRoleSchoolId}
+        onSchoolIdChange={(id) => {
+          setAddRoleSchoolId(id);
+          setAddRoleSelectedRoles(new Set());
+        }}
+        roles={roles}
+        selectedRoleIds={addRoleSelectedRoles}
+        onRoleIdsChange={setAddRoleSelectedRoles}
+        onSubmit={handleSaveRolesFromDialog}
+        onCancel={() => {
+          setIsAddRoleDialogOpen(false);
+          setAddRoleSchoolId("");
+          setAddRoleSelectedRoles(new Set());
+          setToggleRoleError(null);
+        }}
+        isSaving={isSavingRoles}
+        error={toggleRoleError}
+        excludeSchoolIds={
+          user
+            ? new Set(user.schoolRoles?.map((sr) => sr.schoolId) ?? [])
+            : undefined
+        }
+        loadingSchools={loadingSchools}
+      />
 
       {/* Toggle Role Confirmation Dialog */}
       <AlertDialog

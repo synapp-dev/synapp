@@ -8,6 +8,7 @@ export interface UserDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUserUpdate?: () => void;
+  onDeleteUserClick?: () => void;
 }
 
 export interface RoleToRemove {

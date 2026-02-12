@@ -304,7 +304,7 @@ export function UserPositionsTab({
                 return (
                   <div key={schoolId} className="space-y-2">
                     <Card className="border">
-                      <CardContent className="px-4 py-4 space-y-3">
+                      <CardContent className="px-4 py-2 space-y-3">
                         {/* School Title */}
                         <div className="flex flex-col -space-y-0.5">
                           <h3 className="text-lg font-semibold">
@@ -523,7 +523,7 @@ export function UserPositionsTab({
                 return (
                   <div key={schoolId} className="space-y-2">
                     <Card className="border">
-                      <CardContent className="px-4 py-4 space-y-3">
+                      <CardContent className="px-4 py-2 space-y-3">
                         {/* School Title */}
                         <div className="flex flex-col -space-y-0.5">
                           <h3 className="text-lg font-semibold">

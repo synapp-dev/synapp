@@ -12,18 +12,21 @@ import {
   SidebarSeparator,
 } from "@workspace/ui/components/sidebar";
 import { User, ShieldCheck, History, Trash2, Briefcase, GraduationCap, Settings } from "lucide-react";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import type { TabType } from "./types";
 
 interface UserDetailSidebarProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
   canManageFeatures?: boolean;
+  onDeleteClick?: () => void;
 }
 
 export function UserDetailSidebar({
   activeTab,
   onTabChange,
   canManageFeatures,
+  onDeleteClick,
 }: UserDetailSidebarProps) {
   return (
     <div className="hidden md:flex flex-col w-48 shrink-0 bg-transparent">
@@ -124,10 +127,16 @@ export function UserDetailSidebar({
                     </SidebarMenuItem>
                     <SidebarSeparator className="!mx-0 !ml-0 my-1" />
                     <SidebarMenuItem>
-                      <SidebarMenuButton disabled className="text-destructive hover:text-destructive hover:bg-destructive/10">
-                        <Trash2 className="h-4 w-4" />
-                        <span>Delete user</span>
-                      </SidebarMenuButton>
+                      <FeatureGuard feature="admin:delete-user">
+                        <SidebarMenuButton
+                          disabled={!onDeleteClick}
+                          onClick={onDeleteClick}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span>Delete user</span>
+                        </SidebarMenuButton>
+                      </FeatureGuard>
                     </SidebarMenuItem>
                   </SidebarMenu>
                 </SidebarGroupContent>
