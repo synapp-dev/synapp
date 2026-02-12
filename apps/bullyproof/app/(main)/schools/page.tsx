@@ -29,7 +29,7 @@ import {
   type School as MeSchool,
 } from "@/entities/me/model/useMySchoolsQuery";
 import { usePageTitle } from "@/hooks/use-page-title";
-import Image from "next/image";
+import { StorageImage } from "@/components/atoms/storage-image";
 
 // Union type for both school types
 type School = MeSchool | SchoolServiceSchool;
@@ -469,7 +469,7 @@ function SchoolsPageContent() {
                 <CardHeader>
                   <div className="flex items-start gap-3">
                     {avatarUrl ? (
-                      <Image
+                      <StorageImage
                         src={avatarUrl}
                         alt={school.name || "School"}
                         width={48}
