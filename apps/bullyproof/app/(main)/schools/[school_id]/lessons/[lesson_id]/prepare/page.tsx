@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
@@ -236,6 +237,9 @@ export default function LessonPreparePage() {
   }, [currentSlideIndex, slides.length]);
 
   // Auto-update lesson status to 'ready' when both checklist items are checked
+  // Note: isUpdatingStatus intentionally excluded from deps - it's a guard to prevent
+  // concurrent updates. Including it would cause the effect to re-run when it flips
+  // to false, potentially before the refetch completes, triggering duplicate PUTs.
   useEffect(() => {
     const updateStatusToReady = async () => {
       if (
@@ -247,8 +251,8 @@ export default function LessonPreparePage() {
         setIsUpdatingStatus(true);
         try {
           await lessonsApi.put.update(lesson_id, { status: "ready" });
-          // Invalidate the lesson query to refresh data
-          queryClient.invalidateQueries({ queryKey: ["lesson", lesson_id] });
+          // Invalidate using the correct query key so lessonData refreshes
+          queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
         } catch (error) {
           console.error("Failed to update lesson status:", error);
         } finally {
@@ -258,7 +262,7 @@ export default function LessonPreparePage() {
     };
 
     updateStatusToReady();
-  }, [viewedSlides, downloadedPlan, lessonData?.status, lesson_id, queryClient, isUpdatingStatus]);
+  }, [viewedSlides, downloadedPlan, lessonData?.status, lesson_id, queryClient]);
 
   // Open schedule dialog with pre-populated values if lesson already has a schedule
   const openScheduleDialog = () => {
@@ -303,7 +307,7 @@ export default function LessonPreparePage() {
       await lessonsApi.put.update(lesson_id, { 
         scheduledFor: scheduledDateTime.toISOString() 
       });
-      queryClient.invalidateQueries({ queryKey: ["lesson", lesson_id] });
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
       setShowScheduleDialog(false);
       setShowConfirmOverwrite(false);
       setPendingSchedule(null);
