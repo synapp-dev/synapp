@@ -15,6 +15,11 @@ async function seedFeatures() {
       { key: 'system:school-admin-access', name: 'School Admin Access', description: 'School admin functionality access', category: 'system', section: 'system' },
       { key: 'system:impersonate', name: 'Impersonate Users', description: 'Access to the impersonate user menu in the app header', category: 'system', section: 'system' },
       { key: 'system:feedback-button', name: 'Feedback Button', description: 'Access to the feedback/bug report button in the app header', category: 'system', section: 'system' },
+      { key: 'system:manage-user-roles', name: 'Manage User Roles', description: 'Assign and edit roles for users (Edit button and Add New Role in user detail drawer Roles tab)', category: 'system', section: 'system' },
+
+      // Action features – admin
+      { key: 'admin:delete-user', name: 'Delete User', description: 'Delete users from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
+      { key: 'admin:delete-school', name: 'Delete School', description: 'Delete schools from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
 
       // Page features – top-level
       { key: '/dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'page', section: 'dashboard' },
@@ -233,6 +238,49 @@ async function seedFeatures() {
         });
       }
     }
+
+    // Manage user roles: enabled for INTRADARK_DEV and PLATFORM_ADMIN
+    const manageUserRolesFeature = insertedFeatures.find(f => f.key === 'system:manage-user-roles');
+    if (manageUserRolesFeature) {
+      if (intradarkDevRole.length > 0) {
+        permissionsToCreate.push({
+          featureId: manageUserRolesFeature.id,
+          level: 'role' as const,
+          targetId: intradarkDevRole[0].id,
+          enabled: true,
+        });
+      }
+      if (platformAdminRole.length > 0) {
+        permissionsToCreate.push({
+          featureId: manageUserRolesFeature.id,
+          level: 'role' as const,
+          targetId: platformAdminRole[0].id,
+          enabled: true,
+        });
+      }
+    }
+
+    // Delete user: only INTRADARK_DEV gets access
+    const deleteUserFeature = insertedFeatures.find(f => f.key === 'admin:delete-user');
+    if (deleteUserFeature && intradarkDevRole.length > 0) {
+      permissionsToCreate.push({
+        featureId: deleteUserFeature.id,
+        level: 'role' as const,
+        targetId: intradarkDevRole[0].id,
+        enabled: true,
+      });
+    }
+
+    // Delete school: only INTRADARK_DEV gets access
+    const deleteSchoolFeature = insertedFeatures.find(f => f.key === 'admin:delete-school');
+    if (deleteSchoolFeature && intradarkDevRole.length > 0) {
+      permissionsToCreate.push({
+        featureId: deleteSchoolFeature.id,
+        level: 'role' as const,
+        targetId: intradarkDevRole[0].id,
+        enabled: true,
+      });
+    }
     
     // Insert permissions
     let permissionsCreated = 0;
@@ -300,6 +348,63 @@ async function seedFeatures() {
         .insert(featurePermissions)
         .values({
           featureId: feedbackFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // Manage user roles: globally visible but not enabled (admins see Edit/Add New Role but cannot use unless they have role override)
+    if (manageUserRolesFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: manageUserRolesFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // Delete user: globally visible but not enabled (only INTRADARK_DEV can use)
+    if (deleteUserFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: deleteUserFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // Delete school: globally visible but not enabled (only INTRADARK_DEV can use)
+    if (deleteSchoolFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: deleteSchoolFeature.id,
           level: 'global',
           targetId: null,
           enabled: false,

@@ -65,6 +65,7 @@ export const SYSTEM_FEATURES = {
   SCHOOL_ADMIN_ACCESS: "system:school-admin-access",
   IMPERSONATE: "system:impersonate",
   FEEDBACK_BUTTON: "system:feedback-button",
+  MANAGE_USER_ROLES: "system:manage-user-roles",
 } as const;
 
 // ─── Component Features ──────────────────────────────────────────────────────
@@ -76,9 +77,10 @@ export const COMPONENT_FEATURES = {
 
 // ─── Action Features ─────────────────────────────────────────────────────────
 
-/** Action feature keys (category: "action") - add as needed */
+/** Action feature keys (category: "action") */
 export const ACTION_FEATURES = {
-  // Example: ADMIN_DELETE_USER: "admin:delete-user",
+  DELETE_USER: "admin:delete-user",
+  DELETE_SCHOOL: "admin:delete-school",
 } as const;
 
 // ─── Valid Categories ────────────────────────────────────────────────────────

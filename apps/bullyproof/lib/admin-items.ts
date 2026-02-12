@@ -11,6 +11,7 @@ import {
   type LucideIcon,
   Component,
   Ticket,
+  TicketCheck,
 } from "lucide-react";
 
 export interface AdminItem {
@@ -117,8 +118,8 @@ export const adminItemsConfig: AdminItem[] = [
   {
     title: "Tickets",
     url: "/admin/tickets",
-    icon: Ticket,
-    iconName: "Ticket",
+    icon: TicketCheck,
+    iconName: "TicketCheck",
     description: "View and manage user feedback tickets",
     featureKey: "/admin/tickets",
     enabled: true,
