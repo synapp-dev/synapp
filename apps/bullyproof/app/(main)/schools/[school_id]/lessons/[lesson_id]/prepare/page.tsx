@@ -106,9 +106,6 @@ export default function LessonPreparePage() {
   const [slides, setSlides] = useState<SlideData[]>([]);
   const galleryRef = useRef<HTMLDivElement>(null);
 
-  // No-op: signed URL invalidation is handled by TQ/DB cache
-  const invalidateSlide = (_slideId: string) => {};
-
   const fetchTopicData = useCallback(async () => {
     if (!lessonData?.topicId) return;
 
@@ -116,7 +113,10 @@ export default function LessonPreparePage() {
       setIsLoadingTopic(true);
       setTopicError(null);
 
-      const topicResult = await topicsApi.get.byId(lessonData.topicId);
+      const topicResult = await topicsApi.get.byId(lessonData.topicId, {
+        includeSlides: true,
+        includeUrls: true,
+      });
       if (topicResult.data) {
         setTopic(topicResult.data);
         const initialSlides =
@@ -131,14 +131,12 @@ export default function LessonPreparePage() {
               videoUrl: slide.videoUrl ?? null,
               videoStartS: slide.videoStartS ?? null,
               videoEndS: slide.videoEndS ?? null,
+              signedUrl: (slide as { signedUrl?: string }).signedUrl ?? null,
+              signedImageUrl: (slide as { signedImageUrl?: string }).signedImageUrl ?? null,
+              signedVideoUrl: (slide as { signedVideoUrl?: string }).signedVideoUrl ?? null,
             })) ?? [];
         setSlides(initialSlides);
         setCurrentSlideIndex(0);
-
-        // Invalidate all slide caches to force refresh
-        initialSlides.forEach((slide) => {
-          invalidateSlide(slide.id);
-        });
       } else {
         setTopicError(
           topicResult.error?.message ?? "Failed to fetch topic details"
@@ -152,7 +150,7 @@ export default function LessonPreparePage() {
     } finally {
       setIsLoadingTopic(false);
     }
-  }, [lessonData?.topicId, invalidateSlide]);
+  }, [lessonData?.topicId]);
 
   // Fetch slides when lesson data loads (for thumbnail preview)
   useEffect(() => {

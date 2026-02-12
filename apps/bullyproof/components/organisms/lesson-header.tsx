@@ -21,7 +21,10 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
   const fetchFirstSlide = useCallback(async (topicId: string) => {
     try {
       setIsLoadingSlides(true);
-      const topicResult = await topicsApi.get.byId(topicId);
+      const topicResult = await topicsApi.get.byId(topicId, {
+        includeSlides: true,
+        includeUrls: true,
+      });
       if (topicResult.data?.slides && topicResult.data.slides.length > 0) {
         const sortedSlides = topicResult.data.slides.sort(
           (a, b) => a.orderIndex - b.orderIndex
@@ -36,6 +39,9 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
           videoUrl: slide.videoUrl ?? null,
           videoStartS: slide.videoStartS ?? null,
           videoEndS: slide.videoEndS ?? null,
+          signedUrl: (slide as { signedUrl?: string }).signedUrl ?? null,
+          signedImageUrl: (slide as { signedImageUrl?: string }).signedImageUrl ?? null,
+          signedVideoUrl: (slide as { signedVideoUrl?: string }).signedVideoUrl ?? null,
         });
       }
     } catch (err) {
@@ -55,7 +61,7 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
     return (
       <div className="border-b pb-4 mb-6">
         <div className="flex gap-4">
-          <Skeleton className="w-32 aspect-video rounded-lg flex-shrink-0" />
+          <Skeleton className="w-40 aspect-video rounded-lg flex-shrink-0" />
           <div className="space-y-3 flex-1">
             <Skeleton className="h-4 w-16" />
             <Skeleton className="h-6 w-64" />
@@ -102,7 +108,7 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
     <div className="flex gap-4 bg-muted p-6 rounded-lg">
       {/* First slide thumbnail */}
       {firstSlide ? (
-        <div className="flex-shrink-0 w-32 aspect-video rounded-lg overflow-hidden shadow-sm border">
+        <div className="flex-shrink-0 w-40 aspect-video rounded-lg overflow-hidden">
           <SlideRenderer
             slide={firstSlide}
             className="w-full h-full"
@@ -110,7 +116,7 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
           />
         </div>
       ) : isLoadingSlides ? (
-        <Skeleton className="w-32 aspect-video rounded-lg flex-shrink-0" />
+        <Skeleton className="w-40 aspect-video rounded-lg flex-shrink-0" />
       ) : null}
 
       <div className="space-y-3 flex-1">
