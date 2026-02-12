@@ -38,26 +38,28 @@ function extractStoragePath(urlOrPath: string): string {
 
 /**
  * Generates a signed URL for a Supabase storage file.
- * 
+ *
  * @param urlOrPath - Either a Supabase public URL or a storage path
  * @param supabase - The Supabase client instance
  * @param expiresIn - Expiry time in seconds (default: 604800 = 1 week)
- * @returns The signed URL, or the original URL if generation fails
+ * @returns The signed URL, or null if generation fails (caller must not pass path to Image src)
  */
 export async function getSignedUrl(
   urlOrPath: string,
   supabase: SupabaseClient<Database>,
   expiresIn: number = 604800
-): Promise<string> {
-  // Skip data URLs and other non-storage URLs
+): Promise<string | null> {
+  // Skip data URLs and other non-storage URLs - return as-is only if it's a valid URL
   if (urlOrPath.startsWith("data:") || !urlOrPath) {
+    return urlOrPath;
+  }
+  if (urlOrPath.startsWith("http")) {
     return urlOrPath;
   }
 
   try {
     const storagePath = extractStoragePath(urlOrPath);
-    
-    // Generate signed URL
+
     const { data, error } = await supabase.storage
       .from("content")
       .createSignedUrl(storagePath, expiresIn);
@@ -67,14 +69,12 @@ export async function getSignedUrl(
         `Failed to generate signed URL for ${urlOrPath}:`,
         error.message
       );
-      // Return original URL as fallback
-      return urlOrPath;
+      return null;
     }
 
     return data.signedUrl;
   } catch (error) {
     console.error(`Error generating signed URL for ${urlOrPath}:`, error);
-    // Return original URL as fallback
-    return urlOrPath;
+    return null;
   }
 }

@@ -20,6 +20,7 @@ export default function Page() {
           width={100}
           height={100}
           className="mx-auto"
+          priority
         />
         <CardHeader className="text-center">
           <CardTitle>Welcome!</CardTitle>
