@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
@@ -289,6 +290,9 @@ export function TicketDetailDialog({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
+          <DialogDescription className="sr-only">
+            Ticket details and screenshot
+          </DialogDescription>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <TypeIcon className={`h-5 w-5 ${typeMeta.color}`} />
@@ -483,6 +487,9 @@ export function TicketDetailDialog({
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">Screenshot Preview</DialogTitle>
+          <DialogDescription className="sr-only">
+            Full size screenshot preview
+          </DialogDescription>
           {ticket.screenshotUrl && (
             <img
               src={ticket.screenshotUrl}
