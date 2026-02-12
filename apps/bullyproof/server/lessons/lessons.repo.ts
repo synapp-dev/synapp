@@ -160,6 +160,7 @@ export const lessonsRepo = {
     scheduledFor?: string;
     status?: string;
     classIds?: string[];
+    metadata?: Record<string, unknown>;
   }) =>
     db.transaction(async (tx) => {
       const { classIds, ...lessonData } = data;
@@ -189,15 +190,19 @@ export const lessonsRepo = {
     scheduledFor?: string;
     status?: string;
     classIds?: string[];
+    createdByUserId?: string;
+    metadata?: Record<string, unknown>;
   }) =>
     db.transaction(async (tx) => {
-      const { classIds, ...lessonData } = data;
+      const { classIds, metadata, ...lessonData } = data;
+      const updatePayload: Record<string, unknown> = { ...lessonData };
+      if (metadata !== undefined) updatePayload.metadata = metadata;
       
       // Only update lesson fields if there are any properties to update
-      if (Object.keys(lessonData).length > 0) {
+      if (Object.keys(updatePayload).length > 0) {
         await tx
           .update(lessons)
-          .set(lessonData)
+          .set(updatePayload as any)
           .where(eq(lessons.id, id));
       }
 
@@ -225,9 +230,38 @@ export const lessonsRepo = {
         .limit(1);
       
       return updatedLesson[0];
-
-      return updatedLesson[0];
     }),
+
+  takeOver: async (
+    lessonId: string,
+    newOwnerId: string,
+    newOwnerName: string,
+    previousOwnerId: string,
+    previousOwnerName: string | null
+  ) => {
+    const lessonRows = await db.select().from(lessons).where(eq(lessons.id, lessonId)).limit(1);
+    if (lessonRows.length === 0) return;
+    const lesson = lessonRows[0]!;
+    const currentMeta = (lesson.metadata as Record<string, unknown>) || {};
+    const history = Array.isArray(currentMeta.eventHistory) ? currentMeta.eventHistory : [];
+    const updatedMeta = {
+      ...currentMeta,
+      eventHistory: [
+        ...history,
+        {
+          type: "ownership_change",
+          userId: newOwnerId,
+          userName: newOwnerName,
+          timestamp: new Date().toISOString(),
+          payload: { previousOwnerId, previousOwnerName, newOwnerId, newOwnerName },
+        },
+      ],
+    };
+    await db
+      .update(lessons)
+      .set({ createdByUserId: newOwnerId, metadata: updatedMeta })
+      .where(eq(lessons.id, lessonId));
+  },
 
   delete: (id: string) =>
     db.transaction(async (tx) => {

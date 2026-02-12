@@ -4,6 +4,7 @@ import { z } from "zod";
 export const createLessonSchema = z.object({
   schoolId: z.string().trim().min(1).max(500),
   topicId: z.string().trim().min(1).max(500),
+  createdByUserId: z.string().uuid().optional(),
   title: z.string().trim().min(1).max(200).optional(),
   description: z.string().trim().max(1000).optional(),
   scheduledFor: z.string().datetime().optional(),

@@ -14,9 +14,9 @@ import { lessonsRepo } from "./lessons.repo";
 import { topicsRepo } from "../topics/topics.repo";
 import { curriculumRepo } from "../curriculum/curriculum.repo";
 import { classesRepo } from "../classes/classes.repo";
-import { getUserScopedRoles } from "../auth/rbac";
+import { getUserScopedRoles, ADMIN_CANNOT_CREATE_LESSON_KEYS } from "../auth/rbac";
 import { checkFeatureAccess } from "@/server/features/features.service";
-import { classes, lessons, topics, lessonClasses } from "@/server/db/schema";
+import { classes, lessons, topics, lessonClasses, userRoles, userProfile } from "@/server/db/schema";
 import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
@@ -125,9 +125,73 @@ export const lessonsService = {
     const data: CreateLessonParams = createLessonSchema.parse(params);
     await assertCanManageLessons(ctx, ctx.userId!);
 
+    const roles = await getUserScopedRoles(ctx.userId!);
+    const isAdminRestricted = roles.platform.some((key) =>
+      ADMIN_CANNOT_CREATE_LESSON_KEYS.includes(key as (typeof ADMIN_CANNOT_CREATE_LESSON_KEYS)[number])
+    );
+
+    let effectiveCreatedByUserId = ctx.userId!;
+    let metadata: Record<string, unknown> | undefined;
+
+    if (isAdminRestricted) {
+      if (!data.createdByUserId) {
+        throw new Error("You must select a user to create the lesson on behalf of.");
+      }
+      if (data.createdByUserId === ctx.userId) {
+        throw new Error("You cannot create a lesson on your own behalf. Please select another user.");
+      }
+      // Validate selected user has a school role at this school
+      const schoolMembership = await db
+        .select({ userId: userRoles.userId })
+        .from(userRoles)
+        .where(
+          and(
+            eq(userRoles.userId, data.createdByUserId),
+            eq(userRoles.schoolId, data.schoolId),
+            eq(userRoles.roleScope, "school")
+          )
+        )
+        .limit(1);
+      if (!schoolMembership.length) {
+        throw new Error("The selected user is not a member of this school.");
+      }
+      effectiveCreatedByUserId = data.createdByUserId;
+      metadata = {
+        createdByAdmin: {
+          adminUserId: ctx.userId,
+          createdAt: new Date().toISOString(),
+        },
+      };
+    }
+
+    // Initialize eventHistory for audit trail
+    const creatorProfile = await db
+      .select({ firstName: userProfile.firstName, lastName: userProfile.lastName })
+      .from(userProfile)
+      .where(eq(userProfile.id, effectiveCreatedByUserId))
+      .limit(1);
+    const creatorName =
+      creatorProfile[0]?.firstName && creatorProfile[0]?.lastName
+        ? `${creatorProfile[0].firstName} ${creatorProfile[0].lastName}`
+        : undefined;
+    const eventHistory = [
+      {
+        type: "created",
+        userId: effectiveCreatedByUserId,
+        userName: creatorName,
+        timestamp: new Date().toISOString(),
+        payload: { status: "preparing" },
+      },
+    ];
+    const finalMetadata: Record<string, unknown> = {
+      ...(metadata ?? {}),
+      eventHistory,
+    };
+
     const newLesson = await lessonsRepo.create({
       ...data,
-      createdByUserId: ctx.userId!,
+      createdByUserId: effectiveCreatedByUserId,
+      metadata: finalMetadata,
     });
 
     return await lessonsRepo.getWithDetails(newLesson.id);
@@ -184,8 +248,110 @@ export const lessonsService = {
       }
     }
 
-    const updatedLesson = await lessonsRepo.update(id, data);
+    // Owner-only check for status → feedback
+    if (data.status === "feedback") {
+      if (ctx.userId !== existingLesson[0].createdByUserId) {
+        throw new Error("Only the lesson owner can transition the lesson to feedback.");
+      }
+    }
+
+    // Build update payload with event history
+    const updateData: Record<string, unknown> = { ...data };
+    const existing = existingLesson[0]!;
+    const currentMeta = (existing.metadata as Record<string, unknown>) || {};
+    let history = Array.isArray(currentMeta.eventHistory) ? [...currentMeta.eventHistory] : [];
+
+    const actorProfile = await db
+      .select({ firstName: userProfile.firstName, lastName: userProfile.lastName })
+      .from(userProfile)
+      .where(eq(userProfile.id, ctx.userId!))
+      .limit(1);
+    const actorName =
+      actorProfile[0]?.firstName && actorProfile[0]?.lastName
+        ? `${actorProfile[0].firstName} ${actorProfile[0].lastName}`
+        : undefined;
+
+    if (data.status !== undefined && data.status !== existing.status) {
+      history.push({
+        type: "status_transition",
+        userId: ctx.userId,
+        userName: actorName,
+        timestamp: new Date().toISOString(),
+        payload: { fromStatus: existing.status, toStatus: data.status },
+      });
+    }
+    if (data.scheduledFor !== undefined && data.scheduledFor !== existing.scheduledFor) {
+      history.push({
+        type: "scheduled",
+        userId: ctx.userId,
+        userName: actorName,
+        timestamp: new Date().toISOString(),
+        payload: {
+          previousScheduledFor: existing.scheduledFor ?? undefined,
+          scheduledFor: data.scheduledFor,
+        },
+      });
+    }
+
+    if (history.length > 0) {
+      const newMeta = { ...currentMeta, eventHistory: history };
+      if (data.status === "feedback") {
+        newMeta.feedbackOwnerUserId = existing.createdByUserId;
+      }
+      updateData.metadata = newMeta;
+    }
+
+    await lessonsRepo.update(id, updateData as UpdateLessonParams & { metadata?: Record<string, unknown> });
     return await lessonsRepo.getWithDetails(id);
+  },
+
+  async takeOverLesson(ctx: AuthContext, lessonId: string) {
+    if (!ctx.userId) throw new Error("Unauthorized");
+    const lessonRows = await lessonsRepo.getById(lessonId);
+    if (!lessonRows[0]) throw new Error("Lesson not found");
+    const lesson = lessonRows[0];
+
+    // Only TEACHER at the school can take over (not SCHOOL_ADMIN, SCHOOL_STAFF)
+    const roles = await getUserScopedRoles(ctx.userId);
+    const isTeacherAtSchool = roles.school.some(
+      (r) => r.schoolId === lesson.schoolId && r.roleKey === "TEACHER"
+    );
+    if (!isTeacherAtSchool) {
+      throw new Error("You must be a teacher at this school to take over the lesson.");
+    }
+
+    const takeOverableStatuses = ["preparing", "ready", "in_progress"];
+    if (!takeOverableStatuses.includes(lesson.status)) {
+      throw new Error("You cannot take over this lesson.");
+    }
+
+    if (lesson.createdByUserId === ctx.userId) {
+      throw new Error("You are already the owner.");
+    }
+
+    const previousOwnerId = lesson.createdByUserId ?? "";
+    const previousOwnerProfile = await db
+      .select({ firstName: userProfile.firstName, lastName: userProfile.lastName })
+      .from(userProfile)
+      .where(eq(userProfile.id, previousOwnerId))
+      .limit(1);
+    const previousOwnerName =
+      previousOwnerProfile[0]?.firstName && previousOwnerProfile[0]?.lastName
+        ? `${previousOwnerProfile[0].firstName} ${previousOwnerProfile[0].lastName}`
+        : null;
+
+    const newOwnerProfile = await db
+      .select({ firstName: userProfile.firstName, lastName: userProfile.lastName })
+      .from(userProfile)
+      .where(eq(userProfile.id, ctx.userId))
+      .limit(1);
+    const newOwnerName =
+      newOwnerProfile[0]?.firstName && newOwnerProfile[0]?.lastName
+        ? `${newOwnerProfile[0].firstName} ${newOwnerProfile[0].lastName}`
+        : "";
+
+    await lessonsRepo.takeOver(lessonId, ctx.userId, newOwnerName, previousOwnerId, previousOwnerName);
+    return await lessonsRepo.getWithDetails(lessonId);
   },
 
   async deleteLesson(ctx: AuthContext, id: string) {

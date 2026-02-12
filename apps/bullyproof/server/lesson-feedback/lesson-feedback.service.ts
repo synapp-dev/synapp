@@ -8,6 +8,7 @@ import {
 } from "./lesson-feedback.validators";
 import { lessonFeedbackRepo } from "./lesson-feedback.repo";
 import { lessonsRepo } from "../lessons/lessons.repo";
+import { lessonsService } from "../lessons/lessons.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -24,14 +25,15 @@ async function assertCanManageFeedback(
     throw new Error("Unauthorized");
   }
 
-  // Only the teacher who created the lesson can submit feedback
+  // Only the owner at feedback time can submit feedback (feedbackOwnerUserId or createdByUserId)
   const lessonData = await lessonsRepo.getById(lessonId);
   if (!lessonData[0]) {
     throw new Error("Lesson not found");
   }
-
-  // Check if the user is the creator of the lesson
-  if (lessonData[0].createdByUserId !== ctx.userId) {
+  const lesson = lessonData[0];
+  const meta = (lesson.metadata as Record<string, unknown>) || {};
+  const feedbackOwnerId = (meta.feedbackOwnerUserId as string) ?? lesson.createdByUserId;
+  if (feedbackOwnerId !== ctx.userId) {
     throw new Error("Unauthorized to manage feedback for this lesson");
   }
 }
@@ -46,8 +48,10 @@ export const lessonFeedbackService = {
       return null;
     }
 
-    // Allow the lesson creator to view feedback
-    if (lessonData[0].createdByUserId !== ctx.userId) {
+    const lesson = lessonData[0];
+    const meta = (lesson.metadata as Record<string, unknown>) || {};
+    const feedbackOwnerId = (meta.feedbackOwnerUserId as string) ?? lesson.createdByUserId;
+    if (feedbackOwnerId !== ctx.userId) {
       throw new Error("Unauthorized to view feedback for this lesson");
     }
 
@@ -72,8 +76,8 @@ export const lessonFeedbackService = {
       comments: data.comments ?? null,
     });
 
-    // Update lesson status to completed
-    await lessonsRepo.update(data.lessonId, { status: "completed" });
+    // Update lesson status to completed (via service so eventHistory is logged)
+    await lessonsService.updateLesson(ctx, data.lessonId, { status: "completed" });
 
     return feedback;
   },
@@ -92,8 +96,8 @@ export const lessonFeedbackService = {
       comments: data.comments ?? null,
     });
 
-    // Ensure lesson status is completed after feedback update
-    await lessonsRepo.update(lessonId, { status: "completed" });
+    // Ensure lesson status is completed after feedback update (via service so eventHistory is logged)
+    await lessonsService.updateLesson(ctx, lessonId, { status: "completed" });
 
     return updated;
   },
