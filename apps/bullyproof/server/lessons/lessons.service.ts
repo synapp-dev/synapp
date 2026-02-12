@@ -294,7 +294,7 @@ export const lessonsService = {
     }
 
     if (history.length > 0) {
-      const newMeta = { ...currentMeta, eventHistory: history };
+      const newMeta: Record<string, unknown> = { ...currentMeta, eventHistory: history };
       if (data.status === "feedback") {
         newMeta.feedbackOwnerUserId = existing.createdByUserId;
       }
