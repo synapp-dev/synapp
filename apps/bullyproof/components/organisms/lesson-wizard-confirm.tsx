@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
-import { Info, CheckCircle2, User } from "lucide-react";
+import { Info, CheckCircle2, User, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
@@ -19,10 +19,22 @@ import { topicsApi } from "@/entities/topics/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { useMeStore } from "@/entities/me/model/store";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
+import { useUsers } from "@/entities/users/model/store";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 
 interface LessonWizardConfirmProps {
   selectedClasses: ClassOption[];
   selectedTopic: TopicOption | null;
+  schoolId?: string | null;
+  onBehalfOfUserId?: string | null;
+  onOnBehalfOfUserIdChange?: (userId: string | null) => void;
+  isAdminRestricted?: boolean;
 }
 
 type TopicWithSlides = {
@@ -92,8 +104,28 @@ function TopicThumbnail({ topic, horizontal = false }: { topic: TopicWithSlides;
 export function LessonWizardConfirm({
   selectedClasses,
   selectedTopic,
+  schoolId,
+  onBehalfOfUserId,
+  onOnBehalfOfUserIdChange,
+  isAdminRestricted,
 }: LessonWizardConfirmProps) {
   const currentUser = useMeStore((s) => s.currentUser);
+
+  const { users, isLoading: isLoadingUsers } = useUsers({
+    schoolId: schoolId ?? undefined,
+    limit: 200,
+    offset: 0,
+  });
+
+  const schoolUsersExcludingSelf = useMemo(() => {
+    if (!currentUser?.id) return users;
+    return users.filter((u) => u.id !== currentUser.id);
+  }, [users, currentUser?.id]);
+
+  const selectedOnBehalfUser = useMemo(() => {
+    if (!onBehalfOfUserId) return null;
+    return schoolUsersExcludingSelf.find((u) => u.id === onBehalfOfUserId);
+  }, [schoolUsersExcludingSelf, onBehalfOfUserId]);
 
   // Fetch topic with slides
   const { data: topicData } = useQuery({
@@ -134,8 +166,13 @@ export function LessonWizardConfirm({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Get teacher name from current user (first name and last name)
-  const teacherName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || "Unknown Teacher";
+  // Get teacher name: when admin creates on behalf, show selected user; otherwise current user
+  const teacherName =
+    selectedOnBehalfUser
+      ? [selectedOnBehalfUser.firstName, selectedOnBehalfUser.lastName].filter(Boolean).join(" ") ||
+        selectedOnBehalfUser.email ||
+        "Unknown Teacher"
+      : [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || "Unknown Teacher";
 
   // Calculate slide count
   const slideCount = topicData?.slides?.length || topicData?.slideCount || 0;
@@ -235,6 +272,48 @@ export function LessonWizardConfirm({
             {teacherName}
           </div>
         </div>
+
+        {/* Admin on-behalf-of block (loading state) */}
+        {isAdminRestricted && schoolId && (
+          <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-3">
+                <p>
+                  You are logged into an admin account and cannot create lessons in your own name.
+                  Would you like to create a lesson on behalf of a user?
+                </p>
+                <Select
+                  value={onBehalfOfUserId ?? ""}
+                  onValueChange={(v) => onOnBehalfOfUserIdChange?.(v || null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        isLoadingUsers
+                          ? "Loading users..."
+                          : schoolUsersExcludingSelf.length === 0
+                            ? "No users available at this school"
+                            : "Select a user"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schoolUsersExcludingSelf.map((u) => {
+                      const displayName =
+                        [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || u.id;
+                      return (
+                        <SelectItem key={u.id} value={u.id}>
+                          {displayName} {u.email ? `(${u.email})` : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
     );
   }
@@ -376,6 +455,48 @@ export function LessonWizardConfirm({
           {teacherName}
         </div>
       </div>
+
+      {/* Admin on-behalf-of block */}
+      {isAdminRestricted && schoolId && (
+        <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-3">
+              <p>
+                You are logged into an admin account and cannot create lessons in your own name. Would
+                you like to create a lesson on behalf of a user?
+              </p>
+              <Select
+                value={onBehalfOfUserId ?? ""}
+                onValueChange={(v) => onOnBehalfOfUserIdChange?.(v || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      isLoadingUsers
+                        ? "Loading users..."
+                        : schoolUsersExcludingSelf.length === 0
+                          ? "No users available at this school"
+                          : "Select a user"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {schoolUsersExcludingSelf.map((u) => {
+                    const displayName =
+                      [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || u.id;
+                    return (
+                      <SelectItem key={u.id} value={u.id}>
+                        {displayName} {u.email ? `(${u.email})` : ""}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       
       <Separator />
       

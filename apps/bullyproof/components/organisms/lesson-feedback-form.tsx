@@ -16,6 +16,7 @@ import { Badge } from "@workspace/ui/components/badge";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { LessonTopicThumbnail } from "@/entities/lessons/ui/lesson-card";
+import { useMeStore } from "@/entities/me/model/store";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
@@ -30,6 +31,8 @@ export interface LessonForFeedback {
     classId: string;
     className: string;
   }>;
+  createdByUserId?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface LessonFeedbackFormProps {
@@ -60,6 +63,7 @@ export function LessonFeedbackForm({
 }: LessonFeedbackFormProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const currentUser = useMeStore((s) => s.currentUser);
   
   // Multi-lesson state
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
@@ -96,7 +100,13 @@ export function LessonFeedbackForm({
       const result = await lessonsApi.get.byId(lessonId);
       if (result.error || !result.data) return null;
       
-      const detail = result.data;
+      const detail = result.data as {
+        createdByUserId?: string | null;
+        metadata?: Record<string, unknown>;
+        topicId?: string;
+        topic?: { title?: string; stageOrder?: number | null; stageName?: string };
+        assignedClasses?: Array<{ classId: string; className: string }>;
+      };
       return {
         id: lessonId,
         topicId: detail.topicId,
@@ -107,7 +117,9 @@ export function LessonFeedbackForm({
           classId: c.classId,
           className: c.className,
         })) || [],
-      } as LessonForFeedback;
+        createdByUserId: detail.createdByUserId,
+        metadata: detail.metadata,
+      };
     },
     enabled: !!lessonId && !isMultiLessonMode,
     staleTime: 5 * 60 * 1000,
@@ -115,6 +127,16 @@ export function LessonFeedbackForm({
 
   // Use lesson from props (multi-lesson mode) or fetched details (single-lesson mode)
   const currentLesson = isMultiLessonMode ? currentLessonFromProps : singleLessonDetails;
+
+  // Ownership check: only feedback owner (metadata.feedbackOwnerUserId or createdByUserId) can submit feedback
+  const lessonForOwnerCheck = isMultiLessonMode ? currentLessonFromProps : singleLessonDetails;
+  const feedbackOwnerId =
+    (lessonForOwnerCheck as LessonForFeedback)?.metadata?.feedbackOwnerUserId ??
+    (lessonForOwnerCheck as LessonForFeedback)?.createdByUserId;
+  const isFeedbackOwner =
+    !!currentUser?.id &&
+    !!feedbackOwnerId &&
+    feedbackOwnerId === currentUser.id;
 
   // Fetch existing feedback for current lesson
   const { data: existingFeedback, isLoading: isLoadingFeedback } = useQuery({
@@ -244,6 +266,44 @@ export function LessonFeedbackForm({
   // Don't render anything if no lesson ID
   if (!effectiveLessonId) {
     return null;
+  }
+
+  // Non-owner view: show message instead of dialog (single-lesson mode or multi-lesson with owner check)
+  if (!isFeedbackOwner && !isMultiLessonMode && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <div className="rounded-lg border bg-muted/30 p-6 max-w-md text-center space-y-4">
+          <p className="text-muted-foreground font-medium">
+            Only the teacher who completed the lesson can give feedback.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This lesson was completed by another teacher. You cannot submit or edit feedback for it.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Multi-lesson mode: if current lesson is not owned by user, show message (when we have owner info)
+  if (
+    !isFeedbackOwner &&
+    isMultiLessonMode &&
+    lessonForOwnerCheck &&
+    (lessonForOwnerCheck as LessonForFeedback).createdByUserId !== undefined &&
+    !isLoading
+  ) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4">
+        <div className="rounded-lg border bg-muted/30 p-6 max-w-md text-center space-y-4">
+          <p className="text-muted-foreground font-medium">
+            Only the teacher who completed the lesson can give feedback.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            This lesson was completed by another teacher. You cannot submit or edit feedback for it.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
