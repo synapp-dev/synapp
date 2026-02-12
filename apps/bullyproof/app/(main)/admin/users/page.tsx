@@ -58,7 +58,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
+import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { apiFetch } from "@/lib/api/fetcher.client";
+import { meApi } from "@/entities/me/api/endpoints";
 
 function AdminUsersPageContent() {
   const router = useRouter();
@@ -164,6 +166,71 @@ function AdminUsersPageContent() {
       params.delete("historyTab");
       router.push(`/admin/users?${params.toString()}`, { scroll: false });
       setSelectedUser(null);
+    }
+  };
+
+  const handleOpenExistingUser = async (userId: string) => {
+    const result = await meApi.get.userById(userId);
+    if (result.data) {
+      const raw = result.data;
+      // Parse platformRoles (view may return string or array)
+      let platformRoles: string[] = [];
+      if (Array.isArray(raw.platformRoles)) {
+        platformRoles = raw.platformRoles;
+      } else if (typeof raw.platformRoles === "string") {
+        try {
+          platformRoles = JSON.parse(raw.platformRoles);
+        } catch {
+          platformRoles = raw.platformRoles
+            .replace(/[{}"]/g, "")
+            .split(",")
+            .map((r) => r.trim())
+            .filter(Boolean);
+        }
+      }
+      // Parse schoolRoles (view may return JSON string or array)
+      let schoolRoles: Array<{
+        schoolId: string;
+        schoolName: string | null;
+        roleKey: string | null;
+        roleName: string | null;
+      }> = [];
+      if (raw.schoolRoles) {
+        if (typeof raw.schoolRoles === "string") {
+          try {
+            const parsed = JSON.parse(raw.schoolRoles);
+            schoolRoles = Array.isArray(parsed) ? parsed : [];
+          } catch {
+            schoolRoles = [];
+          }
+        } else if (Array.isArray(raw.schoolRoles)) {
+          schoolRoles = raw.schoolRoles.map((sr: Record<string, unknown>) => ({
+            schoolId: String(sr.schoolId ?? ""),
+            schoolName: sr.schoolName != null ? String(sr.schoolName) : null,
+            roleKey: sr.roleKey != null ? String(sr.roleKey) : null,
+            roleName: sr.roleName != null ? String(sr.roleName) : null,
+          }));
+        }
+      }
+      const user: UserWithRolesAndSchools = {
+        id: raw.id,
+        firstName: raw.firstName,
+        lastName: raw.lastName,
+        email: raw.email,
+        avatarUrl: raw.avatarUrl,
+        createdAt: raw.createdAt,
+        updatedAt: raw.updatedAt,
+        metadata: raw.metadata,
+        platformRoles,
+        schoolRoles,
+        lastLoginAt: null,
+      };
+      setSelectedUser(user);
+      setIsDrawerOpen(true);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("id", userId);
+      params.delete("dialog");
+      router.push(`/admin/users?${params.toString()}`, { scroll: false });
     }
   };
 
@@ -456,19 +523,21 @@ function AdminUsersPageContent() {
                 </TooltipTrigger>
                 <TooltipContent>Bulk Email Disabled</TooltipContent>
               </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setIsDeleteDialogOpen(true)}
-                    className="group h-8 w-8 bg-destructive/5 hover:bg-destructive/10 border border-transparent hover:border-destructive transition-all duration-200 ease-in-out"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive opacity-100 group-hover:animate-shake-twice" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Delete</TooltipContent>
-              </Tooltip>
+              <FeatureGuard feature="admin:delete-user">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setIsDeleteDialogOpen(true)}
+                      className="group h-8 w-8 bg-destructive/5 hover:bg-destructive/10 border border-transparent hover:border-destructive transition-all duration-200 ease-in-out"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive opacity-100 group-hover:animate-shake-twice" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete</TooltipContent>
+                </Tooltip>
+              </FeatureGuard>
             </div>
           ) : (
             <Button
@@ -700,6 +769,17 @@ function AdminUsersPageContent() {
           await refetchUsers();
           await refetchAllUsers();
         }}
+        onDeleteUserClick={
+          selectedUser
+            ? () => {
+                const rowIndex = users.findIndex((u) => u.id === selectedUser.id);
+                if (rowIndex >= 0) {
+                  setRowSelection({ [rowIndex]: true });
+                  setIsDeleteDialogOpen(true);
+                }
+              }
+            : undefined
+        }
       />
 
       {/* Add User Sheet */}
@@ -721,6 +801,7 @@ function AdminUsersPageContent() {
           await refetchUsers();
           await refetchAllUsers();
         }}
+        onOpenExistingUser={handleOpenExistingUser}
       />
 
       {/* Delete Users Dialog */}

@@ -15,6 +15,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
+import { meApi } from "@/entities/me/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
@@ -66,12 +67,14 @@ interface AddUserSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUserCreated?: () => void;
+  onOpenExistingUser?: (userId: string) => void;
 }
 
 export function AddUserSheet({
   open,
   onOpenChange,
   onUserCreated,
+  onOpenExistingUser,
 }: AddUserSheetProps) {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
@@ -87,6 +90,9 @@ export function AddUserSheet({
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
+  const [existingUser, setExistingUser] = useState<{ id: string } | null>(null);
+  const [showExistingUserOptions, setShowExistingUserOptions] = useState(false);
+  const [checkingExistingUser, setCheckingExistingUser] = useState(false);
 
   const totalSteps = 4;
 
@@ -117,6 +123,8 @@ export function AddUserSheet({
       setSchoolId("");
       setError(null);
       setSchoolComboboxOpen(false);
+      setExistingUser(null);
+      setShowExistingUserOptions(false);
     }
   }, [open]);
 
@@ -175,10 +183,42 @@ export function AddUserSheet({
     }
   };
 
-  const goNext = () => {
-    if (canProceedToNext()) {
-      setError(null);
-      setStep((prev) => Math.min(totalSteps, prev + 1));
+  const goNext = async () => {
+    if (!canProceedToNext()) return;
+
+    setError(null);
+
+    if (step === 1) {
+      setCheckingExistingUser(true);
+      try {
+        const result = await meApi.get.userByEmail(email.trim());
+        if (result.data) {
+          setExistingUser({ id: result.data.id });
+          setShowExistingUserOptions(true);
+          setCheckingExistingUser(false);
+          return;
+        }
+      } catch {
+        // If check fails, proceed anyway (backend will handle)
+      }
+      setCheckingExistingUser(false);
+    }
+
+    setShowExistingUserOptions(false);
+    setExistingUser(null);
+    setStep((prev) => Math.min(totalSteps, prev + 1));
+  };
+
+  const handleAssignToAnotherSchool = () => {
+    setShowExistingUserOptions(false);
+    setExistingUser(null);
+    setStep(2);
+  };
+
+  const handleEditRoles = () => {
+    if (existingUser && onOpenExistingUser) {
+      onOpenChange(false);
+      onOpenExistingUser(existingUser.id);
     }
   };
 
@@ -301,7 +341,7 @@ export function AddUserSheet({
           lastName,
           roleScope,
           schoolId: userType === "school" ? schoolId : undefined,
-          roleName: selectedRole.name,
+          roleName: selectedRole.key,
         }),
       });
 
@@ -349,58 +389,90 @@ export function AddUserSheet({
                 Enter the user's basic information.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="user@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && canProceedToNext()) {
-                    e.preventDefault();
-                    goNext();
-                  }
-                }}
-                autoFocus
-                disabled={loading}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="firstName">First Name *</Label>
-                <Input
-                  id="firstName"
-                  placeholder="John"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && canProceedToNext()) {
-                      e.preventDefault();
-                      goNext();
-                    }
-                  }}
-                  disabled={loading}
-                />
+            {showExistingUserOptions ? (
+              <div className="space-y-4">
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>User already exists</AlertTitle>
+                  <AlertDescription>
+                    A user with this email already exists. You can assign them to
+                    another school or edit their roles at their current school.
+                  </AlertDescription>
+                </Alert>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleAssignToAnotherSchool}
+                    className="flex-1"
+                  >
+                    Assign to another school
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleEditRoles}
+                    disabled={!onOpenExistingUser}
+                  >
+                    Edit roles
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name *</Label>
-                <Input
-                  id="lastName"
-                  placeholder="Doe"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && canProceedToNext()) {
-                      e.preventDefault();
-                      goNext();
-                    }
-                  }}
-                  disabled={loading}
-                />
-              </div>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canProceedToNext()) {
+                        e.preventDefault();
+                        goNext();
+                      }
+                    }}
+                    autoFocus
+                    disabled={loading || checkingExistingUser}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name *</Label>
+                    <Input
+                      id="firstName"
+                      placeholder="John"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && canProceedToNext()) {
+                          e.preventDefault();
+                          goNext();
+                        }
+                      }}
+                      disabled={loading || checkingExistingUser}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name *</Label>
+                    <Input
+                      id="lastName"
+                      placeholder="Doe"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && canProceedToNext()) {
+                          e.preventDefault();
+                          goNext();
+                        }
+                      }}
+                      disabled={loading || checkingExistingUser}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         );
 
@@ -991,27 +1063,43 @@ export function AddUserSheet({
         {/* Footer */}
         <DialogFooter className="shrink-0 border-t -mx-6 px-6 pt-4">
           <div className="flex w-full items-center justify-end gap-2">
-            {step > 1 && (
+            {(step > 1 || showExistingUserOptions) && (
               <Button
                 type="button"
                 variant="ghost"
-                onClick={goBack}
+                onClick={() => {
+                  if (showExistingUserOptions) {
+                    setShowExistingUserOptions(false);
+                    setExistingUser(null);
+                  } else {
+                    goBack();
+                  }
+                }}
                 disabled={loading}
               >
                 Back
               </Button>
             )}
-            {step < totalSteps ? (
+            {!showExistingUserOptions && step < totalSteps ? (
               <Button
                 type="button"
                 onClick={goNext}
-                disabled={!canProceedToNext() || loading}
+                disabled={!canProceedToNext() || loading || checkingExistingUser}
                 className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
               >
-                Next
-                <ChevronsRight className="h-4 w-4" />
+                {checkingExistingUser ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ChevronsRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
-            ) : (
+            ) : !showExistingUserOptions ? (
               <Button
                 type="button"
                 onClick={handleCreateUser}
@@ -1030,7 +1118,7 @@ export function AddUserSheet({
                   </>
                 )}
               </Button>
-            )}
+            ) : null}
           </div>
         </DialogFooter>
       </DialogContent>
