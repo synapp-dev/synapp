@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -442,6 +443,9 @@ export function FeedbackDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[750px] h-[550px] flex flex-col" showCloseButton={false}>
+        <DialogDescription className="sr-only">
+          Send feedback or view your support tickets
+        </DialogDescription>
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
@@ -818,6 +822,9 @@ export function FeedbackDialog({
           showCloseButton={false}
         >
           <DialogTitle className="sr-only">Screenshot Preview</DialogTitle>
+          <DialogDescription className="sr-only">
+            Full size screenshot preview
+          </DialogDescription>
           {screenshotPreviewUrl && (
             <img
               src={screenshotPreviewUrl}

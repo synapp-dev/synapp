@@ -106,13 +106,6 @@ const data = {
       feature: "/school/classes", // Feature key for access control
     },
     {
-      title: "Performance",
-      url: "/performance",
-      icon: TrendingUp,
-      isActive: false,
-      feature: "/school/performance", // Feature key for access control
-    },
-    {
       title: "Settings",
       url: "/settings",
       icon: Settings,
@@ -144,6 +137,13 @@ const data = {
     },
   ],
   navData: [
+    {
+      title: "Performance",
+      url: "/performance",
+      icon: TrendingUp,
+      isActive: false,
+      feature: "/school/performance", // Feature key for access control
+    },
     {
       title: "Reports",
       url: "/reports",
@@ -180,7 +180,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   if (effectiveMaintenanceMode) {
     return (
       <Sidebar collapsible="icon" {...props}>
-        <SidebarHeader className="mb-2">
+        <SidebarHeader className="mb-2 items-center">
           <Link href="/" className="block">
             {displayState === "expanded" ? (
               <Image
@@ -188,7 +188,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 alt="Bullyproof Logo"
                 width={500}
                 height={500}
-                className="h-16 mt-4"
+                className="h-16 mt-4 w-auto"
               />
             ) : (
               <Image
@@ -196,7 +196,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 alt="Bullyproof Small Logo"
                 width={500}
                 height={500}
-                className="h-10 mt-4"
+                className="h-10 mt-4 w-auto"
               />
             )}
           </Link>
@@ -501,7 +501,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="mb-2">
+      <SidebarHeader className="mb-2 items-center">
         <Link href="/" className="block">
           {displayState === "expanded" ? (
             <Image
@@ -509,7 +509,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               alt="Bullyproof Logo"
               width={500}
               height={500}
-              className="h-16 mt-4"
+              className="h-16 mt-4 w-auto"
             />
           ) : (
             <Image
@@ -517,7 +517,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               alt="Bullyproof Small Logo"
               width={500}
               height={500}
-              className="h-10 mt-4"
+              className="h-10 mt-4 w-auto"
             />
           )}
         </Link>

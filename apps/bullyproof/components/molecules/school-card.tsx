@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSchoolStore } from "@/stores/school-store";
-import Image from "next/image";
+import { StorageImage } from "@/components/atoms/storage-image";
 
 export function SchoolCard() {
   const [mounted, setMounted] = useState(false);
@@ -85,12 +85,12 @@ export function SchoolCard() {
       <div className="flex flex-row items-center gap-3 flex-wrap">
         <div className="text-xl font-extrabold flex items-center gap-2">
           {currentSchool.avatarUrl && (
-            <Image
+            <StorageImage
               src={currentSchool.avatarUrl}
               alt={currentSchool.name || "School"}
-              width={100}
-              height={100}
-              className="w-10 h-auto"
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-full object-cover"
             />
           )}
           {currentSchool.name || "Loading..."}
