@@ -32,12 +32,14 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Calendar } from "@workspace/ui/components/calendar";
-import { BookOpen, Loader2, ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, CalendarIcon, FileText, AlertCircle } from "lucide-react";
+import { BookOpen, Loader2, ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, CalendarIcon, FileText, AlertCircle, HandMetal } from "lucide-react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { toast } from "sonner";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { useMeStore } from "@/entities/me/model/store";
+import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useQueryClient } from "@tanstack/react-query";
@@ -82,6 +84,18 @@ export default function LessonPreparePage() {
     isError: lessonError,
     error: lessonErrorData,
   } = useLessonById(lesson_id);
+  const currentUser = useMeStore((s) => s.currentUser);
+  const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
+  const takeOverableStatuses = ["preparing", "ready", "in_progress"];
+  const canShowTakeOver =
+    !isLessonCreator &&
+    lessonData?.status &&
+    takeOverableStatuses.includes(lessonData.status);
+  const isFeedbackOrCompleted =
+    lessonData?.status === "feedback" || lessonData?.status === "completed";
+
+  const [showTakeOverDialog, setShowTakeOverDialog] = useState(false);
+  const [isTakingOver, setIsTakingOver] = useState(false);
 
   // Checklist state - initialize based on lesson status
   const isAlreadyReady = lessonData?.status === "ready" || 
@@ -377,6 +391,67 @@ export default function LessonPreparePage() {
               : "Please try again later"}
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // Non-owner: show Take Over CTA or feedback message
+  if (!isLessonCreator) {
+    const handleTakeOver = async () => {
+      setIsTakingOver(true);
+      try {
+        const result = await lessonsApi.post.takeOver(lesson_id);
+        if (result.error) {
+          throw new Error(result.error.message ?? "Failed to take over lesson");
+        }
+        queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
+        toast.success("You have taken over this lesson");
+        setShowTakeOverDialog(false);
+      } catch (err) {
+        toast.error("Failed to take over lesson", {
+          description: err instanceof Error ? err.message : "Unknown error",
+        });
+      } finally {
+        setIsTakingOver(false);
+      }
+    };
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Prepare Lesson</h1>
+          <p className="text-muted-foreground">
+            {canShowTakeOver
+              ? "You need to take over this lesson to prepare it."
+              : isFeedbackOrCompleted
+                ? "Only the lesson owner can complete feedback."
+                : "You don't have permission to prepare this lesson."}
+          </p>
+        </div>
+        {canShowTakeOver && (
+          <Card>
+            <CardContent className="pt-6 flex flex-col items-center gap-4">
+              <p className="text-muted-foreground text-center">
+                Take over this lesson to view the checklist and prepare for delivery.
+              </p>
+              <Button onClick={() => setShowTakeOverDialog(true)}>
+                <HandMetal className="h-4 w-4 mr-2" />
+                Take Over Lesson
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+        <TakeOverLessonDialog
+          open={showTakeOverDialog}
+          onOpenChange={setShowTakeOverDialog}
+          lesson={{
+            id: lesson_id,
+            assignedClasses: lessonData.assignedClasses,
+            teacher: lessonData.teacher,
+            createdByUserId: lessonData.createdByUserId,
+          }}
+          onConfirm={handleTakeOver}
+          isTakingOver={isTakingOver}
+        />
       </div>
     );
   }
