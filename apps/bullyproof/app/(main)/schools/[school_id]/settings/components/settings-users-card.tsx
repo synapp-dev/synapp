@@ -60,20 +60,15 @@ interface SettingsUsersCardProps {
 
 function rawToUserWithRoles(raw: {
   id: string;
-  firstName: string | null;
-  lastName: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
   avatarUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
   metadata?: unknown;
   platformRoles?: string[] | string;
-  schoolRoles?: Array<{
-    schoolId?: string;
-    schoolName?: string | null;
-    roleKey?: string | null;
-    roleName?: string | null;
-  }> | string;
+  schoolRoles?: unknown;
 }): UserWithRolesAndSchools {
   let platformRoles: string[] = [];
   if (Array.isArray(raw.platformRoles)) {
@@ -114,8 +109,8 @@ function rawToUserWithRoles(raw: {
   }
   return {
     id: raw.id,
-    firstName: raw.firstName,
-    lastName: raw.lastName,
+    firstName: raw.firstName ?? null,
+    lastName: raw.lastName ?? null,
     email: raw.email,
     avatarUrl: raw.avatarUrl,
     createdAt: raw.createdAt,
