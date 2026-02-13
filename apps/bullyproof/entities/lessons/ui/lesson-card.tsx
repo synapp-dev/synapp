@@ -21,7 +21,7 @@ import { Loader2, CheckCheck } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
-import { getDisplayStatus } from "@/utils/lesson-status";
+import { getDisplayStatus, getStatusColors } from "@/utils/lesson-status";
 
 // Format time as relative "time ago" string
 function formatTimeAgo(timestamp: string): string {
@@ -128,21 +128,6 @@ function LiveCountdown({ scheduledFor }: { scheduledFor: string }) {
 // Format status for display
 function formatStatus(status: string): string {
   return status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
-}
-
-// Status color configuration
-const statusColors: Record<string, { bg: string; dot: string; border: string }> = {
-  preparing: { bg: "bg-yellow-500/10", dot: "bg-yellow-500", border: "border-yellow-500" },
-  ready: { bg: "bg-green-500/10", dot: "bg-green-500", border: "border-green-500" },
-  scheduled: { bg: "bg-blue-500/10", dot: "bg-blue-500", border: "border-blue-500" },
-  in_progress: { bg: "bg-orange-500/10", dot: "bg-orange-500", border: "border-orange-500" },
-  feedback: { bg: "bg-purple-500/10", dot: "bg-purple-500", border: "border-purple-500" },
-  completed: { bg: "bg-gray-500/10", dot: "bg-gray-500", border: "border-gray-500" },
-  cancelled: { bg: "bg-red-500/10", dot: "bg-red-500", border: "border-red-500" },
-};
-
-function getStatusColors(status: string): { bg: string; dot: string; border: string } {
-  return statusColors[status] || { bg: "bg-gray-500/10", dot: "bg-gray-500", border: "border-gray-500" };
 }
 
 export type Lesson = {

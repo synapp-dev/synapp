@@ -280,11 +280,11 @@ export function LessonSidebarNav({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isCancelling}>Keep Lesson</AlertDialogCancel>
+              <AlertDialogCancel  disabled={isCancelling}>Keep Lesson</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleCancelLesson}
                 disabled={isCancelling}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-destructive text-secondary hover:bg-destructive/90"
               >
                 {isCancelling ? (
                   <>
