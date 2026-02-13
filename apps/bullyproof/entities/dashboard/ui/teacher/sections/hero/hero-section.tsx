@@ -24,10 +24,14 @@ import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { LessonFeedbackForm, type LessonForFeedback } from "@/components/organisms/lesson-feedback-form";
 import { checkFeatureAccessAndVisibleCached } from "@/utils/check-feature-access-cached";
+import { getDisplayStatus, getStatusColors } from "@/utils/lesson-status";
+import { CheckCheck } from "lucide-react";
 
 type LessonWithDetails = {
   id: string;
+  schoolId: string;
   createdAt: string;
+  scheduledFor?: string | null;
   topic?: {
     id: string;
     title: string;
@@ -173,28 +177,43 @@ export function TeacherHeroSection() {
     staleTime: 60 * 1000, // 1 minute
   });
 
-  // Group lessons by date (YYYY-MM-DD) using local time based on createdAt
+  // Filter out cancelled lessons (match lessons page behavior)
+  const nonCancelledLessons = useMemo(
+    () => (lessonsData ?? []).filter((l) => l.status !== "cancelled"),
+    [lessonsData]
+  );
+
+  // Only show lessons with scheduledFor or completed lessons
+  const calendarVisibleLessons = useMemo(
+    () =>
+      nonCancelledLessons.filter(
+        (l) => l.scheduledFor != null || l.status === "completed"
+      ),
+    [nonCancelledLessons]
+  );
+
+  // Group lessons by date (YYYY-MM-DD) using scheduledFor when available, else createdAt
   const lessonsByDate = useMemo(() => {
     const grouped: Record<string, LessonWithDetails[]> = {};
-    
-    lessonsData?.forEach((lesson) => {
-      if (!lesson.createdAt) return;
-      
-      const lessonDate = new Date(lesson.createdAt);
-      // Normalize to local date at midnight for consistent grouping
+
+    calendarVisibleLessons.forEach((lesson) => {
+      const dateSource = lesson.scheduledFor ?? lesson.createdAt;
+      if (!dateSource) return;
+
+      const lessonDate = new Date(dateSource);
       const year = lessonDate.getFullYear();
       const month = String(lessonDate.getMonth() + 1).padStart(2, "0");
       const day = String(lessonDate.getDate()).padStart(2, "0");
-      const dateKey = `${year}-${month}-${day}`; // YYYY-MM-DD
-      
+      const dateKey = `${year}-${month}-${day}`;
+
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }
       grouped[dateKey].push(lesson);
     });
-    
+
     return grouped;
-  }, [lessonsData]);
+  }, [calendarVisibleLessons]);
 
   // Get dates that have lessons for calendar modifiers
   const datesWithLessons = useMemo(() => {
@@ -362,8 +381,9 @@ export function TeacherHeroSection() {
               ) : (
                 <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-2">
                   {selectedDateLessons.map((lesson) => {
-                    const lessonDate = lesson.createdAt
-                      ? new Date(lesson.createdAt)
+                    const dateForDisplay = lesson.scheduledFor ?? lesson.createdAt;
+                    const lessonDate = dateForDisplay
+                      ? new Date(dateForDisplay)
                       : null;
                     const timeStr = lessonDate
                       ? lessonDate.toLocaleTimeString("en-US", {
@@ -373,62 +393,90 @@ export function TeacherHeroSection() {
                         })
                       : "No time";
 
-                    return (
+                    const rawDisplayStatus = getDisplayStatus(
+                      lesson.status,
+                      lesson.scheduledFor
+                    );
+                    const { bg: statusBg, dot: statusDot, border: statusBorder } =
+                      getStatusColors(rawDisplayStatus);
+                    const isCompleted = rawDisplayStatus === "completed";
+                    const displayStatus = rawDisplayStatus
+                      .replace("_", " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase());
+
+                    const schoolSlug = schools.find(
+                      (s) => s.id === lesson.schoolId
+                    )?.slug;
+
+                    const cardContent = (
                       <div
-                        key={lesson.id}
-                        className="w-full border rounded-lg bg-card p-4 hover:bg-accent/50 transition-colors"
+                        className={cn(
+                          "w-full rounded-lg border px-3 py-2.5 transition-colors",
+                          statusBg,
+                          isCompleted ? "border-border" : statusBorder,
+                          schoolSlug && "hover:bg-accent/50 cursor-pointer"
+                        )}
                       >
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5">
-                            <BookOpen className="h-4 w-4 text-primary" />
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {timeStr}
+                            </span>
+                            <span className="text-muted-foreground/60 shrink-0">•</span>
+                            <p className="font-medium text-sm truncate">
+                              {lesson.topic?.title || "Untitled Lesson"}
+                            </p>
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium text-sm">
-                                {lesson.topic?.title || "Untitled Lesson"}
-                              </p>
-                              <span className="text-xs text-muted-foreground">
-                                {timeStr}
-                              </span>
-                            </div>
-                            {lesson.assignedClasses &&
-                              lesson.assignedClasses.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2">
-                                  {lesson.assignedClasses.map((assignedClass) => (
-                                    <span
-                                      key={assignedClass.classId}
-                                      className="text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary"
-                                    >
-                                      {assignedClass.className}
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            <div className="mt-2">
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 shrink-0 text-xs px-2 py-0.5 rounded-md font-medium border",
+                              isCompleted
+                                ? "bg-muted text-muted-foreground border-border"
+                                : cn(statusBg, statusBorder)
+                            )}
+                          >
+                            {isCompleted ? (
+                              <CheckCheck className="w-3 h-3" />
+                            ) : (
                               <span
                                 className={cn(
-                                  "text-xs px-2 py-0.5 rounded-md",
-                                  lesson.status === "completed"
-                                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
-                                    : lesson.status === "in_progress"
-                                    ? "bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                                    : lesson.status === "feedback"
-                                    ? "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
-                                    : "bg-muted text-muted-foreground"
+                                  "w-1.5 h-1.5 rounded-full",
+                                  statusDot,
+                                  "animate-pulse"
                                 )}
-                              >
-                                {lesson.status
-                                  .split("_")
-                                  .map(
-                                    (word) =>
-                                      word.charAt(0).toUpperCase() +
-                                      word.slice(1)
-                                  )
-                                  .join(" ")}
-                              </span>
-                            </div>
-                          </div>
+                              />
+                            )}
+                            {displayStatus}
+                          </span>
                         </div>
+                        {lesson.assignedClasses &&
+                          lesson.assignedClasses.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {lesson.assignedClasses.map((assignedClass) => (
+                              <span
+                                key={assignedClass.classId}
+                                className="text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary"
+                              >
+                                {assignedClass.className}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+
+                    return (
+                      <div key={lesson.id}>
+                        {schoolSlug ? (
+                          <Link
+                            href={`/schools/${schoolSlug}/lessons/${lesson.id}`}
+                            className="block"
+                          >
+                            {cardContent}
+                          </Link>
+                        ) : (
+                          cardContent
+                        )}
                       </div>
                     );
                   })}
