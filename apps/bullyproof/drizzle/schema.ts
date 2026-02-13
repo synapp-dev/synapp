@@ -1103,12 +1103,14 @@ export const curriculumStages = pgTable("curriculum_stages", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	code: text().notNull(),
 	name: text().notNull(),
+	slug: text().notNull(),
 	sortIndex: smallint("sort_index").notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	unique("curriculum_stages_code_key").on(table.code),
 	unique("curriculum_stages_name_key").on(table.name),
+	unique("curriculum_stages_slug_key").on(table.slug),
 	unique("curriculum_stages_sort_index_key").on(table.sortIndex),
 	check("curriculum_stages_code_chk", sql`code ~ '^S[0-9]+$'::text`),
 ]);
