@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
+import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import {
@@ -32,10 +25,9 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Calendar } from "@workspace/ui/components/calendar";
-import { BookOpen, Loader2, ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, CalendarIcon, FileText, AlertCircle, HandMetal } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, FileText, AlertCircle, HandMetal, ChevronsRight, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { toast } from "sonner";
-import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useMeStore } from "@/entities/me/model/store";
@@ -44,7 +36,19 @@ import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
+import Image from "next/image";
 import { usePageTitle } from "@/hooks/use-page-title";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@workspace/ui/components/drawer";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 import {
   SlideRenderer,
   type SlideData,
@@ -105,6 +109,7 @@ export default function LessonPreparePage() {
   const [viewedSlides, setViewedSlides] = useState(false);
   const [downloadedPlan, setDownloadedPlan] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   // Initialize checklist state when lesson data loads
   useEffect(() => {
@@ -115,6 +120,7 @@ export default function LessonPreparePage() {
   }, [isAlreadyReady]);
 
   const [showPreview, setShowPreview] = useState(false);
+  const [showGalleryDrawer, setShowGalleryDrawer] = useState(false);
   const [topic, setTopic] = useState<Topic | null>(null);
   const [isLoadingTopic, setIsLoadingTopic] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
@@ -135,6 +141,8 @@ export default function LessonPreparePage() {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [slides, setSlides] = useState<SlideData[]>([]);
   const galleryRef = useRef<HTMLDivElement>(null);
+  const slideGalleryRef = useRef<HTMLDivElement | null>(null);
+  const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
 
   const fetchTopicData = useCallback(async () => {
     if (!lessonData?.topicId) return;
@@ -235,7 +243,7 @@ export default function LessonPreparePage() {
     }
   };
 
-  // Scroll gallery to show current slide
+  // Scroll gallery to show current slide (horizontal strip)
   useEffect(() => {
     if (galleryRef.current && slides.length > 0) {
       const slideElement = galleryRef.current.children[
@@ -245,10 +253,38 @@ export default function LessonPreparePage() {
         slideElement.scrollIntoView({
           behavior: "smooth",
           block: "nearest",
+          inline: "nearest",
         });
       }
     }
   }, [currentSlideIndex, slides.length]);
+
+  // Wheel handler: convert vertical scroll to horizontal in slide gallery
+  const setSlideGalleryRef = useCallback((element: HTMLDivElement | null) => {
+    if (slideGalleryRef.current && wheelHandlerRef.current) {
+      slideGalleryRef.current.removeEventListener("wheel", wheelHandlerRef.current);
+    }
+    slideGalleryRef.current = element;
+    if (!element) {
+      wheelHandlerRef.current = null;
+      return;
+    }
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      element.scrollLeft += e.deltaY;
+    };
+    wheelHandlerRef.current = handleWheel;
+    element.addEventListener("wheel", handleWheel, { passive: false });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (slideGalleryRef.current && wheelHandlerRef.current) {
+        slideGalleryRef.current.removeEventListener("wheel", wheelHandlerRef.current);
+      }
+    };
+  }, []);
 
   // Auto-update lesson status to 'ready' when both checklist items are checked
   // Note: isUpdatingStatus intentionally excluded from deps - it's a guard to prevent
@@ -349,6 +385,23 @@ export default function LessonPreparePage() {
   // Navigate to run lesson page
   const handleRunLesson = () => {
     router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
+  };
+
+  // Skip checklist and mark lesson ready, then navigate to run lesson
+  const handleSkipToReady = async () => {
+    setIsSkipping(true);
+    try {
+      await lessonsApi.put.update(lesson_id, { status: "ready" });
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
+      router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
+    } catch (error) {
+      console.error("Failed to mark lesson ready:", error);
+      toast.error("Failed to mark lesson ready", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
+    } finally {
+      setIsSkipping(false);
+    }
   };
 
   const currentSlide = slides[currentSlideIndex];
@@ -456,302 +509,131 @@ export default function LessonPreparePage() {
     );
   }
 
-  if (showPreview) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => {
-            setShowPreview(false);
-            // Auto-check "viewed slides" when returning from preview
-            setViewedSlides(true);
-          }}>
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Back
-          </Button>
-          <h1 className="text-3xl font-bold">
-            {lessonData.topic?.title || "Lesson Preview"}
-          </h1>
-        </div>
-
-        {/* Preview Content */}
-        {isLoadingTopic ? (
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Loading slides...</p>
-            </div>
-          </div>
-        ) : topicError ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center text-destructive">
-                <p className="font-medium">Error loading slides</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  {topicError}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : slides.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-center py-12 text-muted-foreground">
-                <p className="font-medium">No slides available</p>
-                <p className="text-sm mt-2">
-                  This lesson doesn't have any slides yet.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        ) : currentSlide ? (
-          <div className="grid grid-cols-4 gap-6">
-            {/* Left Side - Current Slide Preview */}
-            <div className="col-span-3 space-y-4">
-              {/* Preview Title Bar */}
-              <div className="flex items-center justify-center py-2 px-4 bg-muted/50 rounded-t-lg border-b">
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Preview Only
-                </span>
-              </div>
-              {/* Current Slide */}
-              <div className="relative w-full aspect-video">
-                <SlideRenderer
-                  key={currentSlide.id}
-                  slide={currentSlide}
-                  className="w-full h-full"
-                />
-              </div>
-
-              {/* Navigation Controls */}
-              {slides.length > 1 && (
-                <div className="flex items-center justify-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToPrevious}
-                    disabled={!canGoPrev}
-                  >
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Previous
-                  </Button>
-                  <div className="text-sm text-muted-foreground px-4">
-                    Slide {currentSlideIndex + 1} of {slides.length}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={goToNext}
-                    disabled={!canGoNext}
-                  >
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Right Side - Slide Gallery */}
-            <div className="col-span-1">
-              <div
-                ref={galleryRef}
-                className="flex flex-col gap-4 overflow-y-auto overflow-x-visible py-3 px-2 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent h-[calc(100vh-300px)]"
-              >
-                {slides.map((slide, index) => (
-                  <button
-                    key={slide.id}
-                    onClick={() => setCurrentSlideIndex(index)}
-                    className={`
-                      flex-shrink-0 relative group transition-all rounded-lg overflow-hidden shadow-lg bg-background cursor-pointer
-                      ${
-                        index === currentSlideIndex
-                          ? "ring-2 ring-primary ring-offset-2 scale-105"
-                          : "opacity-70 hover:opacity-100 hover:scale-[1.02]"
-                      }
-                    `}
-                    style={{
-                      width: "100%",
-                      aspectRatio: "16 / 9",
-                    }}
-                  >
-                    <div className="w-full h-full relative">
-                      <SlideRenderer
-                        slide={slide}
-                        className="w-full h-full"
-                        thumbnailOnly={true}
-                      />
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                      Slide {slide.orderIndex + 1}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  const firstSlide = slides[0];
-
   return (
       <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Prepare Lesson</h1>
-        <p className="text-muted-foreground">
-          Get ready for your lesson. Review materials, check resources, and
-          prepare for delivery.
-        </p>
+      <h1 className="text-3xl font-bold">Prepare Lesson</h1>
+      <p className="text-muted-foreground">
+        Review the checklist and prepare for delivery.
+      </p>
       </div>
-
-<div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-      {/* Lesson Card with slide thumbnail */}
-      <Card
-        className="cursor-pointer hover:shadow-lg transition-shadow col-span-4 p-4 justify-center"
-        onClick={() => setShowPreview(true)}
-      >
-        <div className="flex">
-          {/* Slide thumbnail on the left - fixed dimensions to prevent layout shift */}
-          <div className="flex-shrink-0 w-48 aspect-video rounded-lg overflow-hidden border bg-muted">
-            {isLoadingTopic ? (
-              <Skeleton className="w-full h-full" />
-            ) : firstSlide ? (
-              <SlideRenderer
-                slide={firstSlide}
-                className="w-full h-full"
-                thumbnailOnly={true}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <BookOpen className="h-8 w-8 text-muted-foreground" />
-              </div>
-            )}
-          </div>
-          
-          {/* Card content on the right */}
-          <div className="flex-1">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5" />
-                {lessonData.topic?.title || "Lesson"}
-              </CardTitle>
-              <CardDescription>
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">
-                  {slides.length > 0 
-                    ? `${slides.length} slide${slides.length !== 1 ? 's' : ''} available`
-                    : "No slides available"}
-                </p>
-                
-              </div>
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-            <p className="text-sm text-muted-foreground">
-                  Click to view the lesson slides in preview mode.
-                </p>
-            </CardContent>
-          </div>
-        </div>
-      </Card>
-      <Card
-        className="col-span-1 cursor-pointer hover:shadow-lg transition-shadow gap-2"
-        onClick={() => setDownloadedPlan(true)}
-      >
-        <CardHeader className="">
-          <CardTitle className="text-center">Lesson Plan</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-2 border mx-4 p-2 py-4 bg-muted rounded-lg">
-          <FileText className="h-14 w-14" />
-          {isLoadingLessonPlans ? (
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading...</p>
-            </div>
-          ) : lessonPlansError ? (
-            <p className="text-sm text-muted-foreground text-center">
-              Unable to load lesson plans
-            </p>
-          ) : lessonPlans.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center">
-              No lesson plan available
-            </p>
-          ) : lessonPlans.length === 1 ? (
-            <button
-              type="button"
-              onClick={(e) => handleLessonPlanDownload(lessonPlans[0].id, e)}
-              className="text-sm font-medium underline text-blue-400 hover:text-blue-600 focus:outline-none"
+      <div className="space-y-4">
+          <div className="space-y-4">
+            {/* Step 1: View slides card */}
+            <Card
+              className={`overflow-hidden transition-all ${!isAlreadyReady && slides.length > 0 ? "cursor-pointer hover:shadow-md" : "opacity-75"}`}
+              onClick={() => !isAlreadyReady && slides.length > 0 && setShowPreview(true)}
             >
-              Download PDF
-            </button>
-          ) : (
-            <div className="flex flex-col items-center gap-1 w-full">
-              {lessonPlans.map((plan) => (
-                <button
-                  key={plan.id}
-                  type="button"
-                  onClick={(e) => handleLessonPlanDownload(plan.id, e)}
-                  className="text-sm font-medium underline text-blue-400 hover:text-blue-600 focus:outline-none truncate max-w-full text-center"
-                  title={plan.fileName}
-                >
-                  {plan.fileName}
-                </button>
-              ))}
+              <div className="flex items-center gap-4 px-4 py-3">
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                  {viewedSlides ? (
+                    <CheckCircle2 className="w-10 h-10 text-green-500" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full border-2 border-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-shrink-0 w-32 aspect-video rounded overflow-hidden bg-muted">
+                  {isLoadingTopic ? (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : slides[0] ? (
+                    <SlideRenderer
+                      slide={slides[0]}
+                      className="w-full h-full"
+                      thumbnailOnly={true}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="text-xs text-muted-foreground">No slides</span>
+                    </div>
+                  )}
+                </div>
+                <p className="font-medium">
+                  View {slides.length} lesson slide{slides.length !== 1 ? "s" : ""}
+                </p>
+              </div>
+            </Card>
+
+            {/* Step 2: Lesson plan card */}
+            <Card
+              className={`overflow-hidden transition-all ${!isAlreadyReady && lessonPlans.length > 0 ? "cursor-pointer hover:shadow-md" : "opacity-75"}`}
+              onClick={() => {
+                if (!isAlreadyReady && lessonPlans.length > 0) {
+                  handleLessonPlanDownload(lessonPlans[0].id);
+                  setDownloadedPlan(true);
+                }
+              }}
+            >
+              <div className="flex items-center gap-4 px-4">
+                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                  {downloadedPlan ? (
+                    <CheckCircle2 className="w-10 h-10 text-green-500" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full border-2 border-muted-foreground" />
+                  )}
+                </div>
+                <div className="flex-shrink-0 w-32 flex items-center justify-center border aspect-video rounded-lg bg-muted">
+                  {isLoadingLessonPlans ? (
+                    <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                    <Image
+                      src="/images/bp-small-logo.svg"
+                      alt="Lesson plan"
+                      width={128}
+                      height={128}
+                      className="object-contain w-9 h-9"
+                    />
+                
+                    <FileText className="h-10 w-10 text-[var(--brand-bullyproof-primary)]" />
+                    </div>
+                  )}
+                </div>
+                {isLoadingLessonPlans ? (
+                  <p className="text-sm text-muted-foreground">Loading...</p>
+                ) : lessonPlans.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No lesson plan available</p>
+                ) : (
+                  <button
+                    type="button"
+                    className="font-medium text-blue-600 underline hover:text-blue-700 hover:underline cursor-pointer dark:text-blue-500 dark:hover:text-blue-400"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isAlreadyReady && lessonPlans.length > 0) {
+                        handleLessonPlanDownload(lessonPlans[0].id);
+                        setDownloadedPlan(true);
+                      }
+                    }}
+                    disabled={isAlreadyReady}
+                  >
+                    Download the lesson plan
+                  </button>
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Skip button - not a step */}
+          {!isAlreadyReady && (
+            <div className="mt-4">
+              <Button
+                size="lg"
+                onClick={handleSkipToReady}
+                disabled={isSkipping}
+                className="flex items-center gap-3 bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 w-full sm:w-auto sm:min-w-[260px] text-base font-medium"
+              >
+                {isSkipping ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <ChevronsRight className="h-5 w-5" />
+                )}
+                {isSkipping ? "Marking ready..." : "Skip, I'm ready to run now"}
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
-      </div>
 
-      {/* Preparation Checklist */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {isAlreadyReady ? (
-              <CheckCircle2 className="h-5 w-5 text-green-500" />
-            ) : null}
-            Preparation Checklist
-          </CardTitle>
-          <CardDescription>
-            {isAlreadyReady 
-              ? "You're ready to deliver this lesson!"
-              : "Complete these steps before delivering your lesson"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center space-x-3">
-              <Checkbox 
-                id="viewed-slides"
-                checked={viewedSlides} 
-                onCheckedChange={(checked) => setViewedSlides(checked === true)}
-                disabled={isAlreadyReady}
-              />
-              <label 
-                htmlFor="viewed-slides"
-                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${viewedSlides ? 'text-muted-foreground line-through' : ''}`}
-              >
-                I have viewed the slides
-              </label>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Checkbox 
-                id="downloaded-plan"
-                checked={downloadedPlan} 
-                onCheckedChange={(checked) => setDownloadedPlan(checked === true)}
-                disabled={isAlreadyReady}
-              />
-              <label 
-                htmlFor="downloaded-plan"
-                className={`text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 ${downloadedPlan ? 'text-muted-foreground line-through' : ''}`}
-              >
-                I have downloaded the lesson plan
-              </label>
-            </div>
-          </div>
           {isUpdatingStatus && (
             <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -759,25 +641,172 @@ export default function LessonPreparePage() {
             </div>
           )}
 
-          {/* Action buttons - show when ready */}
+          {/* I'm ready button - show when already ready */}
           {isAlreadyReady && !isUpdatingStatus && (
-            <div className="mt-6 pt-4 border-t flex items-center gap-3">
-              <Button onClick={handleRunLesson} className="flex items-center gap-2">
-                <PlayCircle className="h-4 w-4" />
-                Run Lesson
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={openScheduleDialog}
-                className="flex items-center gap-2"
+            <div className="mt-6 pt-4 border-t">
+              <Button
+                size="lg"
+                onClick={handleRunLesson}
+                className="flex items-center gap-3 bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 text-base font-medium"
               >
-                <CalendarIcon className="h-4 w-4" />
-                {lessonData?.scheduledFor ? "Reschedule Lesson" : "Schedule Lesson"}
+                I&apos;m ready
+                <ChevronsRight className="h-5 w-5 animate-bounce-right" />
               </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      
+
+      {/* Slide Preview Dialog */}
+      <Dialog
+        open={showPreview}
+        onOpenChange={(open) => {
+          setShowPreview(open);
+          if (!open) {
+            setViewedSlides(true);
+            setShowGalleryDrawer(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-6xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 py-4 border-b shrink-0">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center justify-center gap-3 cursor-help">
+                  <TriangleAlert className="h-8 w-8 text-amber-500 shrink-0" />
+                  <DialogTitle className="text-3xl font-bold uppercase tracking-wider text-amber-600 md:text-4xl dark:text-amber-500">
+                    Preview Only
+                  </DialogTitle>
+                  <TriangleAlert className="h-8 w-8 text-amber-500 shrink-0" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-sm text-center">
+                Do not use this mode to present to the class
+              </TooltipContent>
+            </Tooltip>
+            <DialogDescription className="sr-only">
+              Preview only. Do not use this mode to present to the class.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 p-6">
+            {isLoadingTopic ? (
+              <div className="flex flex-col items-center justify-center min-h-[300px] gap-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Loading slides...</p>
+              </div>
+            ) : topicError ? (
+              <div className="text-center text-destructive py-8">
+                <p className="font-medium">Error loading slides</p>
+                <p className="text-sm text-muted-foreground mt-2">{topicError}</p>
+              </div>
+            ) : slides.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="font-medium">No slides available</p>
+                <p className="text-sm mt-2">This lesson doesn&apos;t have any slides yet.</p>
+              </div>
+            ) : currentSlide ? (
+              <div className="flex flex-col gap-4 min-h-0">
+                <div className="relative w-full aspect-video flex-shrink-0">
+                  <SlideRenderer
+                    key={currentSlide.id}
+                    slide={currentSlide}
+                    className="w-full h-full"
+                  />
+                </div>
+                {slides.length > 1 && (
+                  <div className="flex items-center justify-center gap-4 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goToPrevious();
+                      }}
+                      disabled={!canGoPrev}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-2" />
+                      Previous
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowGalleryDrawer(true);
+                      }}
+                      className="flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
+                      <span>
+                        Slide {currentSlideIndex + 1} of {slides.length}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                    </button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        goToNext();
+                      }}
+                      disabled={!canGoNext}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-2" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Slide gallery drawer - from bottom */}
+      <Drawer open={showGalleryDrawer} onOpenChange={setShowGalleryDrawer}>
+        <DrawerContent className="z-[100] !left-1/2 !right-auto -translate-x-1/2 w-full max-w-[75rem] max-h-[50vh] rounded-t-xl border-x border-t shadow-lg data-[vaul-drawer-direction=bottom]:!left-1/2 data-[vaul-drawer-direction=bottom]:!right-auto">
+          <DrawerHeader>
+            <DrawerTitle>Jump to slide</DrawerTitle>
+          </DrawerHeader>
+          <div
+            ref={(el) => {
+              galleryRef.current = el;
+              setSlideGalleryRef(el);
+            }}
+            className="flex gap-4 overflow-x-auto overflow-y-visible py-3 px-4 pb-6 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
+          >
+            {slides.map((slide, index) => (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={() => {
+                  setCurrentSlideIndex(index);
+                  setShowGalleryDrawer(false);
+                }}
+                className={`
+                  flex-shrink-0 relative rounded-lg overflow-hidden shadow-lg bg-background cursor-pointer w-[180px]
+                  ${
+                    index === currentSlideIndex
+                      ? "ring-2 ring-primary ring-offset-2"
+                      : "opacity-70 hover:opacity-100"
+                  }
+                `}
+                style={{ aspectRatio: "16 / 9" }}
+              >
+                <div className="w-full h-full relative">
+                  <SlideRenderer
+                    slide={slide}
+                    className="w-full h-full"
+                    thumbnailOnly={true}
+                  />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
+                  Slide {slide.orderIndex + 1}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       {/* Schedule Lesson Dialog */}
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>

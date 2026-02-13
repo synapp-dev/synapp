@@ -1,14 +1,8 @@
 "use client";
 
 import { useState, use, useEffect } from "react";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
-import { Presentation, Settings, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft } from "lucide-react";
+import { Card, CardContent } from "@workspace/ui/components/card";
+import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +35,7 @@ import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { Separator } from "@workspace/ui/components/separator";
 
 // Live countdown component for scheduled lessons
 function LiveCountdown({ scheduledFor }: { scheduledFor: string }) {
@@ -106,7 +101,6 @@ export default function LessonRunLessonPage({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [presentDialogOpen, setPresentDialogOpen] = useState(false);
-  // const [controlsDialogOpen, setControlsDialogOpen] = useState(false); // Commented out - control mode disabled
 
   // Schedule dialog state
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -130,6 +124,15 @@ export default function LessonRunLessonPage({
   const isOverdue = lessonData?.scheduledFor 
     ? new Date(lessonData.scheduledFor) <= new Date() 
     : false;
+
+  // Check if the selected schedule time is in the past
+  const isScheduleTimeInPast = (() => {
+    if (!scheduleDate) return false;
+    const [hours, minutes] = scheduleTime.split(":").map(Number);
+    const scheduledDateTime = new Date(scheduleDate);
+    scheduledDateTime.setHours(hours, minutes, 0, 0);
+    return scheduledDateTime < new Date();
+  })();
 
   const takeOverableStatuses = ["preparing", "ready", "in_progress"];
   const canShowTakeOver =
@@ -297,21 +300,12 @@ export default function LessonRunLessonPage({
     setPendingSchedule(null);
   };
 
-  // Commented out - control mode disabled
-  // const handleControlsAccept = () => {
-  //   const controlsUrl = `/schools/${school_id}/lessons/${lesson_id}/run-lesson/controls`;
-  //   window.open(controlsUrl, "_blank", "noopener,noreferrer");
-  //   setControlsDialogOpen(false);
-  // };
-
   return (
       <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold mb-2">Run Lesson</h1>
-        <p className="text-muted-foreground">
-          Choose how you'd like to deliver your lesson to the class.
-        </p>
+        
       </div>
 
       {/* Scheduling Alert */}
@@ -321,9 +315,30 @@ export default function LessonRunLessonPage({
           <AlertTitle className="text-blue-600 dark:text-blue-400">
             Lesson Scheduled
           </AlertTitle>
-          <AlertDescription className="text-muted-foreground">
-            This lesson is scheduled to start in <LiveCountdown scheduledFor={lessonData.scheduledFor} />.
-            Click Presentation Mode to start immediately, or wait until the scheduled time.
+          <AlertDescription className="text-muted-foreground flex flex-col gap-0">
+          
+            <div className="flex flex-col -space-y-2">
+            <p className="text-4xl font-black flex flex-row items-center gap-1">
+              {/* <ChevronsRight className="h-5 w-5" /> */}
+             <LiveCountdown scheduledFor={lessonData.scheduledFor} /> 
+            </p>
+            <p className=" font-light">
+            {new Date(lessonData.scheduledFor).toLocaleString(undefined, {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+            </p>
+            </div>
+           
+            <Separator className="my-2" />
+            <p>
+              Click Run lesson now to start immediately, or wait until the scheduled time.
+            </p>
           </AlertDescription>
         </Alert>
       )}
@@ -341,7 +356,7 @@ export default function LessonRunLessonPage({
               day: 'numeric',
               hour: 'numeric',
               minute: '2-digit',
-            })}. Click Presentation Mode to start now.
+            })} Click Run lesson now to start.
           </AlertDescription>
         </Alert>
       )}
@@ -350,71 +365,30 @@ export default function LessonRunLessonPage({
         <Alert className="border-muted">
           <CalendarIcon className="h-4 w-4" />
           <AlertTitle>Not Scheduled</AlertTitle>
-          <AlertDescription className="text-muted-foreground flex flex-col gap-2">
-            <span>
-              Click Presentation Mode to start immediately, or schedule it for later.
-            </span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={openScheduleDialog}
-              className="w-fit"
-            >
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              Schedule Lesson
-            </Button>
+          <AlertDescription className="text-muted-foreground">
+            Click Run lesson now to start immediately, or Schedule lesson for later.
           </AlertDescription>
         </Alert>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Presentation Mode Card */}
-        <Card
-          className="h-full hover:shadow-lg transition-shadow cursor-pointer"
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Button
+          size="lg"
           onClick={() => setPresentDialogOpen(true)}
+          className="bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 sm:min-w-[200px] capitalize"
         >
-          <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Presentation className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle>Presentation Mode</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-sm">
-              Display slides in fullscreen mode for your classroom. This view
-              shows only the slides with minimal controls, perfect for
-              projecting to students. Navigate with arrow keys and hover near
-              the bottom to reveal controls.
-            </CardDescription>
-          </CardContent>
-        </Card>
-
-        {/* Control Mode Card - Disabled for now */}
-        <Card
-          className="h-full opacity-50 cursor-not-allowed"
-          // onClick={() => setControlsDialogOpen(true)} // Commented out - control mode disabled
+          <Presentation className="h-5 w-5" />
+          Run lesson now
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={openScheduleDialog}
+          className="sm:min-w-[200px]"
         >
-          <CardHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Settings className="h-6 w-6 text-primary" />
-              </div>
-              <CardTitle className="text-muted-foreground">
-                Control Mode
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <CardDescription className="text-sm">
-              View slides with teacher notes simultaneously. This mode shows
-              slides at the top and your notes at the bottom, giving you full
-              control while presenting. Perfect for managing your lesson flow
-              and staying on track with your talking points.
-            </CardDescription>
-          </CardContent>
-        </Card>
+          <CalendarIcon className="h-5 w-5" />
+          {lessonData?.scheduledFor ? "Change schedule time" : "Schedule lesson for later"}
+        </Button>
       </div>
 
       {/* Presentation Mode Dialog */}
@@ -423,19 +397,21 @@ export default function LessonRunLessonPage({
           <DialogHeader>
             <DialogTitle>Open Presentation Mode</DialogTitle>
             <DialogDescription>
-              A new tab will open with the presentation view.
+            This tab will be what the class will see. You should move this tab
+            to open on a projector screen.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <p className="text-sm text-foreground">
-              This tab will be what the class will see. You should move this tab
-              to open on a projector screen.
-            </p>
-            <div className="space-y-2 text-sm text-muted-foreground">
+           
+           
+            <div className="text-sm text-muted-foreground flex flex-col gap-8">
+              <div>
               <p>
                 <strong className="text-foreground">
-                  You may duplicate your screen:
+                  Duplicate your screen
                 </strong>{" "}
+                </p>
+                <p>
                 Press{" "}
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Windows + P
@@ -445,11 +421,16 @@ export default function LessonRunLessonPage({
                   Cmd + F1
                 </kbd>{" "}
                 (Mac) and select "Duplicate"
-              </p>
+                  </p>
+                  </div>
+
+                  <div>
               <p>
                 <strong className="text-foreground">
-                  However, it is recommended you extend your screen:
+                  Extend your screen (Recommended)
                 </strong>{" "}
+                </p>
+                <p>
                 Press{" "}
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Windows + P
@@ -462,6 +443,7 @@ export default function LessonRunLessonPage({
                 on your main screen while the class sees the presentation on the
                 extended display.
               </p>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -475,36 +457,6 @@ export default function LessonRunLessonPage({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Controls Mode Dialog - Commented out - control mode disabled */}
-      {/* <Dialog open={controlsDialogOpen} onOpenChange={setControlsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Open Control Mode</DialogTitle>
-            <DialogDescription>
-              A new tab will open with the control view.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-foreground">
-              This view is for you and should not be shown to the class.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              You can view the controls on your laptop, tablet, or phone by
-              signing in and selecting "Controls" from the lesson run page.
-            </p>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setControlsDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleControlsAccept}>Open Controls</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog> */}
 
       {/* Schedule Lesson Dialog */}
       <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
@@ -554,11 +506,28 @@ export default function LessonRunLessonPage({
                   value={scheduleTime}
                   onChange={(e) => setScheduleTime(e.target.value)}
                   className="w-full rounded-lg"
+                  aria-invalid={isScheduleTimeInPast}
                 />
+                {isScheduleTimeInPast && (
+                  <Alert variant="destructive" className="py-2 space-x-0">
+                    <ChevronsUp className="h-4 w-4 animate-bounce-up" />
+                    <AlertDescription>
+                      This time has already passed
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
               
               {/* Summary Card */}
-              <Card className="bg-muted/50 py-0">
+              {!scheduleDate && (
+                <Alert variant="destructive" className="py-2 space-x-0">
+                  <ChevronsLeft className="h-4 w-4 animate-bounce-left" />
+                  <AlertDescription>
+                    You must select a day
+                  </AlertDescription>
+                </Alert>
+              )}
+              <Card className={`bg-muted/50 py-0 ${!scheduleDate ? "border-destructive" : ""}`}>
                 <CardContent className="p-4 space-y-3">
                   {/* Lesson Details */}
                   <div>
@@ -610,7 +579,7 @@ export default function LessonRunLessonPage({
             </Button>
             <Button
               onClick={handleScheduleLesson}
-              disabled={!scheduleDate || isScheduling}
+              disabled={!scheduleDate || isScheduling || isScheduleTimeInPast}
             >
               {isScheduling ? (
                 <>

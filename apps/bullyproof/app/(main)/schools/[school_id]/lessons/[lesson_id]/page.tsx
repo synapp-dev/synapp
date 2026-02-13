@@ -16,7 +16,10 @@ export default async function LessonPage({
   if (lesson?.status === "feedback") {
     redirect(`/schools/${school_id}/lessons/${lesson_id}/feedback`);
   }
-  
+  if (lesson?.status === "ready" || lesson?.status === "in_progress") {
+    redirect(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
+  }
+
   // Default to prepare tab
   redirect(`/schools/${school_id}/lessons/${lesson_id}/prepare`);
 }

@@ -173,6 +173,11 @@ export default function LessonsPage({
       : "Failed to load lessons"
     : null;
 
+  const nonCancelledLessons = useMemo(
+    () => lessons.filter((l) => l.status !== "cancelled"),
+    [lessons]
+  );
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "completed":
@@ -216,13 +221,13 @@ export default function LessonsPage({
   const { myLessons, otherLessons } = useMemo(() => {
     if (filter === "my-lessons") {
       // API already filtered by user, so all lessons are "my lessons"
-      return { myLessons: lessons, otherLessons: [] };
+      return { myLessons: nonCancelledLessons, otherLessons: [] };
     }
 
     const myLessonsList: Lesson[] = [];
     const otherLessonsList: Lesson[] = [];
 
-    lessons.forEach((lesson) => {
+    nonCancelledLessons.forEach((lesson) => {
       if (currentUser?.id && lesson.createdByUserId === currentUser.id) {
         myLessonsList.push(lesson);
       } else {
@@ -231,7 +236,7 @@ export default function LessonsPage({
     });
 
     return { myLessons: myLessonsList, otherLessons: otherLessonsList };
-  }, [lessons, currentUser?.id, filter]);
+  }, [nonCancelledLessons, currentUser?.id, filter]);
 
   // Filter lessons based on search query and filter dropdown
   const filteredLessons = useMemo(() => {
@@ -242,7 +247,7 @@ export default function LessonsPage({
       lessonsToFilter = myLessons;
     } else {
       // "all" - show all lessons
-      lessonsToFilter = lessons;
+      lessonsToFilter = nonCancelledLessons;
     }
 
     // Apply search query
@@ -262,7 +267,7 @@ export default function LessonsPage({
         fuzzySearch(searchQuery, classNames)
       );
     });
-  }, [lessons, myLessons, otherLessons, filter, searchQuery]);
+  }, [nonCancelledLessons, myLessons, otherLessons, filter, searchQuery]);
 
   // Separate filtered lessons back into categories for display
   const { filteredMyLessons, filteredOtherLessons } = useMemo(() => {
