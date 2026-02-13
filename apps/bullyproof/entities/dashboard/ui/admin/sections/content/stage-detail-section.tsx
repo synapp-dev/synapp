@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -26,7 +27,7 @@ import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { curriculumStages, topics } from "@/server/db/schema";
 import {
-  useStageByCode,
+  useStageBySlug,
   useInvalidateStage,
 } from "@/entities/stages/model/store";
 import {
@@ -76,6 +77,7 @@ import {
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { AnimatedThumbnail } from "@/components/organisms/animated-thumbnail";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
+import { createSlug } from "@/utils/slug";
 
 // Component to handle thumbnail image with error fallback
 function ThumbnailImage({ signedUrl, alt }: { signedUrl: string | null; alt: string }) {
@@ -147,6 +149,7 @@ function TopicCard({
   isDragActive,
   cardIndex,
   readonly = false,
+  linkHref,
   onMouseEnter,
   onMouseLeave,
   onChevronHover,
@@ -169,6 +172,7 @@ function TopicCard({
   isDragActive: boolean;
   cardIndex: number;
   readonly?: boolean;
+  linkHref?: string;
   onMouseEnter: () => void;
   onMouseLeave: (e?: React.MouseEvent) => void;
   onChevronHover: (side: "left" | "right") => void;
@@ -259,12 +263,10 @@ function TopicCard({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  return (
-    <div
-      className="flex flex-col relative w-full"
-      ref={setNodeRef}
-      style={style}
-    >
+  const rootClassName = "flex flex-col relative w-full";
+
+  const innerContent = (
+    <>
       {/* Placeholder Overlay - shows on adjacent card when hovering chevron */}
       {showPlaceholderOverlay && (
         <div className="absolute inset-0 z-20 pointer-events-none animate-in fade-in duration-200">
@@ -464,7 +466,7 @@ function TopicCard({
                 imageSlidesList={imageSlidesList}
                 topicTitle={topic.title}
                 cardIndex={cardIndex}
-                isPaused={isDragActive}
+                isPaused={!isHovered || isDragActive}
                 isCertification={false}
               />
               {/* Dimming overlay when hovered */}
@@ -665,6 +667,16 @@ function TopicCard({
           )}
         </div>
       </Card>
+    </>
+  );
+
+  return linkHref ? (
+    <Link href={linkHref} className={rootClassName} prefetch>
+      {innerContent}
+    </Link>
+  ) : (
+    <div ref={setNodeRef} style={style} className={rootClassName}>
+      {innerContent}
     </div>
   );
 }
@@ -732,6 +744,8 @@ export function StageDetailSection({
   const [showDragHintIndex, setShowDragHintIndex] = useState<number | null>(
     null
   );
+  const [hoveredReadonlyIndex, setHoveredReadonlyIndex] =
+    useState<number | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hideButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const leaveDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -755,7 +769,7 @@ export function StageDetailSection({
     isLoading,
     error: stageError,
     refetch: refetchStage,
-  } = useStageByCode(slug);
+  } = useStageBySlug(slug);
 
   const {
     topics,
@@ -846,9 +860,14 @@ export function StageDetailSection({
       return;
     }
 
-    // Navigate to topic page using T{stageOrder} format
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
+    // Navigate to topic page using pretty slug from title (fallback to T{stageOrder})
+    const topicSegment = topic.title?.trim()
+      ? createSlug(topic.title)
+      : topic.stageOrder != null
+        ? `T${topic.stageOrder}`
+        : null;
+    if (topicSegment) {
+      router.push(`${basePath}/${slug}/${topicSegment}`);
     }
   };
 
@@ -883,15 +902,25 @@ export function StageDetailSection({
 
   const handleAddSlideBefore = (topic: TopicWithSlides) => {
     // Navigate to topic page - the topic editor should handle adding slide at position 0
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
+    const topicSegment = topic.title?.trim()
+      ? createSlug(topic.title)
+      : topic.stageOrder != null
+        ? `T${topic.stageOrder}`
+        : null;
+    if (topicSegment) {
+      router.push(`${basePath}/${slug}/${topicSegment}`);
     }
   };
 
   const handleAddSlideAfter = (topic: TopicWithSlides) => {
     // Navigate to topic page - the topic editor should handle adding slide at the end
-    if (topic.stageOrder !== null && topic.stageOrder !== undefined) {
-      router.push(`${basePath}/${slug}/T${topic.stageOrder}`);
+    const topicSegment = topic.title?.trim()
+      ? createSlug(topic.title)
+      : topic.stageOrder != null
+        ? `T${topic.stageOrder}`
+        : null;
+    if (topicSegment) {
+      router.push(`${basePath}/${slug}/${topicSegment}`);
     }
   };
 
@@ -1285,37 +1314,52 @@ export function StageDetailSection({
             ) : readonly ? (
               // Read-only mode: simple grid without drag/drop
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {displayTopics.map((topic, index) => (
-                  <StaggeredAnimation
-                    key={topic.id}
-                    index={index}
-                    incrementDelay={0.075}
-                  >
-                    <TopicCard
-                      topic={topic}
-                      isHovered={false}
-                      isLeaving={false}
-                      hoveredSide={null}
-                      showPlaceholderOverlay={false}
-                      isDragHandleHovered={false}
-                      showDragHint={false}
-                      isDragActive={false}
-                      cardIndex={index}
-                      readonly={true}
-                      onMouseEnter={() => {}}
-                      onMouseLeave={() => {}}
-                      onChevronHover={() => {}}
-                      onChevronLeave={() => {}}
-                      onDragHandleEnter={() => {}}
-                      onDragHandleLeave={() => {}}
-                      onClick={(e) => handleTopicClick(topic, e)}
-                      onAddTopicClick={() => {}}
-                      onDeleteTopic={() => {}}
-                      onAddSlideBefore={() => {}}
-                      onAddSlideAfter={() => {}}
-                    />
-                  </StaggeredAnimation>
-                ))}
+                {displayTopics.map((topic, index) => {
+                  const topicLinkHref = (() => {
+                    const segment = topic.title?.trim()
+                      ? createSlug(topic.title)
+                      : topic.stageOrder != null
+                        ? `T${topic.stageOrder}`
+                        : null;
+                    return segment ? `${basePath}/${slug}/${segment}` : undefined;
+                  })();
+                  return (
+                    <StaggeredAnimation
+                      key={topic.id}
+                      index={index}
+                      incrementDelay={0.075}
+                    >
+                      <TopicCard
+                        topic={topic}
+                        isHovered={hoveredReadonlyIndex === index}
+                        isLeaving={false}
+                        hoveredSide={null}
+                        showPlaceholderOverlay={false}
+                        isDragHandleHovered={false}
+                        showDragHint={false}
+                        isDragActive={false}
+                        cardIndex={index}
+                        readonly={true}
+                        linkHref={topicLinkHref}
+                        onMouseEnter={() => setHoveredReadonlyIndex(index)}
+                        onMouseLeave={() => setHoveredReadonlyIndex(null)}
+                        onChevronHover={() => {}}
+                        onChevronLeave={() => {}}
+                        onDragHandleEnter={() => {}}
+                        onDragHandleLeave={() => {}}
+                        onClick={
+                          topicLinkHref
+                            ? () => {}
+                            : (e) => handleTopicClick(topic, e)
+                        }
+                        onAddTopicClick={() => {}}
+                        onDeleteTopic={() => {}}
+                        onAddSlideBefore={() => {}}
+                        onAddSlideAfter={() => {}}
+                      />
+                    </StaggeredAnimation>
+                  );
+                })}
               </div>
             ) : (
               <DndContext

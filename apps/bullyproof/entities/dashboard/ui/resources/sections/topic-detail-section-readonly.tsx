@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -13,6 +12,7 @@ import {
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   FileText,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
@@ -23,17 +23,17 @@ import {
 } from "@/components/organisms/slide-renderer";
 import { Separator } from "@workspace/ui/components/separator";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@workspace/ui/components/drawer";
 import {
   useTopicsByStage,
 } from "@/entities/topics/model/store-enhanced";
-import { useStageByCode } from "@/entities/stages/model/store";
+import { useStageBySlug } from "@/entities/stages/model/store";
 import type { topics, topicSlides } from "@/server/db/schema";
+import { createSlug } from "@/utils/slug";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -57,18 +57,20 @@ export function TopicDetailSectionReadonly({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
-  const slideGalleryRef = useRef<HTMLDivElement>(null);
+  const [showGalleryDrawer, setShowGalleryDrawer] = useState(false);
+  const galleryRef = useRef<HTMLDivElement>(null);
+  const slideGalleryRef = useRef<HTMLDivElement | null>(null);
+  const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
 
-  // Extract stageOrder from topicSlug (format: "T1", "T2", etc.)
-  const stageOrder = topicSlug.startsWith("T")
-    ? parseInt(topicSlug.substring(1))
-    : null;
+  // Resolve topic by slug: primary = createSlug(title), fallback = T1/T2 legacy format
+  const isLegacyFormat = /^T\d+$/.test(topicSlug);
+  const legacyStageOrder = isLegacyFormat ? parseInt(topicSlug.substring(1)) : null;
 
   const {
     stage: fetchedStage,
     isLoading: isLoadingStage,
     error: stageError,
-  } = useStageByCode(stageSlug);
+  } = useStageBySlug(stageSlug);
 
   const {
     topics: fetchedTopics,
@@ -92,10 +94,10 @@ export function TopicDetailSectionReadonly({
     }
 
     // Only check for data after loading completes
-    if (fetchedTopics && stageOrder !== null) {
-      const foundTopic = fetchedTopics.find(
-        (t) => t.stageOrder === stageOrder
-      );
+    if (fetchedTopics) {
+      const foundTopic = isLegacyFormat
+        ? fetchedTopics.find((t) => t.stageOrder === legacyStageOrder)
+        : fetchedTopics.find((t) => createSlug(t.title) === topicSlug);
       if (foundTopic) {
         setTopic(foundTopic as Topic);
         setIsLoading(false);
@@ -114,7 +116,7 @@ export function TopicDetailSectionReadonly({
       }
       setIsLoading(false);
     }
-  }, [fetchedTopics, fetchedStage, stageOrder, isLoadingStage, isLoadingTopics]);
+  }, [fetchedTopics, fetchedStage, topicSlug, isLegacyFormat, legacyStageOrder, isLoadingStage, isLoadingTopics]);
 
   useEffect(() => {
     // Only set errors after loading completes
@@ -181,6 +183,49 @@ export function TopicDetailSectionReadonly({
     };
   }, [handleKeyDown]);
 
+  // Scroll gallery to show current slide in drawer
+  useEffect(() => {
+    if (galleryRef.current && slides.length > 0) {
+      const slideElement = galleryRef.current.children[
+        currentSlideIndex
+      ] as HTMLElement;
+      if (slideElement) {
+        slideElement.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
+        });
+      }
+    }
+  }, [currentSlideIndex, slides.length]);
+
+  // Wheel handler: convert vertical scroll to horizontal in slide gallery drawer
+  const setSlideGalleryRef = useCallback((element: HTMLDivElement | null) => {
+    if (slideGalleryRef.current && wheelHandlerRef.current) {
+      slideGalleryRef.current.removeEventListener("wheel", wheelHandlerRef.current);
+    }
+    slideGalleryRef.current = element;
+    if (!element) {
+      wheelHandlerRef.current = null;
+      return;
+    }
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      element.scrollLeft += e.deltaY;
+    };
+    wheelHandlerRef.current = handleWheel;
+    element.addEventListener("wheel", handleWheel, { passive: false });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (slideGalleryRef.current && wheelHandlerRef.current) {
+        slideGalleryRef.current.removeEventListener("wheel", wheelHandlerRef.current);
+      }
+    };
+  }, []);
+
   const currentSlide = slides[currentSlideIndex];
 
   if (isLoading || isLoadingStage || isLoadingTopics) {
@@ -229,9 +274,9 @@ export function TopicDetailSectionReadonly({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 flex-1 min-h-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -256,136 +301,126 @@ export function TopicDetailSectionReadonly({
         )}
       </div>
 
-      <Separator />
+      <Separator className="flex-shrink-0" />
 
       {/* Main Slide Viewer */}
-      <Card>
-        <CardContent className="p-0">
-          {slides.length === 0 ? (
-            <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6">
-              <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-              <p className="text-lg font-medium text-muted-foreground">
-                No slides available
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                This topic doesn't have any slides yet.
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-row h-[calc(100vh-200px)]">
-              {/* Slide Renderer - 3/4 width */}
-              <div className={`flex flex-col ${slides.length > 1 ? 'w-3/4 border-r' : 'w-full'}`}>
-                {/* Header */}
-                <div className="px-6 py-4 border-b">
-                  <h2 className="text-xl font-semibold">{topic.title}</h2>
-                </div>
-
-                {/* Slide Display */}
-                <div className="flex-1 flex items-center justify-center p-6 overflow-hidden">
-                  <div className="w-full h-full max-w-full max-h-full flex items-center justify-center">
-                    {currentSlide && (
-                      <div className="w-full h-full aspect-video bg-muted rounded-lg overflow-hidden">
-                        <SlideRenderer
-                          slide={currentSlide}
-                          className="w-full h-full"
-                          thumbnailOnly={false}
-                          isCertification={false}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Footer with Controls */}
-                <div className="px-6 py-4 border-t flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handlePreviousSlide}
-                    disabled={currentSlideIndex === 0 || slides.length === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  {slides.length > 1 ? (
-                    <Select
-                      value={String(currentSlideIndex + 1)}
-                      onValueChange={(value) =>
-                        setCurrentSlideIndex(parseInt(value) - 1)
-                      }
-                    >
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {slides.map((_, index) => (
-                          <SelectItem key={index + 1} value={String(index + 1)}>
-                            Slide {index + 1}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      Slide 1 of 1
-                    </div>
-                  )}
-
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleNextSlide}
-                    disabled={currentSlideIndex === slides.length - 1 || slides.length === 1}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+      {slides.length === 0 ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6 bg-muted/30 rounded-lg flex-1">
+          <FileText className="h-16 w-16 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium text-muted-foreground">
+            No slides available
+          </p>
+          <p className="text-sm text-muted-foreground mt-2">
+            This topic doesn&apos;t have any slides yet.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Slide Display */}
+          <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden bg-muted rounded-lg">
+            {currentSlide && (
+              <div className="w-full h-full max-w-full max-h-full flex items-center justify-center">
+                <SlideRenderer
+                  key={currentSlide.id}
+                  slide={currentSlide}
+                  className="w-full h-full max-w-full max-h-full"
+                  thumbnailOnly={false}
+                  isCertification={false}
+                />
               </div>
+            )}
+          </div>
 
-              {/* Slide Gallery - 1/4 width */}
-              {slides.length > 1 && (
-                <div className="w-1/4 flex flex-col">
-                  <div className="px-4 py-3 border-b">
-                    <h3 className="text-sm font-medium">All Slides</h3>
-                  </div>
-                  <div
-                    ref={slideGalleryRef}
-                    className="flex-1 overflow-y-auto p-4 space-y-3"
-                  >
-                    {slides.map((slide, index) => (
-                      <button
-                        key={slide.id}
-                        onClick={() => setCurrentSlideIndex(index)}
-                        className={`
-                          w-full relative transition-all rounded-lg overflow-hidden
-                          ${
-                            index === currentSlideIndex
-                              ? "ring-2 ring-primary ring-offset-2"
-                              : "opacity-70 hover:opacity-100"
-                          }
-                        `}
-                        style={{
-                          aspectRatio: "16 / 9",
-                        }}
-                      >
-                        <SlideRenderer
-                          slide={slide}
-                          className="w-full h-full"
-                          thumbnailOnly={true}
-                          isCertification={false}
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                          Slide {slide.orderIndex + 1}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+          {/* Controls */}
+          {slides.length > 1 && (
+            <div className="flex items-center justify-center gap-4 flex-shrink-0 mb-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handlePreviousSlide}
+                disabled={currentSlideIndex === 0}
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+              <button
+                type="button"
+                onClick={() => setShowGalleryDrawer(true)}
+                className="flex w-fit items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <span>
+                  Slide {currentSlideIndex + 1} of {slides.length}
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+              </button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNextSlide}
+                disabled={currentSlideIndex === slides.length - 1}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
             </div>
           )}
-        </CardContent>
-      </Card>
+          {slides.length === 1 && (
+            <div className="flex items-center justify-center flex-shrink-0 text-sm text-muted-foreground mb-6">
+              Slide 1 of 1
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Slide gallery drawer - from bottom */}
+      {slides.length > 1 && (
+      <Drawer open={showGalleryDrawer} onOpenChange={setShowGalleryDrawer}>
+        <DrawerContent className="z-[100] !left-1/2 !right-auto -translate-x-1/2 w-full max-w-[75rem] max-h-[50vh] rounded-t-xl border-x border-t shadow-lg data-[vaul-drawer-direction=bottom]:!left-1/2 data-[vaul-drawer-direction=bottom]:!right-auto">
+          <DrawerHeader>
+            <DrawerTitle>Jump to slide</DrawerTitle>
+          </DrawerHeader>
+          <div
+            ref={(el) => {
+              galleryRef.current = el;
+              setSlideGalleryRef(el);
+            }}
+            className="flex gap-4 overflow-x-auto overflow-y-visible py-3 px-4 pb-6 scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent"
+          >
+            {slides.map((slide, index) => (
+              <button
+                key={slide.id}
+                type="button"
+                onClick={() => {
+                  setCurrentSlideIndex(index);
+                  setShowGalleryDrawer(false);
+                }}
+                className={`
+                  flex-shrink-0 relative rounded-lg overflow-hidden shadow-lg bg-background cursor-pointer w-[180px]
+                  ${
+                    index === currentSlideIndex
+                      ? "ring-2 ring-primary ring-offset-2"
+                      : "opacity-70 hover:opacity-100"
+                  }
+                `}
+                style={{ aspectRatio: "16 / 9" }}
+              >
+                <div className="w-full h-full relative">
+                  <SlideRenderer
+                    slide={slide}
+                    className="w-full h-full"
+                    thumbnailOnly={true}
+                    isCertification={false}
+                  />
+                </div>
+                <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
+                  Slide {slide.orderIndex + 1}
+                </div>
+              </button>
+            ))}
+          </div>
+        </DrawerContent>
+      </Drawer>
+      )}
     </div>
   );
 }

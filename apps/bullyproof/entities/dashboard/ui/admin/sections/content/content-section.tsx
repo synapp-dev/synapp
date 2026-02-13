@@ -60,8 +60,8 @@ export function ContentSection({
   }, [refetch]);
 
   const handleStageClick = (stage: Stage) => {
-    // Navigate to stage detail page using the stage code as slug
-    router.push(`${basePath}/${stage.code}`);
+    // Navigate to stage detail page using the stage slug (pretty URL)
+    router.push(`${basePath}/${stage.slug}`);
   };
 
   const handleAddNewClick = () => {
@@ -140,6 +140,7 @@ export function ContentSection({
             stages={stages}
             onStageClick={handleStageClick}
             basePath={basePath}
+            thumbnailClicksGoToStage={!isAdmin}
           />
         )}
       </div>

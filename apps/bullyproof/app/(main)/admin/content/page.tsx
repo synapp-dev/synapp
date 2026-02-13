@@ -124,7 +124,7 @@ export default function AdminContentPage() {
                   {curriculumStages.map((stage) => (
                     <Link
                       key={stage.id}
-                      href={`/admin/content/curriculum/${stage.code}`}
+                      href={`/admin/content/curriculum/${stage.slug}`}
                       onClick={(e) => e.stopPropagation()}
                     >
                       <Badge

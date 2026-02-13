@@ -107,12 +107,13 @@ import {
   useTopicsByStage,
   useInvalidateTopics,
 } from "@/entities/topics/model/store-enhanced";
-import { useStageByCode, useInvalidateStage } from "@/entities/stages/model/store";
+import { useStageBySlug, useInvalidateStage } from "@/entities/stages/model/store";
 import { useMutationInvalidation } from "@/hooks/use-mutation-invalidation";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
 import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer";
 import { EditCurriculumTopicDrawer } from "./edit-curriculum-topic-drawer";
+import { createSlug } from "@/utils/slug";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -596,8 +597,9 @@ export function TopicDetailSection({
   const invalidateSlide = (_slideId: string) => {};
   const invalidateCertificationSlide = (_slideId: string) => {};
 
-  // Parse topic slug (e.g., "T1" -> order 1) - only for curriculum
-  const topicOrder = topicSlug?.startsWith("T")
+  // Resolve topic by slug: primary = createSlug(title), fallback = T1/T2 legacy format
+  const isLegacyTopicSlug = topicSlug ? /^T\d+$/.test(topicSlug) : false;
+  const legacyTopicOrder = isLegacyTopicSlug && topicSlug
     ? parseInt(topicSlug.substring(1), 10)
     : null;
 
@@ -607,7 +609,7 @@ export function TopicDetailSection({
     isLoading: isLoadingStage,
     error: stageError,
     refetch: refetchStage,
-  } = useStageByCode(isCertification ? null : stageSlug || null);
+  } = useStageBySlug(isCertification ? null : stageSlug || null);
 
   const {
     topics: cachedTopics,
@@ -770,26 +772,30 @@ export function TopicDetailSection({
   }, [cachedTopics]);
 
   const foundTopic = useMemo(() => {
-    if (isCertification || !cachedTopics || !topicOrder) return null;
-    return cachedTopics.find((t) => t.stageOrder === topicOrder) as any;
-  }, [isCertification, cachedTopics, topicOrder]);
+    if (isCertification || !cachedTopics || !topicSlug) return null;
+    return (
+      isLegacyTopicSlug
+        ? cachedTopics.find((t) => t.stageOrder === legacyTopicOrder)
+        : cachedTopics.find((t) => createSlug(t.title) === topicSlug)
+    ) as any;
+  }, [isCertification, cachedTopics, topicSlug, isLegacyTopicSlug, legacyTopicOrder]);
 
   // Track the last processed topic ID to prevent infinite loops
   const lastProcessedTopicIdRef = useRef<string | null>(null);
-  const lastTopicOrderRef = useRef<number | null>(null);
+  const lastTopicSlugRef = useRef<string | null>(null);
 
-  // Reset ref when topic order changes (navigating to different topic)
+  // Reset ref when topic slug changes (navigating to different topic)
   useEffect(() => {
-    if (topicOrder !== lastTopicOrderRef.current) {
+    if (topicSlug !== lastTopicSlugRef.current) {
       lastProcessedTopicIdRef.current = null;
-      lastTopicOrderRef.current = topicOrder;
+      lastTopicSlugRef.current = topicSlug ?? null;
     }
-  }, [topicOrder]);
+  }, [topicSlug]);
 
   // Handle curriculum flow with cached data
   useEffect(() => {
     if (isCertification) return;
-    if (!stageSlug || !topicOrder) return;
+    if (!stageSlug || !topicSlug) return;
 
     // Set loading state based on hooks
     setIsLoading(isLoadingStage || isLoadingTopics);
@@ -816,12 +822,12 @@ export function TopicDetailSection({
     if (!cachedStage || !foundTopic) {
       if (!foundTopic && cachedTopics && cachedTopics.length > 0) {
         // Topics loaded but this specific topic not found
-        setError(`Topic with order ${topicOrder} not found`);
+        setError(`Topic not found`);
         setIsLoading(false);
         lastProcessedTopicIdRef.current = null;
       } else if (!cachedStage) {
         // Stage not found after loading completed
-        setError(`Stage with code ${stageSlug} not found`);
+        setError(`Stage not found`);
         setIsLoading(false);
       } else if (!foundTopic && !cachedTopics) {
         // Topics not loaded after loading completed
@@ -952,7 +958,7 @@ export function TopicDetailSection({
   }, [
     isCertification,
     stageSlug,
-    topicOrder,
+    topicSlug,
     cachedStage?.id, // Use ID instead of whole object
     foundTopic?.id, // Use found topic ID - this is stable and changes only when topic changes
     isLoadingStage,
