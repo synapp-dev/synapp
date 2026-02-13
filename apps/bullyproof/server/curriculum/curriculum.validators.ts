@@ -39,6 +39,13 @@ export const getStageByCodeSchema = z.object({
 
 export type GetStageByCodeParams = z.infer<typeof getStageByCodeSchema>;
 
+// Schema for getting stage by slug
+export const getStageBySlugSchema = z.object({
+  slug: z.string().trim().min(1).max(500),
+});
+
+export type GetStageBySlugParams = z.infer<typeof getStageBySlugSchema>;
+
 // Schema for getting year by ID
 export const getYearByIdSchema = z.object({
   id: z.string().trim().min(1).max(500),

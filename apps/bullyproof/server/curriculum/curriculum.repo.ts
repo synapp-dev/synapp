@@ -6,9 +6,46 @@ import {
   schoolLevels,
   schoolYearAssignments,
 } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc, sql } from "drizzle-orm";
+import { eq, and, ne, inArray, desc, asc, sql } from "drizzle-orm";
+
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+}
+
+async function findUniqueSlug(
+  baseSlug: string,
+  excludeStageId?: string
+): Promise<string> {
+  let slug = baseSlug;
+  let counter = 1;
+
+  while (true) {
+    const conditions = excludeStageId
+      ? and(eq(curriculumStages.slug, slug), ne(curriculumStages.id, excludeStageId))
+      : eq(curriculumStages.slug, slug);
+
+    const existing = await db
+      .select({ id: curriculumStages.id })
+      .from(curriculumStages)
+      .where(conditions)
+      .limit(1);
+
+    if (existing.length === 0) {
+      return slug;
+    }
+
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+}
 
 export const curriculumRepo = {
+  generateSlug,
   getStages: () =>
     db.select().from(curriculumStages).orderBy(asc(curriculumStages.sortIndex)),
 
@@ -179,6 +216,42 @@ export const curriculumRepo = {
     };
   },
 
+  getStageBySlug: (slug: string) =>
+    db
+      .select()
+      .from(curriculumStages)
+      .where(eq(curriculumStages.slug, slug))
+      .limit(1),
+
+  getStageBySlugWithYears: async (slug: string) => {
+    const stage = await db
+      .select()
+      .from(curriculumStages)
+      .where(eq(curriculumStages.slug, slug))
+      .limit(1);
+
+    if (stage.length === 0) return null;
+
+    const years = await db
+      .select({
+        year: schoolYears,
+        level: schoolLevels,
+      })
+      .from(stageYearLinks)
+      .innerJoin(schoolYears, eq(stageYearLinks.schoolYearId, schoolYears.id))
+      .innerJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
+      .where(eq(stageYearLinks.stageId, stage[0].id))
+      .orderBy(asc(schoolYears.sortIndex));
+
+    return {
+      ...stage[0],
+      years: years.map((y) => ({
+        ...y.year,
+        level: y.level,
+      })),
+    };
+  },
+
   getYearWithStages: async (yearId: string) => {
     const year = await db
       .select({
@@ -240,11 +313,15 @@ export const curriculumRepo = {
       existingStages.length > 0 ? existingStages[0].sortIndex : -1;
     // Use max + 1, but cap at 32766 (one less than max smallint) to be safe
     const tempSortIndex = Math.min(maxSortIndex + 1, 32766);
+    const baseSlug =
+      generateSlug(data.name) || data.code.toLowerCase();
+    const slug = await findUniqueSlug(baseSlug);
     const [stage] = await db
       .insert(curriculumStages)
       .values({
         code: data.code,
         name: data.name,
+        slug,
         sortIndex: tempSortIndex,
       })
       .returning();
@@ -297,11 +374,18 @@ export const curriculumRepo = {
       throw new Error("Stage not found");
     }
 
-    // Update the stage name
+    // Recompute slug when name changes
+    const baseSlug =
+      generateSlug(data.name) ||
+      existingStage[0].code.toLowerCase();
+    const slug = await findUniqueSlug(baseSlug, stageId);
+
+    // Update the stage name and slug
     await db
       .update(curriculumStages)
       .set({
         name: data.name,
+        slug,
         updatedAt: sql`now()`,
       })
       .where(eq(curriculumStages.id, stageId));

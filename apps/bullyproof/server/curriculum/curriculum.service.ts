@@ -3,6 +3,7 @@ import {
   getYearsSchema,
   getStageByIdSchema,
   getStageByCodeSchema,
+  getStageBySlugSchema,
   getYearByIdSchema,
   getLevelsSchema,
   createStageSchema,
@@ -12,6 +13,7 @@ import {
   type GetYearsParams,
   type GetStageByIdParams,
   type GetStageByCodeParams,
+  type GetStageBySlugParams,
   type GetYearByIdParams,
   type GetLevelsParams,
   type CreateStageParams,
@@ -84,6 +86,13 @@ export const curriculumService = {
     await assertCanViewCurriculum(ctx);
 
     return await curriculumRepo.getStageByCodeWithYears(code);
+  },
+
+  async getStageBySlug(ctx: AuthContext, params: unknown) {
+    const { slug } = getStageBySlugSchema.parse(params);
+    await assertCanViewCurriculum(ctx);
+
+    return await curriculumRepo.getStageBySlugWithYears(slug);
   },
 
   async getYearById(ctx: AuthContext, params: unknown) {
