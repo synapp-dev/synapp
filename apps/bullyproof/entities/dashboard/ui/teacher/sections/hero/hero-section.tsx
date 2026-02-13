@@ -1,7 +1,7 @@
 import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { useState, useEffect, useMemo } from "react";
-import { Calendar as CalendarIcon, BookOpen, School, ChevronRight, ChevronsRight } from "lucide-react";
+import { Calendar as CalendarIcon, BookOpen, School, ChevronRight, ChevronsRight, Plus } from "lucide-react";
 import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
@@ -22,6 +22,7 @@ import {
 } from "@workspace/ui/components/dialog";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { Button } from "@workspace/ui/components/button";
 import { LessonFeedbackForm, type LessonForFeedback } from "@/components/organisms/lesson-feedback-form";
 import { checkFeatureAccessAndVisibleCached } from "@/utils/check-feature-access-cached";
 import { getDisplayStatus, getStatusColors } from "@/utils/lesson-status";
@@ -65,6 +66,19 @@ export function TeacherHeroSection() {
     
     // Check each school to see if lessons feature is enabled
     return schools.some((school) => {
+      const { hasAccess } = checkFeatureAccessAndVisibleCached(
+        currentUser.featurePermissions,
+        "lessons",
+        school.id,
+        currentUser.roleIds
+      );
+      return hasAccess;
+    });
+  }, [currentUser?.featurePermissions, currentUser?.roleIds, schools]);
+
+  const schoolsWithLessons = useMemo(() => {
+    if (!currentUser?.featurePermissions || schools.length === 0) return [];
+    return schools.filter((school) => {
       const { hasAccess } = checkFeatureAccessAndVisibleCached(
         currentUser.featurePermissions,
         "lessons",
@@ -342,30 +356,30 @@ export function TeacherHeroSection() {
               </div>
 
               {isLoadingLessons ? (
-                <div className="flex flex-col gap-3">
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="w-full border-2 border-dashed border-muted-foreground rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Solid circle */}
-                        <div className="w-6 h-6 rounded-full bg-muted-foreground mt-1 shrink-0" />
-                        {/* Dotted boxes */}
-                        <div className="flex-1 space-y-2">
-                          <div className="h-4 border-2 border-dashed border-muted-foreground rounded-md w-3/4" />
-                          <div className="flex items-center gap-2">
-                            <div className="h-3 border-2 border-dashed border-muted-foreground rounded-md w-1/3" />
-                            <div className="w-2 h-2 rounded-full bg-muted-foreground" />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 mt-2">
-                            <div className="h-6 border-2 border-dashed border-muted-foreground rounded-md" />
-                            <div className="h-6 border-2 border-dashed border-muted-foreground rounded-md" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="w-full border-2 border-dotted rounded-lg bg-muted/30 flex items-center px-4 py-3">
+                  <Skeleton className="h-4 w-48 flex-1" />
                 </div>
               ) : selectedDateLessons.length === 0 ? (
                 <div className="flex flex-col gap-4">
+                  {/* Start new lesson - only when teacher has at least one school with lessons access */}
+                  {schoolsWithLessons.length === 1 ? (
+                    <Link href={`/schools/${schoolsWithLessons[0].slug}/lessons?wizardOpen=true&step=0`}>
+                      <Button variant="outline" size="sm" className="w-full justify-center gap-2">
+                        <Plus className="h-4 w-4" />
+                        Start new lesson
+                      </Button>
+                    </Link>
+                  ) : schoolsWithLessons.length > 1 ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-center gap-2"
+                      onClick={() => setIsSchoolDialogOpen(true)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Start new lesson
+                    </Button>
+                  ) : null}
                   {/* Main card with text */}
                   <div className="w-full border-2 border-dotted rounded-lg bg-muted/30 flex items-center px-4 py-3">
                     <p className="text-sm text-muted-foreground">
