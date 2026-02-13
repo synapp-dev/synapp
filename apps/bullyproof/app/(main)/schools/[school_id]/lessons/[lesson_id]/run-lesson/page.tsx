@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from "react";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp } from "lucide-react";
+import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp, HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +34,9 @@ import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@workspace/ui/components/separator";
+import { SlideRenderer, type SlideData } from "@/components/organisms/slide-renderer";
 
 // Live countdown component for scheduled lessons
 function LiveCountdown({ scheduledFor }: { scheduledFor: string }) {
@@ -101,6 +102,7 @@ export default function LessonRunLessonPage({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [presentDialogOpen, setPresentDialogOpen] = useState(false);
+  const [presentHelpOpen, setPresentHelpOpen] = useState(false);
 
   // Schedule dialog state
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -139,6 +141,13 @@ export default function LessonRunLessonPage({
     !isLessonCreator &&
     lessonData?.status &&
     takeOverableStatuses.includes(lessonData.status);
+
+  // Fetch live state when lesson is ready or in progress (for "Continue from slide X" label and dialog preview)
+  const { data: liveStateData, isLoading: isSlideLoading } = useQuery({
+    queryKey: ["lesson", lesson_id, "live-state"],
+    queryFn: () => lessonsApi.liveState.get.byLessonId(lesson_id),
+    enabled: !!lesson_id && (lessonData?.status === "ready" || lessonData?.status === "in_progress"),
+  });
 
   // Check for query param to auto-open dialog
   useEffect(() => {
@@ -191,7 +200,7 @@ export default function LessonRunLessonPage({
           Back to lesson
         </Button>
         <div>
-          <h1 className="text-3xl font-bold mb-2">Run Lesson</h1>
+          <h1 className="text-3xl font-bold mb-2">Start Lesson</h1>
           <p className="text-muted-foreground">
             {canShowTakeOver
               ? "You need to take over this lesson to run it."
@@ -300,11 +309,42 @@ export default function LessonRunLessonPage({
     setPendingSchedule(null);
   };
 
+  const isInProgress = lessonData?.status === "in_progress";
+  const liveState = liveStateData?.data?.liveState;
+  const currentIndex = liveState?.current_index ?? (liveState as { currentIndex?: number })?.currentIndex;
+  const currentSlideNum = currentIndex != null ? currentIndex + 1 : null;
+  const primaryButtonLabel = isInProgress
+    ? (currentSlideNum != null ? `Continue lesson from slide ${currentSlideNum}` : "Continue Lesson")
+    : "Start lesson";
+  const presentDialogButtonLabel = isInProgress ? "Continue Lesson" : "Start Lesson";
+
+  // Map API slides to SlideData for dialog preview (opening slide or current if in progress)
+  const rawSlides = liveStateData?.data?.slides ?? [];
+  const formattedSlides: SlideData[] = Array.isArray(rawSlides)
+    ? rawSlides
+      .map((slide: { topicSlideId: string; kind: string; orderIndex: number; textHtml?: string | null; imageUrl?: string | null; videoUrl?: string | null; videoStartS?: number | null; videoEndS?: number | null; effectiveNotes?: string | null; signedUrl?: string | null; signedImageUrl?: string | null }) => ({
+        id: slide.topicSlideId,
+        kind: slide.kind as SlideData["kind"],
+        orderIndex: slide.orderIndex,
+        textHtml: slide.textHtml,
+        imageUrl: slide.imageUrl,
+        videoUrl: slide.videoUrl,
+        videoStartS: slide.videoStartS,
+        videoEndS: slide.videoEndS,
+        effectiveNotes: slide.effectiveNotes,
+        signedUrl: slide.signedUrl ?? null,
+        signedImageUrl: slide.signedImageUrl ?? slide.signedUrl ?? null,
+      }))
+      .sort((a: SlideData, b: SlideData) => a.orderIndex - b.orderIndex)
+    : [];
+  const previewSlideIndex = isInProgress && currentIndex != null ? currentIndex : 0;
+  const previewSlide = formattedSlides[previewSlideIndex] ?? null;
+
   return (
       <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Run Lesson</h1>
+        <h1 className="text-3xl font-bold mb-2">Start Lesson</h1>
         
       </div>
 
@@ -337,7 +377,7 @@ export default function LessonRunLessonPage({
            
             <Separator className="my-2" />
             <p>
-              Click Run lesson now to start immediately, or wait until the scheduled time.
+              Click Start lesson now to start immediately, or wait until the scheduled time.
             </p>
           </AlertDescription>
         </Alert>
@@ -356,7 +396,7 @@ export default function LessonRunLessonPage({
               day: 'numeric',
               hour: 'numeric',
               minute: '2-digit',
-            })} Click Run lesson now to start.
+            })} Click Start lesson now to start.
           </AlertDescription>
         </Alert>
       )}
@@ -366,7 +406,7 @@ export default function LessonRunLessonPage({
           <CalendarIcon className="h-4 w-4" />
           <AlertTitle>Not Scheduled</AlertTitle>
           <AlertDescription className="text-muted-foreground">
-            Click Run lesson now to start immediately, or Schedule lesson for later.
+            Click Start lesson now to start immediately, or Schedule lesson for later.
           </AlertDescription>
         </Alert>
       )}
@@ -378,7 +418,7 @@ export default function LessonRunLessonPage({
           className="bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 sm:min-w-[200px] capitalize"
         >
           <Presentation className="h-5 w-5" />
-          Run lesson now
+          {primaryButtonLabel}
         </Button>
         <Button
           variant="outline"
@@ -396,22 +436,67 @@ export default function LessonRunLessonPage({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Open Presentation Mode</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="w-full aspect-video rounded-lg border overflow-hidden bg-muted/30">
+              {previewSlide ? (
+                <SlideRenderer slide={previewSlide} className="w-full h-full" thumbnailOnly />
+              ) : isSlideLoading ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <div className="w-full h-full bg-muted/50" />
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              You&apos;re about to open a <strong>new tab</strong>, which will show the slides in full screen. This is what the class will see.
+            </p>
+          </div>
+          <DialogFooter className="flex justify-between sm:justify-between">
+            <Button
+              variant="outline"
+              onClick={() => setPresentHelpOpen(true)}
+              className="gap-2"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Help
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setPresentDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handlePresentAccept}
+                className="bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90"
+              >
+                {presentDialogButtonLabel}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Presentation Screen Help Dialog */}
+      <Dialog open={presentHelpOpen} onOpenChange={setPresentHelpOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Presentation Screen Help</DialogTitle>
             <DialogDescription>
-            This tab will be what the class will see. You should move this tab
-            to open on a projector screen.
+              How to display the presentation on a projector or second screen.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-           
-           
-            <div className="text-sm text-muted-foreground flex flex-col gap-8">
-              <div>
+          <div className="text-sm text-muted-foreground flex flex-col gap-8 py-4">
+            <div>
               <p>
                 <strong className="text-foreground">
                   Duplicate your screen
-                </strong>{" "}
-                </p>
-                <p>
+                </strong>
+              </p>
+              <p>
                 Press{" "}
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Windows + P
@@ -420,17 +505,16 @@ export default function LessonRunLessonPage({
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Cmd + F1
                 </kbd>{" "}
-                (Mac) and select "Duplicate"
-                  </p>
-                  </div>
-
-                  <div>
+                (Mac) and select &quot;Duplicate&quot;
+              </p>
+            </div>
+            <div>
               <p>
                 <strong className="text-foreground">
                   Extend your screen (Recommended)
-                </strong>{" "}
-                </p>
-                <p>
+                </strong>
+              </p>
+              <p>
                 Press{" "}
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Windows + P
@@ -439,22 +523,12 @@ export default function LessonRunLessonPage({
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Cmd + F1
                 </kbd>{" "}
-                (Mac) and select "Extend". This allows you to see the controls
-                on your main screen while the class sees the presentation on the
-                extended display.
+                (Mac) and select &quot;Extend&quot;. This allows you to see the
+                controls on your main screen while the class sees the
+                presentation on the extended display.
               </p>
-              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setPresentDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handlePresentAccept}>Open Presentation</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

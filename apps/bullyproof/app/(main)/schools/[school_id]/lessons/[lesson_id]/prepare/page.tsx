@@ -34,6 +34,7 @@ import { useMeStore } from "@/entities/me/model/store";
 import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
+import { getAuthHeaders } from "@/lib/api/fetcher.client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
 import Image from "next/image";
@@ -229,15 +230,29 @@ export default function LessonPreparePage() {
   const handleLessonPlanDownload = async (planId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     try {
-      const result = await topicsApi.lessonPlans.getUrl(planId);
-      if (result.data?.url) {
-        window.open(result.data.url, "_blank");
-        setDownloadedPlan(true);
-      } else {
-        toast.error("Failed to get download link");
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/topic-lesson-plans/${planId}/download`, {
+        headers,
+      });
+      if (!res.ok) {
+        toast.error("Failed to download lesson plan");
+        return;
       }
-    } catch (err: unknown) {
-      toast.error("Failed to get download link", {
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition");
+      const match = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = match?.[1] ?? "lesson-plan.pdf";
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+      setDownloadedPlan(true);
+    } catch (err) {
+      toast.error("Failed to download lesson plan", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
     }
@@ -522,8 +537,8 @@ export default function LessonPreparePage() {
           <div className="space-y-4">
             {/* Step 1: View slides card */}
             <Card
-              className={`overflow-hidden transition-all ${!isAlreadyReady && slides.length > 0 ? "cursor-pointer hover:shadow-md" : "opacity-75"}`}
-              onClick={() => !isAlreadyReady && slides.length > 0 && setShowPreview(true)}
+              className={`overflow-hidden transition-all ${slides.length > 0 ? "cursor-pointer hover:shadow-md" : "opacity-75"}`}
+              onClick={() => slides.length > 0 && setShowPreview(true)}
             >
               <div className="flex items-center gap-4 px-4 py-3">
                 <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
@@ -558,9 +573,9 @@ export default function LessonPreparePage() {
 
             {/* Step 2: Lesson plan card */}
             <Card
-              className={`overflow-hidden transition-all ${!isAlreadyReady && lessonPlans.length > 0 ? "cursor-pointer hover:shadow-md" : "opacity-75"}`}
+              className={`overflow-hidden transition-all ${lessonPlans.length > 0 ? "cursor-pointer hover:shadow-md" : "opacity-75"}`}
               onClick={() => {
-                if (!isAlreadyReady && lessonPlans.length > 0) {
+                if (lessonPlans.length > 0) {
                   handleLessonPlanDownload(lessonPlans[0].id);
                   setDownloadedPlan(true);
                 }
@@ -601,12 +616,11 @@ export default function LessonPreparePage() {
                     className="font-medium text-blue-600 underline hover:text-blue-700 hover:underline cursor-pointer dark:text-blue-500 dark:hover:text-blue-400"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isAlreadyReady && lessonPlans.length > 0) {
+                      if (lessonPlans.length > 0) {
                         handleLessonPlanDownload(lessonPlans[0].id);
                         setDownloadedPlan(true);
                       }
                     }}
-                    disabled={isAlreadyReady}
                   >
                     Download the lesson plan
                   </button>
@@ -641,7 +655,7 @@ export default function LessonPreparePage() {
             </div>
           )}
 
-          {/* I'm ready button - show when already ready */}
+          {/* Next button - show when checklist complete */}
           {isAlreadyReady && !isUpdatingStatus && (
             <div className="mt-6 pt-4 border-t">
               <Button
@@ -649,7 +663,7 @@ export default function LessonPreparePage() {
                 onClick={handleRunLesson}
                 className="flex items-center gap-3 bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 text-base font-medium"
               >
-                I&apos;m ready
+                Next
                 <ChevronsRight className="h-5 w-5 animate-bounce-right" />
               </Button>
             </div>
@@ -673,11 +687,11 @@ export default function LessonPreparePage() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="flex items-center justify-center gap-3 cursor-help">
-                  <TriangleAlert className="h-8 w-8 text-amber-500 shrink-0" />
-                  <DialogTitle className="text-3xl font-bold uppercase tracking-wider text-amber-600 md:text-4xl dark:text-amber-500">
+          
+                  <DialogTitle className="text-3xl font-bold uppercase tracking-wider text-muted-foreground md:text-4xl">
                     Preview Only
                   </DialogTitle>
-                  <TriangleAlert className="h-8 w-8 text-amber-500 shrink-0" />
+               
                 </div>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-sm text-center">

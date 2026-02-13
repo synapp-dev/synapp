@@ -42,9 +42,9 @@ function StartNewLessonCard({ onClick }: { onClick: () => void }) {
             <span className="w-1.5 h-1.5 rounded-full bg-primary" />
             New
           </span>
-          <span className="text-xs text-muted-foreground">
+          {/* <span className="text-xs text-muted-foreground">
             Create a lesson
-          </span>
+          </span> */}
         </CardHeader>
         {/* CardContent - Thumbnail area with plus icon */}
         <CardContent className="p-0 bg-card/80 border-x border-primary/30 border-dashed rounded-lg relative z-[1]">
@@ -66,9 +66,7 @@ function StartNewLessonCard({ onClick }: { onClick: () => void }) {
           </div>
           {/* Placeholder to match LessonCard classes row */}
           <div className="flex flex-wrap gap-1 mt-1">
-            <span className="text-xs py-0 px-1.5 h-5 border border-dashed border-muted-foreground/50 rounded-full inline-flex items-center text-muted-foreground">
-              Select classes
-            </span>
+            <span className="min-w-16 h-5 border border-dashed border-muted-foreground/10 rounded-full inline-flex" />
           </div>
         </CardFooter>
       </Card>
