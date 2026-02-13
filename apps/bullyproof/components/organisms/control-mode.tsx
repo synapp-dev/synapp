@@ -95,7 +95,7 @@ export function ControlMode({ lessonId }: ControlModeProps) {
       {/* Header with mode switcher */}
       <div className="flex-shrink-0 flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Run Lesson</h1>
+          <h1 className="text-3xl font-bold mb-2">Start Lesson</h1>
           <p className="text-muted-foreground">
             Control mode - View slides and notes simultaneously
           </p>

@@ -36,6 +36,7 @@ export function AnimatedThumbnail({
   const transitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverAdvanceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Pre-fetch URLs for current and next slides
   const currentSlide = imageSlidesList[currentIndex];
@@ -64,18 +65,36 @@ export function AnimatedThumbnail({
 
   // Track paused state with ref to avoid triggering re-renders
   const isPausedRef = useRef(isPaused);
+  const prevIsPausedRef = useRef(isPaused);
 
   // Update ref when paused state changes, but don't trigger effect
   useEffect(() => {
     isPausedRef.current = isPaused;
     // If paused, clear timers immediately without state updates
     if (isPaused) {
+      if (hoverAdvanceTimeoutRef.current) {
+        clearTimeout(hoverAdvanceTimeoutRef.current);
+        hoverAdvanceTimeoutRef.current = null;
+      }
       clearAllTimers();
     }
   }, [isPaused]);
 
+  // Advance one slide with proper transition when hover starts (isPaused: true -> false)
+  useEffect(() => {
+    if (prevIsPausedRef.current && !isPaused && imageSlidesList.length > 1) {
+      setIsTransitioning(true);
+      hoverAdvanceTimeoutRef.current = setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % imageSlidesList.length);
+        setIsTransitioning(false);
+        hoverAdvanceTimeoutRef.current = null;
+      }, 1200);
+    }
+    prevIsPausedRef.current = isPaused;
+  }, [isPaused, imageSlidesList.length]);
+
   // Animate through image slides with offset timing
-  // NOTE: isPaused is NOT in dependency array - we use ref to check it
+  // When isPaused becomes false (e.g. on hover), effect re-runs and starts animation
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -129,7 +148,7 @@ export function AnimatedThumbnail({
       isMountedRef.current = false;
       clearAllTimers();
     };
-  }, [imageSlidesList.length, cardIndex]);
+  }, [imageSlidesList.length, cardIndex, isPaused]);
 
   if (!currentSlide || !currentUrl) {
     return (
