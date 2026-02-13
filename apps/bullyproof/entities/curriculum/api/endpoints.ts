@@ -46,6 +46,11 @@ export const curriculumApi = {
         `/curriculum/stages/by-code/${encodeURIComponent(code)}`
       );
     },
+    bySlug(slug: string): Promise<ApiResult<Stage & { years?: any[] }>> {
+      return apiFetch<Stage & { years?: any[] }>(
+        `/curriculum/stages/by-slug/${encodeURIComponent(slug)}`
+      );
+    },
     create(data: {
       code: string;
       name: string;

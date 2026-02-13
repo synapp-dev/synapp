@@ -11,6 +11,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Loader2, BookOpen } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { createSlug } from "@/utils/slug";
 
 interface StageViewProps {
   stageId?: string;
@@ -68,11 +69,21 @@ export function StageView({
     );
   }
 
-  const handleTopicClick = (topicId: string, stageOrder: number | null) => {
+  const handleTopicClick = (
+    topicId: string,
+    topic: { title: string; stageOrder?: number | null }
+  ) => {
     if (onTopicClick) {
-      onTopicClick(topicId, stageOrder);
-    } else if (basePath && stageOrder !== null && stageOrder !== undefined) {
-      router.push(`${basePath}/${stage.code}/T${stageOrder}`);
+      onTopicClick(topicId, topic.stageOrder ?? null);
+    } else if (basePath) {
+      const topicSegment = topic.title?.trim()
+        ? createSlug(topic.title)
+        : topic.stageOrder != null
+          ? `T${topic.stageOrder}`
+          : null;
+      if (topicSegment) {
+        router.push(`${basePath}/${stage.slug}/${topicSegment}`);
+      }
     }
   };
 
@@ -111,7 +122,7 @@ export function StageView({
                       key={topic.id}
                       className="p-3 rounded-md border hover:bg-muted/50 cursor-pointer transition-colors"
                       onClick={() =>
-                        handleTopicClick(topic.id, topic.stageOrder)
+                        handleTopicClick(topic.id, topic)
                       }
                     >
                       <div className="flex items-center justify-between">

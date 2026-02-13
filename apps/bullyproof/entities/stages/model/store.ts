@@ -96,6 +96,32 @@ export function useStageByCode(stageCode: string | null | undefined) {
   };
 }
 
+export function useStageBySlug(stageSlug: string | null | undefined) {
+  const query = useQuery({
+    queryKey: ["stages", "by-slug", stageSlug],
+    queryFn: async () => {
+      if (!stageSlug) return null;
+
+      const result = await curriculumApi.stages.bySlug(stageSlug);
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to fetch stage");
+      }
+      if (result.data) {
+        return result.data;
+      }
+      return null;
+    },
+    enabled: !!stageSlug,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  });
+
+  return {
+    ...query,
+    stage: query.data || null,
+  };
+}
+
 // Helper function to invalidate stage cache
 export function useInvalidateStage() {
   const queryClient = useQueryClient();
@@ -104,6 +130,7 @@ export function useInvalidateStage() {
     invalidateStage: (stageId: string) => {
       queryClient.invalidateQueries({ queryKey: ["stages", stageId] });
       queryClient.invalidateQueries({ queryKey: ["stages", "by-code"] });
+      queryClient.invalidateQueries({ queryKey: ["stages", "by-slug"] });
       queryClient.invalidateQueries({ queryKey: ["stages"] });
     },
     invalidateAllStages: () => {
