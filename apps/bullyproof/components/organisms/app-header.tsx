@@ -19,6 +19,7 @@ import { Breadcrumb } from "@/components/molecules/breadcrumb";
 import { ImpersonateMenu } from "@/components/molecules/impersonate-menu";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { FeedbackDialog } from "@/components/organisms/feedback-dialog";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useMeStore } from "@/entities/me/model/store";
 import {
   getTutorialForPathname,
@@ -39,6 +40,10 @@ export function AppHeader() {
   const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);
   const [unreadTicketCount, setUnreadTicketCount] = useState(0);
   const unreadPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const { visible: isFeedbackButtonVisible, isLoading: isFeedbackFeatureLoading } =
+    useFeatureAccess("system:feedback-button");
+  const shouldFetchUnread = isFeedbackButtonVisible && !isFeedbackFeatureLoading;
 
   // Fetch unread ticket note count
   const fetchUnreadCount = useCallback(async () => {
@@ -62,21 +67,36 @@ export function AppHeader() {
     }
   }, []);
 
-  // Poll for unread count on mount and every 60 seconds
+  const fetchUnreadCountRef = useRef(fetchUnreadCount);
+  const shouldFetchUnreadRef = useRef(shouldFetchUnread);
+  fetchUnreadCountRef.current = fetchUnreadCount;
+  shouldFetchUnreadRef.current = shouldFetchUnread;
+
+  // Poll for unread count on mount and every 60 seconds (only when feedback button is visible)
   useEffect(() => {
-    fetchUnreadCount();
-    unreadPollRef.current = setInterval(fetchUnreadCount, 60_000);
+    if (!shouldFetchUnread) {
+      if (unreadPollRef.current) {
+        clearInterval(unreadPollRef.current);
+        unreadPollRef.current = null;
+      }
+      return;
+    }
+    fetchUnreadCountRef.current();
+    unreadPollRef.current = setInterval(
+      () => fetchUnreadCountRef.current(),
+      60_000
+    );
     return () => {
       if (unreadPollRef.current) clearInterval(unreadPollRef.current);
     };
-  }, [fetchUnreadCount]);
+  }, [shouldFetchUnread]);
 
   // Re-fetch when dialog closes (user may have read notes)
   useEffect(() => {
-    if (!showFeedbackDialog) {
-      fetchUnreadCount();
+    if (!showFeedbackDialog && shouldFetchUnreadRef.current) {
+      fetchUnreadCountRef.current();
     }
-  }, [showFeedbackDialog, fetchUnreadCount]);
+  }, [showFeedbackDialog]);
 
   useEffect(() => {
     const isSchool = pathname.startsWith("/schools/");

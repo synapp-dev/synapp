@@ -113,7 +113,7 @@ export function LessonWizardConfirm({
 
   const { users, isLoading: isLoadingUsers } = useUsers({
     schoolId: schoolId ?? undefined,
-    limit: 200,
+    limit: 100, // API limit is 1-100
     offset: 0,
   });
 

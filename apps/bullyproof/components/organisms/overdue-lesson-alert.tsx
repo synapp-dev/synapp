@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertDialog,
@@ -13,12 +13,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
-import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
-import { Clock, PlayCircle, X } from "lucide-react";
+import { buttonVariants } from "@workspace/ui/components/button";
+import { Checkbox } from "@workspace/ui/components/checkbox";
+import { Label } from "@workspace/ui/components/label";
+import { Clock, PlayCircle } from "lucide-react";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { LessonTopicThumbnail } from "@/entities/lessons/ui/lesson-card";
 import { useMeStore } from "@/entities/me/model/store";
-import { useSchoolStore } from "@/stores/school-store";
+import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
 
 type LessonWithDetails = {
   id: string;
@@ -35,6 +38,8 @@ type LessonWithDetails = {
     classId: string;
     className: string;
   }>;
+  schoolName?: string;
+  schoolSlug?: string;
 };
 
 // Format relative time (e.g., "30 minutes ago", "2 hours ago")
@@ -85,91 +90,135 @@ function addDismissedLessonId(lessonId: string): void {
 
 export function OverdueLessonAlert() {
   const router = useRouter();
+  const pathname = usePathname();
   const currentUser = useMeStore((s) => s.currentUser);
-  const currentSchool = useSchoolStore((state) => state.currentSchool);
+
+  const runLessonMatch = pathname?.match(/^\/schools\/[^/]+\/lessons\/([^/]+)\/run-lesson/);
+  const currentLessonIdFromPath = runLessonMatch?.[1] ?? null;
   const [isOpen, setIsOpen] = useState(false);
   const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [currentLessonIndex, setCurrentLessonIndex] = useState(0);
   const [hasChecked, setHasChecked] = useState(false);
+  const [dontRemindChecked, setDontRemindChecked] = useState(false);
 
   // Load dismissed IDs from localStorage on mount
   useEffect(() => {
     setDismissedIds(getDismissedLessonIds());
   }, []);
 
-  // Fetch lessons with status 'ready' for the current user (across all their schools)
-  const { data: lessons } = useQuery({
+  // Fetch user's schools for school name and slug
+  const { data: schools = [] } = useMySchoolsQuery({ limit: 50 });
+
+  // Fetch lessons with status 'ready', filter overdue (by date), enrich with details
+  const { data: overdueLessonsRaw } = useQuery({
     queryKey: ["lessons", "overdue-check-global", currentUser?.id],
-    queryFn: async () => {
-      if (!currentUser?.id) return [];
-      
-      // Fetch user's lessons without schoolId filter to get all their lessons
+    queryFn: async ({ queryKey }) => {
+      const [, , userId] = queryKey as [string, string, string | undefined];
+      if (!userId) return [];
+
       const result = await lessonsApi.get.list({
-        teacherId: currentUser.id,
+        teacherId: userId,
         status: "ready",
       });
-      
+
       if (result.error || !result.data) return [];
-      return result.data as LessonWithDetails[];
+
+      const now = new Date();
+      const rawOverdue = result.data.filter((lesson: LessonWithDetails) => {
+        if (!lesson.scheduledFor) return false;
+        return new Date(lesson.scheduledFor) < now;
+      });
+
+      // Enrich each overdue lesson with topic and assignedClasses via byId
+      const enriched = await Promise.all(
+        rawOverdue.map(async (lesson: LessonWithDetails) => {
+          const detailResult = await lessonsApi.get.byId(lesson.id);
+          if (detailResult.error || !detailResult.data) {
+            return { ...lesson, topic: undefined, assignedClasses: [] } as LessonWithDetails;
+          }
+          const detail = detailResult.data;
+          return {
+            ...lesson,
+            topic: detail.topic,
+            assignedClasses: detail.assignedClasses || [],
+          } as LessonWithDetails;
+        })
+      );
+
+      return enriched;
     },
     enabled: !!currentUser?.id,
-    staleTime: 5 * 60 * 1000, // 5 minutes - don't refetch too often for global check
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Filter to only overdue lessons (scheduledFor is in the past and not dismissed)
+  // Filter out dismissed lessons and add school name/slug from user's schools
   const overdueLessons = useMemo(() => {
-    if (!lessons) return [];
-    
-    const now = new Date();
-    return lessons.filter((lesson) => {
-      if (!lesson.scheduledFor) return false;
-      if (dismissedIds.includes(lesson.id)) return false;
-      
-      const scheduledDate = new Date(lesson.scheduledFor);
-      return scheduledDate < now;
-    });
-  }, [lessons, dismissedIds]);
+    if (!overdueLessonsRaw) return [];
+    return overdueLessonsRaw
+      .filter((lesson: LessonWithDetails) => !dismissedIds.includes(lesson.id))
+      .map((lesson: LessonWithDetails) => {
+        const school = schools.find((s) => s.id === lesson.schoolId);
+        return {
+          ...lesson,
+          schoolName: school?.name,
+          schoolSlug: school?.slug,
+        } as LessonWithDetails;
+      });
+  }, [overdueLessonsRaw, schools, dismissedIds]);
 
-  // Show dialog when there are overdue lessons (only once per session)
+  const isOnRunLessonForOverdue = Boolean(
+    currentLessonIdFromPath && overdueLessons.some((l) => l.id === currentLessonIdFromPath)
+  );
+
+  // Show dialog when there are overdue lessons (only once per session), but not when already on run-lesson for that lesson
   useEffect(() => {
-    if (overdueLessons.length > 0 && !isOpen && !hasChecked) {
+    if (overdueLessons.length > 0 && !isOpen && !hasChecked && !isOnRunLessonForOverdue) {
       setIsOpen(true);
       setCurrentLessonIndex(0);
       setHasChecked(true);
     }
-  }, [overdueLessons.length, isOpen, hasChecked]);
+  }, [overdueLessons.length, isOpen, hasChecked, isOnRunLessonForOverdue]);
+
+  // Clamp index when list shrinks (e.g. after dismissing a lesson)
+  useEffect(() => {
+    if (overdueLessons.length > 0 && currentLessonIndex >= overdueLessons.length) {
+      setCurrentLessonIndex(0);
+    }
+  }, [overdueLessons.length, currentLessonIndex]);
 
   const currentLesson = overdueLessons[currentLessonIndex];
 
   if (!currentLesson) return null;
 
+  const schoolSlug = currentLesson.schoolSlug || currentLesson.schoolId;
+
   const handleGoToLesson = () => {
+    if (dontRemindChecked) {
+      addDismissedLessonId(currentLesson.id);
+      setDismissedIds((prev) => [...prev, currentLesson.id]);
+    }
     setIsOpen(false);
-    // Use the school slug from the current school if it matches, otherwise use the lesson's schoolId
-    const schoolSlug = currentSchool?.slug || currentLesson.schoolId;
+    setDontRemindChecked(false);
     router.push(`/schools/${schoolSlug}/lessons/${currentLesson.id}/run-lesson`);
   };
 
-  const handleDismiss = () => {
-    addDismissedLessonId(currentLesson.id);
-    setDismissedIds((prev) => [...prev, currentLesson.id]);
-    
-    // If there are more lessons, show the next one
-    if (currentLessonIndex < overdueLessons.length - 1) {
-      setCurrentLessonIndex((prev) => prev + 1);
-    } else {
-      setIsOpen(false);
-    }
-  };
-
   const handleRemindLater = () => {
-    // Just close without dismissing - will show again on next page load
+    if (dontRemindChecked) {
+      addDismissedLessonId(currentLesson.id);
+      setDismissedIds((prev) => [...prev, currentLesson.id]);
+      if (currentLessonIndex < overdueLessons.length - 1) {
+        setCurrentLessonIndex((prev) => prev + 1);
+        setDontRemindChecked(false);
+        return;
+      }
+    }
+    setDontRemindChecked(false);
     setIsOpen(false);
   };
 
   return (
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-      <AlertDialogContent>
+      <AlertDialogContent className="sm:max-w-xl">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-orange-500" />
@@ -184,20 +233,32 @@ export function OverdueLessonAlert() {
                 </span>
                 .
               </p>
-              
-              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-                <p className="font-medium text-foreground">
-                  {currentLesson.topic?.title || "Untitled Lesson"}
-                </p>
-                {currentLesson.assignedClasses && currentLesson.assignedClasses.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {currentLesson.assignedClasses.map((c) => (
-                      <Badge key={c.classId} variant="outline" className="text-xs">
-                        {c.className}
-                      </Badge>
-                    ))}
+
+              <div className="bg-muted/50 rounded-lg p-3">
+                <div className="flex gap-3">
+                  {currentLesson.topicId && (
+                    <div className="w-24 aspect-video flex-shrink-0 self-start overflow-hidden rounded-md flex items-center justify-center bg-muted">
+                      <LessonTopicThumbnail topicId={currentLesson.topicId} horizontal={false} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    {currentLesson.schoolName && (
+                      <p className="text-xs text-muted-foreground">{currentLesson.schoolName}</p>
+                    )}
+                    <p className="font-medium text-foreground">
+                      {currentLesson.topic?.title || "Untitled Lesson"}
+                    </p>
+                    {currentLesson.assignedClasses && currentLesson.assignedClasses.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {currentLesson.assignedClasses.map((c) => (
+                          <Badge key={c.classId} variant="outline" className="text-xs">
+                            {c.className}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               {overdueLessons.length > 1 && (
@@ -209,20 +270,27 @@ export function OverdueLessonAlert() {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDismiss}
-            className="sm:mr-auto"
+          <div className="flex items-center space-x-2 sm:mr-auto">
+            <Checkbox
+              id="dont-remind-overdue"
+              checked={dontRemindChecked}
+              onCheckedChange={(checked) => setDontRemindChecked(checked === true)}
+            />
+            <Label
+              htmlFor="dont-remind-overdue"
+              className="text-sm font-normal cursor-pointer"
+            >
+              Don&apos;t remind me again
+            </Label>
+          </div>
+          <AlertDialogCancel
+            className={buttonVariants({ variant: "ghost" })}
+            onClick={handleRemindLater}
           >
-            <X className="h-4 w-4 mr-1" />
-            Don't remind me
-          </Button>
-          <AlertDialogCancel onClick={handleRemindLater}>
             Remind Later
           </AlertDialogCancel>
           <AlertDialogAction onClick={handleGoToLesson}>
-            <PlayCircle className="h-4 w-4 mr-2" />
+            <PlayCircle className="h-4 w-4" />
             Go to Lesson
           </AlertDialogAction>
         </AlertDialogFooter>
