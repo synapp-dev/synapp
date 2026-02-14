@@ -660,7 +660,10 @@ export function LessonWizard({
     setSelectedStageId(stageId);
   };
 
-  const handleCreateLesson = async () => {
+  const createLessonAndRedirect = async (
+    status: "preparing" | "ready",
+    redirectPath: "prepare" | "run-lesson"
+  ) => {
     if (!canProceed() || !state.selectedTopic || !schoolUuid) {
       if (!schoolUuid) {
         setError("School information not loaded. Please try again.");
@@ -672,16 +675,14 @@ export function LessonWizard({
     setError(null);
 
     try {
-      // Prepare payload - lessons start as 'preparing'
       const payload = {
-        schoolId: schoolUuid, // Use UUID for API call
+        schoolId: schoolUuid,
         topicId: state.selectedTopic.id,
         classIds: state.selectedClasses.map((c) => c.id),
-        status: "preparing" as const,
+        status,
         ...(onBehalfOfUserId && { createdByUserId: onBehalfOfUserId }),
       };
 
-      // Call the API to create the lesson
       const result = await lessonsApi.post.create(payload);
 
       if (result.error) {
@@ -692,7 +693,6 @@ export function LessonWizard({
         throw new Error("No data returned from API");
       }
 
-      // Extract the lesson UUID from the response
       const lessonId = result.data.id;
 
       if (!lessonId) {
@@ -700,24 +700,16 @@ export function LessonWizard({
         throw new Error("Lesson ID (UUID) not returned from API. Please try again.");
       }
 
-      // Set flag to prevent URL sync from interfering with redirect
       isRedirectingAfterCreationRef.current = true;
-      
-      // Invalidate lessons queries so the list shows fresh data
+
       queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
-      // Invalidate recommendations so next wizard gets fresh data
       queryClient.invalidateQueries({ queryKey: ["lesson-recommendations"] });
-      
-      // Clear wizard params before redirecting
+
       clearWizardParams();
-      
-      // Close drawer first
       handleOpenChange(false);
-      
-      // Navigate to lesson page using the UUID
-      router.push(`/schools/${schoolId}/lessons/${lessonId}`);
-      
-      // Reset flag after a delay to allow redirect to complete
+
+      router.push(`/schools/${schoolId}/lessons/${lessonId}/${redirectPath}`);
+
       setTimeout(() => {
         isRedirectingAfterCreationRef.current = false;
       }, 500);
@@ -728,6 +720,12 @@ export function LessonWizard({
       setLoading(false);
     }
   };
+
+  const handlePrepareLesson = () =>
+    createLessonAndRedirect("preparing", "prepare");
+
+  const handleStartLesson = () =>
+    createLessonAndRedirect("ready", "run-lesson");
 
   const getStepTitle = () => {
     switch (state.step) {
@@ -1081,9 +1079,13 @@ export function LessonWizard({
                 selectedClasses={state.selectedClasses}
                 selectedTopic={state.selectedTopic}
                 schoolId={schoolUuid}
+                schoolSlug={schoolId}
                 onBehalfOfUserId={onBehalfOfUserId}
                 onOnBehalfOfUserIdChange={setOnBehalfOfUserId}
                 isAdminRestricted={isAdminRestricted}
+                onPrepareLesson={handlePrepareLesson}
+                onStartLesson={handleStartLesson}
+                isLoading={loading}
               />
             </div>
 
@@ -1178,10 +1180,10 @@ export function LessonWizard({
                               const selectedStageOption = recommendationData?.warning?.multipleStages?.find(
                                 (stage) => stage.stageId === selectedStageId
                               );
-                              // If there's a recommended topic, say "Proceed", otherwise "Continue to Topic Selection"
-                              return selectedStageOption?.firstTopic?.id ? "Proceed" : "Continue to Topic Selection";
+                              // If there's a recommended topic, say "Next", otherwise "Continue to Topic Selection"
+                              return selectedStageOption?.firstTopic?.id ? "Next" : "Continue to Topic Selection";
                             }
-                            return "Proceed";
+                            return "Next";
                           })()}
                           <ChevronsRight className={`h-4 w-4 ${!loading ? 'animate-[var(--animate-bounce-right)]' : ''}`} />
                         </>
@@ -1198,27 +1200,14 @@ export function LessonWizard({
                 disabled={!canProceed() || loading}
                 className={`bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1 ${canProceed() && !loading ? 'animate-pulse' : ''}`}
               >
-                Continue
+                {state.step === 1 ? "Next" : "Continue"}
                 <ChevronsRight className={`h-4 w-4 ${canProceed() && !loading ? 'animate-[var(--animate-bounce-right)]' : ''}`} />
               </Button>
+            ) : state.step === 4 ? (
+              /* Step 4 (Confirm): actions are in LessonWizardConfirm, no footer button */
+              <div className="w-[100px]" />
             ) : (
-              <Button
-                onClick={handleCreateLesson}
-                disabled={loading || !canProceed()}
-                className={`bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1 ${canProceed() && !loading ? 'animate-pulse' : ''}`}
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    Create Lesson
-                    <ChevronsRight className={`h-4 w-4 ${canProceed() && !loading ? 'animate-[var(--animate-bounce-right)]' : ''}`} />
-                  </>
-                )}
-              </Button>
+              <div className="w-[100px]" />
             )}
                 </div>
               </div>

@@ -2,16 +2,22 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
-import { Separator } from "@workspace/ui/components/separator";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
-import { Info, CheckCircle2, User, AlertTriangle } from "lucide-react";
+import { FileText, Play, AlertTriangle, Loader2 } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
@@ -32,9 +38,13 @@ interface LessonWizardConfirmProps {
   selectedClasses: ClassOption[];
   selectedTopic: TopicOption | null;
   schoolId?: string | null;
+  schoolSlug?: string | null;
   onBehalfOfUserId?: string | null;
   onOnBehalfOfUserIdChange?: (userId: string | null) => void;
   isAdminRestricted?: boolean;
+  onPrepareLesson?: () => Promise<void>;
+  onStartLesson?: () => Promise<void>;
+  isLoading?: boolean;
 }
 
 type TopicWithSlides = {
@@ -105,9 +115,13 @@ export function LessonWizardConfirm({
   selectedClasses,
   selectedTopic,
   schoolId,
+  schoolSlug,
   onBehalfOfUserId,
   onOnBehalfOfUserIdChange,
   isAdminRestricted,
+  onPrepareLesson,
+  onStartLesson,
+  isLoading = false,
 }: LessonWizardConfirmProps) {
   const currentUser = useMeStore((s) => s.currentUser);
 
@@ -184,94 +198,37 @@ export function LessonWizardConfirm({
     return null;
   }
 
+  const canCreate = !isAdminRestricted || !!onBehalfOfUserId;
+  const isDisabled = !canCreate || isLoading;
+
   if (!topicData) {
     return (
-      <div className="flex flex-col gap-6">
-        {/* Confirm Selections Badge */}
-        <Badge
-          variant="outline"
-          className="text-sm bg-green-500/20 text-green-700 border-green-500 flex items-center gap-1.5 font-semibold w-fit"
-        >
-          <CheckCircle2 className="h-3.5 w-3.5 text-green-700" />
-          Confirm selections
-        </Badge>
-
-        {/* Lesson Section */}
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-muted-foreground">Lesson</label>
-          <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-            {/* Skeleton Thumbnail */}
-            <Skeleton className="h-full w-48 flex-shrink-0 rounded-l-md" />
-            {/* Skeleton Content */}
-            <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
-              <div className="space-y-2 min-w-0 w-full">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-4 w-32" /> {/* Stage name */}
-                  <Skeleton className="h-3 w-24" /> {/* Year codes */}
-                </div>
-                <div className="flex items-center gap-1">
-                  <Skeleton className="h-5 w-8 rounded-sm" /> {/* Badge */}
-                  <Skeleton className="h-5 w-48" /> {/* Topic title */}
-                </div>
-                <div className="flex items-center gap-2 mt-4">
-                  <Skeleton className="h-5 w-20" /> {/* Slide count badge */}
-                </div>
-              </div>
+      <div className="flex flex-col gap-6 items-center">
+        {/* Lesson-style card (skeleton) */}
+        <Card className="w-2/3 min-w-[240px] transition-all overflow-hidden p-0 gap-0 flex flex-col relative shadow-none bg-primary/5 border border-primary/30 border-dashed">
+          <CardHeader className="py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center border-primary/30 border-dashed">
+            <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              New
+            </span>
+            <Skeleton className="h-3 w-20" />
+          </CardHeader>
+          <CardContent className="p-0 flex-1 flex items-center justify-center bg-card/80 border-x border-primary/30 border-dashed relative z-[1]">
+            <Skeleton className="w-full aspect-video rounded-none" />
+          </CardContent>
+          <CardFooter className="flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start border-primary/30 border-dashed">
+            <Skeleton className="h-3 w-24" />
+            <div className="flex items-center gap-2 min-w-0">
+              <Skeleton className="h-5 w-8 rounded-sm" />
+              <Skeleton className="h-5 flex-1 max-w-[200px]" />
             </div>
-          </Card>
-        </div>
-
-        {/* Classes Section */}
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-muted-foreground">Classes</label>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {selectedClasses.length === 0 ? (
-              <span className="text-sm text-muted-foreground">No classes selected</span>
-            ) : (
-              <>
-                {selectedClasses.slice(0, 5).map((cls) => (
-                  <Badge
-                    key={cls.id}
-                    variant="secondary"
-                    className="text-xs"
-                  >
-                    {cls.name}
-                  </Badge>
-                ))}
-                {selectedClasses.length > 5 && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge
-                        variant="secondary"
-                        className="text-xs cursor-pointer"
-                      >
-                        +{selectedClasses.length - 5} more
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="flex flex-col gap-1">
-                        {selectedClasses.slice(5).map((cls) => (
-                          <span key={cls.id} className="text-sm">
-                            {cls.name}
-                          </span>
-                        ))}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Teacher Section */}
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-muted-foreground">Teacher</label>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-            <User className="h-4 w-4" />
-            {teacherName}
-          </div>
-        </div>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {selectedClasses.slice(0, 3).map((cls) => (
+                <Skeleton key={cls.id} className="h-5 w-16 rounded-md" />
+              ))}
+            </div>
+          </CardFooter>
+        </Card>
 
         {/* Admin on-behalf-of block (loading state) */}
         {isAdminRestricted && schoolId && (
@@ -319,141 +276,96 @@ export function LessonWizardConfirm({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Confirm Selections Badge */}
-      <Badge
-        variant="outline"
-        className="text-sm bg-green-500/20 text-green-700 border-green-500 flex items-center gap-1.5 font-semibold w-fit"
-      >
-        <CheckCircle2 className="h-3.5 w-3.5 text-green-700" />
-        Confirm selections
-      </Badge>
-
-      {/* Lesson Section */}
-      <div className="space-y-2">
-        <label className="text-sm font-semibold text-muted-foreground">Lesson</label>
-        <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-          {/* Thumbnail on the left */}
-          <TopicThumbnail topic={topicData as TopicWithSlides} horizontal={true} />
-          
-          {/* Information on the right */}
-          <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
-            <div className="space-y-2 min-w-0 w-full">
-              {stageName && (
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {stageName}
-                  </p>
-                  {(() => {
-                    // Get year codes from stage data, sorted by sortIndex
-                    if (!stageData?.years || !Array.isArray(stageData.years)) return null;
-                    
-                    const sortedYears = [...stageData.years].sort((a: any, b: any) => {
-                      const aIndex = a.sortIndex ?? 999999;
-                      const bIndex = b.sortIndex ?? 999999;
-                      return aIndex - bIndex;
-                    });
-                    
-                    const yearCodes = sortedYears
-                      .map((year: any) => year.code)
-                      .filter((code: string) => code);
-                    
-                    return yearCodes.length > 0 ? (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        {yearCodes.map((code: string, index: number) => (
-                          <span key={code} className="flex items-center gap-1">
-                            {index > 0 && <span className="opacity-25">•</span>}
-                            {code}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
-              )}
-              <div className="flex items-center gap-1 min-w-0 w-full overflow-hidden">
-                {topicData.stageOrder !== null && topicData.stageOrder !== undefined && (
-                  <Badge
-                    variant="secondary"
-                    className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
-                  >
-                    L{topicData.stageOrder}
-                  </Badge>
-                )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <h3 className="text-lg font-semibold text-primary capitalize truncate block min-w-0 flex-1 max-w-full cursor-default">
-                      {selectedTopic.title}
-                    </h3>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{selectedTopic.title}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mt-4">
-                <Badge
-                  variant="outline"
-                  className="text-xs py-0 px-1.5 h-5"
-                >
-                  {slideCount} {slideCount === 1 ? "slide" : "slides"}
-                </Badge>
-              </div>
-            </div>
+    <div className="flex flex-col gap-6 items-center">
+      {/* Lesson-style card matching LessonCard layout */}
+      <Card className="w-2/3 min-w-[240px] transition-all overflow-hidden p-0 gap-0 flex flex-col relative shadow-none bg-primary/5 border border-primary/30 border-dashed">
+        <CardHeader className="py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center border-primary/30 border-dashed">
+          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            New
+          </span>
+          <span className="text-xs text-muted-foreground">{teacherName}</span>
+        </CardHeader>
+        <CardContent className="p-0 flex-1 flex items-center justify-center bg-card/80 border-x border-primary/30 border-dashed relative z-[1]">
+          <TopicThumbnail topic={topicData as TopicWithSlides} horizontal={false} />
+        </CardContent>
+        <CardFooter className="flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start border-primary/30 border-dashed">
+          {stageName && (
+            <p className="text-xs font-medium text-muted-foreground">{stageName}</p>
+          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {topicData.stageOrder !== null && topicData.stageOrder !== undefined && (
+              <Badge
+                variant="secondary"
+                className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
+              >
+                L{topicData.stageOrder}
+              </Badge>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <CardTitle className="text-base font-semibold text-primary capitalize line-clamp-2 flex-1 cursor-default text-left">
+                  {selectedTopic.title}
+                </CardTitle>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{selectedTopic.title}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
-        </Card>
-      </div>
-
-      {/* Classes Section */}
-      <div className="space-y-2">
-        <label className="text-sm font-semibold text-muted-foreground">Classes</label>
-        <div className="flex items-center gap-1.5 flex-wrap">
-          {selectedClasses.length === 0 ? (
-            <span className="text-sm text-muted-foreground">No classes selected</span>
-          ) : (
-            <>
-              {selectedClasses.slice(0, 5).map((cls) => (
+          {selectedClasses.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {selectedClasses.map((cls) => (
                 <Badge
                   key={cls.id}
-                  variant="secondary"
-                  className="text-xs"
+                  variant="outline"
+                  className="text-xs py-0 px-1.5 h-5"
                 >
                   {cls.name}
                 </Badge>
               ))}
-              {selectedClasses.length > 5 && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge
-                      variant="secondary"
-                      className="text-xs cursor-pointer"
-                    >
-                      +{selectedClasses.length - 5} more
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <div className="flex flex-col gap-1">
-                      {selectedClasses.slice(5).map((cls) => (
-                        <span key={cls.id} className="text-sm">
-                          {cls.name}
-                        </span>
-                      ))}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              )}
+            </div>
+          )}
+        </CardFooter>
+      </Card>
+
+      {/* Action buttons */}
+      <div className="flex flex-col gap-2 w-2/3 min-w-[240px]">
+        <Button
+          variant="outline"
+          onClick={() => onPrepareLesson?.()}
+          disabled={isDisabled}
+          className="w-full gap-1"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <FileText className="h-4 w-4" />
+              Prepare for this lesson
             </>
           )}
-        </div>
-      </div>
-
-      {/* Teacher Section */}
-      <div className="space-y-2">
-        <label className="text-sm font-semibold text-muted-foreground">Teacher</label>
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <User className="h-4 w-4" />
-          {teacherName}
-        </div>
+        </Button>
+        <Button
+          onClick={() => onStartLesson?.()}
+          disabled={isDisabled}
+          className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              <Play className="h-4 w-4" />
+              Start lesson
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Admin on-behalf-of block */}
@@ -497,17 +409,6 @@ export function LessonWizardConfirm({
           </AlertDescription>
         </Alert>
       )}
-      
-      <Separator />
-      
-      <Alert className="border-0">
-        <Info className="h-4 w-4" />
-        <AlertDescription>
-          <p>
-            Double check you've selected the right classes and you're happy with the lesson selected. If you are, click create lesson to go to the lesson page.
-          </p>
-        </AlertDescription>
-      </Alert>
     </div>
   );
 }

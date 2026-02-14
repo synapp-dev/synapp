@@ -21,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
-import { AlertTriangle, CheckCircle2, Info, Star, ChevronsRight, ChevronsUp, ChevronsDown, ChevronDown } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Star, ChevronsRight, ChevronsUp, ChevronsDown } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Separator } from "@workspace/ui/components/separator";
 import Image from "next/image";
@@ -331,7 +331,6 @@ export function LessonWizardRecommendation({
   const router = useRouter();
   const currentUser = useMeStore((s) => s.currentUser);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
-  const [isClassProgressExpanded, setIsClassProgressExpanded] = useState(false);
   
   // Fetch all stages to compare sortIndex values for determining higher/lower stages
   const { stages: allStages } = useStages();
@@ -932,55 +931,34 @@ export function LessonWizardRecommendation({
           
           {isLoadingTopic ? (
             <>
-              <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-                {/* Skeleton Thumbnail */}
-                <Skeleton className="h-full w-48 flex-shrink-0 rounded-l-md" />
-                {/* Skeleton Content */}
-                <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Skeleton className="h-4 w-32" /> {/* Stage name */}
-                      <Skeleton className="h-3 w-24" /> {/* Year codes */}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Skeleton className="h-5 w-8 rounded-sm" /> {/* Badge */}
-                      <Skeleton className="h-5 w-48" /> {/* Topic title */}
-                    </div>
-                    <div className="flex items-center gap-2 mt-4">
-                      <Skeleton className="h-5 w-20" /> {/* Slide count badge */}
+              <Card className="w-full transition-all overflow-hidden p-0 gap-0">
+                {/* Skeleton Lesson details */}
+                <div className="flex flex-row h-32">
+                  <Skeleton className="h-full w-48 flex-shrink-0 rounded-l-md" />
+                  <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Skeleton className="h-5 w-8 rounded-sm" />
+                        <Skeleton className="h-5 w-48" />
+                      </div>
+                      <div className="flex items-center gap-2 mt-4">
+                        <Skeleton className="h-5 w-20" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </Card>
-              
-              {/* Skeleton Information card */}
-              <Alert className="bg-muted/5 text-muted-foreground border-0">
-                <Skeleton className="h-4 w-4 rounded" />
-                <AlertDescription className="text-muted-foreground space-y-2">
-                  <Skeleton className="h-4 w-full max-w-md" />
-                  <Skeleton className="h-4 w-full max-w-sm" />
-                </AlertDescription>
-              </Alert>
 
-              {/* Skeleton Class Progress Tab */}
-              {selectedClasses.length > 0 && recommendedTopic?.stageId && (
-                <div className="mt-4">
-                  <div className="flex justify-center mx-8">
-                    <Separator className="w-1/2" />
-                  </div>
-                  {/* Tab Button */}
-                  <button
-                    disabled
-                    className="w-full bg-card border rounded-t-lg shadow-sm"
-                  >
-                    <div className="flex items-center justify-between px-4 py-3">
-                      <Skeleton className="h-4 w-24" />
-                      <Skeleton className="h-4 w-4 rounded" />
+                {/* Skeleton Class Progress - extends from bottom */}
+                {selectedClasses.length > 0 && recommendedTopic?.stageId && (
+                  <>
+                    <div className="border-t" />
+                    <div className="px-4 pt-3 pb-1">
+                      <Skeleton className="h-3 w-20" />
                     </div>
-                  </button>
-
-                  {/* Expanded Content Skeleton */}
-                  <div className="bg-card border-x border-b rounded-b-lg overflow-hidden">
                     <div className="px-4 py-4 space-y-4">
                       {selectedClasses.map((cls) => (
                         <div key={cls.id} className="flex items-center justify-between gap-4">
@@ -993,23 +971,31 @@ export function LessonWizardRecommendation({
                         </div>
                       ))}
                     </div>
-                  </div>
-                </div>
-              )}
+                  </>
+                )}
+              </Card>
+
+              {/* Skeleton Information card */}
+              <Alert className="mt-4 bg-muted/5 text-muted-foreground border-0">
+                <Skeleton className="h-4 w-4 rounded" />
+                <AlertDescription className="text-muted-foreground space-y-2">
+                  <Skeleton className="h-4 w-full max-w-md" />
+                  <Skeleton className="h-4 w-full max-w-sm" />
+                </AlertDescription>
+              </Alert>
             </>
           ) : topicData ? (
-            <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-              {/* Thumbnail on the left */}
-              <TopicThumbnail topic={topicData} horizontal={true} />
-              
-              {/* Information on the right */}
-              <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
-                <div className="space-y-2 min-w-0 w-full">
-                  {recommendedTopic.stageName && (
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {recommendedTopic.stageName}
-                      </p>
+            <Card className="w-full transition-all overflow-hidden p-0 gap-0">
+              {/* Lesson details - top section */}
+              <div className="flex flex-row h-32">
+                <TopicThumbnail topic={topicData} horizontal={true} />
+                <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
+                  <div className="space-y-2 min-w-0 w-full">
+                    {recommendedTopic.stageName && (
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {recommendedTopic.stageName}
+                        </p>
                       {(() => {
                         // Get year codes from stage data, sorted by sortIndex
                         if (!stageData?.years || !Array.isArray(stageData.years)) return null;
@@ -1067,6 +1053,51 @@ export function LessonWizardRecommendation({
                   </div>
                 </div>
               </div>
+              </div>
+
+              {/* Class Progress - extends from bottom of lesson details */}
+              {selectedClasses.length > 0 && recommendedTopic?.stageId && (
+                <>
+                  <div className="border-t" />
+                  <div className="px-4 pt-3 pb-1">
+                    <span className="text-xs font-medium text-muted-foreground">Class Progress</span>
+                  </div>
+                  <div className="px-4 py-4 max-h-96 overflow-y-auto space-y-4">
+                    {isLoadingCompletedTopics ? (
+                      <div className="space-y-3">
+                        {selectedClasses.map((cls) => (
+                          <div key={cls.id} className="flex items-center justify-between gap-4">
+                            <Skeleton className="h-5 w-32 flex-shrink-0" />
+                            <div className="flex gap-2 overflow-x-auto">
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <Skeleton key={i} className="h-6 w-12 rounded flex-shrink-0" />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {selectedClasses.map((cls) => {
+                          const completedTopics = completedTopicsData?.[cls.id] || [];
+                          const completedTopicIds = completedTopics.map(t => t.topicId);
+                          return (
+                            <div key={cls.id} className="flex items-center justify-between gap-4">
+                              <h4 className="text-sm font-medium flex-shrink-0">{cls.name}</h4>
+                              <TopicProgressList
+                                className="flex-shrink-0"
+                                stageId={recommendedTopic.stageId}
+                                recommendedTopicId={recommendedTopic.id}
+                                completedTopicIds={completedTopicIds}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </Card>
           ) : (
             <Alert className="bg-blue-50 border-blue-300 text-blue-900">
@@ -1077,42 +1108,14 @@ export function LessonWizardRecommendation({
               </AlertDescription>
             </Alert>
           )}
-          
-          {/* Information card about proceeding */}
-          <Alert className="bg-muted/5 text-muted-foreground border-0">
-            <Info className="h-4 w-4 text-muted-foreground" />
-            <AlertDescription className="text-muted-foreground">
-              If you're happy with this recommendation, you can click proceed. Otherwise, if you'd like to choose another lesson, click Choose another topic.
-            </AlertDescription>
-          </Alert>
 
-          {/* Class Progress Tab */}
-          {selectedClasses.length > 0 && recommendedTopic?.stageId && (
+          {/* Class Progress - when no topicData (Alert fallback), show as separate section */}
+          {!topicData && selectedClasses.length > 0 && recommendedTopic?.stageId && (
             <div className="mt-4">
-              <div className="flex justify-center mx-8">
-                <Separator className="w-1/2" />
-              </div>
-              {/* Tab Button */}
-              <button
-                onClick={() => setIsClassProgressExpanded(!isClassProgressExpanded)}
-                className="w-full bg-card border rounded-t-lg shadow-sm hover:bg-accent transition-colors"
-              >
-                <div className="flex items-center justify-between px-4 py-3">
-                  <span className="text-sm font-semibold text-muted-foreground">Class Progress</span>
-                  <ChevronDown
-                    className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                      isClassProgressExpanded ? "rotate-180" : ""
-                    }`}
-                  />
+              <div className="bg-card border rounded-lg overflow-hidden">
+                <div className="px-4 pt-3 pb-1">
+                  <span className="text-xs font-medium text-muted-foreground">Class Progress</span>
                 </div>
-              </button>
-
-              {/* Expanded Content */}
-              <div
-                className={`bg-card border-x border-b rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out ${
-                  isClassProgressExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                }`}
-              >
                 <div className="px-4 py-4 max-h-96 overflow-y-auto space-y-4">
                   {isLoadingCompletedTopics ? (
                     <div className="space-y-3">
@@ -1150,6 +1153,16 @@ export function LessonWizardRecommendation({
               </div>
             </div>
           )}
+
+          {/* Information card about proceeding - at bottom, above footer */}
+          <Alert className="mt-4 bg-muted/5 text-muted-foreground border-0">
+            <Info className="h-4 w-4 text-muted-foreground" />
+            <AlertDescription className="text-muted-foreground leading-none">
+              <span>If you&apos;re happy with this recommendation, you can click <span className="font-bold">Next</span>.</span>
+              <br />
+              <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another topic</span>.</span>
+            </AlertDescription>
+          </Alert>
 
         </div>
       )}
@@ -1350,54 +1363,34 @@ export function LessonWizardRecommendation({
 
                 {isLoadingSelectedStageTopic ? (
                   <>
-                    <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-                      {/* Skeleton Thumbnail */}
-                      <Skeleton className="h-full w-48 flex-shrink-0 rounded-l-md" />
-                      {/* Skeleton Content */}
-                      <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0">
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Skeleton className="h-4 w-32" /> {/* Stage name */}
-                            <Skeleton className="h-3 w-24" /> {/* Year codes */}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Skeleton className="h-5 w-8 rounded-sm" /> {/* Badge */}
-                            <Skeleton className="h-5 w-48" /> {/* Topic title */}
-                          </div>
-                          <div className="flex items-center gap-2 mt-4">
-                            <Skeleton className="h-5 w-20" /> {/* Slide count badge */}
+                    <Card className="w-full transition-all overflow-hidden p-0 gap-0">
+                      {/* Skeleton Lesson details */}
+                      <div className="flex flex-row h-32">
+                        <Skeleton className="h-full w-48 flex-shrink-0 rounded-l-md" />
+                        <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-3 w-24" />
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Skeleton className="h-5 w-8 rounded-sm" />
+                              <Skeleton className="h-5 w-48" />
+                            </div>
+                            <div className="flex items-center gap-2 mt-4">
+                              <Skeleton className="h-5 w-20" />
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </Card>
 
-                    {/* Skeleton Information card */}
-                    <Alert className="bg-muted/5 text-muted-foreground border-0">
-                      <Skeleton className="h-4 w-4 rounded" />
-                      <AlertDescription className="text-muted-foreground space-y-2">
-                        <Skeleton className="h-4 w-full max-w-md" />
-                        <Skeleton className="h-4 w-full max-w-sm" />
-                      </AlertDescription>
-                    </Alert>
-
-                    <Separator className="w-full" />
-
-                    {/* Skeleton Class Progress Tab */}
-                    {selectedClasses.length > 0 && selectedStageId && (
-                      <div className="mt-4">
-                        {/* Tab Button */}
-                        <button
-                          disabled
-                          className="w-full bg-card border rounded-t-lg shadow-sm"
-                        >
-                          <div className="flex items-center justify-between px-4 py-3">
-                            <Skeleton className="h-4 w-24" />
-                            <Skeleton className="h-4 w-4 rounded" />
+                      {/* Skeleton Class Progress - extends from bottom */}
+                      {selectedClasses.length > 0 && selectedStageId && (
+                        <>
+                          <div className="border-t" />
+                          <div className="px-4 pt-3 pb-1">
+                            <Skeleton className="h-3 w-20" />
                           </div>
-                        </button>
-
-                        {/* Expanded Content Skeleton */}
-                        <div className="bg-card border-x border-b rounded-b-lg overflow-hidden">
                           <div className="px-4 py-4 space-y-4">
                             {selectedClasses.map((cls) => (
                               <div key={cls.id} className="flex items-center justify-between gap-4">
@@ -1410,142 +1403,132 @@ export function LessonWizardRecommendation({
                               </div>
                             ))}
                           </div>
-                        </div>
-                      </div>
-                    )}
+                        </>
+                      )}
+                    </Card>
+
+                    {/* Skeleton Information card */}
+                    <Alert className="mt-4 bg-muted/5 text-muted-foreground border-0">
+                      <Skeleton className="h-4 w-4 rounded" />
+                      <AlertDescription className="text-muted-foreground space-y-2">
+                        <Skeleton className="h-4 w-full max-w-md" />
+                        <Skeleton className="h-4 w-full max-w-sm" />
+                      </AlertDescription>
+                    </Alert>
                   </>
                 ) : selectedStageTopicData ? (
-                  <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-                    <TopicThumbnail topic={selectedStageTopicData} horizontal={true} />
-                    <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
-                      <div className="space-y-2 min-w-0 w-full">
-                        {selectedStageData?.name && (
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium text-muted-foreground">
-                              {selectedStageData.name}
-                            </p>
-                            {selectedStageData.years && Array.isArray(selectedStageData.years) && (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                {selectedStageData.years
-                                  .sort((a: any, b: any) => (a.sortIndex ?? 999999) - (b.sortIndex ?? 999999))
-                                  .map((year: any, index: number) => (
-                                    <span key={year.id} className="flex items-center gap-1">
-                                      {index > 0 && <span className="opacity-25">•</span>}
-                                      {year.code}
-                                    </span>
-                                  ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-1 min-w-0 w-full overflow-hidden">
-                          {selectedStageTopicData.stageOrder !== null && selectedStageTopicData.stageOrder !== undefined && (
-                            <Badge
-                              variant="secondary"
-                              className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
-                            >
-                              L{selectedStageTopicData.stageOrder}
-                            </Badge>
+                  <Card className="w-full transition-all overflow-hidden p-0 gap-0">
+                    {/* Lesson details - top section */}
+                    <div className="flex flex-row h-32">
+                      <TopicThumbnail topic={selectedStageTopicData} horizontal={true} />
+                      <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
+                        <div className="space-y-2 min-w-0 w-full">
+                          {selectedStageData?.name && (
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm font-medium text-muted-foreground">
+                                {selectedStageData.name}
+                              </p>
+                              {selectedStageData.years && Array.isArray(selectedStageData.years) && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  {selectedStageData.years
+                                    .sort((a: any, b: any) => (a.sortIndex ?? 999999) - (b.sortIndex ?? 999999))
+                                    .map((year: any, index: number) => (
+                                      <span key={year.id} className="flex items-center gap-1">
+                                        {index > 0 && <span className="opacity-25">•</span>}
+                                        {year.code}
+                                      </span>
+                                    ))}
+                                </div>
+                              )}
+                            </div>
                           )}
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <h3 className="text-lg font-semibold text-primary capitalize truncate block min-w-0 flex-1 max-w-full cursor-default">
-                                {selectedStageTopicData.title}
-                              </h3>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{selectedStageTopicData.title}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap mt-4">
-                          <Badge
-                            variant="outline"
-                            className="text-xs py-0 px-1.5 h-5"
-                          >
-                            {(selectedStageTopicData.slides?.length || selectedStageTopicData.slideCount || 0)} {(selectedStageTopicData.slides?.length || selectedStageTopicData.slideCount || 0) === 1 ? "slide" : "slides"}
-                          </Badge>
+                          <div className="flex items-center gap-1 min-w-0 w-full overflow-hidden">
+                            {selectedStageTopicData.stageOrder !== null && selectedStageTopicData.stageOrder !== undefined && (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
+                              >
+                                L{selectedStageTopicData.stageOrder}
+                              </Badge>
+                            )}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <h3 className="text-lg font-semibold text-primary capitalize truncate block min-w-0 flex-1 max-w-full cursor-default">
+                                  {selectedStageTopicData.title}
+                                </h3>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>{selectedStageTopicData.title}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap mt-4">
+                            <Badge
+                              variant="outline"
+                              className="text-xs py-0 px-1.5 h-5"
+                            >
+                              {(selectedStageTopicData.slides?.length || selectedStageTopicData.slideCount || 0)} {(selectedStageTopicData.slides?.length || selectedStageTopicData.slideCount || 0) === 1 ? "slide" : "slides"}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
                     </div>
+
+                    {/* Class Progress - extends from bottom of lesson details */}
+                    {selectedClasses.length > 0 && selectedStageId && selectedStageData && (
+                      <>
+                        <div className="border-t" />
+                        <div className="px-4 pt-3 pb-1">
+                          <span className="text-xs font-medium text-muted-foreground">Class Progress</span>
+                        </div>
+                        <div className="px-4 py-4 max-h-96 overflow-y-auto space-y-4">
+                          {isLoadingCompletedTopics ? (
+                            <div className="space-y-3">
+                              {selectedClasses.map((cls) => (
+                                <div key={cls.id} className="flex items-center justify-between gap-4">
+                                  <Skeleton className="h-5 w-32 flex-shrink-0" />
+                                  <div className="flex gap-2 overflow-x-auto">
+                                    {[1, 2, 3, 4, 5].map((i) => (
+                                      <Skeleton key={i} className="h-6 w-12 rounded flex-shrink-0" />
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              {selectedClasses.map((cls) => {
+                                const completedTopics = completedTopicsData?.[cls.id] || [];
+                                const completedTopicIds = completedTopics.map(t => t.topicId);
+                                const selectedStageTopicId = selectedStageTopicData?.id || null;
+                                return (
+                                  <div key={cls.id} className="flex items-center justify-between gap-4">
+                                    <h4 className="text-sm font-medium flex-shrink-0">{cls.name}</h4>
+                                    <TopicProgressList
+                                      className="flex-shrink-0"
+                                      stageId={selectedStageId}
+                                      recommendedTopicId={selectedStageTopicId}
+                                      completedTopicIds={completedTopicIds}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </Card>
                 ) : null}
 
-                {/* Information card about proceeding */}
-                <Alert className="bg-muted/5 text-muted-foreground border-0">
+                {/* Information card about proceeding - at bottom, above footer */}
+                <Alert className="mt-4 bg-muted/5 text-muted-foreground border-0">
                   <Info className="h-4 w-4 text-muted-foreground" />
-                  <AlertDescription className="text-muted-foreground">
-                    If you're happy with this recommendation, you can click proceed. Otherwise, if you'd like to choose another lesson, click Choose another topic.
+                  <AlertDescription className="text-muted-foreground leading-normal">
+                    <span>If you&apos;re happy with this recommendation, you can click <span className="font-bold">Next</span>.</span>
+                    <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another topic</span>.</span>
                   </AlertDescription>
                 </Alert>
-
-             
-                      <Separator className="w-full" />
-                   
-
-                {/* Class Progress Tab */}
-                {selectedClasses.length > 0 && selectedStageId && selectedStageData && (
-                  <div className="mt-4">
-                   
-                    {/* Tab Button */}
-                    <button
-                      onClick={() => setIsClassProgressExpanded(!isClassProgressExpanded)}
-                      className="w-full bg-card border rounded-t-lg shadow-sm hover:bg-accent transition-colors"
-                    >
-                      <div className="flex items-center justify-between px-4 py-3">
-                        <span className="text-sm font-semibold text-muted-foreground">Class Progress</span>
-                        <ChevronDown
-                          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                            isClassProgressExpanded ? "rotate-180" : ""
-                          }`}
-                        />
-                      </div>
-                    </button>
-
-                    {/* Expanded Content */}
-                    <div
-                      className={`bg-card border-x border-b rounded-b-lg overflow-hidden transition-all duration-300 ease-in-out ${
-                        isClassProgressExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"
-                      }`}
-                    >
-                      <div className="px-4 py-4 max-h-96 overflow-y-auto space-y-4">
-                        {isLoadingCompletedTopics ? (
-                          <div className="space-y-3">
-                            {selectedClasses.map((cls) => (
-                              <div key={cls.id} className="flex items-center justify-between gap-4">
-                                <Skeleton className="h-5 w-32 flex-shrink-0" />
-                                <div className="flex gap-2 overflow-x-auto">
-                                  {[1, 2, 3, 4, 5].map((i) => (
-                                    <Skeleton key={i} className="h-6 w-12 rounded flex-shrink-0" />
-                                  ))}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {selectedClasses.map((cls) => {
-                              const completedTopics = completedTopicsData?.[cls.id] || [];
-                              const completedTopicIds = completedTopics.map(t => t.topicId);
-                              const selectedStageTopicId = selectedStageTopicData?.id || null;
-                              return (
-                                <div key={cls.id} className="flex items-center justify-between gap-4">
-                                  <h4 className="text-sm font-medium flex-shrink-0">{cls.name}</h4>
-                                  <TopicProgressList
-                                    className="flex-shrink-0"
-                                    stageId={selectedStageId}
-                                    recommendedTopicId={selectedStageTopicId}
-                                    completedTopicIds={completedTopicIds}
-                                  />
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             ) : null
       )}
