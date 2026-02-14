@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Star, Loader2, Pencil } from "lucide-react";
+import { Star, Loader2, Pencil, MessageSquare, ChevronsRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +20,31 @@ import { useMeStore } from "@/entities/me/model/store";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 
+const RATING_LABELS: Record<number, string> = {
+  1: "Terrible",
+  2: "Poor",
+  3: "Average",
+  4: "Good",
+  5: "Excellent",
+};
+
+// Format date as relative "time ago" string
+function timeAgo(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHr = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHr / 24);
+
+  if (diffSec < 60) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHr < 24) return `${diffHr}h ago`;
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
 // Type for lesson info in multi-lesson mode
 export interface LessonForFeedback {
   id: string;
@@ -31,6 +56,7 @@ export interface LessonForFeedback {
     classId: string;
     className: string;
   }>;
+  teacher?: { firstName?: string; lastName?: string; email?: string };
   createdByUserId?: string | null;
   metadata?: Record<string, unknown>;
 }
@@ -106,6 +132,7 @@ export function LessonFeedbackForm({
         topicId?: string;
         topic?: { title?: string; stageOrder?: number | null; stageName?: string };
         assignedClasses?: Array<{ classId: string; className: string }>;
+        teacher?: { firstName?: string; lastName?: string; email?: string };
       };
       return {
         id: lessonId,
@@ -117,6 +144,7 @@ export function LessonFeedbackForm({
           classId: c.classId,
           className: c.className,
         })) || [],
+        teacher: detail.teacher,
         createdByUserId: detail.createdByUserId,
         metadata: detail.metadata,
       };
@@ -330,18 +358,21 @@ export function LessonFeedbackForm({
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>Rate Your Lesson Experience</span>
+            <DialogTitle className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-muted-foreground" />
+                Lesson Feedback
+              </span>
               {isMultiLessonMode && totalLessons > 1 && (
                 <Badge variant="secondary" className="ml-2 font-normal">
                   {currentLessonIndex + 1} of {totalLessons}
                 </Badge>
               )}
             </DialogTitle>
-            <DialogDescription>
+            {/* <DialogDescription>
               Please provide your feedback. Rating is required to complete the
               lesson.
-            </DialogDescription>
+            </DialogDescription> */}
           </DialogHeader>
 
           {isLoading ? (
@@ -352,49 +383,61 @@ export function LessonFeedbackForm({
             <div className="space-y-4 pt-2">
               {/* Lesson Preview - shown when lesson info is available */}
               {currentLesson && (
-                <div className="rounded-lg border bg-muted/30 overflow-hidden">
-                  {/* Thumbnail */}
-                  <div className="w-full aspect-video">
-                    <LessonTopicThumbnail topicId={currentLesson.topicId} horizontal={false} />
+                <div className="rounded-lg border bg-muted/30 overflow-hidden flex flex-row">
+                  {/* Thumbnail - left side */}
+                  <div className="w-36 flex-shrink-0 aspect-video overflow-hidden rounded-l-lg">
+                    <LessonTopicThumbnail topicId={currentLesson.topicId} horizontal={true} />
                   </div>
                   
-                  {/* Lesson Info */}
-                  <div className="p-3 space-y-2">
-                    {/* Stage name */}
-                    {currentLesson.stageName && (
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {currentLesson.stageName}
-                      </p>
-                    )}
-                    
-                    {/* Topic title with L badge */}
-                    <div className="flex items-center gap-2">
-                      {currentLesson.stageOrder !== null && currentLesson.stageOrder !== undefined && (
-                        <Badge
-                          variant="secondary"
-                          className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
-                        >
-                          L{currentLesson.stageOrder}
-                        </Badge>
+                  {/* Content - right side */}
+                  <div className="flex-1 min-w-0 p-3 flex flex-row items-center justify-between gap-2">
+                    <div className="flex flex-col gap-1.5 min-w-0">
+                      {/* Stage name - above lesson name */}
+                      {currentLesson.stageName && (
+                        <p className="text-xs font-medium text-muted-foreground">
+                          {currentLesson.stageName}
+                        </p>
                       )}
-                      <span className="text-sm font-semibold text-primary capitalize line-clamp-2">
-                        {currentLesson.topicTitle || "Untitled Lesson"}
-                      </span>
+                      
+                      {/* L badge + title */}
+                      <div className="flex items-center gap-2">
+                        {currentLesson.stageOrder !== null && currentLesson.stageOrder !== undefined && (
+                          <Badge
+                            variant="secondary"
+                            className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
+                          >
+                            L{currentLesson.stageOrder}
+                          </Badge>
+                        )}
+                        <span className="text-sm font-semibold text-primary capitalize line-clamp-2">
+                          {currentLesson.topicTitle || "Untitled Lesson"}
+                        </span>
+                      </div>
+                      
+                      {/* Classes and teacher - justify-between */}
+                      {(currentLesson.assignedClasses?.length || currentLesson.teacher) && (
+                        <div className="flex flex-row justify-between gap-2 text-xs text-muted-foreground">
+                          <span className="min-w-0 truncate">
+                            {currentLesson.assignedClasses?.length
+                              ? currentLesson.assignedClasses.map((c) => c.className).join(", ")
+                              : null}
+                          </span>
+                          <span className="flex-shrink-0">
+                            {currentLesson.teacher
+                              ? `${currentLesson.teacher.firstName || ""} ${currentLesson.teacher.lastName || ""}`.trim() ||
+                                currentLesson.teacher.email ||
+                                null
+                              : null}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
-                    {/* Assigned classes */}
-                    {currentLesson.assignedClasses && currentLesson.assignedClasses.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {currentLesson.assignedClasses.map((classItem) => (
-                          <Badge
-                            key={classItem.classId}
-                            variant="outline"
-                            className="text-xs py-0 px-1.5 h-5"
-                          >
-                            {classItem.className}
-                          </Badge>
-                        ))}
-                      </div>
+                    {/* Completion date - far right */}
+                    {existingFeedback?.createdAt && (
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        {timeAgo(existingFeedback.createdAt)}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -412,10 +455,9 @@ export function LessonFeedbackForm({
               </svg>
               
               {/* Star Rating */}
-              <div className="space-y-2">
-                <Label htmlFor="rating" className="text-sm">Rating *</Label>
+              <div className="space-y-2 flex flex-col items-center py-4">
                 <div
-                  className="flex gap-1.5"
+                  className="flex gap-2 justify-center"
                   role="radiogroup"
                   aria-label="Lesson rating"
                 >
@@ -432,7 +474,7 @@ export function LessonFeedbackForm({
                       disabled={isSubmitting}
                     >
                       <Star
-                        className={`h-7 w-7 transition-all ${
+                        className={`h-11 w-11 transition-all ${
                           value <= (filledRating ?? 0)
                             ? "text-yellow-500"
                             : "fill-none text-muted-foreground"
@@ -449,9 +491,10 @@ export function LessonFeedbackForm({
                     </button>
                   ))}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {!rating && "Click a star to rate this lesson"}
-                  {rating && `You rated this lesson ${rating} out of 5 stars`}
+                <p key={String(hoveredRating ?? rating)} className="text-base animate-slide-up-fade-in font-semibold text-foreground min-h-[1.5rem]">
+                  {!rating && !hoveredRating
+                    ? "Click a star to rate this lesson"
+                    : RATING_LABELS[hoveredRating ?? rating]}
                 </p>
               </div>
 
@@ -482,7 +525,7 @@ export function LessonFeedbackForm({
                   variant="ghost"
                   onClick={handleSkip}
                   disabled={isSubmitting}
-                  size="sm"
+                  size="default"
                 >
                   {isMultiLessonMode && currentLessonIndex < totalLessons - 1 
                     ? "Skip" 
@@ -491,20 +534,29 @@ export function LessonFeedbackForm({
                 <Button
                   onClick={handleSubmit}
                   disabled={!rating || isSubmitting}
-                  className="min-w-[140px] text-sm"
-                  size="sm"
+                  className="min-w-[140px] text-sm bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
+                  size="default"
                 >
                   {isSubmitting ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                       Saving...
                     </>
                   ) : existingFeedback ? (
-                    "Update Feedback"
+                    <>
+                      Update Feedback
+                      <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                    </>
                   ) : isMultiLessonMode && currentLessonIndex < totalLessons - 1 ? (
-                    "Submit & Next"
+                    <>
+                      Submit & Next
+                      <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                    </>
                   ) : (
-                    "Mark as Completed"
+                    <>
+                      Submit
+                      <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                    </>
                   )}
                 </Button>
               </div>
