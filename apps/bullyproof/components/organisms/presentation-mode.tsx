@@ -6,6 +6,7 @@ import { Button } from "@workspace/ui/components/button";
 import {
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
   X,
   Settings,
   Maximize,
@@ -13,6 +14,8 @@ import {
   Joystick,
   CheckCircle2,
   Loader2,
+  PartyPopper,
+  ChevronsRight,
 } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -23,7 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";
+import { Card, CardContent } from "@workspace/ui/components/card";
 import { Separator } from "@workspace/ui/components/separator";
+import Image from "next/image";
+import { LessonCard } from "@/entities/lessons/ui/lesson-card";
 import { SlideRenderer, type SlideData } from "./slide-renderer";
 import { useLessonLiveState } from "@/hooks/use-lesson-live-state";
 import { usePrefetchTopicImages } from "@/hooks/use-prefetch-topic-images";
@@ -34,9 +40,13 @@ import { lessonsApi } from "@/entities/lessons/api/endpoints";
 
 interface PresentationModeProps {
   lessonId: string;
+  schoolSlug?: string;
 }
 
-export function PresentationMode({ lessonId }: PresentationModeProps) {
+export function PresentationMode({
+  lessonId,
+  schoolSlug,
+}: PresentationModeProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -454,25 +464,51 @@ export function PresentationMode({ lessonId }: PresentationModeProps) {
   // Show completion slide if we've navigated past the last regular slide
   if (showCompletionSlide) {
     return (
-      <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-muted">
-        <div className="flex flex-col items-center justify-center gap-8 p-8 text-center max-w-2xl">
-          <CheckCircle2 className="h-24 w-24 text-primary" />
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold text-foreground">
-              Topic Complete
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              You have completed all slides in this topic.
-            </p>
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-muted p-6">
+        <Card className="w-full max-w-xl overflow-hidden">
+          <CardContent className="flex flex-col items-center gap-6 p-8">
+            {/* <Image
+              src="/images/bullyproof-logo.svg"
+              alt="Bullyproof"
+              width={180}
+              height={48}
+              className="h-12 w-auto object-contain"
+            /> */}
+            {lessonData && schoolSlug ? (
+              <div className="w-full max-w-md">
+                <LessonCard
+                  lesson={lessonData}
+                  schoolSlug={schoolSlug}
+                  displayOnly
+                />
+              </div>
+            ) : (
+              <div className="w-full max-w-md aspect-video rounded-lg bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <Separator className="w-full mb-4 mt-2" />
+              <div className="flex items-center justify-center gap-2 text-[var(--brand-bullyproof-primary)]">
+                <PartyPopper className="h-8 w-8 shrink-0" />
+                <h1 className="text-4xl font-bold">
+                  Topic Complete!
+                </h1>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Please click finish to mark the lesson as complete.
+              </p>
+            </div>
             <Button
               onClick={handleClosePresentation}
               size="lg"
-              className="mt-6"
+              className="mt-2 bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1 w-full max-w-3xs"
             >
-              Click here to close
+              Finish
+              <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
             </Button>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

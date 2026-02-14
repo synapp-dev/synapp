@@ -242,12 +242,15 @@ export function LessonTopicThumbnail({
 export interface LessonCardProps {
   lesson: Lesson;
   schoolSlug: string;
+  /** When true, renders as a non-clickable div instead of a link */
+  displayOnly?: boolean;
 }
 
 // Component to fetch and display lesson card with topic details
 export function LessonCard({
   lesson,
   schoolSlug,
+  displayOnly = false,
 }: LessonCardProps) {
   // Fetch topic details to get stageOrder and stage info
   const { data: topicData } = useQuery({
@@ -298,12 +301,8 @@ export function LessonCard({
   const { bg: statusBg, dot: statusDot, border: statusBorder } = getStatusColors(rawDisplayStatus);
   const isCompleted = rawDisplayStatus === "completed";
 
-  return (
-    <Link
-      href={`/schools/${schoolSlug}/lessons/${lesson.id}`}
-      className="block"
-    >
-      <Card className={`hover:shadow-md transition-shadow h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none ${statusBg}`}>
+  const cardContent = (
+    <Card className={`${!displayOnly ? "hover:shadow-md" : ""} transition-shadow h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none ${statusBg}`}>
         {/* CardHeader - Status and teacher info */}
         <CardHeader className={`py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center ${isCompleted ? '' : statusBorder}`}>
           <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -371,6 +370,13 @@ export function LessonCard({
           )}
         </CardFooter>
       </Card>
+  );
+
+  return displayOnly ? (
+    <div className="block">{cardContent}</div>
+  ) : (
+    <Link href={`/schools/${schoolSlug}/lessons/${lesson.id}`} className="block">
+      {cardContent}
     </Link>
   );
 }

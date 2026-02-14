@@ -15,5 +15,7 @@ export default async function LessonRunLessonPresentPage({
 }) {
   const { school_id, lesson_id } = await params;
 
-  return <PresentationMode lessonId={lesson_id} />;
+  return (
+    <PresentationMode lessonId={lesson_id} schoolSlug={school_id} />
+  );
 }
