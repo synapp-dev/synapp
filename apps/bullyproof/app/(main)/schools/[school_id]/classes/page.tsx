@@ -27,6 +27,150 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
+import { toast } from "sonner";
+
+type ClassItem = {
+  id: string;
+  name: string | null;
+  stream?: string | null;
+  yearNames?: string[] | null;
+  room?: string | null;
+  studentCap?: number | null;
+};
+
+function ClassCard({
+  classItem,
+  isStarred,
+  isToggling,
+  onToggle,
+  disabled,
+}: {
+  classItem: ClassItem;
+  isStarred: boolean;
+  isToggling: boolean;
+  onToggle: (classId: string, isStarred: boolean) => void;
+  disabled: boolean;
+}) {
+  const handleClick = () => {
+    if (!disabled && !isToggling) {
+      onToggle(classItem.id, isStarred);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleClick();
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      className="w-full h-full text-left block"
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      disabled={disabled || isToggling}
+      aria-disabled={disabled || isToggling}
+      aria-label={`${isStarred ? "Remove" : "Add"} ${classItem.name ?? "class"} from my classes`}
+    >
+      <Card
+        className={cn(
+          "group h-full transition-all duration-200",
+          "hover:shadow-md",
+          (disabled || isToggling) && "pointer-events-none opacity-60 cursor-not-allowed",
+          !(disabled || isToggling) && "cursor-pointer",
+          // Base and selected state
+          isStarred && "bg-[var(--brand-bullyproof-primary)]/5",
+          // Unstarred hover
+          !isStarred &&
+            !disabled &&
+            !isToggling &&
+            "hover:scale-[1.01] hover:-translate-y-1 hover:bg-[var(--brand-bullyproof-primary)]/5",
+          // Starred hover (inverse)
+          isStarred &&
+            !disabled &&
+            !isToggling &&
+            "hover:scale-[0.99] hover:translate-y-1 hover:bg-card"
+        )}
+      >
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-lg truncate">
+                {classItem.name}
+              </CardTitle>
+              {classItem.stream && (
+                <p className="text-sm text-muted-foreground mt-1">
+                  Stream: {classItem.stream}
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <span
+                className={cn(
+                  "text-sm text-muted-foreground whitespace-nowrap transition-all capitalize",
+                  (disabled || isToggling)
+                    ? "opacity-0"
+                    : "opacity-0 group-hover:animate-slide-right-fade-in"
+                )}
+              >
+                {isStarred ? (
+                  <>remove from <span className="font-semibold">my classes</span></>
+                ) : (
+                  <>add to <span className="font-semibold">my classes</span></>
+                )}
+              </span>
+              {isToggling ? (
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              ) : (
+                <Star
+                  className={cn(
+                    "h-5 w-5 transition-all duration-200",
+                    isStarred
+                      ? "fill-amber-500 text-amber-500"
+                      : "text-muted-foreground",
+                    !disabled &&
+                      isStarred &&
+                      "group-hover:animate-spin-slow-reverse group-hover:fill-transparent group-hover:text-muted-foreground",
+                    !disabled &&
+                      !isStarred &&
+                      "group-hover:animate-spin-slow group-hover:fill-amber-500 group-hover:text-amber-500"
+                  )}
+                />
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {classItem.yearNames && classItem.yearNames.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {classItem.yearNames.map((yearName, idx) => (
+                  <Badge key={idx} variant="outline" className="text-xs">
+                    {yearName}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {classItem.room && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Room: </span>
+                <span className="font-medium">{classItem.room}</span>
+              </div>
+            )}
+            {classItem.studentCap && (
+              <div className="text-sm">
+                <span className="text-muted-foreground">Capacity: </span>
+                <span className="font-medium">{classItem.studentCap}</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </button>
+  );
+}
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -134,8 +278,14 @@ export default function ClassesPage({
       }
       return result.data;
     },
-    onSuccess: () => {
-      // Invalidate user classes query to refresh star states
+    onSuccess: (_, variables) => {
+      const className =
+        classes.find((c) => c.id === variables.classId)?.name ?? "Class";
+      toast.success(
+        variables.isStarred
+          ? `${className} successfully removed from my classes`
+          : `${className} successfully added to my classes`
+      );
       queryClient.invalidateQueries({
         queryKey: ["user-classes", currentUser?.id],
       });
@@ -320,105 +470,18 @@ export default function ClassesPage({
                 <h2 className="text-lg pl-2 font-medium text-muted-foreground">My Classes</h2>
               </div>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredMyClasses.map((classItem) => {
-                  const isStarred = userClassIds.has(classItem.id);
-                  const isToggling = toggleClassMutation.isPending;
-
-                  return (
-                    <Card
-                      key={classItem.id}
-                      className={cn(
-                        "hover:shadow-md transition-shadow h-full",
-                        isStarred && "bg-[var(--brand-bullyproof-primary)]/5"
-                      )}
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg truncate">
-                              {classItem.name}
-                            </CardTitle>
-                            {classItem.stream && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Stream: {classItem.stream}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!isToggling && currentUser?.id) {
-                                toggleClassMutation.mutate({
-                                  classId: classItem.id,
-                                  isStarred,
-                                });
-                              }
-                            }}
-                            disabled={isToggling || !currentUser?.id}
-                            className={cn(
-                              "shrink-0 p-1 rounded-md transition-colors",
-                              "hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed",
-                              isStarred && "text-amber-500"
-                            )}
-                            title={
-                              isStarred
-                                ? "Remove from my classes"
-                                : "Add to my classes"
-                            }
-                          >
-                            <Star
-                              className={cn(
-                                "h-5 w-5",
-                                isStarred
-                                  ? "fill-amber-500 text-amber-500"
-                                  : "text-muted-foreground"
-                              )}
-                            />
-                          </button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {classItem.yearNames &&
-                            classItem.yearNames.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {classItem.yearNames.map((yearName, idx) => (
-                                  <Badge
-                                    key={idx}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {yearName}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          {classItem.room && (
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">
-                                Room:{" "}
-                              </span>
-                              <span className="font-medium">
-                                {classItem.room}
-                              </span>
-                            </div>
-                          )}
-                          {classItem.studentCap && (
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">
-                                Capacity:{" "}
-                              </span>
-                              <span className="font-medium">
-                                {classItem.studentCap}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                {filteredMyClasses.map((classItem) => (
+                  <ClassCard
+                    key={classItem.id}
+                    classItem={classItem}
+                    isStarred={userClassIds.has(classItem.id)}
+                    isToggling={toggleClassMutation.isPending}
+                    onToggle={(classId, isStarred) =>
+                      toggleClassMutation.mutate({ classId, isStarred })
+                    }
+                    disabled={!currentUser?.id}
+                  />
+                ))}
               </div>
             </div>
           )}
@@ -430,105 +493,18 @@ export default function ClassesPage({
                 {myClasses.length > 0 ? "Other Classes" : "All Classes"}
               </h2>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredOtherClasses.map((classItem) => {
-                  const isStarred = userClassIds.has(classItem.id);
-                  const isToggling = toggleClassMutation.isPending;
-
-                  return (
-                    <Card
-                      key={classItem.id}
-                      className={cn(
-                        "hover:shadow-md transition-shadow h-full",
-                        isStarred && "bg-[var(--brand-bullyproof-primary)]/5"
-                      )}
-                    >
-                      <CardHeader>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
-                            <CardTitle className="text-lg truncate">
-                              {classItem.name}
-                            </CardTitle>
-                            {classItem.stream && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                Stream: {classItem.stream}
-                              </p>
-                            )}
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              if (!isToggling && currentUser?.id) {
-                                toggleClassMutation.mutate({
-                                  classId: classItem.id,
-                                  isStarred,
-                                });
-                              }
-                            }}
-                            disabled={isToggling || !currentUser?.id}
-                            className={cn(
-                              "shrink-0 p-1 rounded-md transition-colors",
-                              "hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed",
-                              isStarred && "text-amber-500"
-                            )}
-                            title={
-                              isStarred
-                                ? "Remove from my classes"
-                                : "Add to my classes"
-                            }
-                          >
-                            <Star
-                              className={cn(
-                                "h-5 w-5",
-                                isStarred
-                                  ? "fill-amber-500 text-amber-500"
-                                  : "text-muted-foreground"
-                              )}
-                            />
-                          </button>
-                        </div>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {classItem.yearNames &&
-                            classItem.yearNames.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {classItem.yearNames.map((yearName, idx) => (
-                                  <Badge
-                                    key={idx}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {yearName}
-                                  </Badge>
-                                ))}
-                              </div>
-                            )}
-                          {classItem.room && (
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">
-                                Room:{" "}
-                              </span>
-                              <span className="font-medium">
-                                {classItem.room}
-                              </span>
-                            </div>
-                          )}
-                          {classItem.studentCap && (
-                            <div className="text-sm">
-                              <span className="text-muted-foreground">
-                                Capacity:{" "}
-                              </span>
-                              <span className="font-medium">
-                                {classItem.studentCap}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                {filteredOtherClasses.map((classItem) => (
+                  <ClassCard
+                    key={classItem.id}
+                    classItem={classItem}
+                    isStarred={userClassIds.has(classItem.id)}
+                    isToggling={toggleClassMutation.isPending}
+                    onToggle={(classId, isStarred) =>
+                      toggleClassMutation.mutate({ classId, isStarred })
+                    }
+                    disabled={!currentUser?.id}
+                  />
+                ))}
               </div>
             </div>
           )}
