@@ -3,10 +3,13 @@ import {
   vSchoolsReadable,
   vSchoolsStatistics,
   schools,
+  lessons,
   userRoles,
   roles,
+  userProfile,
+  userSchoolPositions,
 } from "@/server/db/schema";
-import { asc, desc, eq, ilike, inArray, sql, and } from "drizzle-orm";
+import { asc, desc, eq, ilike, inArray, sql, and, or, count } from "drizzle-orm";
 
 export const schoolRepo = {
   getAll: () => db.select().from(vSchoolsReadable),
@@ -124,12 +127,239 @@ export const schoolRepo = {
   getByIds: (ids: string[]) =>
     db.select().from(vSchoolsReadable).where(inArray(vSchoolsReadable.id, ids)),
 
-  getBySlug: (slug: string) =>
-    db
-      .select()
+  getBySlug: async (slug: string) => {
+    const rows = await db
+      .select({
+        id: vSchoolsReadable.id,
+        name: vSchoolsReadable.name,
+        code: vSchoolsReadable.code,
+        stateId: vSchoolsReadable.stateId,
+        sectorId: vSchoolsReadable.sectorId,
+        emailDomain: vSchoolsReadable.emailDomain,
+        address: vSchoolsReadable.address,
+        joinedAt: vSchoolsReadable.joinedAt,
+        createdAt: vSchoolsReadable.createdAt,
+        slug: vSchoolsReadable.slug,
+        bannerUrl: vSchoolsReadable.bannerUrl,
+        avatarUrl: vSchoolsReadable.avatarUrl,
+        state: vSchoolsReadable.state,
+        sector: vSchoolsReadable.sector,
+        levels: vSchoolsReadable.levels,
+        levelBadge: vSchoolsReadable.levelBadge,
+        teacherCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.teacherCount}, 0)`.as(
+            "teacher_count"
+          ),
+        classCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.classCount}, 0)`.as(
+            "class_count"
+          ),
+        lessonCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.lessonCount}, 0)`.as(
+            "lesson_count"
+          ),
+        schoolAdminCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.schoolAdminCount}, 0)`.as(
+            "school_admin_count"
+          ),
+        schoolLicenceCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.schoolLicenceCount}, 0)`.as(
+            "school_licence_count"
+          ),
+        staffCount:
+          sql<number>`COALESCE(${vSchoolsStatistics.staffCount}, 0)`.as(
+            "staff_count"
+          ),
+        activeLicence:
+          sql<boolean>`COALESCE(${vSchoolsStatistics.activeLicence}, false)`.as(
+            "active_licence"
+          ),
+      })
       .from(vSchoolsReadable)
+      .leftJoin(vSchoolsStatistics, eq(vSchoolsStatistics.id, vSchoolsReadable.id))
       .where(eq(vSchoolsReadable.slug, slug))
-      .limit(1),
+      .limit(1);
+    return rows;
+  },
+
+  getSchoolStats: async (schoolId: string) => {
+    const [statsRow, schoolRow] = await Promise.all([
+      db
+        .select({
+          teacherCount: vSchoolsStatistics.teacherCount,
+          schoolAdminCount: vSchoolsStatistics.schoolAdminCount,
+          staffCount: vSchoolsStatistics.staffCount,
+          classCount: vSchoolsStatistics.classCount,
+          lessonCount: vSchoolsStatistics.lessonCount,
+        })
+        .from(vSchoolsStatistics)
+        .where(eq(vSchoolsStatistics.id, schoolId))
+        .limit(1),
+      db
+        .select({
+          joinedAt: schools.joinedAt,
+          createdAt: schools.createdAt,
+        })
+        .from(schools)
+        .where(eq(schools.id, schoolId))
+        .limit(1),
+    ]);
+
+    const stats = statsRow[0];
+    const school = schoolRow[0];
+
+    // Days since joined (or created if no joined_at) - "days of being bully proof"
+    let daysBullyProof = 0;
+    let startDate: string | null = null;
+    if (school) {
+      const dateStr = school.joinedAt ?? school.createdAt;
+      if (dateStr) {
+        startDate = dateStr;
+        const start = new Date(dateStr).getTime();
+        const now = Date.now();
+        daysBullyProof = Math.max(0, Math.floor((now - start) / (1000 * 60 * 60 * 24)));
+      }
+    }
+
+    const teacherCount = Number(stats?.teacherCount ?? 0);
+    const schoolAdminCount = Number(stats?.schoolAdminCount ?? 0);
+    const staffCount = Number(stats?.staffCount ?? 0);
+    // Total staff excluding licence: teachers + admins + staff (may slightly overcount users with multiple roles)
+    const totalStaff = teacherCount + schoolAdminCount + staffCount;
+
+    // Lessons completed = status 'completed' or 'feedback' only
+    const completedLessonRows = await db
+      .select({ count: count() })
+      .from(lessons)
+      .where(
+        and(
+          eq(lessons.schoolId, schoolId),
+          inArray(lessons.status, ["completed", "feedback"])
+        )
+      );
+    const completedLessonCount = Number(completedLessonRows[0]?.count ?? 0);
+
+    return {
+      daysBullyProof,
+      startDate,
+      teacherCount,
+      totalStaff,
+      classCount: Number(stats?.classCount ?? 0),
+      completedLessonCount,
+    };
+  },
+
+  getKeyStaff: async (schoolId: string) => {
+    const adminRole = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.key, "SCHOOL_ADMIN"))
+      .limit(1);
+    const adminRoleId = adminRole[0]?.id;
+    if (!adminRoleId) {
+      return { admins: [], apStaff: [] };
+    }
+
+    const adminUserIds = await db
+      .select({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(
+        and(
+          eq(userRoles.schoolId, schoolId),
+          eq(userRoles.roleId, adminRoleId)
+        )
+      );
+    const adminIds = adminUserIds.map((r) => r.userId);
+
+    const adminProfiles =
+      adminIds.length > 0
+        ? await db
+            .select({
+              id: userProfile.id,
+              firstName: userProfile.firstName,
+              lastName: userProfile.lastName,
+              email: userProfile.email,
+              avatarUrl: userProfile.avatarUrl,
+            })
+            .from(userProfile)
+            .where(inArray(userProfile.id, adminIds))
+        : [];
+
+    const leadershipKeywords = [
+      "%principal%",
+      "%deputy%",
+      "%head of%",
+      "%head of %",
+      "%hod%",
+      "% ap %",
+    ];
+    const apPositions = await db
+      .select({
+        userId: userSchoolPositions.userId,
+        position: userSchoolPositions.position,
+      })
+      .from(userSchoolPositions)
+      .where(
+        and(
+          eq(userSchoolPositions.schoolId, schoolId),
+          or(
+            ...leadershipKeywords.map((k) =>
+              ilike(userSchoolPositions.position, k)
+            )
+          )
+        )
+      );
+
+    const apUserIds = [...new Set(apPositions.map((p) => p.userId))].filter(
+      (id) => !adminIds.includes(id)
+    );
+
+    const apProfilesWithPositions: Array<{
+      id: string;
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+      avatarUrl: string | null;
+      positions: string[];
+    }> = [];
+
+    if (apUserIds.length > 0) {
+      const profiles = await db
+        .select({
+          id: userProfile.id,
+          firstName: userProfile.firstName,
+          lastName: userProfile.lastName,
+          email: userProfile.email,
+          avatarUrl: userProfile.avatarUrl,
+        })
+        .from(userProfile)
+        .where(inArray(userProfile.id, apUserIds));
+
+      const positionMap = new Map<string, string[]>();
+      for (const p of apPositions) {
+        if (apUserIds.includes(p.userId)) {
+          const arr = positionMap.get(p.userId) ?? [];
+          arr.push(p.position);
+          positionMap.set(p.userId, arr);
+        }
+      }
+
+      for (const prof of profiles) {
+        apProfilesWithPositions.push({
+          ...prof,
+          positions: positionMap.get(prof.id) ?? [],
+        });
+      }
+    }
+
+    const shuffled = apProfilesWithPositions.sort(() => Math.random() - 0.5);
+    const apStaff = shuffled.slice(0, 6);
+
+    return {
+      admins: adminProfiles,
+      apStaff,
+    };
+  },
 
   generateSlug: (name: string): string => {
     return name

@@ -139,6 +139,34 @@ export const schoolService = {
 
     return school;
   },
+
+  async getSchoolStats(ctx: AuthContext, schoolIdOrSlug: string) {
+    let schoolId = schoolIdOrSlug;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(schoolIdOrSlug)) {
+      const rows = await schoolRepo.getBySlug(schoolIdOrSlug);
+      const school = rows[0];
+      if (!school) return null;
+      schoolId = school.id;
+    }
+    await assertCanViewSchool(ctx, schoolId);
+    return schoolRepo.getSchoolStats(schoolId);
+  },
+
+  async getKeyStaff(ctx: AuthContext, schoolIdOrSlug: string) {
+    let schoolId = schoolIdOrSlug;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(schoolIdOrSlug)) {
+      const rows = await schoolRepo.getBySlug(schoolIdOrSlug);
+      const school = rows[0];
+      if (!school) return null;
+      schoolId = school.id;
+    }
+    await assertCanViewSchool(ctx, schoolId);
+    return schoolRepo.getKeyStaff(schoolId);
+  },
   async createSchool(ctx: AuthContext, params: unknown) {
     await assertCanCreateSchool(ctx);
     const data: CreateSchoolParams = createSchoolSchema.parse(params);

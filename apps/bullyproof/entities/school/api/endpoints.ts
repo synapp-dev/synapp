@@ -24,6 +24,36 @@ export const schoolApi = {
     schoolBySlug(slug: string): Promise<ApiResult<School | null>> {
       return apiFetch<School | null>(`/schools/${encodeURIComponent(slug)}`);
     },
+    stats(schoolIdOrSlug: string): Promise<
+      ApiResult<{ daysBullyProof: number; startDate: string | null; teacherCount: number; totalStaff: number; classCount: number; completedLessonCount: number }>
+    > {
+      return apiFetch(
+        `/schools/${encodeURIComponent(schoolIdOrSlug)}/stats`
+      );
+    },
+    keyStaff(schoolIdOrSlug: string): Promise<
+      ApiResult<{
+        admins: Array<{
+          id: string;
+          firstName: string | null;
+          lastName: string | null;
+          email: string;
+          avatarUrl: string | null;
+        }>;
+        apStaff: Array<{
+          id: string;
+          firstName: string | null;
+          lastName: string | null;
+          email: string;
+          avatarUrl: string | null;
+          positions: string[];
+        }>;
+      }>
+    > {
+      return apiFetch(
+        `/schools/${encodeURIComponent(schoolIdOrSlug)}/key-staff`
+      );
+    },
     years(schoolId: string): Promise<
       ApiResult<Array<{ year: { id: string; code: string; displayName: string; levelId: string; sortIndex: number }; level: { id: string; name: string; key: string } }>>
     > {

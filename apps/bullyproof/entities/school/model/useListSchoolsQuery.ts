@@ -53,6 +53,32 @@ export function useSearchSchoolsQuery(
   });
 }
 
+export type SchoolStats = {
+  daysBullyProof: number;
+  startDate: string | null;
+  teacherCount: number;
+  totalStaff: number;
+  classCount: number;
+  completedLessonCount: number;
+};
+
+export function useSchoolStatsQuery(
+  schoolIdOrSlug: string | null | undefined,
+  options?: { enabled?: boolean }
+): UseQueryResult<SchoolStats | null, Error> {
+  return useQuery<SchoolStats | null, Error>({
+    queryKey: [...schoolKeys.all(), "stats", schoolIdOrSlug ?? ""],
+    queryFn: async () => {
+      if (!schoolIdOrSlug) return null;
+      const { data, error } = await schoolApi.get.stats(schoolIdOrSlug);
+      if (error) throw new Error(error.message);
+      return data ?? null;
+    },
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && !!schoolIdOrSlug,
+  });
+}
+
 export function useSchoolBySlugQuery(
   slug: string | null | undefined,
   options?: { enabled?: boolean }
@@ -67,5 +93,37 @@ export function useSchoolBySlugQuery(
     },
     staleTime: 30_000,
     enabled: (options?.enabled ?? true) && !!slug,
+  });
+}
+
+export type KeyStaffMember = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+  avatarUrl: string | null;
+};
+
+export type KeyStaffApMember = KeyStaffMember & { positions: string[] };
+
+export type KeyStaffData = {
+  admins: KeyStaffMember[];
+  apStaff: KeyStaffApMember[];
+};
+
+export function useSchoolKeyStaffQuery(
+  schoolIdOrSlug: string | null | undefined,
+  options?: { enabled?: boolean }
+): UseQueryResult<KeyStaffData | null, Error> {
+  return useQuery<KeyStaffData | null, Error>({
+    queryKey: [...schoolKeys.all(), "keyStaff", schoolIdOrSlug ?? ""],
+    queryFn: async () => {
+      if (!schoolIdOrSlug) return null;
+      const { data, error } = await schoolApi.get.keyStaff(schoolIdOrSlug);
+      if (error) throw new Error(error.message);
+      return data ?? null;
+    },
+    staleTime: 60_000,
+    enabled: (options?.enabled ?? true) && !!schoolIdOrSlug,
   });
 }
