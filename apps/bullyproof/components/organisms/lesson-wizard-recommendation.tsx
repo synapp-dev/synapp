@@ -4,7 +4,13 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Alert, AlertTitle, AlertDescription } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
-import { Card } from "@workspace/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import {
   Tooltip,
@@ -23,7 +29,6 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { AlertTriangle, CheckCircle2, Info, Star, ChevronsRight, ChevronsUp, ChevronsDown } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { Separator } from "@workspace/ui/components/separator";
 import Image from "next/image";
 import type { ClassOption } from "@/types/lesson-wizard";
 import { topicsApi } from "@/entities/topics/api/endpoints";
@@ -33,6 +38,7 @@ import { useStages } from "@/entities/stages/model/store";
 import { useMeStore } from "@/entities/me/model/store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useRouter } from "next/navigation";
+import { getDisplayStatus, getStatusColors } from "@/utils/lesson-status";
 
 interface RecommendationData {
   recommendedTopicId: string | null;
@@ -735,118 +741,116 @@ export function LessonWizardRecommendation({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Conflict Alert - Separate Card */}
+      {/* Conflict: single info alert at top (full width), lesson card, Go to lesson button */}
       {hasConflict && conflictLesson && conflictTopicData && (
         <div className="flex flex-col gap-4">
-          <Alert className="bg-amber-50 border-amber-300 text-amber-900">
-            <AlertTriangle className="h-4 w-4 text-amber-600" />
-            <AlertTitle className="text-amber-900">Lesson Already Being Prepared</AlertTitle>
-            <AlertDescription className="text-amber-800 mt-2">
-              {isSingleClass ? (
-                <>
-                  <p className="text-sm mb-2">
-                    You already have a lesson being prepared for <span className="font-medium">{conflictingClasses[0]?.name}</span>. You cannot have two lessons being prepared for the same class.
-                  </p>
-                  <p className="text-sm">
-                    Go to the lesson page to resolve this before continuing.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm mb-2">
-                    You already have a lesson being prepared for {conflictingClasses.length > 0 && (
-                      <span className="font-medium">{conflictingClasses.map(c => c.name).join(", ")}</span>
-                    )}. You cannot have two lessons being prepared for the same class.
-                  </p>
-                  {nonConflictingClasses.length > 0 && conflictLessonOwner && (
-                    <p className="text-sm mb-2">
-                      The other class{nonConflictingClasses.length > 1 ? "es" : ""} you've selected ({nonConflictingClasses.map(c => c.name).join(", ")}) {nonConflictingClasses.length > 1 ? "don't" : "doesn't"} have a prepared lesson. You can add {nonConflictingClasses.length > 1 ? "them" : "it"} to the existing lesson if you'd like.
-                    </p>
-                  )}
-                  <p className="text-sm">
-                    Go to the lesson page to resolve this or add the other class{nonConflictingClasses.length > 1 ? "es" : ""} to the existing lesson.
-                  </p>
-                </>
-              )}
-            </AlertDescription>
-          </Alert>
-          
-          <Separator />
-          
-          {/* Full-width topic card */}
-          <Card className="w-full transition-all overflow-hidden p-0 gap-0 flex flex-row h-32">
-            {/* Thumbnail on the left */}
-            <TopicThumbnail topic={conflictTopicData} horizontal={true} />
-            
-            {/* Information on the right */}
-            <div className="flex-1 flex flex-col justify-between p-4 pr-6 min-w-0 overflow-hidden">
-              <div className="space-y-2 min-w-0 w-full">
-                {conflictStageData?.name && (
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-muted-foreground">
+          {/* 1. Single info alert - full width, at top */}
+          {(() => {
+            const statusPhraseMap: Record<string, string> = {
+              preparing: "being prepared",
+              ready: "ready",
+              in_progress: "in progress",
+              feedback: "in feedback",
+            };
+            const statusPhrase = statusPhraseMap[conflictLesson.status] ?? "active";
+            const ownerDisplay = conflictLesson.ownerName || conflictLesson.ownerEmail || "Someone";
+            const alertTitle = conflictLessonOwner
+              ? `You already have a lesson ${statusPhrase} for this class`
+              : `${ownerDisplay} already has a lesson ${statusPhrase} for this class`;
+
+            const alertStyles: Record<string, { className: string; icon: typeof AlertTriangle }> = {
+              preparing: { className: "bg-amber-50 border-amber-300 text-amber-900", icon: AlertTriangle },
+              ready: { className: "bg-blue-50 border-blue-300 text-blue-900", icon: Info },
+              in_progress: { className: "bg-blue-50 border-blue-300 text-blue-900", icon: Info },
+              feedback: { className: "bg-purple-50 border-purple-300 text-purple-900", icon: Info },
+            };
+            const style = alertStyles[conflictLesson.status] ?? alertStyles.preparing;
+            const IconComponent = style.icon;
+
+            return (
+              <Alert className={style.className}>
+                <IconComponent className={`h-4 w-4 ${conflictLesson.status === "preparing" ? "text-amber-600" : conflictLesson.status === "ready" || conflictLesson.status === "in_progress" ? "text-blue-600" : "text-purple-600"}`} />
+                <AlertTitle className={conflictLesson.status === "preparing" ? "text-amber-900" : conflictLesson.status === "ready" || conflictLesson.status === "in_progress" ? "text-blue-900" : "text-purple-900"}>
+                  {alertTitle}
+                </AlertTitle>
+              </Alert>
+            );
+          })()}
+
+          {/* 2. Lesson card - matching LessonCard layout (lessons page / confirmation step) */}
+          <div className="flex flex-col gap-4 items-center">
+          {(() => {
+            const rawDisplayStatus = getDisplayStatus(conflictLesson.status, null);
+            const displayStatus = rawDisplayStatus.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
+            const { bg: statusBg, dot: statusDot, border: statusBorder } = getStatusColors(rawDisplayStatus);
+            const ownerDisplay = conflictLessonOwner
+              ? [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || currentUser?.email || "You"
+              : conflictLesson.ownerName || conflictLesson.ownerEmail || "Someone";
+            const assignedClasses = conflictLesson.classIds.map((id, i) => {
+              const names = conflictLesson.className.split(", ");
+              return { classId: id, className: names[i] ?? conflictLesson.className };
+            });
+
+            return (
+              <Card className={`w-2/3 min-w-[240px] transition-all overflow-hidden p-0 gap-0 flex flex-col relative border-0 shadow-none ${statusBg}`}>
+                <CardHeader className={`py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center ${statusBorder}`}>
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${statusDot} animate-pulse`} />
+                    {displayStatus}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {ownerDisplay} · —
+                  </span>
+                </CardHeader>
+                <CardContent className={`p-0 flex-1 flex items-center justify-center bg-card/80 border-x relative z-[1] ${statusBorder}`}>
+                  <TopicThumbnail topic={conflictTopicData} horizontal={false} />
+                </CardContent>
+                <CardFooter className={`flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start ${statusBorder}`}>
+                  {conflictStageData?.name && (
+                    <p className="text-xs font-medium text-muted-foreground">
                       {conflictStageData.name}
                     </p>
-                    {(() => {
-                      // Get year codes from stage data, sorted by sortIndex
-                      if (!conflictStageData?.years || !Array.isArray(conflictStageData.years)) return null;
-                      
-                      const sortedYears = [...conflictStageData.years].sort((a: any, b: any) => {
-                        const aIndex = a.sortIndex ?? 999999;
-                        const bIndex = b.sortIndex ?? 999999;
-                        return aIndex - bIndex;
-                      });
-                      
-                      const yearCodes = sortedYears
-                        .map((year: any) => year.code)
-                        .filter((code: string) => code);
-                      
-                      return yearCodes.length > 0 ? (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {yearCodes.map((code: string, index: number) => (
-                            <span key={code} className="flex items-center gap-1">
-                              {index > 0 && <span className="opacity-25">•</span>}
-                              {code}
-                            </span>
-                          ))}
-                        </div>
-                      ) : null;
-                    })()}
-                  </div>
-                )}
-                <div className="flex items-center gap-1 min-w-0 w-full overflow-hidden">
-                  {conflictTopicData.stageOrder !== null && conflictTopicData.stageOrder !== undefined && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
-                    >
-                      L{conflictTopicData.stageOrder}
-                    </Badge>
                   )}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <h3 className="text-lg font-semibold text-primary capitalize truncate block min-w-0 flex-1 max-w-full cursor-default">
-                        {conflictTopicData.title}
-                      </h3>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{conflictTopicData.title}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap mt-4">
-                  <Badge
-                    variant="outline"
-                    className="text-xs py-0 px-1.5 h-5"
-                  >
-                    {(conflictTopicData.slides?.length || conflictTopicData.slideCount || 0)} {(conflictTopicData.slides?.length || conflictTopicData.slideCount || 0) === 1 ? "slide" : "slides"}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          </Card>
+                  <div className="flex items-center gap-2 min-w-0">
+                    {conflictTopicData.stageOrder !== null && conflictTopicData.stageOrder !== undefined && (
+                      <Badge
+                        variant="secondary"
+                        className="text-xs text-muted-foreground font-bold border-0 py-0 px-1.5 h-5 rounded-sm flex-shrink-0"
+                      >
+                        L{conflictTopicData.stageOrder}
+                      </Badge>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <CardTitle className="text-base font-semibold text-primary capitalize line-clamp-2 flex-1 cursor-default text-left">
+                          {conflictTopicData.title}
+                        </CardTitle>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{conflictTopicData.title}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  {assignedClasses.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {assignedClasses.map((classItem) => (
+                        <Badge
+                          key={classItem.classId}
+                          variant="outline"
+                          className="text-xs py-0 px-1.5 h-5"
+                        >
+                          {classItem.className}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </CardFooter>
+              </Card>
+            );
+          })()}
           
           {/* Action buttons */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 w-2/3 min-w-[240px]">
             {!isSingleClass && nonConflictingClasses.length > 0 && conflictLessonOwner && onAddClassesToLesson && (
               <Button
                 onClick={async () => {
@@ -874,10 +878,12 @@ export function LessonWizardRecommendation({
                   window.location.href = `/schools/${schoolSlug}/lessons/${conflictLesson.lessonId}`;
                 }
               }}
-              className="w-full"
+              className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
             >
               Go to lesson
+              <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
             </Button>
+          </div>
           </div>
         </div>
       )}
@@ -1557,8 +1563,8 @@ export function LessonWizardRecommendation({
         </Alert>
       )}
 
-      {/* Active Lessons Display */}
-      {activeLessons.length > 0 && (
+      {/* Active Lessons Display - hidden when conflict; conflict block handles that case */}
+      {activeLessons.length > 0 && !hasConflict && (
         <div className="space-y-4">
           {/* Live Lessons (in_progress/feedback) - Blocking */}
           {liveLessons.length > 0 && (
