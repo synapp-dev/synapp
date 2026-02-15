@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
+import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import Image from "next/image";
 import {
@@ -20,6 +21,7 @@ import { LessonWizardClasses } from "./lesson-wizard-classes";
 import { LessonWizardRecommendation } from "./lesson-wizard-recommendation";
 import { LessonWizardTopic } from "./lesson-wizard-topic";
 import { LessonWizardConfirm } from "./lesson-wizard-confirm";
+import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
 import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
 import {
   ChevronLeft,
@@ -33,6 +35,8 @@ import {
   HelpCircle,
   X,
   Check,
+  MessageSquare,
+  Info,
 } from "lucide-react";
 import {
   HoverCard,
@@ -42,6 +46,7 @@ import {
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
+import { Alert, AlertTitle } from "@workspace/ui/components/alert";
 import { classesApi } from "@/entities/classes/api/endpoints";
 import { useIsAdminRestrictedForLessons } from "@/hooks/use-is-admin-restricted-for-lessons";
 
@@ -95,6 +100,7 @@ export function LessonWizard({
   const [skippedStep3, setSkippedStep3] = useState(false);
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [onBehalfOfUserId, setOnBehalfOfUserId] = useState<string | null>(null);
+  const [showFeedbackGate, setShowFeedbackGate] = useState(false);
 
   const isAdminRestricted = useIsAdminRestrictedForLessons();
 
@@ -148,6 +154,24 @@ export function LessonWizard({
   // This ensures users never see stale recommendations they could accidentally proceed with
   const isRecommendationLoading = isLoadingRecommendation || isFetchingRecommendation;
 
+  // Fetch outstanding feedback lessons - gate for starting new lessons
+  const {
+    data: outstandingFeedbackLessons = [],
+    refetch: refetchOutstandingFeedback,
+  } = useQuery({
+    queryKey: ["outstanding-feedback-lessons"],
+    queryFn: async () => {
+      const result = await lessonsApi.get.outstandingFeedback();
+      if (result.error) {
+        throw new Error(result.error.message ?? "Failed to fetch outstanding feedback");
+      }
+      return result.data ?? [];
+    },
+    enabled: open,
+    staleTime: 0, // Always fresh - user may have just completed feedback
+  });
+  const hasOutstandingFeedback = outstandingFeedbackLessons.length > 0;
+
   // Reset state when drawer closes to ensure clean state on next open
   useEffect(() => {
     if (!open) {
@@ -164,6 +188,7 @@ export function LessonWizard({
       setSkippedStep3(false);
       setSelectedStageId(null);
       setOnBehalfOfUserId(null);
+      setShowFeedbackGate(false);
       // Reset initialization flag so we can restore from URL on next open
       hasInitializedFromUrlRef.current = false;
       // Reset redirect flag
@@ -495,7 +520,8 @@ export function LessonWizard({
     }
   };
 
-  const handleOptionSelect = (option: "teach" | "view") => {
+  const handleOptionSelect = async (option: "teach" | "view") => {
+    if (loading) return;
     if (option === "view") {
       if (!schoolId) return;
       // Prevent the URL-restore useEffect from reopening the drawer
@@ -507,8 +533,21 @@ export function LessonWizard({
         isIntentionallyClosingRef.current = false;
       }, 300);
     } else {
-      // Continue to next step (select classes)
-      goToStep(1);
+      // Wait for feedback check to resolve before allowing user to proceed
+      setLoading(true);
+      try {
+        const { data } = await refetchOutstandingFeedback();
+        const needsFeedback = (data ?? []).length > 0;
+        if (needsFeedback) {
+          setShowFeedbackGate(true);
+        } else {
+          goToStep(1);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to check outstanding feedback");
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -871,13 +910,70 @@ export function LessonWizard({
             {/* Always render all step components to maintain consistent hook order */}
             {/* Hide inactive steps using CSS to prevent hook order issues */}
 
-            {/* Step 0: Initial option selection */}
+            {/* Step 0: Outstanding feedback gate - shown after clicking Prepare & Teach when feedback required */}
+            {state.step === 0 && showFeedbackGate ? (
+              <div className="flex flex-col gap-6 items-center">
+                <Alert className="w-full bg-purple-50 border-purple-300 text-purple-900">
+                  <Info className="h-4 w-4 text-purple-600" />
+                  <AlertTitle className="text-purple-900">
+                    Feedback required before starting another lesson
+                  </AlertTitle>
+                </Alert>
+                <div className="flex flex-col gap-6 items-center w-full">
+                  {outstandingFeedbackLessons.map((lesson) => {
+                    const feedbackHref = lesson.schoolSlug
+                      ? `/schools/${lesson.schoolSlug}/lessons/${lesson.id}/feedback`
+                      : `/schools/${schoolId}/lessons/${lesson.id}/feedback`;
+                    const lessonForCard: Lesson = {
+                      id: lesson.id,
+                      schoolId: lesson.schoolId,
+                      topicId: lesson.topicId,
+                      createdByUserId: null,
+                      status: "feedback",
+                      scheduledFor: null,
+                      createdAt: lesson.createdAt,
+                      topic: { title: lesson.topicTitle },
+                      teacher: lesson.teacher ?? undefined,
+                      assignedClasses: lesson.assignedClasses ?? undefined,
+                    };
+                    return (
+                      <div key={lesson.id} className="flex flex-col gap-2 w-2/3 min-w-[240px]">
+                        <LessonCard
+                          lesson={lessonForCard}
+                          schoolSlug={lesson.schoolSlug ?? schoolId}
+                          displayOnly
+                        />
+                        <Button
+                          asChild
+                          className="w-full bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
+                        >
+                          <Link href={feedbackHref} replace>
+                            Go to lesson
+                            <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                          </Link>
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+            /* Step 0: Initial option selection (Teach vs View) */
             <div className={state.step === 0 ? "block" : "hidden"}>
               <div className="flex flex-col gap-4 max-w-2xl">
                 <Card
-                  className="hover:shadow-md transition-all cursor-pointer text-left gap-0 shadow-lg duration-150 hover:scale-[101%] text-[var(--brand-bullyproof-primary)] hover:bg-[var(--brand-bullyproof-primary)] hover:border-[var(--brand-bullyproof-primary)] group/prepare-card"
+                  className={`relative transition-all text-left gap-0 shadow-lg group/prepare-card ${
+                    loading
+                      ? "cursor-wait opacity-70"
+                      : "hover:shadow-md cursor-pointer duration-150 hover:scale-[101%] text-[var(--brand-bullyproof-primary)] hover:bg-[var(--brand-bullyproof-primary)] hover:border-[var(--brand-bullyproof-primary)]"
+                  }`}
                   onClick={() => handleOptionSelect("teach")}
                 >
+                  {loading && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/80">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  )}
                   <CardHeader className="text-left">
                     <div className="flex items-center gap-2">
                       <Play className="h-6 w-6 group-hover/prepare-card:text-secondary group-hover/prepare-card:animate-bounce-right-subtle transition-colors" />
@@ -897,7 +993,9 @@ export function LessonWizard({
                 </div>
 
                 <Card
-                  className="hover:shadow-md hover:bg-muted transition-all cursor-pointer text-left gap-0 group/browse-card hover:scale-[101%] text-muted-foreground hover:text-primary shadow-none"
+                  className={`transition-all text-left gap-0 group/browse-card shadow-none ${
+                    loading ? "cursor-wait opacity-70" : "hover:shadow-md hover:bg-muted cursor-pointer hover:scale-[101%] text-muted-foreground hover:text-primary"
+                  }`}
                   onClick={() => handleOptionSelect("view")}
                 >
                   <CardHeader className="text-left">
@@ -917,6 +1015,7 @@ export function LessonWizard({
                 </Card>
               </div>
             </div>
+            )}
 
             <div className={state.step === 1 ? "block" : "hidden"}>
               <LessonWizardClasses
@@ -1102,12 +1201,22 @@ export function LessonWizard({
                 <div className="flex items-center justify-between max-w-3xl mx-auto w-full relative">
             <Button
               variant="ghost"
-              onClick={state.step === 0 ? () => handleOpenChange(false) : goBack}
+              onClick={
+                state.step === 0
+                  ? showFeedbackGate
+                    ? () => setShowFeedbackGate(false)
+                    : () => handleOpenChange(false)
+                  : goBack
+              }
               disabled={loading}
               className="gap-1"
             >
               <ChevronLeft className="h-4 w-4" />
-              {state.step === 0 ? "Cancel" : "Back"}
+              {state.step === 0
+                ? showFeedbackGate
+                  ? "Back"
+                  : "Cancel"
+                : "Back"}
             </Button>
 
             {/* Selected classes count with hover card - only show on step 1, centered */}
@@ -1141,8 +1250,11 @@ export function LessonWizard({
               </div>
             )}
 
-            {state.step === 0 ? (
+            {state.step === 0 && !showFeedbackGate ? (
               // Step 0 doesn't show continue button - user clicks cards instead
+              <div className="w-[100px]" />
+            ) : state.step === 0 && showFeedbackGate ? (
+              // Feedback gate - no action button on right
               <div className="w-[100px]" />
             ) : state.step === 2 ? (
               // Recommendation step - show Proceed and Choose Another Topic buttons side by side if we can proceed

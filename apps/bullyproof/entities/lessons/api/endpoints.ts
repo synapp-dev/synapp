@@ -3,8 +3,31 @@ import type { lessons } from "@/server/db/schema";
 
 type Lesson = typeof lessons.$inferSelect;
 
+export type OutstandingFeedbackLesson = {
+  id: string;
+  topicId: string;
+  schoolId: string;
+  schoolSlug: string | null;
+  createdAt: string;
+  topicTitle: string;
+  teacher?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+  } | null;
+  assignedClasses?: Array<{
+    classId: string;
+    className: string;
+    classCode: string | null;
+  }>;
+};
+
 export const lessonsApi = {
   get: {
+    outstandingFeedback(): Promise<ApiResult<OutstandingFeedbackLesson[]>> {
+      return apiFetch<OutstandingFeedbackLesson[]>("/lessons/outstanding-feedback");
+    },
     list(params?: {
       schoolId?: string;
       teacherId?: string;

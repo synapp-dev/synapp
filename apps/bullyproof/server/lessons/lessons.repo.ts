@@ -26,6 +26,75 @@ export const lessonsRepo = {
       )
       .orderBy(desc(lessons.createdAt)),
 
+  /** Returns lessons with status=feedback owned by teacher, with topic, school, teacher, and assigned classes */
+  getOutstandingFeedbackByTeacher: async (teacherId: string) => {
+    const rows = await db
+      .select({
+        id: lessons.id,
+        topicId: lessons.topicId,
+        schoolId: lessons.schoolId,
+        schoolSlug: schools.slug,
+        createdAt: lessons.createdAt,
+        topicTitle: topics.title,
+        teacherId: lessons.createdByUserId,
+        teacherFirstName: userProfile.firstName,
+        teacherLastName: userProfile.lastName,
+        teacherEmail: userProfile.email,
+      })
+      .from(lessons)
+      .innerJoin(topics, eq(lessons.topicId, topics.id))
+      .innerJoin(schools, eq(lessons.schoolId, schools.id))
+      .leftJoin(userProfile, eq(lessons.createdByUserId, userProfile.id))
+      .where(
+        and(
+          eq(lessons.createdByUserId, teacherId),
+          eq(lessons.status, "feedback")
+        )
+      )
+      .orderBy(desc(lessons.createdAt));
+
+    if (rows.length === 0) return [];
+
+    const lessonIds = rows.map((r) => r.id);
+    const assignedClassesRaw = await db
+      .select({
+        lessonId: lessonClasses.lessonId,
+        classId: lessonClasses.classId,
+        className: classes.name,
+        classCode: classes.code,
+      })
+      .from(lessonClasses)
+      .innerJoin(classes, eq(lessonClasses.classId, classes.id))
+      .where(inArray(lessonClasses.lessonId, lessonIds));
+
+    const classesByLesson = new Map<string, Array<{ classId: string; className: string; classCode: string | null }>>();
+    for (const row of assignedClassesRaw) {
+      const list = classesByLesson.get(row.lessonId) ?? [];
+      list.push({
+        classId: row.classId,
+        className: row.className,
+        classCode: row.classCode,
+      });
+      classesByLesson.set(row.lessonId, list);
+    }
+
+    return rows.map((r) => ({
+      id: r.id,
+      topicId: r.topicId,
+      schoolId: r.schoolId,
+      schoolSlug: r.schoolSlug,
+      createdAt: r.createdAt,
+      topicTitle: r.topicTitle,
+      teacher: {
+        id: r.teacherId ?? "",
+        firstName: r.teacherFirstName,
+        lastName: r.teacherLastName,
+        email: r.teacherEmail,
+      },
+      assignedClasses: classesByLesson.get(r.id) ?? [],
+    }));
+  },
+
   getByStatus: (status: string) =>
     db
       .select()

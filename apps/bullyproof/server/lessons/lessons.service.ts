@@ -15,7 +15,7 @@ import { schoolRepo } from "../school/school.repo";
 import { topicsRepo } from "../topics/topics.repo";
 import { curriculumRepo } from "../curriculum/curriculum.repo";
 import { classesRepo } from "../classes/classes.repo";
-import { getUserScopedRoles, ADMIN_CANNOT_CREATE_LESSON_KEYS } from "../auth/rbac";
+import { getUserScopedRoles, hasPlatformRole, ADMIN_CANNOT_CREATE_LESSON_KEYS } from "../auth/rbac";
 import { checkFeatureAccess } from "@/server/features/features.service";
 import { classes, lessons, topics, lessonClasses, userRoles, userProfile } from "@/server/db/schema";
 import { inArray, eq, and } from "drizzle-orm";
@@ -118,6 +118,11 @@ export const lessonsService = {
     }
 
     return await lessonsRepo.getAll(params.status);
+  },
+
+  async getOutstandingFeedbackLessons(ctx: AuthContext) {
+    if (!ctx.userId) return [];
+    return await lessonsRepo.getOutstandingFeedbackByTeacher(ctx.userId);
   },
 
   async getLessonById(ctx: AuthContext, params: unknown) {
@@ -268,6 +273,20 @@ export const lessonsService = {
     if (data.status === "feedback") {
       if (ctx.userId !== existingLesson[0].createdByUserId) {
         throw new Error("Only the lesson owner can transition the lesson to feedback.");
+      }
+    }
+
+    // Cancel from feedback/completed: only platform admins, not owners
+    if (data.status === "cancelled") {
+      const currentStatus = existingLesson[0].status;
+      if (currentStatus === "feedback" || currentStatus === "completed") {
+        const roles = await getUserScopedRoles(ctx.userId!);
+        const isPlatformAdmin = hasPlatformRole(roles, "PLATFORM_ADMIN", "INTRADARK_DEV");
+        if (!isPlatformAdmin) {
+          throw new Error(
+            "Only platform admins can cancel a lesson that is in feedback or completed."
+          );
+        }
       }
     }
 
@@ -454,8 +473,12 @@ export const lessonsService = {
 
       // Get active lessons for the selected classes (for conflict detection)
       console.log(`${requestId} [SERVICE] Step 6: Fetching active lessons`);
-      const activeLessons = await lessonsRepo.getActiveLessonsForClasses(classIds) || [];
-      console.log(`${requestId} [SERVICE] Step 6: Found ${activeLessons.length} active lessons`);
+      const rawActiveLessons = await lessonsRepo.getActiveLessonsForClasses(classIds) || [];
+      // Feedback lessons only block the owner; other teachers can proceed
+      const activeLessons = rawActiveLessons.filter(
+        (lesson) => !(lesson.status === "feedback" && lesson.createdByUserId !== ctx.userId)
+      );
+      console.log(`${requestId} [SERVICE] Step 6: Found ${activeLessons.length} active lessons (${rawActiveLessons.length} before feedback-owner filter)`);
 
       // Get all stages with years for matching
       console.log(`${requestId} [SERVICE] Step 7: Fetching all stages with years`);
