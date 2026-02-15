@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
+import { SchoolPageCompactHeader } from "@/components/molecules/school-page-compact-header";
+import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 import { useSchoolStore } from "@/stores/school-store";
 import { useClasses } from "@/entities/classes/model/store";
 import { useMeStore } from "@/entities/me/model/store";
@@ -213,14 +215,21 @@ export default function ClassesPage({
   const currentUser = useMeStore((state) => state.currentUser);
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
-  const [schoolId, setSchoolId] = useState<string>("");
+  const [schoolSlug, setSchoolSlug] = useState<string>("");
+  const [showContentAnimation, setShowContentAnimation] = useState(false);
   const [filter, setFilter] = useState<"all" | "my-classes" | "other-classes">(
     "all"
   );
 
   useEffect(() => {
-    params.then(({ school_id }) => setSchoolId(school_id));
+    params.then(({ school_id }) => setSchoolSlug(school_id));
   }, [params]);
+
+  const banner = useStorageImageUrl(currentSchool?.bannerUrl ?? null);
+  const avatar = useStorageImageUrl(currentSchool?.avatarUrl ?? null);
+  const headerReady =
+    !(!!currentSchool?.bannerUrl && banner.loading) &&
+    !(!!currentSchool?.avatarUrl && avatar.loading);
 
   // Use React Query hook for classes
   const {
@@ -390,10 +399,19 @@ export default function ClassesPage({
     </Card>
   );
 
+  if (!schoolSlug) {
+    return (
+      <>
+        <FeatureGuard feature="/school/classes" />
+        {null}
+      </>
+    );
+  }
+
   if (!currentSchool) {
     return (
       <>
-        <FeatureGuard feature="/school/classes" schoolId={schoolId} />
+        <FeatureGuard feature="/school/classes" schoolId={undefined} />
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold">School not found</h1>
@@ -408,14 +426,25 @@ export default function ClassesPage({
 
   return (
     <>
-      <FeatureGuard feature="/school/classes" schoolId={schoolId} />
+      <FeatureGuard feature="/school/classes" schoolId={currentSchool.id} />
       <div className="space-y-6">
-      {/* Header */}
-      {/* <div className="flex items-center gap-2">
-        <GraduationCap className="h-8 w-8" />
-        <h1 className="text-3xl font-bold">Classes</h1>
-      </div> */}
+        <SchoolPageCompactHeader
+          bannerUrl={banner.url}
+          avatarUrl={avatar.url}
+          title="Classes"
+          description="Browse and manage classes, and add them to your list."
+          isLoading={!headerReady}
+          onAnimationComplete={() => setShowContentAnimation(true)}
+        />
 
+        <div
+          className={`space-y-6 opacity-0 ${showContentAnimation ? "animate-slide-down-fade-in" : ""}`}
+          style={
+            showContentAnimation
+              ? { animationFillMode: "forwards" }
+              : undefined
+          }
+        >
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -529,6 +558,7 @@ export default function ClassesPage({
           )}
         </div>
       )}
+        </div>
     </div>
     </>
   );

@@ -14,7 +14,7 @@ import { LessonWizard } from "@/components/organisms/lesson-wizard";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSchoolStore } from "@/stores/school-store";
 import { useLessons } from "@/entities/lessons/model/store";
-import { BookOpen, Eye, EyeOff, Plus, Search } from "lucide-react";
+import { Eye, EyeOff, Search } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
 import { format } from "date-fns";
@@ -30,49 +30,9 @@ import {
 } from "@workspace/ui/components/select";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
-
-// Start New Lesson Card - matching LessonCard layout
-function StartNewLessonCard({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="block w-full text-left cursor-pointer">
-      <Card className="hover:shadow-md transition-shadow h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none bg-primary/5">
-        {/* CardHeader - matching LessonCard */}
-        <CardHeader className="py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center border-primary/30 border-dashed">
-          <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-            New
-          </span>
-          {/* <span className="text-xs text-muted-foreground">
-            Create a lesson
-          </span> */}
-        </CardHeader>
-        {/* CardContent - Thumbnail area with plus icon */}
-        <CardContent className="p-0 bg-card/80 border-x border-primary/30 border-dashed rounded-lg relative z-[1]">
-          <div className="w-full aspect-video bg-muted flex items-center justify-center">
-            <div className="rounded-full bg-primary/10 p-4">
-              <Plus className="h-8 w-8 text-primary" />
-            </div>
-          </div>
-        </CardContent>
-        {/* CardFooter - matching LessonCard */}
-        <CardFooter className="flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start border-primary/30 border-dashed">
-          <p className="text-xs font-medium text-muted-foreground">
-            Get started
-          </p>
-          <div className="flex items-center gap-2 min-w-0">
-            <CardTitle className="text-base font-semibold text-primary capitalize line-clamp-2 flex-1 text-left">
-              Start New Lesson
-            </CardTitle>
-          </div>
-          {/* Placeholder to match LessonCard classes row */}
-          <div className="flex flex-wrap gap-1 mt-1">
-            <span className="min-w-16 h-5 border border-dashed border-muted-foreground/10 rounded-full inline-flex" />
-          </div>
-        </CardFooter>
-      </Card>
-    </button>
-  );
-}
+import { StartNewLessonCard } from "@/entities/lessons/ui/start-new-lesson-card";
+import { SchoolPageCompactHeader } from "@/components/molecules/school-page-compact-header";
+import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -112,10 +72,14 @@ export default function LessonsPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [showCompletedMyLessons, setShowCompletedMyLessons] = useState(false);
   const [showCompletedOtherLessons, setShowCompletedOtherLessons] = useState(false);
+  const [showContentAnimation, setShowContentAnimation] = useState(false);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const { data: currentUser } = useCurrentUser();
+  const banner = useStorageImageUrl(currentSchool?.bannerUrl ?? null);
+  const avatar = useStorageImageUrl(currentSchool?.avatarUrl ?? null);
+  const headerReady = !(!!currentSchool?.bannerUrl && banner.loading) && !(!!currentSchool?.avatarUrl && avatar.loading);
 
   // Get filter from URL query params, default to "my-lessons"
   const filterParam = searchParams?.get("filter");
@@ -141,7 +105,7 @@ export default function LessonsPage({
     });
   }, [params]);
 
-  // Check for dialog query parameter and open wizard if present
+  // Check for dialog query parameter and open wizard if present (once per param presence)
   useEffect(() => {
     const dialog = searchParams?.get("dialog");
     const startingYourLesson = searchParams?.get("startingYourLesson");
@@ -152,6 +116,26 @@ export default function LessonsPage({
       setIsWizardOpen(true);
     }
   }, [searchParams, currentSchool?.id]);
+
+  // When wizard closes, remove dialog param from URL so we don't re-open on next effect run
+  const handleWizardOpenChange = (open: boolean) => {
+    setIsWizardOpen(open);
+    if (!open) {
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      const hadDialog =
+        params.get("dialog") === "add-new-lesson" ||
+        params.get("startingYourLesson") === "true";
+      if (hadDialog) {
+        params.delete("dialog");
+        params.delete("startingYourLesson");
+        const queryString = params.toString();
+        router.replace(
+          `${pathname}${queryString ? `?${queryString}` : ""}`,
+          { scroll: false }
+        );
+      }
+    }
+  };
 
   // Use React Query hook for lessons - fetch "my lessons" separately when filter is "my-lessons"
   // When filter is "my-lessons", don't pass schoolId so API automatically filters by user token
@@ -345,13 +329,22 @@ export default function LessonsPage({
     <>
       <FeatureGuard feature="/school/lessons" schoolId={currentSchool.id} />
       <div className="space-y-6">
-        {/* Header */}
-        {/* <div className="flex items-center gap-2">
-          <BookOpen className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Lessons</h1>
-        </div> */}
+        <SchoolPageCompactHeader
+          bannerUrl={banner.url}
+          avatarUrl={avatar.url}
+          title="Lessons"
+          description="View, manage and create all of your lessons here."
+          isLoading={!headerReady}
+          onAnimationComplete={() => setShowContentAnimation(true)}
+        />
 
-        {/* Search and Filter */}
+        {/* Search and Filter + Content - animates in after header */}
+        <div
+          className={`space-y-6 opacity-0 ${showContentAnimation ? "animate-slide-down-fade-in" : ""}`}
+          style={
+            showContentAnimation ? { animationFillMode: "forwards" } : undefined
+          }
+        >
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -522,12 +515,13 @@ export default function LessonsPage({
             )}
           </div>
         )}
+        </div>
       </div>
 
       <LessonWizard
         schoolId={schoolSlug}
         open={isWizardOpen}
-        onOpenChange={setIsWizardOpen}
+        onOpenChange={handleWizardOpenChange}
       />
     </>
   );

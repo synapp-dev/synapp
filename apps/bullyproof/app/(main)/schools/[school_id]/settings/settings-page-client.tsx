@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
+import { SchoolPageCompactHeader } from "@/components/molecules/school-page-compact-header";
+import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 import { useSchoolStore } from "@/stores/school-store";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -21,8 +23,14 @@ interface SettingsPageClientProps {
 
 export function SettingsPageClient({ schoolSlug }: SettingsPageClientProps) {
   usePageTitle(["schools", "settings"]);
+  const [showContentAnimation, setShowContentAnimation] = useState(false);
   const currentSchool = useSchoolStore((s) => s.currentSchool);
   const [slug, setSlug] = useState(schoolSlug);
+  const banner = useStorageImageUrl(currentSchool?.bannerUrl ?? null);
+  const avatar = useStorageImageUrl(currentSchool?.avatarUrl ?? null);
+  const headerReady =
+    !(!!currentSchool?.bannerUrl && banner.loading) &&
+    !(!!currentSchool?.avatarUrl && avatar.loading);
 
   useEffect(() => {
     setSlug(schoolSlug);
@@ -54,13 +62,23 @@ export function SettingsPageClient({ schoolSlug }: SettingsPageClientProps) {
     <>
       <FeatureGuard feature="/settings" schoolId={school.id}>
         <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold">Settings - {school.name}</h1>
-            <p className="text-muted-foreground">
-              Manage your school&apos;s configuration and users
-            </p>
-          </div>
+          <SchoolPageCompactHeader
+            bannerUrl={banner.url}
+            avatarUrl={avatar.url}
+            title="Settings"
+            description="Manage your school&apos;s configuration and users."
+            isLoading={!headerReady}
+            onAnimationComplete={() => setShowContentAnimation(true)}
+          />
 
+          <div
+            className={`space-y-6 opacity-0 ${showContentAnimation ? "animate-slide-down-fade-in" : ""}`}
+            style={
+              showContentAnimation
+                ? { animationFillMode: "forwards" }
+                : undefined
+            }
+          >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Link href={`${basePath}/details`}>
               <Card className="transition-all h-full hover:shadow-md hover:border-primary/50 cursor-pointer">
@@ -89,6 +107,7 @@ export function SettingsPageClient({ schoolSlug }: SettingsPageClientProps) {
                 </CardHeader>
               </Card>
             </Link>
+          </div>
           </div>
         </div>
       </FeatureGuard>

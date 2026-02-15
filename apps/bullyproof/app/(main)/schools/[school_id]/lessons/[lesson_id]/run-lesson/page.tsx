@@ -27,7 +27,7 @@ import { Calendar } from "@workspace/ui/components/calendar";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useMeStore } from "@/entities/me/model/store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
@@ -100,6 +100,7 @@ export default function LessonRunLessonPage({
   const { school_id, lesson_id } = use(params);
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
   const [presentDialogOpen, setPresentDialogOpen] = useState(false);
   const [presentHelpOpen, setPresentHelpOpen] = useState(false);
@@ -238,10 +239,22 @@ export default function LessonRunLessonPage({
     );
   }
 
+  const handlePresentDialogOpenChange = (open: boolean) => {
+    setPresentDialogOpen(open);
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
+    if (open) {
+      params.set("dialog", "present");
+    } else {
+      params.delete("dialog");
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname ?? "", { scroll: false });
+  };
+
   const handlePresentAccept = () => {
     const presentUrl = `/schools/${school_id}/lessons/${lesson_id}/run-lesson/present`;
     window.open(presentUrl, "_blank", "noopener,noreferrer");
-    setPresentDialogOpen(false);
+    handlePresentDialogOpenChange(false);
   };
 
   // Open schedule dialog with pre-populated values if lesson already has a schedule
@@ -414,7 +427,7 @@ export default function LessonRunLessonPage({
       <div className="flex flex-col sm:flex-row gap-4">
         <Button
           size="lg"
-          onClick={() => setPresentDialogOpen(true)}
+          onClick={() => handlePresentDialogOpenChange(true)}
           className="bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 sm:min-w-[200px] capitalize"
         >
           <Presentation className="h-5 w-5" />
@@ -432,7 +445,7 @@ export default function LessonRunLessonPage({
       </div>
 
       {/* Presentation Mode Dialog */}
-      <Dialog open={presentDialogOpen} onOpenChange={setPresentDialogOpen}>
+      <Dialog open={presentDialogOpen} onOpenChange={handlePresentDialogOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Open Presentation Mode</DialogTitle>
@@ -465,7 +478,7 @@ export default function LessonRunLessonPage({
             <div className="flex gap-2">
               <Button
                 variant="ghost"
-                onClick={() => setPresentDialogOpen(false)}
+                onClick={() => handlePresentDialogOpenChange(false)}
               >
                 Cancel
               </Button>

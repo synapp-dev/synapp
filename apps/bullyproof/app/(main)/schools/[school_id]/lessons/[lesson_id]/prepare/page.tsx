@@ -397,9 +397,9 @@ export default function LessonPreparePage() {
     setPendingSchedule(null);
   };
 
-  // Navigate to run lesson page
+  // Navigate to run lesson page with presentation dialog open
   const handleRunLesson = () => {
-    router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
+    router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson?dialog=present`);
   };
 
   // Skip checklist and mark lesson ready, then navigate to run lesson
@@ -408,7 +408,7 @@ export default function LessonPreparePage() {
     try {
       await lessonsApi.put.update(lesson_id, { status: "ready" });
       queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
-      router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
+      router.push(`/schools/${school_id}/lessons/${lesson_id}/run-lesson?dialog=present`);
     } catch (error) {
       console.error("Failed to mark lesson ready:", error);
       toast.error("Failed to mark lesson ready", {

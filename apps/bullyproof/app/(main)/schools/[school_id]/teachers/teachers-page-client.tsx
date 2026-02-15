@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { Mail, Search, Users } from "lucide-react";
+import { Mail, Search } from "lucide-react";
 import {
   meApi,
   type UserWithRolesAndSchools,
@@ -371,12 +371,6 @@ export default function TeachersPageClient() {
 
   return (
     <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-2">
-          <Users className="h-8 w-8" />
-          <h1 className="text-3xl font-bold">Teachers</h1>
-      </div>
-
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
