@@ -150,6 +150,21 @@ export default function LessonRunLessonPage({
     enabled: !!lesson_id && (lessonData?.status === "ready" || lessonData?.status === "in_progress"),
   });
 
+  // Invalidate lesson data on mount and when tab comes back into focus
+  // so we always show fresh data (e.g. after status updates in presentation mode)
+  useEffect(() => {
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
+      queryClient.invalidateQueries({ queryKey: ["lesson", lesson_id, "live-state"] });
+    };
+    invalidate(); // on mount
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") invalidate();
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [queryClient, lesson_id]);
+
   // Check for query param to auto-open dialog
   useEffect(() => {
     const dialog = searchParams?.get("dialog");

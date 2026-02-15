@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -14,6 +15,7 @@ import { LessonWizard } from "@/components/organisms/lesson-wizard";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSchoolStore } from "@/stores/school-store";
 import { useLessons } from "@/entities/lessons/model/store";
+import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { Eye, EyeOff, Search } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
@@ -66,7 +68,14 @@ export default function LessonsPage({
     params.then(({ school_id }) => setSchoolId(school_id));
   }, [params]);
   usePageTitle(["schools", "lessons"]);
+  const queryClient = useQueryClient();
   const currentSchool = useSchoolStore((state) => state.currentSchool);
+
+  // Invalidate lessons on mount so we always get fresh data when visiting this page
+  // (e.g. after updating lesson status via presentation mode elsewhere)
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
+  }, [queryClient]);
   const [schoolSlug, setSchoolSlug] = useState<string>("");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
