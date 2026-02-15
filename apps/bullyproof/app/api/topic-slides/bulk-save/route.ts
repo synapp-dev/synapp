@@ -30,12 +30,15 @@
  */
 import { NextResponse } from "next/server";
 import { topicsRepo } from "@/server/topics/topics.repo";
+import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 import { checkFeatureAccess } from "@/server/features/features.service";
+import { refreshSignedUrlIfStale } from "@/server/lib/signed-url";
 import { db } from "@/server/db/drizzle";
 import { topicSlides } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { getTopicSlideStoragePath } from "@/server/lib/slide-storage-path";
 
 // Configure route to handle large payloads
 export const runtime = "nodejs";
@@ -296,16 +299,47 @@ export async function POST(request: Request) {
         : -1;
     console.log(`[bulk-save] Max orderIndex: ${maxOrderIndex}`);
 
+    // Step 2.5: Filter creates - skip image slides that have no corresponding file in formData (prevents ghost slides)
+    let filteredCreates = creates && Array.isArray(creates) ? creates : [];
+    const tempIdsWithFiles = new Set<string>();
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith("file_") && value instanceof File) {
+        const tempId = key.replace("file_", "");
+        tempIdsWithFiles.add(tempId);
+      }
+    }
+    if (filteredCreates.length > 0) {
+      const beforeCount = filteredCreates.length;
+      filteredCreates = filteredCreates.filter((slideData: any) => {
+        if (slideData.kind === "image") {
+          const tempId = slideData.tempId;
+          const hasFile = tempId && tempIdsWithFiles.has(tempId);
+          if (!hasFile) {
+            console.log(
+              `[bulk-save] Skipping image create (no file): tempId=${tempId} - prevents ghost slide`
+            );
+            return false;
+          }
+        }
+        return true;
+      });
+      if (filteredCreates.length < beforeCount) {
+        console.log(
+          `[bulk-save] Filtered ${beforeCount - filteredCreates.length} image create(s) without files`
+        );
+      }
+    }
+
     // Step 3: Create new slides with temporary high orderIndex to avoid conflicts
     console.log("[bulk-save] Step 3: Creating new slides...");
     // Store mapping of tempId -> created slide ID for file uploads
     const tempIdToSlideIdMap = new Map<string, string>();
     const createdSlideIds: string[] = [];
-    if (creates && Array.isArray(creates) && creates.length > 0) {
-      console.log(`[bulk-save] Found ${creates.length} slide(s) to create`);
+    if (filteredCreates.length > 0) {
+      console.log(`[bulk-save] Found ${filteredCreates.length} slide(s) to create`);
       
       // Batch create slides using single insert with multiple values
-      const createPayloads = creates.map((slideData, i) => {
+      const createPayloads = filteredCreates.map((slideData: any, i: number) => {
         // Use a temporary high orderIndex to avoid unique constraint violations
         // We'll reorder everything after all operations
         const tempOrderIndex = maxOrderIndex + 1000 + i;
@@ -327,7 +361,7 @@ export async function POST(request: Request) {
           videoEndS: slideData.videoEndS || null,
         };
         
-        console.log(`[bulk-save] Creating slide ${i + 1}/${creates.length}:`, {
+        console.log(`[bulk-save] Creating slide ${i + 1}/${filteredCreates.length}:`, {
           tempId: slideData.tempId,
           kind: payload.kind,
           hasVideoUrl: !!payload.videoUrl,
@@ -349,7 +383,7 @@ export async function POST(request: Request) {
 
         // Map tempId to slideId for file uploads
         createdSlides.forEach((slide, index) => {
-          const slideData = creates[index];
+          const slideData = filteredCreates[index];
           const tempId = slideData?.tempId;
           
           if (slide?.id) {
@@ -402,22 +436,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Stage not found" }, { status: 404 });
     }
 
-    // Extract stage number from stage.code (e.g., "S1" -> 1)
-    const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-    if (!stageNumberMatch) {
-      return NextResponse.json(
-        { error: "Invalid stage code format" },
-        { status: 400 }
-      );
-    }
-    const stageNumber = parseInt(stageNumberMatch[1], 10);
-    const topicNumber = topicData.stageOrder;
-    if (topicNumber === null || topicNumber === undefined) {
-      return NextResponse.json(
-        { error: "Topic stageOrder is missing" },
-        { status: 400 }
-      );
-    }
+    // Use stageId and topicId for paths - stable, never breaks on rename
+    const stageId = stage.id;
+    const topicIdForPath = topicData.id;
 
     // Process file uploads for new slides
     for (const [key, value] of formData.entries()) {
@@ -429,8 +450,12 @@ export async function POST(request: Request) {
         if (slideId) {
           // Get file extension
           const fileExtension = file.name.split(".").pop() || "jpg";
-          const fileName = `${slideId}.${fileExtension}`;
-          const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+          const filePath = getTopicSlideStoragePath(
+            stageId,
+            topicIdForPath,
+            slideId,
+            fileExtension
+          );
 
           // Convert File to ArrayBuffer for server-side upload
           const arrayBuffer = await file.arrayBuffer();
@@ -489,8 +514,12 @@ export async function POST(request: Request) {
 
         // Get file extension
         const fileExtension = file.name.split(".").pop() || "jpg";
-        const fileName = `${slideId}.${fileExtension}`;
-        const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+        const filePath = getTopicSlideStoragePath(
+          stageId,
+          topicIdForPath,
+          slideId,
+          fileExtension
+        );
 
         // Convert File to ArrayBuffer for server-side upload
         const arrayBuffer = await file.arrayBuffer();
@@ -593,8 +622,8 @@ export async function POST(request: Request) {
 
       // Create pairs of [orderIndex, slideId] for new slides
       const newSlidePositions: Array<[number, string]> = [];
-      if (creates && Array.isArray(creates) && createdSlideIds.length > 0) {
-        creates.forEach((createData: any, index: number) => {
+      if (filteredCreates.length > 0 && createdSlideIds.length > 0) {
+        filteredCreates.forEach((createData: any, index: number) => {
           if (index < createdSlideIds.length) {
             newSlidePositions.push([
               createData.orderIndex,
@@ -764,27 +793,11 @@ export async function POST(request: Request) {
     ]);
 
     if (topicDataForCleanup?.slides && topicDataForCleanup.slides.length > 0) {
-      const stage = topicDataForCleanup.stage;
       const topicData = topicDataForCleanup;
       
-      // Extract stage and topic numbers for file verification
-      let stageNumber: number | undefined;
-      let topicNumber: number | undefined;
-      
-      if (stage?.code) {
-        const stageNumberMatch = stage.code.match(/^S(\d+)$/);
-        if (stageNumberMatch) {
-          stageNumber = parseInt(stageNumberMatch[1], 10);
-        }
-      }
-      
-      if (topicData.stageOrder !== null && topicData.stageOrder !== undefined) {
-        topicNumber = topicData.stageOrder;
-      }
-      
       console.log("[bulk-save] [cleanup] Cleanup context:", {
-        stageNumber,
-        topicNumber,
+        stageId: topicDataForCleanup.stage?.id,
+        topicId: topicData.id,
         totalSlides: topicDataForCleanup.slides.length,
         slidesModifiedInThisRequest: slidesModifiedInThisRequest.size,
         protectedSlides: Array.from(slidesModifiedInThisRequest),
@@ -804,11 +817,21 @@ export async function POST(request: Request) {
           textHtml: slide.textHtml ? (slide.textHtml.substring(0, 50) + "...") : null,
         });
 
-        // SAFETY CHECK: Never delete slides that were just created/updated in this request
+        // SAFETY CHECK: Protect slides that were modified AND have content.
+        // Allow cleanup of empty newly-created slides (ghost slides) - they were created without
+        // a file upload and should not persist.
         if (slidesModifiedInThisRequest.has(slide.id)) {
+          const hasContent = slideHasContent(slide);
+          if (hasContent) {
+            console.log(
+              `[bulk-save] [cleanup] PROTECTED: Skipping slide ${slide.id} - was modified and has content`
+            );
+            continue;
+          }
           console.log(
-            `[bulk-save] [cleanup] PROTECTED: Skipping slide ${slide.id} - was modified in this request`
+            `[bulk-save] [cleanup] Allowing cleanup of empty modified slide: ${slide.id} (ghost slide)`
           );
+          emptySlideIds.push(slide.id);
           continue;
         }
 
@@ -991,6 +1014,25 @@ export async function POST(request: Request) {
         stack: error?.stack,
       });
       throw error;
+    }
+
+    // Enrich slides with signed URLs so the client can display images without a refetch
+    if (finalTopicData?.slides && finalTopicData.slides.length > 0) {
+      const updateFn = topicSlidesRepo.updateSignedUrl;
+      const slidesWithUrls = await Promise.all(
+        finalTopicData.slides.map(async (slide: any) => {
+          if (slide.kind !== "image" || !slide.imageUrl) {
+            return slide;
+          }
+          const signedUrl = await refreshSignedUrlIfStale(
+            slide,
+            slide.imageUrl,
+            updateFn
+          );
+          return { ...slide, signedUrl };
+        })
+      );
+      finalTopicData = { ...finalTopicData, slides: slidesWithUrls };
     }
 
     console.log("[bulk-save] SUCCESS: Returning response");

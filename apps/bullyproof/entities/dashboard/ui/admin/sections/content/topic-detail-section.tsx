@@ -134,22 +134,20 @@ function slideHasContent(
   isCertification: boolean,
   pendingFileUploads?: Map<string, File>
 ): boolean {
-  // Always show image slides, even if empty - users can add images to them later
-  if (slide.kind === "image") {
-    return true;
-  }
-  
   // Check if imageUrl exists and is not just a placeholder/invalid URL
   // Blob URLs are temporary and valid (from file uploads)
   const imageUrl = slide.imageUrl;
   const signedUrl = (slide as any).signedUrl; // Signed URL from API - null if file doesn't exist
-  
-  // For image slides:
-  // - If it's a blob URL, it's valid (temporary preview from upload)
-  // - If signedUrl exists, the file exists in storage
-  // - If signedUrl is null but imageUrl exists, the file doesn't exist (invalid)
+
+  // For image slides: require valid image content (blob, signedUrl, or pending upload).
+  // Empty image slides (no URL, broken URL, or missing file) are ghost slides - treat as having no content
+  // so they can be filtered on load and marked for deletion.
   const isBlobUrl = imageUrl?.startsWith("blob:");
   const hasValidImageUrl = isBlobUrl || (!!signedUrl && signedUrl.trim() !== "");
+  const hasPendingUpload = pendingFileUploads?.has(slide.id) || false;
+  if (slide.kind === "image") {
+    return hasValidImageUrl || hasPendingUpload;
+  }
   
   const hasVideoUrl = !!slide.videoUrl && slide.videoUrl.trim() !== "";
   const hasQuizData =
@@ -160,12 +158,11 @@ function slideHasContent(
     (slide as any).quizData.answers?.length >= 2;
   const hasTextHtml =
     !isCertification && slide.kind === "text" && !!slide.textHtml?.trim();
-  const hasPendingUpload = pendingFileUploads?.has(slide.id) || false;
 
   const hasContent = hasValidImageUrl || hasVideoUrl || hasQuizData || hasTextHtml || hasPendingUpload;
-  
-  // Log detailed info for debugging empty slides (non-image slides)
-  if (slide.kind !== "image" && !hasContent) {
+
+  // Log detailed info for debugging empty slides
+  if (!hasContent) {
     console.warn("[slideHasContent] Empty slide detected:", {
       id: slide.id,
       kind: slide.kind,
@@ -725,9 +722,9 @@ export function TopicDetailSection({
             }));
             
             // If we filtered out any slides (non-image slides), mark them for deletion
-            // Image slides are never marked for deletion even if empty
+            // Mark empty slides (including ghost image slides) for deletion
             const emptySlideIds = allSlides
-              .filter((slide) => slide.kind !== "image" && !slideHasContent(slide, isCertification))
+              .filter((slide) => !slideHasContent(slide, isCertification))
               .map((slide) => slide.id);
             
             if (emptySlideIds.length > 0) {
@@ -886,8 +883,7 @@ export function TopicDetailSection({
           signedUrl: slide.signedUrl ?? null,
         })) ?? [];
     
-    // Filter out empty slides (slides without any content)
-    // Note: Image slides are always shown, even if empty, so users can add images to them
+    // Filter out empty slides (including ghost image slides with no valid URL/signedUrl)
     console.log("[topic-detail] Loading slides - total slides from DB:", allSlides.length);
     const validSlides = allSlides.filter((slide) => {
       const hasContent = slideHasContent(slide, isCertification);
@@ -930,24 +926,22 @@ export function TopicDetailSection({
       orderIndex: index,
     }));
     
-    // If we filtered out any slides (non-image slides), mark them for deletion
-    // Image slides are never marked for deletion even if empty
+    // If we filtered out any slides (including empty image slides / ghost slides), mark them for deletion
     if (allSlides.length !== validSlides.length) {
       const emptySlideIds = allSlides
-        .filter((slide) => slide.kind !== "image" && !slideHasContent(slide, isCertification))
+        .filter((slide) => !slideHasContent(slide, isCertification))
         .map((slide) => slide.id);
       console.log("[topic-detail] Marking empty slides for deletion:", emptySlideIds);
       setDeletedSlideIds(new Set(emptySlideIds));
       setHasUnsavedChanges(true);
+    } else {
+      setHasUnsavedChanges(false);
+      setDeletedSlideIds(new Set());
     }
-    
+
     console.log("[topic-detail] Setting local slides:", initialSlides.length, "slides");
     setLocalSlides(initialSlides);
     setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
-    // Only reset hasUnsavedChanges if this is a new topic (user navigated to different topic)
-    // Don't reset if we're just re-rendering the same topic
-    setHasUnsavedChanges(false);
-    setDeletedSlideIds(new Set());
     setPendingFileUploads(new Map());
 
     // Cache signed URLs if they exist (don't invalidate - we just cached them!)
@@ -2411,6 +2405,7 @@ export function TopicDetailSection({
                   quizData: isCertification
                     ? (slide.quizData as QuizData | null)
                     : null,
+                  signedUrl: slide.signedUrl ?? null,
                 };
               }) ?? [];
           setLocalSlides(updatedSlides);
@@ -2502,16 +2497,17 @@ export function TopicDetailSection({
         setSaveProgress(90);
         setSaveStatus("Finalising changes...");
 
-        // Only refetch if we don't have complete data from the response
-        // The response should already contain all the updated slides
-        const needsRefetch = !responseTopic || !responseTopic.slides || responseTopic.slides.length === 0;
-        
+        // Refetch when: (1) response lacks slides, or (2) we had deletes – ensures server state is authoritative
+        const needsRefetch =
+          !responseTopic ||
+          !responseTopic.slides ||
+          responseTopic.slides.length === 0 ||
+          deletedSlideIds.size > 0;
+
         if (needsRefetch) {
-          // Only refetch if response doesn't have complete data
           if (isCertification) {
             await fetchTopicData(true);
           } else {
-            // For curriculum flow, use React Query refetch
             await refetchTopics();
           }
         }

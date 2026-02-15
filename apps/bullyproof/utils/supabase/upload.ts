@@ -1,28 +1,27 @@
 import { createBrowserClient } from "./client";
+import { getTopicSlideStoragePath } from "@/lib/slide-storage-path";
 
 /**
  * Generates a public URL for a topic slide based on its storage path structure.
  *
- * Files are stored in: slides/topics/s{stage}/t{topic}/{slideId}.{extension}
- * This function reconstructs the path and generates the public URL.
+ * Files are stored in: slides/topics/{stageId}/{topicId}/{slideId}.{extension}
+ * Uses IDs - stable, never breaks when stages or topics are renamed.
  *
  * @param slideId - The ID of the topic_slides row
- * @param stageNumber - The stage number (e.g., 1, 2, 3)
- * @param topicNumber - The topic number within the stage (e.g., 1, 2, 3)
+ * @param stageId - The UUID of the stage
+ * @param topicId - The UUID of the topic
  * @param extension - The file extension (e.g., "jpg", "png", "webp")
  * @returns The public URL for the slide image
  */
 export function getSlideImagePublicUrl(
   slideId: string,
-  stageNumber: number,
-  topicNumber: number,
+  stageId: string,
+  topicId: string,
   extension: string = "jpg"
 ): string {
   const supabase = createBrowserClient();
 
-  // Construct path: slides/topics/s{stage}/t{topic}/{slideId}.{extension}
-  const fileName = `${slideId}.${extension}`;
-  const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+  const filePath = getTopicSlideStoragePath(stageId, topicId, slideId, extension);
 
   // Get public URL
   const {
@@ -35,40 +34,37 @@ export function getSlideImagePublicUrl(
 /**
  * Uploads an image file to Supabase Storage and returns the public URL.
  *
- * Files are stored in a structured path: slides/topics/s{stage}/t{topic}/{slideId}.{extension}
- * This makes it easier to generate public URLs since we know the stage, topic, and slide ID.
+ * Files are stored in: slides/topics/{stageId}/{topicId}/{slideId}.{extension}
+ * Uses IDs - stable, never breaks when stages or topics are renamed.
  *
  * If a file with the same slideId already exists, it will be renamed with a timestamp
  * (e.g., {slideId}-{timestamp}.{extension}) before uploading the new file.
  *
  * @param file - The file to upload
  * @param slideId - The ID of the topic_slides row (used as filename)
- * @param stageNumber - The stage number (e.g., 1, 2, 3)
- * @param topicNumber - The topic number within the stage (e.g., 1, 2, 3)
+ * @param stageId - The UUID of the stage
+ * @param topicId - The UUID of the topic
  * @returns The public URL of the uploaded file
  * @throws Error if upload fails
  */
 export async function uploadSlideImage(
   file: File,
   slideId: string,
-  stageNumber: number,
-  topicNumber: number
+  stageId: string,
+  topicId: string
 ): Promise<string> {
   const supabase = createBrowserClient();
 
   // Get file extension
   const fileExtension = file.name.split(".").pop() || "jpg";
 
-  // Construct path: slides/topics/s{stage}/t{topic}/{slideId}.{extension}
-  // Note: Supabase Storage automatically creates intermediate folders if they don't exist
-  const fileName = `${slideId}.${fileExtension}`;
-  const filePath = `slides/topics/s${stageNumber}/t${topicNumber}/${fileName}`;
+  const filePath = getTopicSlideStoragePath(stageId, topicId, slideId, fileExtension);
 
   // Try to rename existing file with timestamp if it exists
   // This preserves old versions while allowing the new upload
   const timestamp = Date.now();
   const oldFileName = `${slideId}-${timestamp}.${fileExtension}`;
-  const oldFilePath = `slides/topics/s${stageNumber}/t${topicNumber}/${oldFileName}`;
+  const oldFilePath = `slides/topics/${stageId}/${topicId}/${oldFileName}`;
 
   // Attempt to move/rename the existing file (if it exists)
   // If the file doesn't exist, this will fail, which is fine - we'll just upload the new one
