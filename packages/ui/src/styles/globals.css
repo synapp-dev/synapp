@@ -208,6 +208,8 @@
   --animate-slide-left-fade-in-slowest: slide-left-fade-in 1s ease-out forwards;
   --animate-slide-right-fade-in-slowest: slide-right-fade-in 1s ease-out
     forwards;
+  --animate-slide-up-from-bottom: slideUpFromBottom 0.4s ease-out forwards;
+  --animate-banner-reveal: bannerReveal 0.6s ease-in-out forwards;
   --animate-bounce-right: bounce-right 1s ease-in-out infinite;
   --animate-bounce-right-subtle: bounce-right-subtle 1s ease-in-out infinite;
   --animate-bounce-right-delayed: bounce-right 1s ease-in-out infinite 0.3s;
@@ -411,6 +413,16 @@
     0% {
       opacity: 0;
       transform: translateY(100%);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes bannerReveal {
+    0% {
+      opacity: 0;
+      transform: translateY(24px);
     }
     100% {
       opacity: 1;

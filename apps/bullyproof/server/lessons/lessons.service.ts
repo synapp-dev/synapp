@@ -11,6 +11,7 @@ import {
   type GetRecommendationsParams,
 } from "./lessons.validators";
 import { lessonsRepo } from "./lessons.repo";
+import { schoolRepo } from "../school/school.repo";
 import { topicsRepo } from "../topics/topics.repo";
 import { curriculumRepo } from "../curriculum/curriculum.repo";
 import { classesRepo } from "../classes/classes.repo";
@@ -76,10 +77,25 @@ async function assertCanViewLessons(
   throw new Error("Unauthorized to view lessons");
 }
 
+function isValidUUID(str: string): boolean {
+  const uuidRegex =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 export const lessonsService = {
   async listLessons(ctx: AuthContext, query: unknown) {
-    const params: ListLessonsParams = listLessonsSchema.parse(query);
-    await assertCanViewLessons(ctx, params.teacherId, params.schoolId);
+    const params = listLessonsSchema.parse(query);
+    let resolvedSchoolId = params.schoolId;
+    if (params.schoolId && !isValidUUID(params.schoolId)) {
+      const schoolRows = await schoolRepo.getBySlug(params.schoolId);
+      if (schoolRows.length > 0) {
+        resolvedSchoolId = schoolRows[0].id;
+      } else {
+        return [];
+      }
+    }
+    await assertCanViewLessons(ctx, params.teacherId, resolvedSchoolId);
 
     if (params.teacherId) {
       return await lessonsRepo.getByTeacherId(params.teacherId, params.status);
@@ -89,8 +105,8 @@ export const lessonsService = {
       return await lessonsRepo.getByClassId(params.classId, params.status);
     }
 
-    if (params.schoolId) {
-      return await lessonsRepo.getBySchoolId(params.schoolId, params.status);
+    if (resolvedSchoolId) {
+      return await lessonsRepo.getBySchoolId(resolvedSchoolId, params.status);
     }
 
     if (ctx.userId) {

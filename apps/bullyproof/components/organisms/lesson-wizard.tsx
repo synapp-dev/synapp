@@ -708,7 +708,8 @@ export function LessonWizard({
       clearWizardParams();
       handleOpenChange(false);
 
-      router.push(`/schools/${schoolId}/lessons/${lessonId}/${redirectPath}`);
+      const url = `/schools/${schoolId}/lessons/${lessonId}/${redirectPath}`;
+      router.push(redirectPath === "run-lesson" ? `${url}?dialog=present` : url);
 
       setTimeout(() => {
         isRedirectingAfterCreationRef.current = false;

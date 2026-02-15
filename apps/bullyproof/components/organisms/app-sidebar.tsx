@@ -105,13 +105,6 @@ const data = {
       isActive: false,
       feature: "/school/classes", // Feature key for access control
     },
-    {
-      title: "Settings",
-      url: "/settings",
-      icon: Settings,
-      isActive: false,
-      feature: "/settings", // Feature key for access control
-    },
   ],
   navCurriculum: [
     {
@@ -150,6 +143,13 @@ const data = {
       icon: FileText,
       isActive: false,
       feature: "/school/reports", // Feature key for access control
+    },
+    {
+      title: "Settings",
+      url: "/settings",
+      icon: Settings,
+      isActive: false,
+      feature: "/settings", // Feature key for access control
     },
   ],
 };
@@ -554,7 +554,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     {filteredNavData.length > 0 && (
                       <NavMain
                         items={withSlug(filteredNavData)}
-                        title="Data"
+                        title="Admin"
                         enableStaggeredAnimation
                         startIndex={9}
                       />

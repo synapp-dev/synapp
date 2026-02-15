@@ -46,6 +46,7 @@ import {
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useSchoolStore } from "@/stores/school-store";
 import { cn } from "@workspace/ui/lib/utils";
+import { StorageImage } from "@/components/atoms/storage-image";
 
 // Union type for both school types
 type School = MeSchool | SchoolServiceSchool;
@@ -98,7 +99,7 @@ function extractSchoolMetadata(school: School | null) {
   return { stateText, sectorText, levelsText };
 }
 
-// Component for school icon with teal background
+// Component for school icon with teal background (fallback when no avatar)
 function SchoolIconBadge({ size = "md" }: { size?: "sm" | "md" }) {
   const iconSize = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
   const containerSize = size === "sm" ? "w-6 h-6" : "w-8 h-8";
@@ -110,6 +111,36 @@ function SchoolIconBadge({ size = "md" }: { size?: "sm" | "md" }) {
       <School className={`${iconSize} text-background`} />
     </div>
   );
+}
+
+// Component for active school: avatar if URL exists, otherwise placeholder badge
+function SchoolAvatarOrBadge({
+  school,
+  size = "md",
+}: {
+  school: School | null;
+  size?: "sm" | "md";
+}) {
+  const avatarUrl = school ? (school as any).avatarUrl ?? null : null;
+
+  if (avatarUrl) {
+    const widthPx = size === "sm" ? 22 : 29;
+    const widthClass = size === "sm" ? "w-5" : "w-7";
+    return (
+      <div className={`${widthClass} flex-shrink-0 ml-1`}>
+        <StorageImage
+          src={avatarUrl}
+          alt={school?.name || "School"}
+          width={widthPx}
+          height={widthPx}
+          className="w-full h-auto rounded object-contain"
+          style={{ width: widthPx, height: "auto" }}
+        />
+      </div>
+    );
+  }
+
+  return <SchoolIconBadge size={size} />;
 }
 
 // Component for displaying school metadata (state, sector, levels)
@@ -245,7 +276,15 @@ export function SchoolSwitcher() {
     const slugFromPath = match ? decodeURIComponent(match[1]!) : null;
 
     if (slugFromPath && schools.length > 0) {
-      // If on a school page, try to find the school from the list
+      // Prefer currentSchool from store when it matches - it has full data (avatarUrl, etc.)
+      // from SchoolStoreProvider/useSchoolBySlugQuery. The schools list (mySchools) uses
+      // vSchoolsEnriched which lacks avatarUrl.
+      const storeSlug = currentSchool?.slug;
+      if (currentSchool && storeSlug === slugFromPath) {
+        setSelectedSchool(currentSchool as School);
+        return;
+      }
+      // Fall back to finding from the list
       const fromList = schools.find(
         (s) =>
           typeof (s as any).slug === "string" &&
@@ -417,7 +456,7 @@ export function SchoolSwitcher() {
           >
             {displayState === "expanded" ? (
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <SchoolIconBadge size="md" />
+                <SchoolAvatarOrBadge school={selectedSchool} size="md" />
                 <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
                   <h3 className="font-medium truncate">
                     {selectedSchool?.name || "No school selected"}
@@ -426,7 +465,7 @@ export function SchoolSwitcher() {
                 </div>
               </div>
             ) : (
-              <SchoolIconBadge size="sm" />
+              <SchoolAvatarOrBadge school={selectedSchool} size="sm" />
             )}
           </SidebarMenuButton>
         ) : (
@@ -450,7 +489,7 @@ export function SchoolSwitcher() {
                     >
                       {selectedSchool?.name ? (
                         <div className="flex-shrink-0">
-                          <SchoolIconBadge size="md" />
+                          <SchoolAvatarOrBadge school={selectedSchool} size="md" />
                         </div>
                       ) : (
                         <School className="size-4 text-muted-foreground flex-shrink-0" />
@@ -477,7 +516,7 @@ export function SchoolSwitcher() {
                     )}
                   </>
                 ) : (
-                  <SchoolIconBadge size="sm" />
+                  <SchoolAvatarOrBadge school={selectedSchool} size="sm" />
                 )}
               </SidebarMenuButton>
             </PopoverTrigger>

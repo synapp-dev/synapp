@@ -35,6 +35,8 @@ interface ContentSectionProps {
   basePath: string;
   /** Optional school ID for school-specific routes */
   schoolId?: string;
+  /** When true, hide the header (used when parent provides its own header) */
+  hideHeader?: boolean;
 }
 
 export function ContentSection({
@@ -43,6 +45,7 @@ export function ContentSection({
   description,
   basePath,
   schoolId,
+  hideHeader = false,
 }: ContentSectionProps) {
   const router = useRouter();
   const [isAddSheetOpen, setIsAddSheetOpen] = useState(false);
@@ -118,18 +121,20 @@ export function ContentSection({
   return (
     <>
       <div className="space-y-6">
-        <div className={isAdmin ? "flex items-center justify-between" : ""}>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-            <p className="text-muted-foreground">{description}</p>
+        {!hideHeader && (
+          <div className={isAdmin ? "flex items-center justify-between" : ""}>
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
+              <p className="text-muted-foreground">{description}</p>
+            </div>
+            {isAdmin && (
+              <Button onClick={handleAddNewClick} size="sm">
+                <Plus className="h-4 w-4 mr-2" />
+                Add new stage
+              </Button>
+            )}
           </div>
-          {isAdmin && (
-            <Button onClick={handleAddNewClick} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
-              Add new stage
-            </Button>
-          )}
-        </div>
+        )}
         {stages.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <p className="font-medium mb-2">{emptyText}</p>
