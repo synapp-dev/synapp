@@ -13,7 +13,8 @@ export default async function LessonPage({
   const lesson = lessonData[0];
   
   // Determine redirect based on lesson status
-  if (lesson?.status === "feedback") {
+  // Feedback or completed: prepare is locked, default to feedback stage
+  if (lesson?.status === "feedback" || lesson?.status === "completed") {
     redirect(`/schools/${school_id}/lessons/${lesson_id}/feedback`);
   }
   if (lesson?.status === "ready" || lesson?.status === "in_progress") {
