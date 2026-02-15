@@ -19,7 +19,10 @@
     "generate:sql": "tsx scripts/generate-sql.ts",
     "fix:schema": "tsx scripts/fix-drizzle-schema.ts",
     "pull-and-fix-schema": "tsx scripts/pull-and-fix-schema.ts",
-    "fix:certification-order": "tsx scripts/fix-certification-topic-order.ts"
+    "fix:certification-order": "tsx scripts/fix-certification-topic-order.ts",
+    "migrate:slide-paths": "tsx scripts/migrate-slide-storage-paths.ts",
+    "migrate:slide-paths-remote": "tsx scripts/invoke-migrate-edge-function.ts",
+    "rollback:slide-paths": "tsx scripts/rollback-slide-storage-paths.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
