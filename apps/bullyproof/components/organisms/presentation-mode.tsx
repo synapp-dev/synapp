@@ -431,10 +431,17 @@ export function PresentationMode({
   // Loading state
   if (isLoading) {
     return (
-      <div className="relative w-full h-full flex items-center justify-center">
-        <div className="text-center text-muted-foreground">
-          <p>Loading slides...</p>
-        </div>
+      <div className="relative w-full min-h-screen flex items-center justify-center pb-20">
+        <Card className="flex flex-col items-center justify-center gap-12 p-12 bg-transparent border-0 shadow-none">
+          <Image
+            src="/images/bullyproof-logo.svg"
+            alt="Bullyproof"
+            width={600}
+            height={192}
+            className="h-72 w-auto object-contain"
+          />
+          <p className="text-[var(--brand-bullyproof-primary)] text-4xl font-medium capitalize animate-pulse">Loading slides...</p>
+        </Card>
       </div>
     );
   }
