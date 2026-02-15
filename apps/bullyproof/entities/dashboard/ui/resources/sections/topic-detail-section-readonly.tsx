@@ -14,8 +14,8 @@ import {
   ChevronRight,
   ChevronDown,
   FileText,
+  Download,
 } from "lucide-react";
-import { Badge } from "@workspace/ui/components/badge";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   SlideRenderer,
@@ -28,12 +28,16 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@workspace/ui/components/drawer";
+import { Badge } from "@workspace/ui/components/badge";
 import {
   useTopicsByStage,
 } from "@/entities/topics/model/store-enhanced";
 import { useStageBySlug } from "@/entities/stages/model/store";
+import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { createSlug } from "@/utils/slug";
+import { getAuthHeaders } from "@/lib/api/fetcher.client";
+import { toast } from "sonner";
 
 type Topic = typeof topics.$inferSelect & {
   stage?: any;
@@ -58,6 +62,11 @@ export function TopicDetailSectionReadonly({
   const [error, setError] = useState<string | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [showGalleryDrawer, setShowGalleryDrawer] = useState(false);
+  const [lessonPlans, setLessonPlans] = useState<
+    Array<{ id: string; fileName: string; topicId: string }>
+  >([]);
+  const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
+  const [isDownloadingLessonPlan, setIsDownloadingLessonPlan] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
   const slideGalleryRef = useRef<HTMLDivElement | null>(null);
   const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
@@ -129,6 +138,65 @@ export function TopicDetailSectionReadonly({
       setIsLoading(false);
     }
   }, [stageError, isLoadingStage, isLoadingTopics]);
+
+  // Fetch lesson plans when topic loads
+  useEffect(() => {
+    if (!topic?.id) {
+      setLessonPlans([]);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      setIsLoadingLessonPlans(true);
+      try {
+        const result = await topicsApi.lessonPlans.list(topic.id);
+        if (mounted && result.data) {
+          setLessonPlans(result.data);
+        }
+      } catch {
+        if (mounted) setLessonPlans([]);
+      } finally {
+        if (mounted) setIsLoadingLessonPlans(false);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [topic?.id]);
+
+  const handleLessonPlanDownload = useCallback(async () => {
+    if (lessonPlans.length === 0) return;
+    const planId = lessonPlans[0].id;
+    setIsDownloadingLessonPlan(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/topic-lesson-plans/${planId}/download`, {
+        headers,
+      });
+      if (!res.ok) {
+        toast.error("Failed to download lesson plan");
+        return;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition");
+      const match = disposition?.match(/filename="?([^";\n]+)"?/);
+      const filename = match?.[1] ?? "lesson-plan.pdf";
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = objectUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      toast.error("Failed to download lesson plan", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setIsDownloadingLessonPlan(false);
+    }
+  }, [lessonPlans]);
 
   // Helper function to check if a slide has content
   const slideHasContent = (slide: SlideData): boolean => {
@@ -288,17 +356,38 @@ export function TopicDetailSectionReadonly({
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{topic.title}</h1>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              {topic.stageOrder !== null && (
+                <Badge variant="secondary" className="bg-muted font-bold">
+                  L{topic.stageOrder}
+                </Badge>
+              )}
+              {topic.title}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {stage.name} • {slides.length} {slides.length === 1 ? "slide" : "slides"}
             </p>
           </div>
         </div>
-        {topic.stageOrder !== null && (
-          <Badge variant="secondary" className="text-sm">
-            Topic {topic.stageOrder}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {lessonPlans.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLessonPlanDownload}
+              disabled={isDownloadingLessonPlan}
+            >
+              {isDownloadingLessonPlan ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              <span className="sr-only sm:not-sr-only">
+                Download lesson plan
+              </span>
+            </Button>
+          )}
+        </div>
       </div>
 
       <Separator className="flex-shrink-0" />
