@@ -131,7 +131,8 @@ const ANIMATION_DELAYS = {
   rest: "1700ms",
 } as const;
 
-const STATS_COUNTUP_DELAY = 2.7; // seconds - matches card reveal (1.7s) + 1s extra
+const CARD_STAGGER_MS = 120;
+const CARD_ANIMATION_DURATION_S = 0.3;
 
 function SchoolHomeStatsPanel({ schoolSlug }: { schoolSlug: string }) {
   const { data: stats, isLoading } = useSchoolStatsQuery(
@@ -188,6 +189,15 @@ function SchoolHomeStatsPanel({ schoolSlug }: { schoolSlug: string }) {
       })
     : null;
 
+  const restMs = 1700;
+  const cardAnimMs = CARD_ANIMATION_DURATION_S * 1000;
+  const cardDelays = [0, 1, 2, 3].map((i) => restMs + i * CARD_STAGGER_MS);
+  // Number starts towards end of card slide - overlap for slick feel
+  const numberDelayOffsetMs = cardAnimMs * 0.6;
+  const numberDelays = [0, 1, 2, 3].map(
+    (i) => restMs + i * CARD_STAGGER_MS + numberDelayOffsetMs
+  );
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <SchoolInfoCard
@@ -196,7 +206,8 @@ function SchoolHomeStatsPanel({ schoolSlug }: { schoolSlug: string }) {
         value={daysBullyProof}
         description={formattedStartDate ?? "—"}
         countUpDuration={1.5}
-        countUpDelay={STATS_COUNTUP_DELAY}
+        cardAnimationDelayMs={cardDelays[0]}
+        numberAnimationDelayMs={numberDelays[0]}
       />
       <Link
         href={`/schools/${schoolSlug}/teachers`}
@@ -207,7 +218,8 @@ function SchoolHomeStatsPanel({ schoolSlug }: { schoolSlug: string }) {
           title="AP Teachers"
           value={teacherCount}
           description={`${apTeacherPercent}% of staff`}
-          countUpDelay={STATS_COUNTUP_DELAY}
+          cardAnimationDelayMs={cardDelays[1]}
+          numberAnimationDelayMs={numberDelays[1]}
         />
       </Link>
       <Link
@@ -219,7 +231,8 @@ function SchoolHomeStatsPanel({ schoolSlug }: { schoolSlug: string }) {
           title="Classes"
           value={classCount}
           description="In your school"
-          countUpDelay={STATS_COUNTUP_DELAY}
+          cardAnimationDelayMs={cardDelays[2]}
+          numberAnimationDelayMs={numberDelays[2]}
         />
       </Link>
       <Link
@@ -231,7 +244,8 @@ function SchoolHomeStatsPanel({ schoolSlug }: { schoolSlug: string }) {
           title="Lessons Completed"
           value={completedLessonCount}
           description="This school year"
-          countUpDelay={STATS_COUNTUP_DELAY}
+          cardAnimationDelayMs={cardDelays[3]}
+          numberAnimationDelayMs={numberDelays[3]}
         />
       </Link>
     </div>

@@ -10,6 +10,7 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 
 const DEFAULT_COUNTUP_DELAY = 2.7;
 const DEFAULT_COUNTUP_DURATION = 1.2;
+const CARD_ANIMATION_DURATION = 0.3;
 
 export type SchoolInfoCardProps = {
   icon: LucideIcon;
@@ -19,6 +20,10 @@ export type SchoolInfoCardProps = {
   countUpDuration?: number;
   countUpDelay?: number;
   countUpSuffix?: string;
+  /** Delay in ms for staggered slide-in from top (left to right) */
+  cardAnimationDelayMs?: number;
+  /** Delay in ms for number fade-in - offset to match card stagger */
+  numberAnimationDelayMs?: number;
   isLoading?: boolean;
 };
 
@@ -30,6 +35,8 @@ export function SchoolInfoCard({
   countUpDuration = DEFAULT_COUNTUP_DURATION,
   countUpDelay = DEFAULT_COUNTUP_DELAY,
   countUpSuffix,
+  cardAnimationDelayMs,
+  numberAnimationDelayMs,
   isLoading = false,
 }: SchoolInfoCardProps) {
   if (isLoading) {
@@ -44,19 +51,35 @@ export function SchoolInfoCard({
     );
   }
 
+  const cardStyle =
+    cardAnimationDelayMs !== undefined
+      ? {
+          opacity: 0,
+          animation: `slide-down-fade-in ${CARD_ANIMATION_DURATION}s ease-out ${cardAnimationDelayMs}ms forwards`,
+        }
+      : undefined;
+
   return (
-    <Card className="h-full py-1 px-0 transition-all shadow hover:shadow-md hover:border-primary/50">
+    <Card
+      className="h-full py-1 px-0 transition-all shadow hover:shadow-md hover:border-primary/50"
+      style={cardStyle}
+    >
       <CardContent className="flex flex-col items-stretch gap-3 pt-4 pb-4 px-6 text-left">
         <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
           <Icon className="h-5 w-5 shrink-0" />
           {title}
         </p>
-        <span className="text-6xl font-bold tabular-nums block text-right">
+        <span
+          className="text-6xl font-bold tabular-nums block text-right opacity-0"
+          style={{
+            animation: `slide-up-fade-in ${countUpDuration}s ease-out ${(numberAnimationDelayMs ?? countUpDelay * 1000) / 1000}s forwards`,
+          }}
+        >
           <CountUp
             start={0}
             end={value}
             duration={countUpDuration}
-            delay={countUpDelay}
+            delay={(numberAnimationDelayMs ?? countUpDelay * 1000) / 1000}
             suffix={countUpSuffix}
           />
         </span>
