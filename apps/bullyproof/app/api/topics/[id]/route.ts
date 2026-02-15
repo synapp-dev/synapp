@@ -120,9 +120,9 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {
     console.error(e);
-    return NextResponse.json(
-      { error: e.message ?? "Internal error" },
-      { status: 500 }
-    );
+    const message = e.message ?? "Internal error";
+    // Use 409 Conflict for "cannot delete" due to dependencies (user-friendly)
+    const status = message.includes("Cannot delete topic") ? 409 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

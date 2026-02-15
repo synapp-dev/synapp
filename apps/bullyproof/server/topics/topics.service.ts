@@ -18,6 +18,7 @@ import {
 } from "./topics.validators";
 import { topicsRepo } from "./topics.repo";
 import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
+import { lessonsRepo } from "@/server/lessons/lessons.repo";
 import { assertFeature } from "@/server/features/features.service";
 import { createServerClient } from "@/utils/supabase/server";
 import { refreshSignedUrlIfStale } from "@/server/lib/signed-url";
@@ -161,6 +162,15 @@ export const topicsService = {
     if (!topicRow.length) {
       throw new Error("Topic not found");
     }
+
+    // Block deletion if topic has dependent lessons (foreign key would otherwise fail)
+    const dependentLessons = await lessonsRepo.getByTopicId(id);
+    if (dependentLessons.length > 0) {
+      throw new Error(
+        `Cannot delete topic: it has ${dependentLessons.length} lesson(s) that use it. Delete or reassign those lessons first.`
+      );
+    }
+
     const stageId = topicRow[0].stageId;
 
     await topicsRepo.delete(id);

@@ -102,6 +102,10 @@ export const lessonsRepo = {
       .where(eq(lessons.status, status))
       .orderBy(desc(lessons.createdAt)),
 
+  /** Returns lessons for a topic (used to block topic deletion when lessons exist) */
+  getByTopicId: (topicId: string) =>
+    db.select().from(lessons).where(eq(lessons.topicId, topicId)),
+
   getBySchoolId: (schoolId: string, status?: string) =>
     db
       .select()
