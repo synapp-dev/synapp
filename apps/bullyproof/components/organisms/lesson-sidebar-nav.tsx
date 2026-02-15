@@ -127,8 +127,11 @@ export function LessonSidebarNav({
     : [];
   const isPlatformAdminOrDev =
     platformRoles.includes("PLATFORM_ADMIN") || platformRoles.includes("INTRADARK_DEV");
+  // For feedback/completed: only admins can cancel. Owners cannot cancel once lesson is done.
+  const isFeedbackOrCompleted = lessonData?.status === "feedback" || lessonData?.status === "completed";
   const canCancelLesson =
-    hasCancelFeature && (isLessonCreator || isPlatformAdminOrDev);
+    hasCancelFeature &&
+    (isFeedbackOrCompleted ? isPlatformAdminOrDev : (isLessonCreator || isPlatformAdminOrDev));
 
   const handleCancelLesson = async () => {
     setIsCancelling(true);
