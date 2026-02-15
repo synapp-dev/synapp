@@ -156,7 +156,18 @@ export const topicsService = {
   async deleteTopic(ctx: AuthContext, id: string) {
     await assertCanManageTopics(ctx);
 
+    // Get stageId before deleting so we can re-index remaining topics
+    const topicRow = await topicsRepo.getById(id);
+    if (!topicRow.length) {
+      throw new Error("Topic not found");
+    }
+    const stageId = topicRow[0].stageId;
+
     await topicsRepo.delete(id);
+
+    // Re-number stage_order for remaining topics so there are no gaps (1, 2, 3...)
+    await topicsRepo.normalizeStageOrder(stageId);
+
     return { success: true };
   },
 

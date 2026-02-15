@@ -570,13 +570,12 @@ function TopicCard({
               )}
             </div>
           ) : (
-            // Normal mode: show order number in blue bold text and topic title
+            // Normal mode: show sequential position (1-based) - not stage_order,
+            // so numbers stay 1,2,3... after deletions without re-indexing DB
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              {topic.stageOrder !== null && (
-                <span className="text-blue-500 font-bold text-xs flex-shrink-0">
-                  {topic.stageOrder}
-                </span>
-              )}
+              <span className="text-blue-500 font-bold text-xs flex-shrink-0">
+                {cardIndex + 1}
+              </span>
               <div
                 ref={marqueeContainerRef}
                 className="min-w-0 flex-1 overflow-hidden relative"
@@ -1596,6 +1595,9 @@ export function StageDetailSection({
                             (t) => t.id === activeId
                           );
                           if (!draggedTopic) return null;
+                          const draggedIndex = displayTopics.findIndex(
+                            (t) => t.id === activeId
+                          );
                           const { imageSlidesList } =
                             getSlideStatsForCard(draggedTopic);
                           return (
@@ -1616,11 +1618,9 @@ export function StageDetailSection({
                               </div>
                               <div className="w-full text-xs font-medium px-4 py-2 flex items-center justify-between flex-shrink-0 bg-muted text-primary">
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  {draggedTopic.stageOrder !== null && (
-                                    <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary font-semibold text-xs flex-shrink-0">
-                                      {draggedTopic.stageOrder}
-                                    </div>
-                                  )}
+                                  <div className="flex items-center justify-center w-5 h-5 rounded-full bg-primary/20 text-primary font-semibold text-xs flex-shrink-0">
+                                    {draggedIndex >= 0 ? draggedIndex + 1 : 0}
+                                  </div>
                                   <span className="truncate font-medium">
                                     {draggedTopic.title}
                                   </span>

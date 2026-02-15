@@ -161,6 +161,39 @@ export const topicsRepo = {
 
   delete: (id: string) => db.delete(topics).where(eq(topics.id, id)),
 
+  // Renumber stage_order for all topics in a stage to be sequential (1, 2, 3...).
+  // Call after deleting a topic to fill gaps and prevent skipped numbers.
+  normalizeStageOrder: async (stageId: string) => {
+    const allTopics = await db
+      .select()
+      .from(topics)
+      .where(eq(topics.stageId, stageId))
+      .orderBy(asc(topics.stageOrder), asc(topics.createdAt));
+
+    if (allTopics.length === 0) {
+      return 0;
+    }
+
+    // Phase 1: Move all to temp indices to avoid conflicts
+    const tempOffset = 30000;
+    for (let i = 0; i < allTopics.length; i++) {
+      await db
+        .update(topics)
+        .set({ stageOrder: tempOffset + i })
+        .where(eq(topics.id, allTopics[i].id));
+    }
+
+    // Phase 2: Assign sequential 1-based stage_order
+    for (let i = 0; i < allTopics.length; i++) {
+      await db
+        .update(topics)
+        .set({ stageOrder: i + 1 })
+        .where(eq(topics.id, allTopics[i].id));
+    }
+
+    return allTopics.length;
+  },
+
   // Reorder topics based on an array of topic IDs in the desired order
   reorderTopics: async (stageId: string, topicIds: string[]) => {
     // First, move all topics to temporary high indices to avoid conflicts
