@@ -18,6 +18,7 @@ import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { LessonTopicThumbnail } from "@/entities/lessons/ui/lesson-card";
 import { useMeStore } from "@/entities/me/model/store";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const RATING_LABELS: Record<number, string> = {
@@ -64,6 +65,7 @@ export interface LessonForFeedback {
 interface LessonFeedbackFormProps {
   // Single lesson mode (for feedback page)
   lessonId?: string;
+  schoolSlug?: string;
   
   // Multi-lesson mode (for dashboard)
   lessons?: LessonForFeedback[];
@@ -81,6 +83,7 @@ interface LessonFeedbackFormProps {
 
 export function LessonFeedbackForm({
   lessonId,
+  schoolSlug,
   lessons,
   open,
   onOpenChange,
@@ -117,6 +120,7 @@ export function LessonFeedbackForm({
   const [comments, setComments] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
 
   // Fetch lesson details for single-lesson mode (to show preview)
   const { data: singleLessonDetails, isLoading: isLoadingLessonDetails } = useQuery({
@@ -196,6 +200,7 @@ export function LessonFeedbackForm({
     setRating(null);
     setComments("");
     setError(null);
+    setFeedbackSubmitted(false);
   }, [currentLessonIndex]);
 
   // Initialize form with existing feedback
@@ -267,8 +272,10 @@ export function LessonFeedbackForm({
           onComplete?.();
         }
       } else {
-        // Single lesson mode: close dialog and refresh
-        setIsOpen(false);
+        // Single lesson mode: show thank you state in dialog
+        setRating(null);
+        setComments("");
+        setFeedbackSubmitted(true);
         router.refresh();
       }
     } catch (err: any) {
@@ -443,123 +450,143 @@ export function LessonFeedbackForm({
                 </div>
               )}
 
-              {/* SVG Gradient Definition */}
-              <svg width="0" height="0" className="absolute">
-                <defs>
-                  <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#fbbf24" />
-                    <stop offset="50%" stopColor="#f59e0b" />
-                    <stop offset="100%" stopColor="#d97706" />
-                  </linearGradient>
-                </defs>
-              </svg>
-              
-              {/* Star Rating */}
-              <div className="space-y-2 flex flex-col items-center py-4">
-                <div
-                  className="flex gap-2 justify-center"
-                  role="radiogroup"
-                  aria-label="Lesson rating"
-                >
-                  {[1, 2, 3, 4, 5].map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => handleRatingClick(value)}
-                      onMouseEnter={() => handleMouseEnter(value)}
-                      onMouseLeave={handleMouseLeave}
-                      className="group relative inline-block"
-                      aria-label={`Rate ${value} out of 5 stars`}
-                      aria-pressed={rating === value}
-                      disabled={isSubmitting}
+              {feedbackSubmitted && !isMultiLessonMode ? (
+                /* Thank you state - single lesson mode after successful submit */
+                <div className="flex flex-col items-center gap-6 py-6">
+                  <p className="text-lg font-semibold text-foreground">Thanks for your feedback!</p>
+                  {schoolSlug && (
+                    <Button
+                      asChild
+                      className="w-full sm:w-auto bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
                     >
-                      <Star
-                        className={`h-11 w-11 transition-all ${
-                          value <= (filledRating ?? 0)
-                            ? "text-yellow-500"
-                            : "fill-none text-muted-foreground"
-                        } group-hover:text-yellow-500`}
-                        style={
-                          value <= (filledRating ?? 0)
-                            ? {
-                                fill: "url(#gold-gradient)",
-                                stroke: "url(#gold-gradient)",
-                              }
-                            : undefined
-                        }
-                      />
-                    </button>
-                  ))}
-                </div>
-                <p key={String(hoveredRating ?? rating)} className="text-base animate-slide-up-fade-in font-semibold text-foreground min-h-[1.5rem]">
-                  {!rating && !hoveredRating
-                    ? "Click a star to rate this lesson"
-                    : RATING_LABELS[hoveredRating ?? rating]}
-                </p>
-              </div>
-
-              {/* Comments */}
-              <div className="space-y-2">
-                <Label htmlFor="comments" className="text-sm">Comments (Optional)</Label>
-                <Textarea
-                  id="comments"
-                  placeholder="Share your thoughts about this lesson..."
-                  value={comments}
-                  onChange={(e) => setComments(e.target.value)}
-                  rows={3}
-                  disabled={isSubmitting}
-                  className="text-sm"
-                />
-              </div>
-
-              {/* Error Message */}
-              {error && (
-                <div className="p-2.5 bg-destructive/10 border border-destructive/20 rounded-md">
-                  <p className="text-xs text-destructive">{error}</p>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="flex justify-between gap-2 pt-2">
-                <Button
-                  variant="ghost"
-                  onClick={handleSkip}
-                  disabled={isSubmitting}
-                  size="default"
-                >
-                  {isMultiLessonMode && currentLessonIndex < totalLessons - 1 
-                    ? "Skip" 
-                    : "Later"}
-                </Button>
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!rating || isSubmitting}
-                  className="min-w-[140px] text-sm bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
-                  size="default"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : existingFeedback ? (
-                    <>
-                      Update Feedback
-                      <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
-                    </>
-                  ) : isMultiLessonMode && currentLessonIndex < totalLessons - 1 ? (
-                    <>
-                      Submit & Next
-                      <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
-                    </>
-                  ) : (
-                    <>
-                      Submit
-                      <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
-                    </>
+                      <Link href={`/schools/${schoolSlug}/lessons`}>
+                        Return to lessons
+                        <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                      </Link>
+                    </Button>
                   )}
-                </Button>
-              </div>
+                </div>
+              ) : (
+                <>
+                  {/* SVG Gradient Definition */}
+                  <svg width="0" height="0" className="absolute">
+                    <defs>
+                      <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#fbbf24" />
+                        <stop offset="50%" stopColor="#f59e0b" />
+                        <stop offset="100%" stopColor="#d97706" />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  
+                  {/* Star Rating */}
+                  <div className="space-y-2 flex flex-col items-center py-4">
+                    <div
+                      className="flex gap-2 justify-center"
+                      role="radiogroup"
+                      aria-label="Lesson rating"
+                    >
+                      {[1, 2, 3, 4, 5].map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => handleRatingClick(value)}
+                          onMouseEnter={() => handleMouseEnter(value)}
+                          onMouseLeave={handleMouseLeave}
+                          className="group relative inline-block"
+                          aria-label={`Rate ${value} out of 5 stars`}
+                          aria-pressed={rating === value}
+                          disabled={isSubmitting}
+                        >
+                          <Star
+                            className={`h-11 w-11 transition-all ${
+                              value <= (filledRating ?? 0)
+                                ? "text-yellow-500"
+                                : "fill-none text-muted-foreground"
+                            } group-hover:text-yellow-500`}
+                            style={
+                              value <= (filledRating ?? 0)
+                                ? {
+                                    fill: "url(#gold-gradient)",
+                                    stroke: "url(#gold-gradient)",
+                                  }
+                                : undefined
+                            }
+                          />
+                        </button>
+                      ))}
+                    </div>
+                    <p key={String(hoveredRating ?? rating)} className="text-base animate-slide-up-fade-in font-semibold text-foreground min-h-[1.5rem]">
+                      {!rating && !hoveredRating
+                        ? "Click a star to rate this lesson"
+                        : RATING_LABELS[hoveredRating ?? rating]}
+                    </p>
+                  </div>
+
+                  {/* Comments */}
+                  <div className="space-y-2">
+                    <Label htmlFor="comments" className="text-sm">Comments (Optional)</Label>
+                    <Textarea
+                      id="comments"
+                      placeholder="Share your thoughts about this lesson..."
+                      value={comments}
+                      onChange={(e) => setComments(e.target.value)}
+                      rows={3}
+                      disabled={isSubmitting}
+                      className="text-sm"
+                    />
+                  </div>
+
+                  {/* Error Message */}
+                  {error && (
+                    <div className="p-2.5 bg-destructive/10 border border-destructive/20 rounded-md">
+                      <p className="text-xs text-destructive">{error}</p>
+                    </div>
+                  )}
+
+                  {/* Submit Button */}
+                  <div className="flex justify-between gap-2 pt-2">
+                    <Button
+                      variant="ghost"
+                      onClick={handleSkip}
+                      disabled={isSubmitting}
+                      size="default"
+                    >
+                      {isMultiLessonMode && currentLessonIndex < totalLessons - 1 
+                        ? "Skip" 
+                        : "Later"}
+                    </Button>
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!rating || isSubmitting}
+                      className="min-w-[140px] text-sm bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90 gap-1"
+                      size="default"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : existingFeedback ? (
+                        <>
+                          Update Feedback
+                          <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                        </>
+                      ) : isMultiLessonMode && currentLessonIndex < totalLessons - 1 ? (
+                        <>
+                          Submit & Next
+                          <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                        </>
+                      ) : (
+                        <>
+                          Submit
+                          <ChevronsRight className="h-4 w-4 shrink-0 [animation:var(--animate-bounce-right)]" />
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </DialogContent>

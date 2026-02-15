@@ -12,7 +12,7 @@ export default async function LessonFeedbackPage({
 }: {
   params: Promise<{ school_id: string; lesson_id: string }>;
 }) {
-  const { lesson_id } = await params;
+  const { school_id, lesson_id } = await params;
 
-  return <LessonFeedbackForm lessonId={lesson_id} />;
+  return <LessonFeedbackForm lessonId={lesson_id} schoolSlug={school_id} />;
 }
