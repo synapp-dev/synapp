@@ -986,6 +986,14 @@ export function TopicDetailSection({
   // Use local slides instead of topic.slides
   const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
   const currentSlide = slides[currentSlideIndex];
+
+  // Keep currentSlideIndex in bounds when slides list changes (e.g. after bulk delete)
+  useEffect(() => {
+    if (slides.length === 0) return;
+    if (currentSlideIndex >= slides.length) {
+      setCurrentSlideIndex(Math.max(0, slides.length - 1));
+    }
+  }, [slides.length, currentSlideIndex]);
   const canGoPrev = currentSlideIndex > 0;
   const canGoNext = currentSlideIndex < slides.length - 1;
   const isImageOrVideo =
@@ -3688,10 +3696,13 @@ export function TopicDetailSection({
                   (s) => !newDeletedIds.has(s.id)
                 );
                 const currentSlideId = currentSlide?.id;
-                if (
-                  currentSlideId &&
-                  newDeletedIds.has(currentSlideId)
-                ) {
+                // Always ensure currentSlideIndex is valid after bulk delete
+                if (currentSlideId && remainingSlides.some((s) => s.id === currentSlideId)) {
+                  // Current slide survived: find its new index
+                  const newIndex = remainingSlides.findIndex((s) => s.id === currentSlideId);
+                  if (newIndex >= 0) setCurrentSlideIndex(newIndex);
+                } else {
+                  // Current slide was deleted or undefined: clamp to valid range
                   const newIndex = Math.max(
                     0,
                     Math.min(currentSlideIndex, remainingSlides.length - 1)
