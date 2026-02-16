@@ -501,8 +501,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader className="mb-2 items-center">
-        <Link href="/" className="block">
+        <SidebarHeader className="mb-2 items-center">
+          <Link href="/" className="block">
           {displayState === "expanded" ? (
             <Image
               src="/images/bullyproof-logo.svg"
