@@ -11,6 +11,7 @@ import { Star, FileText, AlertTriangle, BookOpen, ChevronLeft } from "lucide-rea
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { TopicOption, ClassOption } from "@/types/lesson-wizard";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { classesApi } from "@/entities/classes/api/endpoints";
@@ -33,7 +34,7 @@ type TopicWithSlides = TopicOption & {
   slides?: Array<{
     id: string;
     kind: string;
-    orderIndex: number;
+    position: string;
     signedUrl?: string | null;
   }>;
 };
@@ -46,7 +47,7 @@ function TopicThumbnail({ topic }: { topic: TopicWithSlides }) {
     if (!topic.slides) return [];
     return topic.slides
       .filter((slide) => slide.kind === "image")
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+      .sort(compareSlidesByPosition);
   }, [topic.slides]);
 
   const firstImageSlide = imageSlides[0];

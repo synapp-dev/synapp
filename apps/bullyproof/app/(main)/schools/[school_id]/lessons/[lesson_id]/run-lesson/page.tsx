@@ -36,6 +36,7 @@ import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-di
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@workspace/ui/components/separator";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { SlideRenderer, type SlideData } from "@/components/organisms/slide-renderer";
 
 // Live countdown component for scheduled lessons
@@ -357,10 +358,10 @@ export default function LessonRunLessonPage({
   const rawSlides = liveStateData?.data?.slides ?? [];
   const formattedSlides: SlideData[] = Array.isArray(rawSlides)
     ? rawSlides
-      .map((slide: { topicSlideId: string; kind: string; orderIndex: number; textHtml?: string | null; imageUrl?: string | null; videoUrl?: string | null; videoStartS?: number | null; videoEndS?: number | null; effectiveNotes?: string | null; signedUrl?: string | null; signedImageUrl?: string | null }) => ({
+      .map((slide: { topicSlideId: string; kind: string; position: string; textHtml?: string | null; imageUrl?: string | null; videoUrl?: string | null; videoStartS?: number | null; videoEndS?: number | null; effectiveNotes?: string | null; signedUrl?: string | null; signedImageUrl?: string | null }) => ({
         id: slide.topicSlideId,
         kind: slide.kind as SlideData["kind"],
-        orderIndex: slide.orderIndex,
+        position: slide.position,
         textHtml: slide.textHtml,
         imageUrl: slide.imageUrl,
         videoUrl: slide.videoUrl,
@@ -370,7 +371,7 @@ export default function LessonRunLessonPage({
         signedUrl: slide.signedUrl ?? null,
         signedImageUrl: slide.signedImageUrl ?? slide.signedUrl ?? null,
       }))
-      .sort((a: SlideData, b: SlideData) => a.orderIndex - b.orderIndex)
+      .sort(compareSlidesByPosition)
     : [];
   const previewSlideIndex = isInProgress && currentIndex != null ? currentIndex : 0;
   const previewSlide = formattedSlides[previewSlideIndex] ?? null;

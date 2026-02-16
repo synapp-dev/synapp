@@ -25,6 +25,12 @@ export type LessonWithDetails = Lesson & {
   }> | null;
 };
 
+// Reject "undefined", "null", and non-UUID strings to prevent invalid API calls
+function isValidLessonId(id: string | undefined | null): boolean {
+  if (!id || id === "undefined" || id === "null") return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 // React Query hooks for lessons
 export function useLessons(filters?: {
   schoolId?: string;
@@ -73,6 +79,7 @@ export function useLessons(filters?: {
     if (!listQuery.data) return [];
     
     return listQuery.data.filter((lesson) => {
+      if (!isValidLessonId(lesson.id)) return false;
       const cached = queryClient.getQueryData<LessonWithDetails | null>(
         lessonsKeys.detail(lesson.id)
       );
@@ -94,7 +101,7 @@ export function useLessons(filters?: {
         }
         return result.data ?? null;
       },
-      enabled: !!lesson.id && listQuery.isSuccess,
+      enabled: isValidLessonId(lesson.id) && listQuery.isSuccess,
       staleTime: 2 * 60 * 1000,
       gcTime: 5 * 60 * 1000,
       initialData: () => {

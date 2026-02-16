@@ -12,6 +12,7 @@ import {
   Component,
   Ticket,
   TicketCheck,
+  Database,
 } from "lucide-react";
 
 export interface AdminItem {
@@ -124,6 +125,15 @@ export const adminItemsConfig: AdminItem[] = [
     featureKey: "/admin/tickets",
     enabled: true,
   },
+  {
+    title: "Migrations",
+    url: "/admin/migrations",
+    icon: Database,
+    iconName: "Database",
+    description: "Run one-off database migrations",
+    featureKey: "/admin/content",
+    enabled: true,
+  },
 ];
 
 /**
@@ -141,6 +151,7 @@ export const adminSegmentToFeatureKey: Record<string, string> = {
   "audit-logs": "/admin/audit-logs",
   "support-tools": "/admin/support-tools",
   tickets: "/admin/tickets",
+  migrations: "/admin/content",
 };
 
 /**
@@ -186,6 +197,8 @@ export function getAdminItemsByCategory() {
       categoryMap["Support Tools"].push(item);
     } else if (item.title === "Tickets") {
       categoryMap["Support Tools"].push(item);
+    } else if (item.title === "Migrations") {
+      categoryMap["System Settings"].push(item);
     }
   });
 

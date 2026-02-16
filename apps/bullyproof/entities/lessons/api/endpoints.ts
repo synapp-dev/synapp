@@ -177,7 +177,7 @@ export const lessonsApi = {
           lessonId: string;
           topicId: string;
           topicSlideId: string;
-          orderIndex: number;
+          position: string;
           kind: string;
           textHtml: string | null;
           imageUrl: string | null;

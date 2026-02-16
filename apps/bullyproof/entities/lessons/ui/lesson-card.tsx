@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { Loader2, CheckCheck } from "lucide-react";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
@@ -189,7 +190,7 @@ export function LessonTopicThumbnail({
     if (!topicData?.slides) return [];
     return topicData.slides
       .filter((slide: any) => slide.kind === "image")
-      .sort((a: any, b: any) => a.orderIndex - b.orderIndex);
+      .sort(compareSlidesByPosition);
   }, [topicData?.slides]);
 
   const firstImageSlide = imageSlides[0];

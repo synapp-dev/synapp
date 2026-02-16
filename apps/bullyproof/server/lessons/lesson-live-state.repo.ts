@@ -37,7 +37,7 @@ export const lessonLiveStateRepo = {
       .select()
       .from(topicSlides)
       .where(eq(topicSlides.topicId, lesson[0].topicId))
-      .orderBy(topicSlides.orderIndex);
+      .orderBy(topicSlides.position);
 
     // Get lesson-specific notes
     const lessonNotes = await db
@@ -80,7 +80,7 @@ export const lessonLiveStateRepo = {
         lessonId,
         topicId: lessonData.topicId,
         topicSlideId: slide.id,
-        orderIndex: slide.orderIndex,
+        position: slide.position,
         kind: slide.kind,
         textHtml: slide.textHtml,
         imageUrl: slide.imageUrl,
@@ -165,7 +165,7 @@ export const lessonLiveStateRepo = {
           .select()
           .from(topicSlides)
           .where(eq(topicSlides.topicId, lesson[0].topicId))
-          .orderBy(topicSlides.orderIndex)
+          .orderBy(topicSlides.position)
           .limit(1);
 
         if (!slides[0]) {

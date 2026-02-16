@@ -62,9 +62,9 @@ export const listLessonsSchema = z
 
 export type ListLessonsParams = z.infer<typeof listLessonsSchema>;
 
-// Schema for getting lesson by ID
+// Schema for getting lesson by ID - must be a valid UUID
 export const getLessonByIdSchema = z.object({
-  id: z.string().trim().min(1).max(500),
+  id: z.string().uuid("Invalid lesson ID"),
 });
 
 export type GetLessonByIdParams = z.infer<typeof getLessonByIdSchema>;

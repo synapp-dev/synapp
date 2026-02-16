@@ -8,12 +8,16 @@
  *
  * The 30-minute threshold is just our refresh cadence. The actual Supabase signed URL
  * remains valid for 1 week, so even a "stale" cached URL still works for viewers.
+ *
+ * Concurrency is limited to avoid "Too many connections issued to the database" when
+ * fetching many topics with slides (e.g. GET /api/topics?includeSlides=true&includeUrls=true).
  */
 
 import { createServerClient } from "@/utils/supabase/server";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+const SIGNED_URL_CONCURRENCY = 6; // Limit concurrent Supabase Storage + DB updates
 const SIGNED_URL_EXPIRY_S = 604800; // 1 week in seconds
 const BUCKET = "content";
 
@@ -27,6 +31,24 @@ interface SlideWithSignedUrl {
 }
 
 type UpdateSignedUrlFn = (id: string, signedUrl: string) => Promise<void>;
+
+/** Semaphore to limit concurrent signed URL generation and DB updates. */
+let _activeCount = 0;
+const _waitQueue: Array<() => void> = [];
+
+async function withConcurrencyLimit<T>(fn: () => Promise<T>): Promise<T> {
+  while (_activeCount >= SIGNED_URL_CONCURRENCY) {
+    await new Promise<void>((resolve) => _waitQueue.push(resolve));
+  }
+  _activeCount++;
+  try {
+    return await fn();
+  } finally {
+    _activeCount--;
+    const next = _waitQueue.shift();
+    if (next) next();
+  }
+}
 
 /**
  * Extracts the relative storage path from a value that might be:
@@ -97,41 +119,43 @@ export async function refreshSignedUrlIfStale(
   }
 
   // Stale or missing — generate a new signed URL (single Supabase call, no list())
-  try {
-    const supabase = await createServerClient();
-    const { data, error } = await supabase.storage
-      .from(BUCKET)
-      .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_S);
+  return withConcurrencyLimit(async () => {
+    try {
+      const supabase = await createServerClient();
+      const { data, error } = await supabase.storage
+        .from(BUCKET)
+        .createSignedUrl(storagePath, SIGNED_URL_EXPIRY_S);
 
-    if (error) {
-      console.warn(
-        `[signed-url] Failed to generate signed URL for ${storagePath}:`,
-        error.message
+      if (error) {
+        console.warn(
+          `[signed-url] Failed to generate signed URL for ${storagePath}:`,
+          error.message
+        );
+        // Return stale cached URL if available — it's still valid for up to 1 week
+        return slide.signedUrl
+          ? (toStorageUrl(slide.signedUrl) ?? slide.signedUrl)
+          : null;
+      }
+
+      const url = data.signedUrl;
+
+      // Fire-and-forget DB update — don't block the response
+      updateFn(slide.id, url).catch((e) =>
+        console.warn(
+          `[signed-url] Failed to cache signed URL for slide ${slide.id}:`,
+          e
+        )
       );
-      // Return stale cached URL if available — it's still valid for up to 1 week
+
+      return toStorageUrl(url) ?? url;
+    } catch (e) {
+      console.error(
+        `[signed-url] Unexpected error for slide ${slide.id}:`,
+        e
+      );
       return slide.signedUrl
         ? (toStorageUrl(slide.signedUrl) ?? slide.signedUrl)
         : null;
     }
-
-    const url = data.signedUrl;
-
-    // Fire-and-forget DB update — don't block the response
-    updateFn(slide.id, url).catch((e) =>
-      console.warn(
-        `[signed-url] Failed to cache signed URL for slide ${slide.id}:`,
-        e
-      )
-    );
-
-    return toStorageUrl(url) ?? url;
-  } catch (e) {
-    console.error(
-      `[signed-url] Unexpected error for slide ${slide.id}:`,
-      e
-    );
-    return slide.signedUrl
-      ? (toStorageUrl(slide.signedUrl) ?? slide.signedUrl)
-      : null;
-  }
+  });
 }

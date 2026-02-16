@@ -20,7 +20,9 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { lessonsService } from "@/server/lessons/lessons.service";
+import { getLessonByIdSchema } from "@/server/lessons/lessons.validators";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 
 /**
@@ -53,6 +55,12 @@ export async function GET(
     return NextResponse.json(lessonData, { status: 200 });
   } catch (e: any) {
     console.error(e);
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid lesson ID" },
+        { status: 400 }
+      );
+    }
     const status =
       e.message?.includes("Unauthorized") || e.message?.includes("permission")
         ? 403
@@ -85,11 +93,18 @@ export async function PUT(
     }
 
     const { id } = await params;
+    getLessonByIdSchema.parse({ id });
     const body = await request.json();
     const updatedLesson = await lessonsService.updateLesson({ userId }, id, body);
     return NextResponse.json(updatedLesson, { status: 200 });
   } catch (e: any) {
     console.error(e);
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid lesson ID" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status: 500 }
@@ -118,10 +133,17 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    getLessonByIdSchema.parse({ id });
     await lessonsService.deleteLesson({ userId }, id);
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {
     console.error(e);
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Invalid lesson ID" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status: 500 }

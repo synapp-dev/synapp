@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { Badge } from "@workspace/ui/components/badge";
 import { Skeleton } from "@workspace/ui/components/skeleton";
@@ -26,14 +27,12 @@ export function LessonHeader({ lessonId }: LessonHeaderProps) {
         includeUrls: true,
       });
       if (topicResult.data?.slides && topicResult.data.slides.length > 0) {
-        const sortedSlides = topicResult.data.slides.sort(
-          (a, b) => a.orderIndex - b.orderIndex
-        );
+        const sortedSlides = topicResult.data.slides.sort(compareSlidesByPosition);
         const slide = sortedSlides[0];
         setFirstSlide({
           id: slide.id,
           kind: slide.kind as "text" | "image" | "video",
-          orderIndex: slide.orderIndex,
+          position: slide.position,
           textHtml: slide.textHtml ?? null,
           imageUrl: slide.imageUrl ?? null,
           videoUrl: slide.videoUrl ?? null,

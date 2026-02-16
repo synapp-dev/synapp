@@ -33,6 +33,7 @@ import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useMeStore } from "@/entities/me/model/store";
 import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { getAuthHeaders } from "@/lib/api/fetcher.client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -160,11 +161,11 @@ export default function LessonPreparePage() {
         setTopic(topicResult.data);
         const initialSlides =
           topicResult.data.slides
-            ?.sort((a, b) => a.orderIndex - b.orderIndex)
+            ?.sort(compareSlidesByPosition)
             .map((slide) => ({
               id: slide.id,
               kind: slide.kind as "text" | "image" | "video",
-              orderIndex: slide.orderIndex,
+              position: slide.position,
               textHtml: slide.textHtml ?? null,
               imageUrl: slide.imageUrl ?? null,
               videoUrl: slide.videoUrl ?? null,
@@ -814,7 +815,7 @@ export default function LessonPreparePage() {
                   />
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                  Slide {slide.orderIndex + 1}
+                  Slide {index + 1}
                 </div>
               </button>
             ))}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { SlideData } from "@/components/organisms/slide-renderer";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 
@@ -79,12 +80,12 @@ export function useLessonLiveState(
           return;
         }
 
-        // Convert slides to SlideData format and ensure they're sorted by orderIndex
+        // Convert slides to SlideData format and ensure they're sorted by position
         const formattedSlides: SlideData[] = fetchedSlides
           .map((slide: any) => ({
             id: slide.topicSlideId,
             kind: slide.kind as SlideData["kind"],
-            orderIndex: slide.orderIndex,
+            position: slide.position,
             textHtml: slide.textHtml,
             imageUrl: slide.imageUrl,
             videoUrl: slide.videoUrl,
@@ -94,7 +95,7 @@ export function useLessonLiveState(
             signedUrl: slide.signedUrl ?? null,
             signedImageUrl: slide.signedImageUrl ?? slide.signedUrl ?? null,
           }))
-          .sort((a, b) => a.orderIndex - b.orderIndex);
+          .sort(compareSlidesByPosition);
 
         setSlides(formattedSlides);
 

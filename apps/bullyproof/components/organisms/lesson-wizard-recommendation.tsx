@@ -31,6 +31,7 @@ import { AlertTriangle, CheckCircle2, Info, Star, ChevronsRight, ChevronsUp, Che
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { ClassOption } from "@/types/lesson-wizard";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
@@ -120,7 +121,7 @@ type TopicWithSlides = {
   slides?: Array<{
     id: string;
     kind: string;
-    orderIndex: number;
+    position: string;
     signedUrl?: string | null;
   }>;
   slideCount?: number;
@@ -134,7 +135,7 @@ function TopicThumbnail({ topic, horizontal = false }: { topic: TopicWithSlides;
     if (!topic.slides) return [];
     return topic.slides
       .filter((slide) => slide.kind === "image")
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+      .sort(compareSlidesByPosition);
   }, [topic.slides]);
 
   const firstImageSlide = imageSlides[0];
@@ -577,14 +578,20 @@ export function LessonWizardRecommendation({
       const allLessonIds = new Set<string>();
       const lessonIdToClassId = new Map<string, string>();
       
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const isValidLessonId = (id: string | undefined | null) =>
+        id && id !== "undefined" && id !== "null" && uuidRegex.test(id);
+
       lessonResults.forEach(({ classId, lessons }) => {
         lessons.forEach((lesson) => {
-          allLessonIds.add(lesson.id);
-          lessonIdToClassId.set(lesson.id, classId);
+          if (isValidLessonId(lesson.id)) {
+            allLessonIds.add(lesson.id);
+            lessonIdToClassId.set(lesson.id, classId);
+          }
         });
       });
       
-      // Batch fetch lesson details
+      // Batch fetch lesson details (only for valid UUIDs)
       const lessonDetailsPromises = Array.from(allLessonIds).map(async (lessonId) => {
         const result = await lessonsApi.get.byId(lessonId);
         return { lessonId, data: result.data, error: result.error };
