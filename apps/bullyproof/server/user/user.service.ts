@@ -10,7 +10,7 @@ import { checkFeatureAccess, assertFeature } from "@/server/features/features.se
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { schoolRepo } from "@/server/school/school.repo";
 import { db } from "@/server/db/drizzle";
-import { userSessions } from "@/drizzle/schema";
+import { userProfile, userSessions } from "@/drizzle/schema";
 import { sql, desc, inArray } from "drizzle-orm";
 
 // Helper to check if a string is a valid UUID
@@ -44,9 +44,11 @@ async function assertCanCreateUsers(ctx: AuthContext) {
 }
 
 /**
- * Get the last login timestamps for a list of user IDs by querying user_sessions
+ * Get the last activity timestamps for a list of user IDs.
+ * Uses user_profile.last_seen_at (updated on site usage via middleware) with fallback
+ * to user_sessions (token refresh) during transition.
  * @param userIds Array of user IDs to query
- * @returns Map of userId to lastLoginAt timestamp (ISO string) or null if no session found
+ * @returns Map of userId to lastLoginAt timestamp (ISO string) or null if none found
  */
 async function getLastLoginTimestamps(
   userIds: string[]
@@ -55,14 +57,20 @@ async function getLastLoginTimestamps(
     return new Map();
   }
 
-  const sessionMap = new Map<string, string | null>();
-
-  // Initialize all user IDs with null
-  userIds.forEach((id) => sessionMap.set(id, null));
+  const resultMap = new Map<string, string | null>();
+  userIds.forEach((id) => resultMap.set(id, null));
 
   try {
-    // Query user_sessions using Drizzle
-    // Get all sessions for the given user IDs
+    // Primary source: last_seen_at from user_profile (updated on site activity)
+    const profiles = await db
+      .select({
+        id: userProfile.id,
+        lastSeenAt: userProfile.lastSeenAt,
+      })
+      .from(userProfile)
+      .where(inArray(userProfile.id, userIds));
+
+    // Fallback: user_sessions (refreshed_at, updated_at, created_at)
     const sessions = await db
       .select({
         userId: userSessions.userId,
@@ -73,49 +81,50 @@ async function getLastLoginTimestamps(
       .from(userSessions)
       .where(inArray(userSessions.userId, userIds));
 
-    // Group by user_id and get the most recent session
-    // For each session, use the maximum of refreshed_at, updated_at, created_at
-    // Then across all sessions, use the maximum of those values
-    const userSessionsMap = new Map<string, string>();
-
-    sessions.forEach((session) => {
-      const userId = session.userId;
-      
-      // Get all available timestamps for this session
+    // Build best session timestamp per user
+    const sessionBest = new Map<string, string>();
+    for (const s of sessions) {
       const timestamps: string[] = [];
-      if (session.refreshedAt) timestamps.push(session.refreshedAt);
-      if (session.updatedAt) timestamps.push(session.updatedAt);
-      if (session.createdAt) timestamps.push(session.createdAt);
-      
-      // Find the maximum timestamp for this session
-      if (timestamps.length > 0) {
-        const sessionLastLogin = timestamps.reduce((max, current) => {
-          return new Date(current).getTime() > new Date(max).getTime()
-            ? current
-            : max;
-        });
-
-        // Compare with existing value for this user and keep the maximum
-        const existing = userSessionsMap.get(userId);
-        if (
-          !existing ||
-          new Date(sessionLastLogin).getTime() > new Date(existing).getTime()
-        ) {
-          userSessionsMap.set(userId, sessionLastLogin);
-        }
+      if (s.refreshedAt) timestamps.push(s.refreshedAt);
+      if (s.updatedAt) timestamps.push(s.updatedAt);
+      if (s.createdAt) timestamps.push(s.createdAt);
+      if (timestamps.length === 0) continue;
+      const best = timestamps.reduce((max, t) =>
+        new Date(t).getTime() > new Date(max).getTime() ? t : max
+      );
+      const existing = sessionBest.get(s.userId);
+      if (!existing || new Date(best).getTime() > new Date(existing).getTime()) {
+        sessionBest.set(s.userId, best);
       }
-    });
+    }
 
-    // Update the main map with session data
-    userSessionsMap.forEach((lastLogin, userId) => {
-      sessionMap.set(userId, lastLogin);
-    });
+    // Use last_seen_at when available, else fall back to session data
+    for (const p of profiles) {
+      const sessionVal = sessionBest.get(p.id);
+      const lastSeen = p.lastSeenAt;
+      if (lastSeen && sessionVal) {
+        resultMap.set(
+          p.id,
+          new Date(lastSeen).getTime() > new Date(sessionVal).getTime()
+            ? lastSeen
+            : sessionVal
+        );
+      } else {
+        resultMap.set(p.id, lastSeen || sessionVal || null);
+      }
+    }
+
+    // Users not in profiles but in sessions (edge case)
+    for (const [userId, best] of sessionBest) {
+      if (!resultMap.get(userId)) {
+        resultMap.set(userId, best);
+      }
+    }
   } catch (error) {
     console.error("Error in getLastLoginTimestamps:", error);
-    // Return map with all nulls if query fails completely
   }
 
-  return sessionMap;
+  return resultMap;
 }
 
 export const userService = {

@@ -12,13 +12,13 @@ import { cn } from "@workspace/ui/lib/utils";
 export type User = UserWithRolesAndSchools;
 
 /**
- * Get badge styling based on days since last login
- * @param lastLoginAt ISO timestamp string or null
+ * Get badge styling based on days since last activity
+ * @param lastLoginAt ISO timestamp string or null (from last_seen_at / activity tracking)
  * @returns className string for badge styling
  */
 function getLastLoginBadgeStyle(lastLoginAt: string | null): string {
   if (!lastLoginAt) {
-    // Never logged in - red
+    // No recent activity - red
     return "bg-red-500/5 border-red-500/5 text-red-700 dark:text-red-400";
   }
 
@@ -39,13 +39,13 @@ function getLastLoginBadgeStyle(lastLoginAt: string | null): string {
 }
 
 /**
- * Get dot color class based on days since last login
- * @param lastLoginAt ISO timestamp string or null
+ * Get dot color class based on days since last activity
+ * @param lastLoginAt ISO timestamp string or null (from last_seen_at / activity tracking)
  * @returns className string for dot color
  */
 function getLastLoginDotColor(lastLoginAt: string | null): string {
   if (!lastLoginAt) {
-    // Never logged in - red
+    // No recent activity - red
     return "bg-red-500";
   }
 
@@ -66,8 +66,8 @@ function getLastLoginDotColor(lastLoginAt: string | null): string {
 }
 
 /**
- * Format time since last login in compact format (11h, 5d, 1w, 1y)
- * @param lastLoginAt ISO timestamp string or null
+ * Format time since last activity in compact format (11h, 5d, 1w, 1y)
+ * @param lastLoginAt ISO timestamp string or null (from last_seen_at / activity tracking)
  * @returns Formatted string like "11h", "5d", "1w", "1y", or "Never"
  */
 function formatLastLogin(lastLoginAt: string | null): string {
@@ -178,7 +178,7 @@ export const columns: ColumnDef<User>[] = [
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 px-2 lg:px-3"
           >
-            Last Login
+            Last Active
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         </div>
@@ -188,7 +188,7 @@ export const columns: ColumnDef<User>[] = [
       const a = rowA.getValue("lastLoginAt") as string | null;
       const b = rowB.getValue("lastLoginAt") as string | null;
 
-      // Null values (never logged in) should sort last
+      // Null values (no activity) should sort last
       if (!a && !b) return 0;
       if (!a) return 1; // a is null, sort it after b
       if (!b) return -1; // b is null, sort it after a
