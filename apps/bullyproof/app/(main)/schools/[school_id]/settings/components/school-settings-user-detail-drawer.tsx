@@ -11,10 +11,10 @@ import {
   Card,
   CardContent,
 } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { Pencil, FileBadge2, ShieldCheck, Users as UsersIcon } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { RoleBadges } from "@/components/atoms/role-badges";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { useRoles } from "@/entities/users/model/store";
 import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
@@ -29,7 +29,6 @@ import { extractSchoolMetadata } from "@/app/(main)/admin/users/components/user-
 import { useCanEditSchoolRoles } from "@/hooks/use-can-edit-school-roles";
 import { getDisplayName } from "@/app/(main)/admin/users/components/user-detail-drawer/utils";
 import type { TabType } from "@/app/(main)/admin/users/components/user-detail-drawer/types";
-import { cn } from "@workspace/ui/lib/utils";
 
 interface SchoolSettingsUserDetailDrawerProps {
   user: UserWithRolesAndSchools | null;
@@ -267,52 +266,14 @@ export function SchoolSettingsUserDetailDrawer({
                         )}
                       </div>
                       <div className="flex items-center gap-3 flex-wrap justify-end">
-                        <div className="flex items-center gap-0 flex-wrap">
-                          {schoolRolesAtThisSchool
-                            .sort((a, b) => {
-                              const order: Record<string, number> = {
-                                SCHOOL_STAFF: 1,
-                                SCHOOL_ADMIN: 2,
-                                TEACHER: 3,
-                              };
-                              return (
-                                (order[a.roleKey || ""] ?? 5) -
-                                (order[b.roleKey || ""] ?? 5)
-                              );
-                            })
-                            .map((role, roleIdx) => {
-                              const roleKey = role.roleKey || "";
-                              const getBadgeClasses = (key: string) => {
-                                if (key === "TEACHER")
-                                  return "bg-[var(--role-teacher)] text-[var(--role-teacher-text)] border-[var(--role-teacher)]/50";
-                                if (key === "SCHOOL_ADMIN")
-                                  return "bg-[var(--role-school-admin)] text-[var(--role-school-admin-text)] border-[var(--role-school-admin)]/50";
-                                if (key === "SCHOOL_STAFF")
-                                  return "bg-[var(--role-school-staff)] text-[var(--role-school-staff-text)] border-[var(--role-school-staff)]/50";
-                                return "";
-                              };
-                              const isAdmin = roleKey.includes("ADMIN");
-                              return (
-                                <Badge
-                                  key={`${roleKey}-${roleIdx}`}
-                                  variant="default"
-                                  className={cn(
-                                    "flex items-center gap-1 z-10 border px-2 py-1",
-                                    getBadgeClasses(roleKey)
-                                  )}
-                                >
-                                  {roleKey === "SCHOOL_LICENCE" ? (
-                                    <FileBadge2 className="h-3 w-3" />
-                                  ) : isAdmin ? (
-                                    <ShieldCheck className="h-3 w-3" />
-                                  ) : (
-                                    <UsersIcon className="h-3 w-3" />
-                                  )}
-                                  {role.roleName || roleKey}
-                                </Badge>
-                              );
-                            })}
-                        </div>
+                        <RoleBadges
+                          roles={schoolRolesAtThisSchool.map((r) => ({
+                            roleKey: r.roleKey || "",
+                            roleName: r.roleName || undefined,
+                          }))}
+                          variant="joined"
+                          size="sm"
+                        />
                         {canEditSchoolRoles && (
                           <Button
                             variant="outline"
@@ -336,11 +297,21 @@ export function SchoolSettingsUserDetailDrawer({
               )}
 
               {activeTab === "positions" && (
-                <UserPositionsTab user={user} schools={schools} />
+                <UserPositionsTab
+                  user={user}
+                  schools={schools}
+                  scopedSchoolId={schoolId}
+                  canEdit={canEditSchoolRoles}
+                />
               )}
 
               {activeTab === "classes" && (
-                <UserClassesTab user={user} schools={schools} />
+                <UserClassesTab
+                  user={user}
+                  schools={schools}
+                  scopedSchoolId={schoolId}
+                  canEdit={canEditSchoolRoles}
+                />
               )}
             </div>
           </main>

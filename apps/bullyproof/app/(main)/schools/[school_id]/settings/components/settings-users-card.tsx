@@ -260,9 +260,9 @@ export function SettingsUsersCard({
     ).length;
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4 flex-wrap flex-shrink-0">
         <div className="flex items-center gap-2">
           {selectedCount > 0 ? (
             <div className="flex items-center gap-2">
@@ -373,31 +373,33 @@ export function SettingsUsersCard({
       </div>
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="flex-shrink-0">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
 
-      <UsersTable
-        users={users}
-        roles={roles}
-        isLoading={loading}
-        error={error}
-        onUserClick={handleUserClick}
-        onRowSelectionChange={setRowSelection}
-        schoolId={schoolId}
-        showSelection={true}
-        pageIndex={pageIndex}
-        pageSize={pageSize}
-        totalCount={totalCount}
-        onPageChange={setPageIndex}
-        onPageSizeChange={(size) => {
-          setPageSize(size);
-          setPageIndex(0);
-        }}
-      />
+      <div className="flex-1 min-h-0 flex flex-col">
+        <UsersTable
+          users={users}
+          roles={roles}
+          isLoading={loading}
+          error={error}
+          onUserClick={handleUserClick}
+          onRowSelectionChange={setRowSelection}
+          schoolId={schoolId}
+          showSelection={true}
+          pageIndex={pageIndex}
+          pageSize={pageSize}
+          totalCount={totalCount}
+          onPageChange={setPageIndex}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPageIndex(0);
+          }}
+        />
+      </div>
 
       <SchoolSettingsUserDetailDrawer
         user={selectedUser}
