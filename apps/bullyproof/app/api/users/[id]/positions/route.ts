@@ -21,10 +21,13 @@
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { checkFeatureAccess } from "@/server/features/features.service";
+import {
+  canManageSchoolUsers,
+  getSchoolsUserCanManage,
+} from "@/server/lib/can-manage-school-users";
 import { db } from "@/server/db/drizzle";
 import { userSchoolPositions, schools } from "@/server/db/schema";
-import { eq, and, ne } from "drizzle-orm";
+import { eq, and, ne, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { handleDatabaseError } from "@/utils/db-error-handler";
 
@@ -63,8 +66,8 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
-    if (!hasAdminUsers) {
+    const allowedSchoolIds = await getSchoolsUserCanManage(userId);
+    if (allowedSchoolIds !== null && allowedSchoolIds.length === 0) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
@@ -75,6 +78,14 @@ export async function GET(
     const targetUserId = id;
 
     // Get all positions for this user with school information
+    const whereConditions =
+      allowedSchoolIds !== null
+        ? and(
+            eq(userSchoolPositions.userId, targetUserId),
+            inArray(userSchoolPositions.schoolId, allowedSchoolIds)
+          )
+        : eq(userSchoolPositions.userId, targetUserId);
+
     const positions = await db
       .select({
         id: userSchoolPositions.id,
@@ -90,8 +101,7 @@ export async function GET(
       })
       .from(userSchoolPositions)
       .innerJoin(schools, eq(userSchoolPositions.schoolId, schools.id))
-      .where(eq(userSchoolPositions.userId, targetUserId));
-
+      .where(whereConditions);
     return NextResponse.json(positions, { status: 200 });
   } catch (e: any) {
     console.error("[USER POSITIONS GET] Error:", e);
@@ -123,18 +133,18 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
-    if (!hasAdminUsers) {
+    const { id } = await params;
+    const targetUserId = id;
+    const body = await request.json();
+    const data = createPositionSchema.parse(body);
+
+    const canManage = await canManageSchoolUsers(userId, data.schoolId);
+    if (!canManage) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 403 }
       );
     }
-
-    const { id } = await params;
-    const targetUserId = id;
-    const body = await request.json();
-    const data = createPositionSchema.parse(body);
 
     // Check if position already exists (to avoid duplicates)
     const existing = await db
@@ -235,14 +245,6 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
-    if (!hasAdminUsers) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-
     const { id } = await params;
     const targetUserId = id;
     const body = await request.json();
@@ -264,6 +266,14 @@ export async function PUT(
       return NextResponse.json(
         { error: "Position not found" },
         { status: 404 }
+      );
+    }
+
+    const canManage = await canManageSchoolUsers(userId, existing.schoolId);
+    if (!canManage) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
       );
     }
 
@@ -356,14 +366,6 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const hasAdminUsers = await checkFeatureAccess(userId, "/admin/users");
-    if (!hasAdminUsers) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 403 }
-      );
-    }
-
     const { id } = await params;
     const targetUserId = id;
     const body = await request.json();
@@ -385,6 +387,14 @@ export async function DELETE(
       return NextResponse.json(
         { error: "Position not found" },
         { status: 404 }
+      );
+    }
+
+    const canManage = await canManageSchoolUsers(userId, existing.schoolId);
+    if (!canManage) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
       );
     }
 

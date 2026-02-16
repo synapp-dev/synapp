@@ -1,36 +1,34 @@
 /**
  * User Classes API route handler.
  *
- * Exposes HTTP endpoint for getting classes assigned to a user (teacher).
+ * Exposes HTTP endpoints for classes assigned to a user (teacher).
  *
  * Authentication:
- * - Requires a valid user derived from the request (401 if missing).
- * - Platform admins can view any user's classes.
+ * - GET: Platform admins, self, or school admins (with school:manage-school-user-roles) at a school.
+ * - POST: Platform admins or school admins at the class's school.
  *
  * Endpoints:
- * - GET /api/users/[id]/classes - Get classes assigned to a user
- *
- * Responses:
- * - 200 OK: Returns array of classes with school information.
- * - 401 Unauthorized: `{ error: string }` when user identification fails.
- * - 403 Forbidden: `{ error: string }` when user lacks required permissions.
- * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
+ * - GET /api/users/[id]/classes - Get classes assigned to a user (?schoolId= optional)
+ * - POST /api/users/[id]/classes - Add or remove a class (body: { classId, action: "add"|"remove" })
  */
 import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { checkFeatureAccess } from "@/server/features/features.service";
+import {
+  canManageSchoolUsers,
+  getSchoolsUserCanManage,
+} from "@/server/lib/can-manage-school-users";
 import { db } from "@/server/db/drizzle";
 import { teacherClasses, classes, schools } from "@/server/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, inArray } from "drizzle-orm";
+import { z } from "zod";
+
+const postBodySchema = z.object({
+  classId: z.string().uuid(),
+  action: z.enum(["add", "remove"]),
+});
 
 /**
  * Handle GET /api/users/[id]/classes
- *
- * Returns classes assigned to a specific user, grouped by school.
- *
- * @param request The incoming HTTP request.
- * @param params The route parameters containing the user ID.
- * @returns A JSON `NextResponse` with classes data or an error payload.
  */
 export async function GET(
   request: Request,
@@ -44,18 +42,53 @@ export async function GET(
     }
 
     const { id: targetUserId } = await params;
+    const { searchParams } = new URL(request.url);
+    const schoolIdParam = searchParams.get("schoolId") || undefined;
 
-    // Check permissions - platform admins can view any user's classes
-    const isPlatformAdmin = await checkFeatureAccess(userId, "/admin/users");
+    // Allow: platform admin, self, or school admin with access
+    const allowedSchoolIds = await getSchoolsUserCanManage(userId);
+    const isSelf = userId === targetUserId;
 
-    if (!isPlatformAdmin && userId !== targetUserId) {
-      return NextResponse.json(
-        { error: "Forbidden: You can only view your own classes" },
-        { status: 403 }
+    if (!isSelf && allowedSchoolIds !== null) {
+      if (allowedSchoolIds.length === 0) {
+        return NextResponse.json(
+          { error: "Forbidden: You can only view your own classes" },
+          { status: 403 }
+        );
+      }
+    }
+
+    let whereClause:
+      | ReturnType<typeof eq>
+      | ReturnType<typeof and> = eq(teacherClasses.userId, targetUserId);
+    if (
+      allowedSchoolIds !== null &&
+      allowedSchoolIds.length > 0 &&
+      !schoolIdParam
+    ) {
+      // School admin: filter to schools they can manage
+      whereClause = and(
+        eq(teacherClasses.userId, targetUserId),
+        inArray(classes.schoolId, allowedSchoolIds)
+      );
+    } else if (schoolIdParam) {
+      // Optional filter by school - school admins must have access to that school
+      if (
+        !isSelf &&
+        allowedSchoolIds !== null &&
+        !allowedSchoolIds.includes(schoolIdParam)
+      ) {
+        return NextResponse.json(
+          { error: "Forbidden: No access to this school" },
+          { status: 403 }
+        );
+      }
+      whereClause = and(
+        eq(teacherClasses.userId, targetUserId),
+        eq(classes.schoolId, schoolIdParam)
       );
     }
 
-    // Get classes assigned to this user with school information
     const result = await db
       .select({
         classId: classes.id,
@@ -70,12 +103,90 @@ export async function GET(
       .from(teacherClasses)
       .innerJoin(classes, eq(teacherClasses.classId, classes.id))
       .leftJoin(schools, eq(classes.schoolId, schools.id))
-      .where(eq(teacherClasses.userId, targetUserId))
+      .where(whereClause)
       .orderBy(asc(classes.name));
 
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
     console.error("[USER CLASSES GET] Error:", e);
+    return NextResponse.json(
+      { error: e.message ?? "Internal error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/users/[id]/classes
+ * Body: { classId: string, action: "add" | "remove" }
+ */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await getUserIdFromRequest(request);
+
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id: targetUserId } = await params;
+    const body = await request.json();
+    const data = postBodySchema.parse(body);
+
+    // Get the class to verify it exists and get its schoolId
+    const [classRow] = await db
+      .select({ id: classes.id, schoolId: classes.schoolId })
+      .from(classes)
+      .where(eq(classes.id, data.classId))
+      .limit(1);
+
+    if (!classRow) {
+      return NextResponse.json(
+        { error: "Class not found" },
+        { status: 404 }
+      );
+    }
+
+    const canManage = await canManageSchoolUsers(userId, classRow.schoolId);
+    if (!canManage) {
+      return NextResponse.json(
+        { error: "Unauthorized to manage classes at this school" },
+        { status: 403 }
+      );
+    }
+
+    if (data.action === "add") {
+      await db
+        .insert(teacherClasses)
+        .values({
+          userId: targetUserId,
+          classId: data.classId,
+        })
+        .onConflictDoNothing();
+    } else {
+      await db
+        .delete(teacherClasses)
+        .where(
+          and(
+            eq(teacherClasses.userId, targetUserId),
+            eq(teacherClasses.classId, data.classId)
+          )
+        );
+    }
+
+    return NextResponse.json({ success: true }, { status: 200 });
+  } catch (e: any) {
+    console.error("[USER CLASSES POST] Error:", e);
+
+    if (e instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: "Validation error", details: e.issues },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status: 500 }
