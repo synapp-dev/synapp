@@ -343,8 +343,8 @@ export const userProfile = pgTable("user_profile", {
 	avatarUrl: text("avatar_url"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-	lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: 'string' }),
 	metadata: jsonb().default({}),
+	lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: 'string' }),
 }, (table) => [
 	index("idx_user_profile_last_seen_at").using("btree", table.lastSeenAt.desc().nullsLast().op("timestamptz_ops")),
 	foreignKey({
@@ -788,7 +788,6 @@ export const oauthConsentsInAuth = auth.table("oauth_consents", {
 export const courseTopicSlides = pgTable("course_topic_slides", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	topicId: uuid("topic_id").notNull(),
-	orderIndex: integer("order_index").notNull(),
 	kind: text().notNull(),
 	textHtml: text("text_html"),
 	imageUrl: text("image_url"),
@@ -801,15 +800,15 @@ export const courseTopicSlides = pgTable("course_topic_slides", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	signedUrl: text("signed_url"),
 	signedUrlUpdatedAt: timestamp("signed_url_updated_at", { withTimezone: true, mode: 'string' }),
+	position: text().notNull(),
 }, (table) => [
 	index("idx_course_topic_slides_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
-	index("idx_course_topic_slides_topic_order").using("btree", table.topicId.asc().nullsLast().op("uuid_ops"), table.orderIndex.asc().nullsLast().op("int4_ops")),
+	index("idx_course_topic_slides_topic_position").using("btree", table.topicId.asc().nullsLast().op("text_ops"), table.position.asc().nullsLast().op("text_ops")),
 	foreignKey({
 			columns: [table.topicId],
 			foreignColumns: [courseTopics.id],
 			name: "course_topic_slides_topic_id_fkey"
 		}).onDelete("cascade"),
-	unique("course_topic_slides_topic_order_unique").on(table.topicId, table.orderIndex),
 	pgPolicy("course_topic_slides_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
 	pgPolicy("course_topic_slides_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
 	pgPolicy("course_topic_slides_update", { as: "permissive", for: "update", to: ["authenticated"] }),
@@ -1011,6 +1010,25 @@ export const quizAttemptAnswers = pgTable("quiz_attempt_answers", {
 	pgPolicy("quiz_attempt_answers_admin_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 
+export const teacherSlideNotes = pgTable("teacher_slide_notes", {
+	teacherUserId: uuid("teacher_user_id").notNull(),
+	topicSlideId: uuid("topic_slide_id"),
+	notesRichtext: text("notes_richtext"),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	id: uuid().defaultRandom().primaryKey().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.teacherUserId],
+			foreignColumns: [userProfile.id],
+			name: "teacher_slide_notes_teacher_user_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicSlideId],
+			foreignColumns: [topicSlides.id],
+			name: "teacher_slide_notes_topic_slide_id_fkey"
+		}).onDelete("set null"),
+]);
+
 export const classes = pgTable("classes", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	schoolId: uuid("school_id").notNull(),
@@ -1031,6 +1049,33 @@ export const classes = pgTable("classes", {
 			name: "classes_school_id_fkey"
 		}).onDelete("cascade"),
 	unique("classes_school_code_unique").on(table.schoolId, table.code),
+]);
+
+export const topicSlides = pgTable("topic_slides", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	topicId: uuid("topic_id").notNull(),
+	kind: text().notNull(),
+	textHtml: text("text_html"),
+	imageUrl: text("image_url"),
+	videoUrl: text("video_url"),
+	videoStartS: integer("video_start_s"),
+	videoEndS: integer("video_end_s"),
+	officialNotes: text("official_notes"),
+	durationSec: integer("duration_sec"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	signedUrl: text("signed_url"),
+	signedUrlUpdatedAt: timestamp("signed_url_updated_at", { withTimezone: true, mode: 'string' }),
+	position: text().notNull(),
+}, (table) => [
+	index("idx_topic_slides_topic_position").using("btree", table.topicId.asc().nullsLast().op("text_ops"), table.position.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [topics.id],
+			name: "topic_slides_topic_id_fkey"
+		}).onDelete("cascade"),
+	check("topic_slides_kind_check", sql`kind = ANY (ARRAY['text'::text, 'image'::text, 'video'::text])`),
+	check("topic_slides_payload_chk", sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (text_html IS NULL))`),
 ]);
 
 export const curriculumStages = pgTable("curriculum_stages", {
@@ -1117,38 +1162,28 @@ export const lessons = pgTable("lessons", {
 	check("lessons_status_check", sql`status = ANY (ARRAY['preparing'::text, 'ready'::text, 'in_progress'::text, 'feedback'::text, 'completed'::text, 'cancelled'::text])`),
 ]);
 
-export const topicSlides = pgTable("topic_slides", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	topicId: uuid("topic_id").notNull(),
-	orderIndex: integer("order_index").notNull(),
-	kind: text().notNull(),
-	textHtml: text("text_html"),
-	imageUrl: text("image_url"),
-	videoUrl: text("video_url"),
-	videoStartS: integer("video_start_s"),
-	videoEndS: integer("video_end_s"),
-	officialNotes: text("official_notes"),
-	durationSec: integer("duration_sec"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+export const lessonSlideNotes = pgTable("lesson_slide_notes", {
+	lessonId: uuid("lesson_id").notNull(),
+	topicSlideId: uuid("topic_slide_id"),
+	notesRichtext: text("notes_richtext"),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	signedUrl: text("signed_url"),
-	signedUrlUpdatedAt: timestamp("signed_url_updated_at", { withTimezone: true, mode: 'string' }),
+	id: uuid().defaultRandom().primaryKey().notNull(),
 }, (table) => [
-	index("idx_topic_slides_topic_order").using("btree", table.topicId.asc().nullsLast().op("int4_ops"), table.orderIndex.asc().nullsLast().op("uuid_ops")),
-	uniqueIndex("topic_slides_topic_order_uniq").using("btree", table.topicId.asc().nullsLast().op("int4_ops"), table.orderIndex.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
-			columns: [table.topicId],
-			foreignColumns: [topics.id],
-			name: "topic_slides_topic_id_fkey"
+			columns: [table.lessonId],
+			foreignColumns: [lessons.id],
+			name: "lesson_slide_notes_lesson_id_fkey"
 		}).onDelete("cascade"),
-	unique("topic_slides_unique_order").on(table.topicId, table.orderIndex),
-	check("topic_slides_kind_check", sql`kind = ANY (ARRAY['text'::text, 'image'::text, 'video'::text])`),
-	check("topic_slides_payload_chk", sql`((kind = 'text'::text) AND (text_html IS NOT NULL) AND (image_url IS NULL) AND (video_url IS NULL)) OR ((kind = 'image'::text) AND (text_html IS NULL) AND (video_url IS NULL)) OR ((kind = 'video'::text) AND (text_html IS NULL))`),
+	foreignKey({
+			columns: [table.topicSlideId],
+			foreignColumns: [topicSlides.id],
+			name: "lesson_slide_notes_topic_slide_id_fkey"
+		}).onDelete("set null"),
 ]);
 
 export const lessonLiveState = pgTable("lesson_live_state", {
 	lessonId: uuid("lesson_id").primaryKey().notNull(),
-	currentSlideId: uuid("current_slide_id").notNull(),
+	currentSlideId: uuid("current_slide_id"),
 	currentIndex: integer("current_index").notNull(),
 	isPaused: boolean("is_paused").default(false).notNull(),
 	updatedBy: uuid("updated_by").notNull(),
@@ -1159,7 +1194,7 @@ export const lessonLiveState = pgTable("lesson_live_state", {
 			columns: [table.currentSlideId],
 			foreignColumns: [topicSlides.id],
 			name: "lesson_live_state_current_slide_id_fkey"
-		}),
+		}).onDelete("set null"),
 	foreignKey({
 			columns: [table.lessonId],
 			foreignColumns: [lessons.id],
@@ -1654,44 +1689,6 @@ export const teacherClasses = pgTable("teacher_classes", {
 		}).onDelete("cascade"),
 	primaryKey({ columns: [table.userId, table.classId], name: "teacher_classes_pkey"}),
 ]);
-
-export const teacherSlideNotes = pgTable("teacher_slide_notes", {
-	teacherUserId: uuid("teacher_user_id").notNull(),
-	topicSlideId: uuid("topic_slide_id").notNull(),
-	notesRichtext: text("notes_richtext"),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	foreignKey({
-			columns: [table.teacherUserId],
-			foreignColumns: [userProfile.id],
-			name: "teacher_slide_notes_teacher_user_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.topicSlideId],
-			foreignColumns: [topicSlides.id],
-			name: "teacher_slide_notes_topic_slide_id_fkey"
-		}).onDelete("cascade"),
-	primaryKey({ columns: [table.teacherUserId, table.topicSlideId], name: "teacher_slide_notes_pkey"}),
-]);
-
-export const lessonSlideNotes = pgTable("lesson_slide_notes", {
-	lessonId: uuid("lesson_id").notNull(),
-	topicSlideId: uuid("topic_slide_id").notNull(),
-	notesRichtext: text("notes_richtext"),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	foreignKey({
-			columns: [table.lessonId],
-			foreignColumns: [lessons.id],
-			name: "lesson_slide_notes_lesson_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.topicSlideId],
-			foreignColumns: [topicSlides.id],
-			name: "lesson_slide_notes_topic_slide_id_fkey"
-		}).onDelete("restrict"),
-	primaryKey({ columns: [table.lessonId, table.topicSlideId], name: "lesson_slide_notes_pkey"}),
-]);
 export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
 	topicId: uuid("topic_id"),
 	title: text(),
@@ -1725,20 +1722,6 @@ export const vSchoolYears = pgView("v_school_years", {	id: uuid(),
 	levelKey: text("level_key"),
 	levelName: text("level_name"),
 }).with({ securityInvoker: true }).as(sql`SELECT y.id, y.code, y.display_name, y.level_id, y.sort_index, sl.key AS level_key, sl.name AS level_name FROM school_years y JOIN school_levels sl ON sl.id = y.level_id`);
-
-export const vLessonSlidesEffective = pgView("v_lesson_slides_effective", {	lessonId: uuid("lesson_id"),
-	topicId: uuid("topic_id"),
-	topicSlideId: uuid("topic_slide_id"),
-	orderIndex: integer("order_index"),
-	kind: text(),
-	textHtml: text("text_html"),
-	imageUrl: text("image_url"),
-	videoUrl: text("video_url"),
-	videoStartS: integer("video_start_s"),
-	videoEndS: integer("video_end_s"),
-	effectiveNotes: text("effective_notes"),
-	teacherUserId: uuid("teacher_user_id"),
-}).with({ securityInvoker: true }).as(sql`SELECT l.id AS lesson_id, l.topic_id, ts.id AS topic_slide_id, ts.order_index, ts.kind, ts.text_html, ts.image_url, ts.video_url, ts.video_start_s, ts.video_end_s, COALESCE(lsn.notes_richtext, tsn.notes_richtext, ts.official_notes, t.official_notes) AS effective_notes, l.created_by_user_id AS teacher_user_id FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id LEFT JOIN lesson_slide_notes lsn ON lsn.lesson_id = l.id AND lsn.topic_slide_id = ts.id LEFT JOIN teacher_slide_notes tsn ON tsn.teacher_user_id = l.created_by_user_id AND tsn.topic_slide_id = ts.id ORDER BY l.id, ts.order_index`);
 
 export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
 	name: text(),
@@ -1778,11 +1761,6 @@ export const vCurriculumStagesYears = pgView("v_curriculum_stages_years", {	stag
 	minSortIndex: smallint("min_sort_index"),
 	maxSortIndex: smallint("max_sort_index"),
 }).with({ securityInvoker: true }).as(sql`WITH yrs AS ( SELECT s.id AS stage_id, s.code AS stage_code, s.name AS stage_name, array_agg(y.code ORDER BY y.sort_index) AS year_codes, array_agg(y.display_name ORDER BY y.sort_index) AS year_names, min(y.sort_index) AS min_sort_index, max(y.sort_index) AS max_sort_index FROM curriculum_stages s LEFT JOIN stage_year_links l ON l.stage_id = s.id LEFT JOIN school_years y ON y.id = l.school_year_id GROUP BY s.id, s.code, s.name ) SELECT stage_id, stage_code, stage_name, year_codes, year_names, CASE WHEN array_length(year_codes, 1) IS NULL THEN NULL::text WHEN array_length(year_codes, 1) = 1 THEN year_codes[1] ELSE (year_codes[1] || '–'::text) || year_codes[array_length(year_codes, 1)] END AS year_code_range, CASE WHEN array_length(year_names, 1) IS NULL THEN NULL::text WHEN array_length(year_names, 1) = 1 THEN year_names[1] ELSE (year_names[1] || ' – '::text) || year_names[array_length(year_names, 1)] END AS year_name_range, min_sort_index, max_sort_index FROM yrs ORDER BY min_sort_index, stage_code`);
-
-export const vLessonAllowedSlides = pgView("v_lesson_allowed_slides", {	lessonId: uuid("lesson_id"),
-	topicSlideId: uuid("topic_slide_id"),
-	orderIndex: integer("order_index"),
-}).with({ securityInvoker: true }).as(sql`SELECT l.id AS lesson_id, ts.id AS topic_slide_id, ts.order_index FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id`);
 
 export const vTopicsWithCompletion = pgView("v_topics_with_completion", {	topicId: uuid("topic_id"),
 	topicTitle: text("topic_title"),
@@ -1840,6 +1818,25 @@ export const vQuizAttemptsEnriched = pgView("v_quiz_attempts_enriched", {	attemp
 	startedAt: timestamp("started_at", { withTimezone: true, mode: 'string' }),
 	completedAt: timestamp("completed_at", { withTimezone: true, mode: 'string' }),
 }).with({ securityInvoker: true }).as(sql`SELECT qa.id AS attempt_id, qa.user_id, qa.quiz_id, qa.topic_id, qa.course_id, qa.attempt_number, qa.total_questions, qa.correct_answers, qa.score_percentage, ctq.passing_score_percentage, qa.is_passed, qa.started_at, qa.completed_at FROM quiz_attempts qa JOIN course_topic_quizzes ctq ON ctq.id = qa.quiz_id WHERE qa.completed_at IS NOT NULL`);
+
+export const vLessonSlidesEffective = pgView("v_lesson_slides_effective", {	lessonId: uuid("lesson_id"),
+	topicId: uuid("topic_id"),
+	topicSlideId: uuid("topic_slide_id"),
+	position: text(),
+	kind: text(),
+	textHtml: text("text_html"),
+	imageUrl: text("image_url"),
+	videoUrl: text("video_url"),
+	videoStartS: integer("video_start_s"),
+	videoEndS: integer("video_end_s"),
+	effectiveNotes: text("effective_notes"),
+	teacherUserId: uuid("teacher_user_id"),
+}).as(sql`SELECT l.id AS lesson_id, l.topic_id, ts.id AS topic_slide_id, ts."position", ts.kind, ts.text_html, ts.image_url, ts.video_url, ts.video_start_s, ts.video_end_s, COALESCE(lsn.notes_richtext, tsn.notes_richtext, ts.official_notes, t.official_notes) AS effective_notes, l.created_by_user_id AS teacher_user_id FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id LEFT JOIN lesson_slide_notes lsn ON lsn.lesson_id = l.id AND lsn.topic_slide_id = ts.id LEFT JOIN teacher_slide_notes tsn ON tsn.teacher_user_id = l.created_by_user_id AND tsn.topic_slide_id = ts.id ORDER BY l.id, ts."position"`);
+
+export const vLessonAllowedSlides = pgView("v_lesson_allowed_slides", {	lessonId: uuid("lesson_id"),
+	topicSlideId: uuid("topic_slide_id"),
+	position: text(),
+}).as(sql`SELECT l.id AS lesson_id, ts.id AS topic_slide_id, ts."position" FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id ORDER BY ts."position"`);
 
 export const vUsersWithRolesAndSchools = pgView("v_users_with_roles_and_schools", {	id: uuid(),
 	firstName: text("first_name"),
