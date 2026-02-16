@@ -62,6 +62,7 @@ export async function GET(
         className: classes.name,
         classCode: classes.code,
         schoolId: classes.schoolId,
+        schoolSlug: schools.slug,
         schoolName: schools.name,
         active: classes.active,
         createdAt: teacherClasses.createdAt,
