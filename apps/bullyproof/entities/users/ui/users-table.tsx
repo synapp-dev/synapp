@@ -42,7 +42,8 @@ import {
   PaginationPrevious,
 } from "@workspace/ui/components/pagination";
 import { cn } from "@workspace/ui/lib/utils";
-import { ShieldCheck, Users as UsersIcon, FileBadge2, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { RoleBadges } from "@/components/atoms/role-badges";
 import type { roles } from "@/server/db/schema";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { columns } from "@/app/(main)/admin/users/components/users-table-columns";
@@ -208,232 +209,53 @@ export function UsersTable({
               rolesBySchool.get(sid)!.push(role);
             });
 
-            const getBadgeClasses = (
-              roleKey: string,
-              isPlatform: boolean
-            ) => {
-              if (roleKey === "TEACHER") {
-                return "bg-[var(--role-teacher)] text-[var(--role-teacher-text)] border-[var(--role-teacher)]/50";
-              } else if (isPlatform && roleKey === "PLATFORM_ADMIN") {
-                return "bg-[var(--role-platform-admin)] text-[var(--role-platform-admin-text)] border-[var(--role-platform-admin)]/50";
-              } else if (!isPlatform && roleKey === "SCHOOL_ADMIN") {
-                return "bg-[var(--role-school-admin)] text-[var(--role-school-admin-text)] border-[var(--role-school-admin)]/50";
-              } else if (roleKey === "SCHOOL_STAFF") {
-                return "bg-[var(--role-school-staff)] text-[var(--role-school-staff-text)] border-[var(--role-school-staff)]/50";
-              } else if (roleKey === "SCHOOL_LICENCE") {
-                return "bg-[var(--role-school-licence)] text-[var(--role-school-licence-text)] border-[var(--role-school-licence)]/50";
-              }
-              return "";
-            };
-
             return (
               <div className="flex flex-wrap gap-4">
                 {allRolesWithSchools.length > 0 ? (
                   <>
                     {/* Render platform roles */}
                     {platformRoles.length > 0 && (
-                      <div className="flex items-center gap-0 flex-wrap">
-                        {platformRoles.map((role, idx) => {
-                          const badgeClasses = getBadgeClasses(
-                            role.roleKey,
-                            true
-                          );
-                          const isFirst = idx === 0;
-                          const isLast = idx === platformRoles.length - 1;
-                          const roleCount = platformRoles.length;
-
-                          // Determine border radius classes
-                          let borderRadiusClass = "";
-                          if (roleCount === 1) {
-                            borderRadiusClass = "rounded-md";
-                          } else if (isFirst) {
-                            borderRadiusClass = "rounded-l-md rounded-r-none";
-                          } else if (isLast) {
-                            borderRadiusClass = "rounded-r-md rounded-l-none";
-                          } else {
-                            borderRadiusClass = "rounded-none";
-                          }
-
-                          return (
-                            <Badge
-                              key={`platform-${idx}`}
-                              variant="default"
-                              className={cn(
-                                "flex items-center gap-1 z-10 border px-2 py-1",
-                                badgeClasses,
-                                !isLast && "border-r-0 -mr-[1px]",
-                                borderRadiusClass
-                              )}
-                            >
-                              {role.roleKey === "SCHOOL_LICENCE" ? (
-                                <FileBadge2 className="h-4 w-4" />
-                              ) : role.isAdmin ? (
-                                <ShieldCheck className="h-4 w-4" />
-                              ) : (
-                                <UsersIcon className="h-4 w-4" />
-                              )}
-                              {role.name}
-                            </Badge>
-                          );
-                        })}
-                      </div>
+                      <RoleBadges
+                        roles={platformRoles.map((r) => ({
+                          roleKey: r.roleKey,
+                          roleName: r.name,
+                          isPlatform: true,
+                        }))}
+                        variant="joined"
+                        size="md"
+                      />
                     )}
 
                     {/* Render school roles grouped by school (or just roles if schoolId is provided) */}
                     {schoolId ? (
-                      // When filtering by school, show roles in a single group without school name
-                      <div className="flex items-center gap-0 flex-wrap">
-                        {(() => {
-                          // Sort roles in order: SCHOOL_STAFF, SCHOOL_ADMIN, TEACHER
-                          const sortedRoles = [...schoolRoles].sort((a, b) => {
-                            const getRolePriority = (
-                              roleKey: string
-                            ): number => {
-                              if (roleKey === "SCHOOL_STAFF") return 1;
-                              if (roleKey === "SCHOOL_ADMIN") return 2;
-                              if (
-                                roleKey === "TEACHER" ||
-                                roleKey.includes("TEACHER")
-                              )
-                                return 3;
-                              return 4;
-                            };
-
-                            const aPriority = getRolePriority(a.roleKey);
-                            const bPriority = getRolePriority(b.roleKey);
-
-                            return aPriority - bPriority;
-                          });
-
-                          const roleCount = sortedRoles.length;
-
-                          return sortedRoles.map((role, roleIdx) => {
-                            const badgeClasses = getBadgeClasses(
-                              role.roleKey,
-                              false
-                            );
-                            const isFirst = roleIdx === 0;
-                            const isLast = roleIdx === roleCount - 1;
-
-                            // Determine border radius classes
-                            let borderRadiusClass = "";
-                            if (roleCount === 1) {
-                              borderRadiusClass = "rounded-md";
-                            } else if (isFirst) {
-                              borderRadiusClass =
-                                "rounded-l-md rounded-r-none";
-                            } else if (isLast) {
-                              borderRadiusClass =
-                                "rounded-r-md rounded-l-none";
-                            } else {
-                              borderRadiusClass = "rounded-none";
-                            }
-
-                            return (
-                              <Badge
-                                key={`${role.roleKey}-${roleIdx}`}
-                                variant="default"
-                                className={cn(
-                                  "flex items-center gap-1 z-10 border px-2 py-1",
-                                  badgeClasses,
-                                  !isLast && "border-r-0 -mr-[1px]",
-                                  borderRadiusClass
-                                )}
-                              >
-                                {role.roleKey === "SCHOOL_LICENCE" ? (
-                                  <FileBadge2 className="h-3 w-3" />
-                                ) : role.isAdmin ? (
-                                  <ShieldCheck className="h-3 w-3" />
-                                ) : (
-                                  <UsersIcon className="h-3 w-3" />
-                                )}
-                                {role.name}
-                              </Badge>
-                            );
-                          });
-                        })()}
-                      </div>
+                      <RoleBadges
+                        roles={schoolRoles.map((r) => ({
+                          roleKey: r.roleKey,
+                          roleName: r.name,
+                          isPlatform: false,
+                        }))}
+                        variant="joined"
+                        size="sm"
+                      />
                     ) : (
-                      // When not filtering by school, group by school and show school names
                       Array.from(rolesBySchool.entries()).map(
-                        ([sid, roles], schoolIdx) => {
-                          const schoolName = roles[0]?.schoolName;
-
-                          // Sort roles in order: SCHOOL_STAFF, SCHOOL_ADMIN, TEACHER
-                          const sortedRoles = [...roles].sort((a, b) => {
-                            const getRolePriority = (
-                              roleKey: string
-                            ): number => {
-                              if (roleKey === "SCHOOL_STAFF") return 1;
-                              if (roleKey === "SCHOOL_ADMIN") return 2;
-                              if (
-                                roleKey === "TEACHER" ||
-                                roleKey.includes("TEACHER")
-                              )
-                                return 3;
-                              return 4;
-                            };
-
-                            const aPriority = getRolePriority(a.roleKey);
-                            const bPriority = getRolePriority(b.roleKey);
-
-                            return aPriority - bPriority;
-                          });
-
-                          const roleCount = sortedRoles.length;
-
+                        ([sid, schoolRolesList]) => {
+                          const schoolName = schoolRolesList[0]?.schoolName;
                           return (
                             <div
                               key={`school-${sid}`}
                               className="flex items-center gap-0 flex-wrap"
                             >
-                              {sortedRoles.map((role, roleIdx) => {
-                                const badgeClasses = getBadgeClasses(
-                                  role.roleKey,
-                                  false
-                                );
-                                const isFirst = roleIdx === 0;
-                                const isLast = roleIdx === roleCount - 1;
-
-                                // Determine border radius classes
-                                let borderRadiusClass = "";
-                                if (roleCount === 1) {
-                                  borderRadiusClass = schoolName
-                                    ? "rounded-l-md rounded-r-md"
-                                    : "rounded-md";
-                                } else if (isFirst) {
-                                  borderRadiusClass =
-                                    "rounded-l-md rounded-r-none";
-                                } else if (isLast) {
-                                  borderRadiusClass =
-                                    "rounded-r-md rounded-l-none";
-                                } else {
-                                  borderRadiusClass = "rounded-none";
-                                }
-
-                                return (
-                                  <Badge
-                                    key={`${sid}-${roleIdx}`}
-                                    variant="default"
-                                    className={cn(
-                                      "flex items-center gap-1 z-10 border px-2 py-1",
-                                      badgeClasses,
-                                      (!isLast || schoolName) &&
-                                        "border-r-0 -mr-[1px]",
-                                      borderRadiusClass
-                                    )}
-                                  >
-                                    {role.roleKey === "SCHOOL_LICENCE" ? (
-                                      <FileBadge2 className="h-3 w-3" />
-                                    ) : role.isAdmin ? (
-                                      <ShieldCheck className="h-3 w-3" />
-                                    ) : (
-                                      <UsersIcon className="h-3 w-3" />
-                                    )}
-                                    {role.name}
-                                  </Badge>
-                                );
-                              })}
+                              <RoleBadges
+                                roles={schoolRolesList.map((r) => ({
+                                  roleKey: r.roleKey,
+                                  roleName: r.name,
+                                  isPlatform: false,
+                                }))}
+                                variant="joined"
+                                size="sm"
+                                lastConnectsToRight={!!schoolName}
+                              />
                               {schoolName && (
                                 <Badge
                                   variant="outline"

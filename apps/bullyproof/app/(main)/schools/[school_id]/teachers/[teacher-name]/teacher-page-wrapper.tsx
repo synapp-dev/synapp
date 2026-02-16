@@ -9,20 +9,27 @@ export function TeacherPageWrapper({
 }: {
   params: Promise<{ school_id: string; "teacher-name": string }>;
 }) {
-  const [schoolId, setSchoolId] = useState<string>("");
-  const [teacherSlug, setTeacherSlug] = useState<string>("");
+  const [resolved, setResolved] = useState<{
+    schoolSlug: string;
+    teacherSlug: string;
+  }>({ schoolSlug: "", teacherSlug: "" });
 
   useEffect(() => {
-    params.then(({ school_id, "teacher-name": slug }) => {
-      setSchoolId(school_id);
-      setTeacherSlug(slug);
+    params.then(({ school_id, "teacher-name": teacherName }) => {
+      setResolved({
+        schoolSlug: school_id,
+        teacherSlug: teacherName,
+      });
     });
   }, [params]);
 
   return (
     <>
-      <FeatureGuard feature="/school/teachers" schoolId={schoolId} />
-      <TeacherPageClient teacherSlug={teacherSlug} schoolSlug={schoolId} />
+      <FeatureGuard feature="/school/teachers" schoolId={resolved.schoolSlug} />
+      <TeacherPageClient
+        teacherSlug={resolved.teacherSlug}
+        schoolSlug={resolved.schoolSlug}
+      />
     </>
   );
 }

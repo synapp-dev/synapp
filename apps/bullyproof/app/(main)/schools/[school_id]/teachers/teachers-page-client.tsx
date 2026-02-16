@@ -4,11 +4,10 @@ import { useState, useEffect, useMemo, Fragment } from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
+import { Separator } from "@workspace/ui/components/separator";
+import { RoleBadges } from "@/components/atoms/role-badges";
 import { Button } from "@workspace/ui/components/button";
 import {
   Avatar,
@@ -26,7 +25,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { Mail, Search } from "lucide-react";
+import {
+  Search,
+  Shield,
+  GraduationCap,
+  Users,
+  Tag,
+} from "lucide-react";
 import {
   meApi,
   type UserWithRolesAndSchools,
@@ -95,19 +100,16 @@ export default function TeachersPageClient() {
     fetchUsers();
   }, [currentSchool?.id]);
 
-  // Filter users to only show those with TEACHER or SCHOOL_ADMIN roles (exclude SCHOOL_LICENCE only users)
+  // Filter users to only show those with TEACHER, SCHOOL_ADMIN, or SCHOOL_STAFF (exclude SCHOOL_LICENCE only users)
   const usersWithValidRoles = useMemo(() => {
     const schoolId = currentSchool?.id;
     if (!schoolId) return users;
 
     return users.filter((user) => {
       const schoolRoles = user.schoolRoles.filter(
-        (role) => role.schoolId === schoolId
+        (role) => role.schoolId === schoolId && role.roleKey !== "SCHOOL_LICENCE"
       );
-      // User must have at least one role that is TEACHER or SCHOOL_ADMIN
-      return schoolRoles.some(
-        (role) => role.roleKey === "TEACHER" || role.roleKey === "SCHOOL_ADMIN"
-      );
+      return schoolRoles.length > 0;
     });
   }, [users, currentSchool?.id]);
 
@@ -152,26 +154,14 @@ export default function TeachersPageClient() {
     return { administrative, teaching, staff, other };
   }, [usersWithValidRoles, currentSchool?.id]);
 
+  const isSearchMode = searchQuery.trim().length > 0;
+
   // Filter users based on search query and role filter
   const filteredUsers = useMemo(() => {
     let filtered = usersWithValidRoles;
 
-    // Apply role filter
-    if (selectedRole !== "all") {
-      const schoolId = currentSchool?.id;
-      filtered = filtered.filter((user) => {
-        if (!schoolId) return false;
-        return user.schoolRoles.some(
-          (role) =>
-            role.schoolId === schoolId &&
-            role.roleKey === selectedRole &&
-            role.roleKey !== "SCHOOL_LICENCE"
-        );
-      });
-    }
-
-    // Apply search query filter
-    if (searchQuery.trim()) {
+    // When searching: filter by search only (no role filter)
+    if (isSearchMode) {
       filtered = filtered.filter((user) => {
         const fullName =
           `${user.firstName || ""} ${user.lastName || ""}`.trim();
@@ -185,17 +175,34 @@ export default function TeachersPageClient() {
           )
         );
       });
+      return filtered;
+    }
+
+    // When role filter selected: filter to that role only
+    if (selectedRole !== "all") {
+      const schoolId = currentSchool?.id;
+      filtered = filtered.filter((user) => {
+        if (!schoolId) return false;
+        return user.schoolRoles.some(
+          (role) =>
+            role.schoolId === schoolId &&
+            role.roleKey === selectedRole &&
+            role.roleKey !== "SCHOOL_LICENCE"
+        );
+      });
     }
 
     return filtered;
-  }, [usersWithValidRoles, searchQuery, selectedRole, currentSchool?.id]);
+  }, [usersWithValidRoles, searchQuery, selectedRole, currentSchool?.id, isSearchMode]);
 
-  // Group filtered users by their actual roles
+  // Group filtered users by roles (only when not in search mode)
+  // When role filter: single category, each user once
+  // When "all": multiple categories, users can appear in each category they have
   const usersByRole = useMemo(() => {
     const schoolId = currentSchool?.id;
-    if (!schoolId) return new Map<string, UserWithRolesAndSchools[]>();
+    if (!schoolId) return new Map<string, { roleKey: string; roleName: string; users: UserWithRolesAndSchools[] }>();
 
-    const roleMap = new Map<string, UserWithRolesAndSchools[]>();
+    const roleMap = new Map<string, { roleKey: string; roleName: string; users: UserWithRolesAndSchools[] }>();
 
     filteredUsers.forEach((user) => {
       const schoolRoles = user.schoolRoles.filter(
@@ -203,25 +210,55 @@ export default function TeachersPageClient() {
           role.schoolId === schoolId && role.roleKey !== "SCHOOL_LICENCE"
       );
 
-      // Add user to each role category they have
+      // When role filter: add user only to the selected role's category (once)
+      if (selectedRole !== "all") {
+        const role = schoolRoles.find((r) => r.roleKey === selectedRole);
+        if (!role) return;
+        const roleKey = role.roleKey || "";
+        const roleName = role.roleName || roleKey || "Unknown";
+        if (!roleMap.has(roleName)) {
+          roleMap.set(roleName, { roleKey, roleName, users: [] });
+        }
+        const entry = roleMap.get(roleName)!;
+        if (!entry.users.some((u) => u.id === user.id)) {
+          entry.users.push(user);
+        }
+        return;
+      }
+
+      // When "all": add user to each role category they have
       schoolRoles.forEach((role) => {
         const roleKey = role.roleKey || "";
         const roleName = role.roleName || roleKey || "Unknown";
 
         if (!roleMap.has(roleName)) {
-          roleMap.set(roleName, []);
+          roleMap.set(roleName, { roleKey, roleName, users: [] });
         }
 
-        // Only add user if not already in this role's array (avoid duplicates)
-        const roleUsers = roleMap.get(roleName)!;
-        if (!roleUsers.some((u) => u.id === user.id)) {
-          roleUsers.push(user);
+        const entry = roleMap.get(roleName)!;
+        if (!entry.users.some((u) => u.id === user.id)) {
+          entry.users.push(user);
         }
       });
     });
 
     return roleMap;
-  }, [filteredUsers, currentSchool?.id]);
+  }, [filteredUsers, currentSchool?.id, selectedRole]);
+
+  // Section order: School Admins first, then Teaching (AP Teacher etc), then Staff
+  const sectionOrder = (a: string, b: string) => {
+    const order: Record<string, number> = {
+      SCHOOL_ADMIN: 1,
+      TEACHER: 2,
+      SCHOOL_STAFF: 3,
+    };
+    const aKey = usersByRole.get(a)?.roleKey ?? "";
+    const bKey = usersByRole.get(b)?.roleKey ?? "";
+    const aPriority = order[aKey] ?? 4;
+    const bPriority = order[bKey] ?? 4;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return a.localeCompare(b);
+  };
 
   const getFullName = (user: UserWithRolesAndSchools) => {
     const firstName = user.firstName || "";
@@ -244,87 +281,112 @@ export default function TeachersPageClient() {
     return "U";
   };
 
-  const getSchoolRoles = (user: UserWithRolesAndSchools) => {
-    const schoolId = currentSchool?.id;
-    if (!schoolId) return [];
-    // Filter out SCHOOL_LICENCE role, only show TEACHER and SCHOOL_ADMIN
-    return user.schoolRoles.filter(
-      (role) => role.schoolId === schoolId && role.roleKey !== "SCHOOL_LICENCE"
-    );
-  };
-
   // Convert teacher name to URL-friendly slug
   const getTeacherSlug = (name: string) => {
     return name.toLowerCase().replace(/\s+/g, "-");
   };
 
-  // Render teacher card component
-  const renderTeacherCard = (user: UserWithRolesAndSchools) => {
+  const getSchoolRolesForUser = (user: UserWithRolesAndSchools) => {
+    const schoolId = currentSchool?.id;
+    if (!schoolId) return [];
+    return user.schoolRoles.filter(
+      (role) => role.schoolId === schoolId && role.roleKey !== "SCHOOL_LICENCE"
+    );
+  };
+
+  // Render teacher card - shows only the role badge for this category
+  const renderTeacherCard = (
+    user: UserWithRolesAndSchools,
+    sectionRole: { roleKey: string; roleName: string }
+  ) => {
+    return renderTeacherCardInner(user, [
+      { roleKey: sectionRole.roleKey, roleName: sectionRole.roleName },
+    ]);
+  };
+
+  // Render teacher card for search results - shows all roles joined
+  const renderTeacherCardSearchResult = (user: UserWithRolesAndSchools) => {
+    const schoolRoles = getSchoolRolesForUser(user);
+    const roles = schoolRoles.map((r) => ({
+      roleKey: r.roleKey || "",
+      roleName: r.roleName || undefined,
+    }));
+    return renderTeacherCardInner(user, roles, "joined");
+  };
+
+  const renderTeacherCardInner = (
+    user: UserWithRolesAndSchools,
+    roles: { roleKey: string; roleName?: string }[],
+    badgeVariant: "pill" | "joined" = "pill"
+  ) => {
     const fullName = getFullName(user);
-    const schoolRoles = getSchoolRoles(user);
     const teacherSlug = getTeacherSlug(fullName);
     const schoolSlug = currentSchool?.slug || "";
+    const firstName = user.firstName?.trim() || "";
+    const lastName = user.lastName?.trim() || "";
 
     return (
       <Link
         href={`/schools/${schoolSlug}/teachers/${teacherSlug}`}
         className="block"
       >
-        <Card className="hover:shadow-md transition-shadow h-full">
-          <CardHeader>
-            <div className="flex items-start space-x-3">
+        <Card className="hover:shadow-md transition-shadow h-full relative">
+          <CardHeader className="w-full h-full flex items-end justify-start">
+            <RoleBadges
+              roles={roles}
+              variant={badgeVariant}
+              size="sm"
+              className="absolute top-4 right-4 shrink-0"
+            />
+            <div className="flex items-end gap-3">
               <Avatar className="h-12 w-12 flex-shrink-0">
                 <AvatarImage src={user.avatarUrl || undefined} />
                 <AvatarFallback>{getInitials(user)}</AvatarFallback>
               </Avatar>
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg truncate">{fullName}</CardTitle>
-                {/* Roles as badges underneath name */}
-                {schoolRoles.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {schoolRoles.map((role, index) => (
-                      <Badge key={index} variant="secondary">
-                        {role.roleName || role.roleKey || "Unknown"}
-                      </Badge>
-                    ))}
+              <div className="min-w-0 flex-1 pb-0.5">
+                {firstName ? (
+                  <div className="font-medium text-sm text-muted-foreground truncate">
+                    {firstName}
                   </div>
-                )}
+                ) : null}
+                <div className="font-bold text-lg truncate">
+                  {lastName || fullName || user.email}
+                </div>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            {/* Email as clickable link */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                window.location.href = `mailto:${user.email}`;
-              }}
-              className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full text-left"
-            >
-              <Mail className="h-4 w-4 flex-shrink-0" />
-              <span className="truncate">{user.email}</span>
-            </button>
-          </CardContent>
         </Card>
       </Link>
     );
   };
 
+  const getCategoryIcon = (roleKey: string) => {
+    if (roleKey === "SCHOOL_ADMIN") return Shield;
+    if (roleKey === "TEACHER" || roleKey?.includes("TEACHER")) return GraduationCap;
+    if (roleKey === "SCHOOL_STAFF") return Users;
+    return Tag;
+  };
+
   // Render category section component
   const renderCategorySection = (
     title: string,
-    users: UserWithRolesAndSchools[]
+    users: UserWithRolesAndSchools[],
+    sectionRole: { roleKey: string; roleName: string }
   ) => {
     if (users.length === 0) return null;
 
+    const CategoryIcon = getCategoryIcon(sectionRole.roleKey);
+
     return (
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">{title}</h2>
+        <h2 className="text-xl font-semibold text-muted-foreground flex items-center gap-2">
+          <CategoryIcon className="h-5 w-5" />
+          {title}
+        </h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {users.map((user) => (
-            <div key={user.id} className="h-full">
-              {renderTeacherCard(user)}
+            <div key={`${user.id}-${sectionRole.roleKey}`} className="h-full">
+              {renderTeacherCard(user, sectionRole)}
             </div>
           ))}
         </div>
@@ -334,25 +396,17 @@ export default function TeachersPageClient() {
 
   // Teacher card skeleton component
   const TeacherCardSkeleton = () => (
-    <Card className="h-full">
-      <CardHeader>
-        <div className="flex items-start space-x-3">
+    <Card className="h-full relative">
+      <CardHeader className="w-full h-full flex items-end justify-start">
+        <Skeleton className="h-6 w-20 rounded-full shrink-0 absolute top-4 right-4" />
+        <div className="flex items-end gap-3">
           <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />
-          <div className="flex-1 min-w-0 space-y-2">
+          <div className="flex-1 min-w-0 space-y-1">
+            <Skeleton className="h-4 w-24" />
             <Skeleton className="h-5 w-32" />
-            <div className="flex flex-wrap gap-1">
-              <Skeleton className="h-5 w-16 rounded-full" />
-              <Skeleton className="h-5 w-20 rounded-full" />
-            </div>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="flex items-center space-x-2">
-          <Skeleton className="h-4 w-4 flex-shrink-0" />
-          <Skeleton className="h-4 w-40" />
-        </div>
-      </CardContent>
     </Card>
   );
 
@@ -456,13 +510,26 @@ export default function TeachersPageClient() {
             </div>
           </CardContent>
         </Card>
+      ) : isSearchMode ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredUsers.map((user) => (
+            <div key={user.id} className="h-full">
+              {renderTeacherCardSearchResult(user)}
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="space-y-8">
+        <div>
           {Array.from(usersByRole.entries())
-            .sort(([roleA], [roleB]) => roleA.localeCompare(roleB))
-            .map(([roleName, users]) => (
+            .sort(([roleA], [roleB]) => sectionOrder(roleA, roleB))
+            .map(([roleName, entry], index) => (
               <Fragment key={roleName}>
-                {renderCategorySection(roleName, users)}
+                {index > 0 && <Separator className="my-12" />}
+                {renderCategorySection(
+                  roleName,
+                  entry.users,
+                  { roleKey: entry.roleKey, roleName: entry.roleName }
+                )}
               </Fragment>
             ))}
         </div>
