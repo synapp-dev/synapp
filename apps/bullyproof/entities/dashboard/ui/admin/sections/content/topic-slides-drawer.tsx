@@ -16,6 +16,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Loader2, FileText, Image, Video } from "lucide-react";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
@@ -153,13 +154,13 @@ export function TopicSlidesDrawer({
             </Card>
           ) : (
             <div className="space-y-4">
-              {topic.slides.map((slide) => (
+              {[...topic.slides].sort(compareSlidesByPosition).map((slide, index) => (
                 <Card key={slide.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2 text-base">
                         {getSlideIcon(slide.kind)}
-                        <span>Slide {slide.orderIndex}</span>
+                        <span>Slide {index + 1}</span>
                       </CardTitle>
                       <Badge variant={getSlideBadgeVariant(slide.kind)}>
                         {slide.kind}
@@ -177,7 +178,7 @@ export function TopicSlidesDrawer({
                       <div className="space-y-2">
                         <img
                           src={toStorageUrl(slide.imageUrl) ?? slide.imageUrl}
-                          alt={`Slide ${slide.orderIndex}`}
+                          alt={`Slide ${index + 1}`}
                           className="w-full rounded-md border"
                         />
                         {slide.officialNotes && (
@@ -215,7 +216,7 @@ export function TopicSlidesDrawer({
                                   className="w-full h-full"
                                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                   allowFullScreen
-                                  title={`Video content for slide ${slide.orderIndex}`}
+                                  title={`Video content for slide ${index + 1}`}
                                 />
                               ) : (
                                 <video

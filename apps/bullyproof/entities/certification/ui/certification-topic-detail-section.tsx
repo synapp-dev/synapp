@@ -3,6 +3,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  compareSlidesByPosition,
+  computePositionsForOrder,
+  generatePositionBetween,
+} from "@/server/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type {
   courseTopics,
@@ -111,13 +116,13 @@ export function CertificationTopicDetailSection({
         const slidesResult = await certificationApi.topics.slides.list(topicId);
         if (slidesResult.data) {
           const initialSlides = slidesResult.data
-            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .sort(compareSlidesByPosition)
             .map((slide) => {
               const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
               return {
                 id: slide.id,
                 kind: slide.kind as "image" | "video" | "quiz" | "test",
-                orderIndex: slide.orderIndex,
+                position: slide.position,
                 textHtml: slide.textHtml ?? null,
                 imageUrl: slide.imageUrl ?? null,
                 videoUrl: slide.videoUrl ?? null,
@@ -150,10 +155,16 @@ export function CertificationTopicDetailSection({
     if (!topic) return;
 
     const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const sortedSlides = [...localSlides].sort(compareSlidesByPosition);
+    const lastPosition =
+      sortedSlides.length > 0
+        ? sortedSlides[sortedSlides.length - 1]?.position
+        : null;
+    const newPosition = generatePositionBetween(lastPosition, null);
     const newSlide: CertificationSlideData = {
       id: tempId,
       kind: "image",
-      orderIndex: slides.length,
+      position: newPosition,
       imageUrl: null,
       videoUrl: null,
       textHtml: null,
@@ -278,20 +289,21 @@ export function CertificationTopicDetailSection({
       const activeSlides = localSlides.filter(
         (s) => !deletedSlideIds.has(s.id)
       );
-      const sortedSlides = [...activeSlides].sort(
-        (a, b) => a.orderIndex - b.orderIndex
-      );
+      const sortedSlides = [...activeSlides].sort(compareSlidesByPosition);
 
       const creates: any[] = [];
       const updates: any[] = [];
       const slideIds: string[] = [];
 
+      const positions = computePositionsForOrder(
+        sortedSlides.map((s) => s.id)
+      );
       for (let i = 0; i < sortedSlides.length; i++) {
         const slide = sortedSlides[i];
         if (slide.id.startsWith("temp_")) {
           creates.push({
             tempId: slide.id,
-            orderIndex: i,
+            position: positions[i],
             kind: slide.kind,
             imageUrl: null,
             videoUrl: slide.videoUrl || null,
@@ -349,11 +361,11 @@ export function CertificationTopicDetailSection({
       if (result.data?.topic) {
         const updatedSlides =
           result.data.topic.slides
-            ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+            ?.sort(compareSlidesByPosition)
             .map((slide: any) => ({
               id: slide.id,
               kind: slide.kind as "image" | "video" | "quiz" | "test",
-              orderIndex: slide.orderIndex,
+              position: slide.position,
               textHtml: slide.textHtml ?? null,
               imageUrl: slide.imageUrl ?? null,
               videoUrl: slide.videoUrl ?? null,
@@ -463,7 +475,7 @@ export function CertificationTopicDetailSection({
                           currentSlide.kind === "quiz"
                             ? "text"
                             : currentSlide.kind,
-                        orderIndex: currentSlide.orderIndex,
+                        position: currentSlide.position,
                         textHtml:
                           currentSlide.kind === "quiz"
                             ? `<div><h3>${renderQuestionWithUrlsAsHtml(currentSlide.quizData?.question || "Question", currentSlide.quizData?.questionUrls)}</h3><ul>${currentSlide.quizData?.answers.map((a) => `<li>${a.text}${a.isCorrect ? " ✓" : ""}</li>`).join("") || ""}</ul></div>`

@@ -50,15 +50,16 @@ export const topicProgressRepo = {
     topicId: string,
     currentSlideId?: string
   ) => {
-    // Get slide order index if slideId provided
+    // Get slide index (position in ordered list) if slideId provided
     let currentSlideIndex: number | null = null;
     if (currentSlideId) {
-      const slide = await db
-        .select({ orderIndex: courseTopicSlides.orderIndex })
+      const allSlides = await db
+        .select({ id: courseTopicSlides.id })
         .from(courseTopicSlides)
-        .where(eq(courseTopicSlides.id, currentSlideId))
-        .limit(1);
-      currentSlideIndex = slide[0]?.orderIndex ?? null;
+        .where(eq(courseTopicSlides.topicId, topicId))
+        .orderBy(courseTopicSlides.position);
+      const idx = allSlides.findIndex((s) => s.id === currentSlideId);
+      currentSlideIndex = idx >= 0 ? idx : null;
     }
 
     try {
@@ -102,20 +103,26 @@ export const topicProgressRepo = {
   },
 
   updateCurrentSlide: async (attemptId: string, slideId: string) => {
-    // Get slide order index
-    const slide = await db
-      .select({ orderIndex: courseTopicSlides.orderIndex })
+    const slideRow = await db
+      .select({ topicId: courseTopicSlides.topicId })
       .from(courseTopicSlides)
       .where(eq(courseTopicSlides.id, slideId))
       .limit(1);
-
-    const slideIndex = slide[0]?.orderIndex ?? null;
+    if (!slideRow[0]) {
+      throw new Error("Slide not found");
+    }
+    const allSlides = await db
+      .select({ id: courseTopicSlides.id })
+      .from(courseTopicSlides)
+      .where(eq(courseTopicSlides.topicId, slideRow[0].topicId))
+      .orderBy(courseTopicSlides.position);
+    const slideIndex = allSlides.findIndex((s) => s.id === slideId);
 
     return db
       .update(courseTopicProgress)
       .set({
         currentSlideId: slideId,
-        currentSlideIndex: slideIndex,
+        currentSlideIndex: slideIndex >= 0 ? slideIndex : null,
         status: sql`CASE WHEN status = 'not_started' THEN 'viewing_slides' ELSE status END`,
         updatedAt: sql`now()`,
       })

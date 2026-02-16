@@ -103,7 +103,7 @@ export async function PUT(
       textHtml: body.textHtml ?? null,
       videoStartS: body.videoStartS ?? null,
       videoEndS: body.videoEndS ?? null,
-      orderIndex: body.orderIndex,
+      position: body.position,
     });
 
     return NextResponse.json(slide, { status: 200 });

@@ -34,6 +34,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type {
   courseTopics,
@@ -160,13 +161,13 @@ function CourseTopicSlidesPageContent() {
 
         // Process slides to match ExtendedSlideData format
         const processedSlides: ExtendedSlideData[] = slidesData
-          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .sort(compareSlidesByPosition)
           .map((slide) => {
             const slideWithUrl = slide as typeof slide & { signedUrl?: string | null };
             return {
               id: slide.id,
               kind: slide.kind as SlideData["kind"],
-              orderIndex: slide.orderIndex,
+              position: slide.position,
               textHtml: slide.textHtml ?? null,
               imageUrl: slide.imageUrl ?? null,
               videoUrl: slide.videoUrl ?? null,

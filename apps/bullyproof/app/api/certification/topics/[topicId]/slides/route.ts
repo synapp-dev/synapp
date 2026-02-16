@@ -89,9 +89,19 @@ export async function POST(
       );
     }
 
+    const existingSlides = await courseTopicSlidesRepo.getByTopicId(topicId);
+    const lastPosition =
+      existingSlides.length > 0
+        ? existingSlides[existingSlides.length - 1].position
+        : null;
+    const { generatePositionBetween } = await import(
+      "@/server/lib/fractional-position"
+    );
+    const position = body.position ?? generatePositionBetween(lastPosition, null);
+
     const slide = await courseTopicSlidesRepo.createSlide({
       topicId,
-      orderIndex: body.orderIndex,
+      position,
       kind: body.kind || "image",
       imageUrl: body.imageUrl ?? null,
       videoUrl: body.videoUrl ?? null,

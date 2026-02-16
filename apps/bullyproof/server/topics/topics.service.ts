@@ -4,17 +4,21 @@ import {
   listTopicsSchema,
   getTopicByIdSchema,
   createSlideSchema,
+  createSlideWithPositionSchema,
   updateSlideSchema,
   reorderSlidesSchema,
   reorderTopicsSchema,
+  deleteSlidesSchema,
   type CreateTopicParams,
   type UpdateTopicParams,
   type ListTopicsParams,
   type GetTopicByIdParams,
   type CreateSlideParams,
+  type CreateSlideWithPositionParams,
   type UpdateSlideParams,
   type ReorderSlidesParams,
   type ReorderTopicsParams,
+  type DeleteSlidesParams,
 } from "./topics.validators";
 import { topicsRepo } from "./topics.repo";
 import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
@@ -192,10 +196,54 @@ export const topicsService = {
 
     const newSlide = await topicsRepo.createSlide(data);
 
-    // Normalize slide order after creation to ensure sequential orderIndex
+    // Normalize slide order after creation to ensure consistent positions
     await topicsRepo.normalizeSlideOrder(data.topicId);
 
     return newSlide[0];
+  },
+
+  async createSlideWithPosition(
+    ctx: AuthContext,
+    topicId: string,
+    params: unknown
+  ) {
+    const data: CreateSlideWithPositionParams =
+      createSlideWithPositionSchema.parse(params);
+    await assertCanManageTopics(ctx);
+
+    const slide = await topicsRepo.createSlideWithPosition(topicId, {
+      kind: data.kind,
+      afterSlideId: data.afterSlideId ?? undefined,
+      position: data.position ?? undefined,
+      imageUrl: data.imageUrl ?? null,
+      videoUrl: data.videoUrl ?? null,
+      textHtml: data.textHtml ?? null,
+      videoStartS: data.videoStartS ?? null,
+      videoEndS: data.videoEndS ?? null,
+    });
+
+    if (slide.kind === "image" && slide.imageUrl) {
+      const signedUrl = await refreshSignedUrlIfStale(
+        slide,
+        slide.imageUrl,
+        topicSlidesRepo.updateSignedUrl
+      );
+      return { ...slide, signedUrl };
+    }
+    return slide;
+  },
+
+  async deleteSlides(ctx: AuthContext, topicId: string, params: unknown) {
+    const data: DeleteSlidesParams = deleteSlidesSchema.parse(params);
+    await assertCanManageTopics(ctx);
+
+    for (const id of data.ids) {
+      const slideData = await topicsRepo.getSlideWithTopicAndStage(id);
+      if (slideData && slideData.topic.id === topicId) {
+        await this.deleteSlide(ctx, id);
+      }
+    }
+    return { success: true };
   },
 
   async updateSlide(ctx: AuthContext, slideId: string, params: unknown) {
@@ -210,7 +258,7 @@ export const topicsService = {
 
     const updatedSlide = await topicsRepo.updateSlide(slideId, data);
 
-    // Normalize slide order after update to ensure sequential orderIndex
+    // Normalize slide order after update to ensure consistent positions
     await topicsRepo.normalizeSlideOrder(slideData.topic.id);
 
     return updatedSlide[0];
@@ -297,7 +345,7 @@ export const topicsService = {
       `[topics.service] Successfully deleted slide from database: ${slideId}`
     );
 
-    // Step 3: Reorder remaining slides to fill gaps (normalize orderIndex)
+    // Step 3: Reorder remaining slides to fill gaps (normalize positions)
     console.log(
       `[topics.service] Normalizing slide order for topicId: ${topicId}`
     );
@@ -313,6 +361,16 @@ export const topicsService = {
   async reorderSlides(ctx: AuthContext, params: unknown) {
     const data: ReorderSlidesParams = reorderSlidesSchema.parse(params);
     await assertCanManageTopics(ctx);
+
+    // Delete orphan slides (not in slideIds) before reordering - prevents ghost slides
+    const topicData = await topicsRepo.getWithDetails(data.topicId);
+    if (topicData?.slides) {
+      const slideIdsSet = new Set(data.slideIds);
+      const orphans = topicData.slides.filter((s) => !slideIdsSet.has(s.id));
+      for (const orphan of orphans) {
+        await this.deleteSlide(ctx, orphan.id);
+      }
+    }
 
     await topicsRepo.reorderSlides(data.topicId, data.slideIds);
     return { success: true };

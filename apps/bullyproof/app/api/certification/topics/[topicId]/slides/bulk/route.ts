@@ -15,7 +15,7 @@
  * - operations: JSON string with structure:
  *   {
  *     topicId: string;
- *     creates: Array<{ orderIndex: number; kind: "image" | "video" | "text"; ... }>;
+ *     creates: Array<{ position?: string; kind: "image" | "video" | "text"; ... }>;
  *     updates: Array<{ id: string; kind?: string; ... }>;
  *     deletes: string[];
  *     reorder: string[];
@@ -42,6 +42,7 @@ import {
   courseTopicSlides,
 } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
+import { generateNKeysBetween } from "fractional-indexing";
 
 export async function POST(
   request: Request,
@@ -83,7 +84,8 @@ export async function POST(
       );
     }
 
-    const { creates, updates, deletes, reorder } = parsedOperations;
+    const { creates, updates, deletes, reorder, desiredOrder } =
+      parsedOperations;
 
     const supabase = await createServerClient();
 
@@ -141,12 +143,12 @@ export async function POST(
       }
     }
 
-    // Step 2: Get current topic data for orderIndex calculation (after deletions)
+    // Step 2: Get current topic data (for position calculation when creating)
     const currentSlides = await courseTopicSlidesRepo.getByTopicId(topicId);
-    const maxOrderIndex =
+    const lastPosition =
       currentSlides.length > 0
-        ? Math.max(...currentSlides.map((s) => s.orderIndex))
-        : -1;
+        ? currentSlides[currentSlides.length - 1].position
+        : null;
 
     // Get topic info (course code already retrieved above)
     const topic = await courseTopicsRepo.getById(topicId);
@@ -154,16 +156,14 @@ export async function POST(
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
-    // Step 3: Create new slides
-    // Use temporary high orderIndex values to avoid unique constraint violations
-    // We'll normalize the order after all operations complete
-    // Calculate tempOrderOffset dynamically to avoid conflicts with existing slides
+    // Step 3: Create new slides (positions will be normalized in Step 5)
     const createdSlideIds: string[] = [];
     const tempIdToSlideIdMap = new Map<string, string>();
-    // Use an offset that's higher than any existing orderIndex to avoid conflicts
-    // Add 1000000 to ensure we're well above any temporary values
-    const tempOrderOffset = Math.max(1000000, maxOrderIndex + 1000000);
-    const newSlideOrderMap = new Map<string, number>(); // Map: slideId -> intended orderIndex
+    const newPositions =
+      creates && creates.length > 0
+        ? generateNKeysBetween(lastPosition, null, creates.length)
+        : [];
+    const newSlideIndexMap = new Map<string, number>(); // Map: slideId -> intended index
     const uploadedUrls: Record<string, string> = {};
     const tempFileInfo = new Map<
       string,
@@ -174,8 +174,7 @@ export async function POST(
       for (let i = 0; i < creates.length; i++) {
         const slideData = creates[i];
         const tempId = slideData.tempId;
-        // Use temporary high orderIndex to avoid conflicts, will be normalized later
-        const tempOrderIndex = tempOrderOffset + i;
+        const position = slideData.position ?? newPositions[i];
 
         // For image slides, we need to upload the file first (if it exists) before creating the slide
         // because the constraint requires image_url IS NOT NULL for image slides
@@ -244,7 +243,7 @@ export async function POST(
 
         const createPayload: any = {
           topicId,
-          orderIndex: tempOrderIndex,
+          position,
           kind: slideData.kind,
           imageUrl:
             slideData.kind === "image"
@@ -267,10 +266,7 @@ export async function POST(
             if (tempId) {
               tempIdToSlideIdMap.set(tempId, slideId);
             }
-            // Store the intended orderIndex for this new slide
-            const intendedOrderIndex =
-              slideData.orderIndex ?? maxOrderIndex + 1 + i;
-            newSlideOrderMap.set(slideId, intendedOrderIndex);
+            newSlideIndexMap.set(slideId, currentSlides.length + i);
 
             // If we uploaded a temp file, now move it to the correct location with the slide ID
             const tempFileData = tempId ? tempFileInfo.get(tempId) : null;
@@ -444,7 +440,7 @@ export async function POST(
       for (const slideData of updates) {
         const updateData: any = { ...slideData };
         delete updateData.id;
-        delete updateData.orderIndex;
+        delete updateData.position;
 
         // If there's an uploaded file for this slide, use its URL
         // But only for image slides
@@ -465,57 +461,49 @@ export async function POST(
     }
 
     // Step 5: Reorder slides
-    // Build final order including newly created slides at their intended positions
-    if (reorder && Array.isArray(reorder) && reorder.length > 0) {
+    let finalOrder: string[] | null = null;
+
+    // Prefer desiredOrder when present: canonical list (existing + temp IDs) in final order
+    if (desiredOrder && Array.isArray(desiredOrder) && desiredOrder.length > 0) {
+      finalOrder = desiredOrder
+        .map((id: string) => tempIdToSlideIdMap.get(id) ?? id)
+        .filter((id: string) => !deletedSlideIds.has(id));
+    } else if (reorder && Array.isArray(reorder) && reorder.length > 0) {
       const validReorderIds = reorder.filter((id) => !deletedSlideIds.has(id));
 
-      // Create pairs of [orderIndex, slideId] for new slides
       const newSlidePositions: Array<[number, string]> = [];
       for (const slideId of createdSlideIds) {
-        const intendedOrderIndex = newSlideOrderMap.get(slideId);
-        if (intendedOrderIndex !== undefined) {
-          newSlidePositions.push([intendedOrderIndex, slideId]);
+        const intendedIndex = newSlideIndexMap.get(slideId);
+        if (intendedIndex !== undefined) {
+          newSlidePositions.push([intendedIndex, slideId]);
         }
       }
-      // Sort by orderIndex
       newSlidePositions.sort((a, b) => a[0] - b[0]);
 
-      // Build final order by inserting new slides at their intended positions
-      // The orderIndex values from creates represent the final position in the sorted array
-      // The reorder array contains existing slide IDs in the order they appear in the frontend's sorted array
-      // The frontend has already calculated the correct order, so we just need to merge them correctly
-
-      // Calculate total number of slides in final order
       const totalSlides = validReorderIds.length + newSlidePositions.length;
-
-      const finalOrder: string[] = [];
+      finalOrder = [];
       let existingIndex = 0;
       let newSlideIndex = 0;
 
-      // Build final order by going through each position
       for (
         let currentPosition = 0;
         currentPosition < totalSlides;
         currentPosition++
       ) {
-        // Check if a new slide should be inserted at this position
         if (
           newSlideIndex < newSlidePositions.length &&
           newSlidePositions[newSlideIndex][0] === currentPosition
         ) {
-          // Insert new slide at this position
           finalOrder.push(newSlidePositions[newSlideIndex][1]);
           newSlideIndex++;
         } else if (existingIndex < validReorderIds.length) {
-          // This position should be filled by an existing slide
-          // The reorder array contains existing slides in their final order
-          // We place them sequentially, skipping positions where new slides go
           finalOrder.push(validReorderIds[existingIndex]);
           existingIndex++;
         }
       }
+    }
 
-      if (finalOrder.length > 0) {
+    if (finalOrder && finalOrder.length > 0) {
         // Validate that all slides belong to this topic (security check)
         console.log(
           "[bulk-save] Validating slide ownership before reordering..."
@@ -563,7 +551,6 @@ export async function POST(
           console.error("Failed to reorder slides:", error);
           throw error;
         }
-      }
     } else {
       // Normalize order if no explicit reorder provided
       // This will ensure all slides (including new ones) are sequentially ordered
@@ -577,6 +564,11 @@ export async function POST(
     const fullTopic = await courseTopicsRepo.getById(topicId);
     const topicData = fullTopic.length > 0 ? fullTopic[0] : null;
 
+    const createdSlideMapping: Record<string, string> = {};
+    tempIdToSlideIdMap.forEach((realId, tempId) => {
+      createdSlideMapping[tempId] = realId;
+    });
+
     return NextResponse.json(
       {
         success: true,
@@ -589,6 +581,9 @@ export async function POST(
               id: topicId,
               slides: finalSlides,
             },
+        ...(Object.keys(createdSlideMapping).length > 0 && {
+          createdSlideMapping,
+        }),
       },
       { status: 200 }
     );

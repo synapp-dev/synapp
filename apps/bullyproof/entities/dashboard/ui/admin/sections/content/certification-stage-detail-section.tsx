@@ -22,6 +22,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { useCertificationCourses } from "@/entities/certification/model/store";
 import {
@@ -105,22 +106,20 @@ type TopicWithSlides = Topic;
 
 // Helper function to get slide stats
 function getSlideStatsForCard(topic: TopicWithSlides) {
-  // Sort slides by orderIndex to ensure correct order
-  const slides = (topic.slides || []).sort(
-    (a, b) => a.orderIndex - b.orderIndex
-  );
+  // Sort slides by position to ensure correct order
+  const slides = (topic.slides || []).sort(compareSlidesByPosition);
   const totalSlides = slides.length;
   const imageSlides = slides.filter((s) => s.kind === "image").length;
   const videoSlides = slides.filter((s) => s.kind === "video").length;
 
-  // Get all image slides sorted by orderIndex
+  // Get all image slides sorted by position
   // Include all image slides regardless of URL presence - URLs can be fetched on-demand if missing
   const imageSlidesList: TopicSlide[] = slides
     .filter((s) => s.kind === "image")
-    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .sort(compareSlidesByPosition)
     .map((s) => ({
       id: s.id,
-      orderIndex: s.orderIndex,
+      position: s.position,
       kind: s.kind,
       imageUrl: s.imageUrl,
       signedUrl: s.signedUrl,

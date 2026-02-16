@@ -499,7 +499,7 @@ export function PresentationMode({
               <div className="flex items-center justify-center gap-2 text-[var(--brand-bullyproof-primary)]">
                 <PartyPopper className="h-8 w-8 shrink-0" />
                 <h1 className="text-4xl font-bold">
-                  Topic Complete!
+                  Lesson Complete!
                 </h1>
               </div>
               <p className="text-sm text-muted-foreground">

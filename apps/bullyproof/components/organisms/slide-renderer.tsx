@@ -18,7 +18,8 @@ export type SlideKind = "text" | "image" | "video" | "quiz" | "test";
 export interface SlideData {
   id: string;
   kind: SlideKind;
-  orderIndex: number;
+  /** Fractional position for ordering */
+  position: string;
   textHtml?: string | null;
   imageUrl?: string | null;
   videoUrl?: string | null;

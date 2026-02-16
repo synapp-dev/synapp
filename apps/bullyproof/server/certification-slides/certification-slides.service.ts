@@ -149,8 +149,8 @@ export const certificationSlidesService = {
       throw new Error("Slide not found");
     }
 
-    // Normalize slide order if orderIndex changed
-    if (data.orderIndex !== undefined) {
+    // Normalize slide order if position changed
+    if (data.position !== undefined) {
       const slide = updated[0];
       await certificationSlidesRepo.normalizeSlideOrder(slide.topicId);
     }

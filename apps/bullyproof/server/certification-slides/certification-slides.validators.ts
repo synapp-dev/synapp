@@ -4,7 +4,7 @@ import { z } from "zod";
 export const createCertificationSlideSchema = z
   .object({
     topicId: z.string().trim().min(1).max(500),
-    orderIndex: z.number().int().min(0),
+    position: z.string().trim().min(1).max(100),
     kind: z.enum(["image", "video", "text"]).default("image"),
     imageUrl: z.union([z.string().url(), z.null()]).optional(),
     videoUrl: z.union([z.string().url(), z.null()]).optional(),
@@ -58,7 +58,7 @@ export const updateCertificationSlideSchema = z
     textHtml: z.union([z.string(), z.null()]).optional(),
     videoStartS: z.union([z.number(), z.null()]).optional(),
     videoEndS: z.union([z.number(), z.null()]).optional(),
-    orderIndex: z.number().int().min(0).optional(),
+    position: z.string().trim().max(100).optional(),
   })
   .refine(
     (data) => {
@@ -89,7 +89,7 @@ export const bulkSaveCertificationSlidesSchema = z.object({
     .array(
       z.object({
         tempId: z.string().optional(), // For file mapping
-        orderIndex: z.number().int().min(0),
+        position: z.string().trim().max(100).optional(),
         kind: z.enum(["image", "video", "text"]),
         imageUrl: z.union([z.string().url(), z.null()]).optional(),
         videoUrl: z.union([z.string().url(), z.null()]).optional(),

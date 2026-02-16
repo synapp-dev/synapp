@@ -6,7 +6,7 @@ import { FileText } from "lucide-react";
 
 export type TopicSlide = {
   id: string;
-  orderIndex: number;
+  position: string;
   kind: string;
   imageUrl?: string | null;
   signedUrl?: string | null;
@@ -169,7 +169,7 @@ export function AnimatedThumbnail({
       >
         <Image
           src={currentUrl}
-          alt={`${topicTitle} - Slide ${currentSlide.orderIndex + 1}`}
+          alt={`${topicTitle} - Slide ${currentIndex + 1}`}
           fill
           className="object-cover"
           sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -185,7 +185,7 @@ export function AnimatedThumbnail({
         >
           <Image
             src={nextUrl}
-            alt={`${topicTitle} - Slide ${nextSlide.orderIndex + 1}`}
+            alt={`${topicTitle} - Slide ${nextIndex + 1}`}
             fill
             className="object-cover"
             sizes="(max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"

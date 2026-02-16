@@ -33,6 +33,7 @@ import {
   useTopicsByStage,
 } from "@/entities/topics/model/store-enhanced";
 import { useStageBySlug } from "@/entities/stages/model/store";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { createSlug } from "@/utils/slug";
@@ -210,11 +211,11 @@ export function TopicDetailSectionReadonly({
 
   // Convert topic slides to SlideData format and filter out empty slides
   const allSlides: SlideData[] = (topic?.slides || [])
-    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .sort(compareSlidesByPosition)
     .map((slide) => ({
       id: slide.id,
       topicId: slide.topicId,
-      orderIndex: slide.orderIndex,
+      position: slide.position,
       kind: slide.kind as "text" | "image" | "video" | "quiz",
       imageUrl: slide.imageUrl,
       videoUrl: slide.videoUrl,
@@ -502,7 +503,7 @@ export function TopicDetailSectionReadonly({
                   />
                 </div>
                 <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                  Slide {slide.orderIndex + 1}
+                  Slide {index + 1}
                 </div>
               </button>
             ))}

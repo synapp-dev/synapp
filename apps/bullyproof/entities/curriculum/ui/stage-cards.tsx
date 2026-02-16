@@ -21,6 +21,7 @@ import {
 import {
   useCertificationTopicsByStageCode,
 } from "@/entities/certification/model/topics-store";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { createSlug } from "@/utils/slug";
 
 // Base stage types
@@ -54,7 +55,7 @@ type TopicWithImage = (CurriculumTopic | CertificationTopic) & {
   slides?: Array<{
     id: string;
     kind: string;
-    orderIndex: number;
+    position: string;
     signedUrl?: string | null;
     signedImageUrl?: string | null; // API may return this instead of signedUrl
   }>;
@@ -78,12 +79,12 @@ function TopicImageThumbnail({
   type = "curriculum",
   isCardHovered = false,
 }: TopicImageThumbnailProps) {
-  // Get all image slides sorted by orderIndex
+  // Get all image slides sorted by position
   const imageSlides = useMemo(() => {
     if (!topic.slides) return [];
     return topic.slides
       .filter((slide) => slide.kind === "image")
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+      .sort(compareSlidesByPosition);
   }, [topic.slides]);
 
   // Get URLs for all image slides (signed URLs come from the API / DB cache)

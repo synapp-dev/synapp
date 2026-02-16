@@ -24,6 +24,10 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  compareSlidesByPosition,
+  computePositionsForOrder,
+} from "@/server/lib/fractional-position";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { certificationApi } from "@/entities/certification/api/endpoints";
@@ -139,11 +143,19 @@ function slideHasContent(
   const imageUrl = slide.imageUrl;
   const signedUrl = (slide as any).signedUrl; // Signed URL from API - null if file doesn't exist
 
-  // For image slides: require valid image content (blob, signedUrl, or pending upload).
+  // For image slides: require valid image content (blob, signedUrl, storage path, or pending upload).
+  // imageUrl can be a storage path (e.g. "stages/s1/topics/.../slide-id.jpg") - count as content.
   // Empty image slides (no URL, broken URL, or missing file) are ghost slides - treat as having no content
   // so they can be filtered on load and marked for deletion.
   const isBlobUrl = imageUrl?.startsWith("blob:");
-  const hasValidImageUrl = isBlobUrl || (!!signedUrl && signedUrl.trim() !== "");
+  const hasStoragePath =
+    !!imageUrl &&
+    !imageUrl.startsWith("blob:") &&
+    imageUrl.trim() !== "";
+  const hasValidImageUrl =
+    isBlobUrl ||
+    hasStoragePath ||
+    (!!signedUrl && signedUrl.trim() !== "");
   const hasPendingUpload = pendingFileUploads?.has(slide.id) || false;
   if (slide.kind === "image") {
     return hasValidImageUrl || hasPendingUpload;
@@ -174,7 +186,7 @@ function slideHasContent(
       hasQuizData,
       hasTextHtml,
       hasPendingUpload,
-      orderIndex: (slide as any).orderIndex,
+      position: (slide as any).position,
     });
   }
 
@@ -287,7 +299,7 @@ function SortableSlideItem({
           />
         </div>
         <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-          Slide {slide.orderIndex + 1}
+          Slide {index + 1}
         </div>
       </button>
 
@@ -663,13 +675,13 @@ export function TopicDetailSection({
             await certificationApi.topics.slides.list(topicId);
           if (slidesResult.data) {
             const allSlides: ExtendedSlideData[] = slidesResult.data
-              .sort((a, b) => a.orderIndex - b.orderIndex)
+              .sort(compareSlidesByPosition)
               .map((slide) => {
                 const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
                 return {
                   id: slide.id,
                   kind: slide.kind as SlideData["kind"],
-                  orderIndex: slide.orderIndex,
+                  position: slide.position,
                   textHtml: slide.textHtml ?? null,
                   imageUrl: slide.imageUrl ?? null,
                   videoUrl: slide.videoUrl ?? null,
@@ -715,10 +727,12 @@ export function TopicDetailSection({
               });
             }
             
-            // Reorder slides to have sequential orderIndex after filtering
+            // Assign fractional positions for display order
+            const validIds = filteredSlides.map((s) => s.id);
+            const positions = computePositionsForOrder(validIds);
             const initialSlides = filteredSlides.map((slide, index) => ({
               ...slide,
-              orderIndex: index,
+              position: positions[index],
             }));
             
             // If we filtered out any slides (non-image slides), mark them for deletion
@@ -869,11 +883,11 @@ export function TopicDetailSection({
     setTopic(foundTopic as Topic);
     const allSlides =
       foundTopic.slides
-        ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+        ?.sort(compareSlidesByPosition)
         .map((slide: any) => ({
           id: slide.id,
           kind: slide.kind as "text" | "image" | "video",
-          orderIndex: slide.orderIndex,
+          position: slide.position,
           textHtml: slide.textHtml ?? null,
           imageUrl: slide.imageUrl ?? null,
           videoUrl: slide.videoUrl ?? null,
@@ -894,11 +908,11 @@ export function TopicDetailSection({
           imageUrl: slide.imageUrl?.substring(0, 100),
           videoUrl: slide.videoUrl,
           textHtml: slide.textHtml?.substring(0, 50),
-          orderIndex: slide.orderIndex,
+          position: slide.position,
         });
       } else {
         // Log details for the last slide to debug why it might appear empty
-        if (slide.orderIndex === allSlides.length - 1) {
+        if (allSlides.length > 0 && allSlides[allSlides.length - 1]?.id === slide.id) {
           console.log("[topic-detail] Last slide content check:", {
             id: slide.id,
             kind: slide.kind,
@@ -906,7 +920,7 @@ export function TopicDetailSection({
             hasImageUrl: !!slide.imageUrl,
             videoUrl: slide.videoUrl,
             textHtml: slide.textHtml?.substring(0, 50),
-            orderIndex: slide.orderIndex,
+            position: slide.position,
             hasContent,
           });
         }
@@ -920,10 +934,12 @@ export function TopicDetailSection({
       empty: allSlides.length - validSlides.length,
     });
     
-    // Reorder slides to have sequential orderIndex after filtering
+    // Assign fractional positions for display order
+    const validIds = validSlides.map((s) => s.id);
+    const positions = computePositionsForOrder(validIds);
     const initialSlides = validSlides.map((slide, index) => ({
       ...slide,
-      orderIndex: index,
+      position: positions[index],
     }));
     
     // If we filtered out any slides (including empty image slides / ghost slides), mark them for deletion
@@ -983,8 +999,10 @@ export function TopicDetailSection({
     }
   }, [foundTopic, isCertification, topic]);
 
-  // Use local slides instead of topic.slides
-  const slides = localSlides.filter((s) => !deletedSlideIds.has(s.id));
+  // Use local slides instead of topic.slides (sort by position for consistency with Confirm Changes dialog)
+  const slides = localSlides
+    .filter((s) => !deletedSlideIds.has(s.id))
+    .sort(compareSlidesByPosition);
   const currentSlide = slides[currentSlideIndex];
 
   // Keep currentSlideIndex in bounds when slides list changes (e.g. after bulk delete)
@@ -1255,11 +1273,11 @@ export function TopicDetailSection({
             // Update slides if they exist
             if ((topicResult.data as any).slides) {
               const updatedSlides = (topicResult.data as any).slides
-                .sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+                .sort(compareSlidesByPosition)
                 .map((slide: any) => ({
                   id: slide.id,
                   kind: slide.kind as "text" | "image" | "video",
-                  orderIndex: slide.orderIndex,
+                  position: slide.position,
                   textHtml: slide.textHtml ?? null,
                   imageUrl: slide.imageUrl ?? null,
                   videoUrl: slide.videoUrl ?? null,
@@ -1408,10 +1426,12 @@ export function TopicDetailSection({
       // Reorder slides using arrayMove
       const newSlides = arrayMove(slides, activeIndex, overIndex);
 
-      // Update orderIndex for all slides
+      // Assign fractional positions for new order
+      const reorderedIds = newSlides.map((s) => s.id);
+      const positions = computePositionsForOrder(reorderedIds);
       const reorderedSlides = newSlides.map((slide, index) => ({
         ...slide,
-        orderIndex: index,
+        position: positions[index],
       }));
 
       setLocalSlides(reorderedSlides);
@@ -1485,7 +1505,7 @@ export function TopicDetailSection({
       const slide = {
         id: tempId,
         kind: "image" as const,
-        orderIndex: insertAfterIndex + 1 + index, // Will be reordered below
+        position: "a0", // Will be set below
         textHtml: null,
         imageUrl: image.blobUrl, // Use blob URL for preview
         videoUrl: null,
@@ -1514,10 +1534,12 @@ export function TopicDetailSection({
     const updatedSlides = [...localSlides];
     updatedSlides.splice(insertAfterIndex + 1, 0, ...newSlides);
 
-    // Reorder all slides to have sequential orderIndex
+    // Assign fractional positions for full list (orderIndex for API compatibility)
+    const allIds = updatedSlides.map((s) => s.id);
+    const positions = computePositionsForOrder(allIds);
     const reorderedSlides = updatedSlides.map((slide, index) => ({
       ...slide,
-      orderIndex: index,
+      position: positions[index],
     }));
 
     setLocalSlides(reorderedSlides);
@@ -1549,7 +1571,7 @@ export function TopicDetailSection({
     const newSlide: ExtendedSlideData = {
       id: tempId,
       kind: "video" as const,
-      orderIndex: insertAfterIndex + 1, // Will be reordered below
+      position: "a0", // Will be set below
       textHtml: null,
       imageUrl: null,
       videoUrl: videoUrl,
@@ -1563,10 +1585,12 @@ export function TopicDetailSection({
     const updatedSlides = [...localSlides];
     updatedSlides.splice(insertAfterIndex + 1, 0, newSlide);
 
-    // Reorder all slides to have sequential orderIndex
+    // Assign fractional positions for full list (orderIndex for API compatibility)
+    const allIds = updatedSlides.map((s) => s.id);
+    const positions = computePositionsForOrder(allIds);
     const reorderedSlides = updatedSlides.map((slide, index) => ({
       ...slide,
-      orderIndex: index,
+      position: positions[index],
     }));
 
     setLocalSlides(reorderedSlides);
@@ -1673,15 +1697,15 @@ export function TopicDetailSection({
   const calculateChanges = (): ChangeItem[] => {
     const changes: ChangeItem[] = [];
 
-    // Get original slides sorted by orderIndex
+    // Get original slides sorted by position
     const originalSorted = [...originalSlides].sort(
-      (a, b) => a.orderIndex - b.orderIndex
+      compareSlidesByPosition
     );
 
-    // Get current slides sorted by orderIndex (excluding deleted)
+    // Get current slides sorted by position (excluding deleted)
     const currentSorted = localSlides
       .filter((s) => !deletedSlideIds.has(s.id))
-      .sort((a, b) => a.orderIndex - b.orderIndex);
+      .sort(compareSlidesByPosition);
 
     // Find deleted slides (from original that are now deleted)
     const deletedSlides = originalSlides.filter((s) =>
@@ -1810,12 +1834,12 @@ export function TopicDetailSection({
     const hasDeletes = deletedSlideIds.size > 0;
     const hasReorder = (() => {
       const originalSorted = [...originalSlides]
-        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .sort(compareSlidesByPosition)
         .map((s) => s.id)
         .filter((id) => !id.startsWith("temp_"));
       const currentSorted = localSlides
         .filter((s) => !deletedSlideIds.has(s.id))
-        .sort((a, b) => a.orderIndex - b.orderIndex)
+        .sort(compareSlidesByPosition)
         .map((s) => s.id)
         .filter((id) => !id.startsWith("temp_"));
       return (
@@ -1929,9 +1953,14 @@ export function TopicDetailSection({
         totalToDelete: newDeletedIds.size,
       });
 
-      const sortedSlides = [...validSlides].sort(
-        (a, b) => a.orderIndex - b.orderIndex
-      );
+      // Use validSlides order as-is - it reflects the user's drag/reorder.
+      // Do NOT sort by position here; position is only updated after save, so sorting
+      // would revert to the original server order and undo the user's reorder.
+      const slidesInSaveOrder = validSlides;
+
+      // Canonical desired order: all slide IDs (existing + temp) in final order.
+      // Backend resolves temp IDs after creates; used to fix jumbling on bulk delete/reorder.
+      const desiredOrder = slidesInSaveOrder.map((s) => s.id);
 
       // Use the updated deleted IDs set (includes empty slides marked for deletion)
       const finalDeletedIds = Array.from(newDeletedIds);
@@ -1941,13 +1970,13 @@ export function TopicDetailSection({
       const updates: any[] = [];
       const slideIds: string[] = [];
 
-      for (const slide of sortedSlides) {
+      for (const slide of slidesInSaveOrder) {
         const extendedSlide = slide as ExtendedSlideData;
         if (slide.id.startsWith("temp_")) {
           // New slide - include tempId so server can map files
           const createData: any = {
             tempId: slide.id, // Include tempId for file mapping
-            orderIndex: slide.orderIndex,
+            position: slide.position,
             kind: slide.kind,
             // Don't include imageUrl - server will upload file and set it
             videoUrl: slide.videoUrl || null,
@@ -2000,6 +2029,7 @@ export function TopicDetailSection({
           updates,
           deletes: finalDeletedIds,
           reorder: slideIds,
+          desiredOrder,
         })
       );
 
@@ -2030,6 +2060,7 @@ export function TopicDetailSection({
         updates,
         deletes: finalDeletedIds,
         reorder: slideIds,
+        desiredOrder,
       });
       const operationsSize = operationsJson.length;
       const totalPayloadSizeMB = (totalSize + operationsSize) / (1024 * 1024);
@@ -2246,8 +2277,9 @@ export function TopicDetailSection({
           }))
         );
 
-        // Process chunks sequentially
+        // Process chunks sequentially; accumulate tempId->realId for desiredOrder resolution
         let lastResult: any = null;
+        const tempToRealMap = new Map<string, string>();
         const totalChunks = chunks.length;
         const progressPerChunk = hasFileUploads ? 60 / totalChunks : 80 / totalChunks;
 
@@ -2286,10 +2318,24 @@ export function TopicDetailSection({
           }
 
           lastResult = chunkResult;
+
+          // Accumulate tempId->realId from response for desiredOrder resolution
+          const mapping = (
+            chunkResult.data as { createdSlideMapping?: Record<string, string> }
+          )?.createdSlideMapping;
+          if (mapping) {
+            Object.entries(mapping).forEach(([tempId, realId]) =>
+              tempToRealMap.set(tempId, realId)
+            );
+          }
         }
 
-        // Step 4: Final reorder operation (if we have slideIds to reorder)
-        if (slideIds.length > 0) {
+        // Step 4: Final reorder using desiredOrder with resolved temp IDs
+        const resolvedOrder = desiredOrder
+          .map((id) => tempToRealMap.get(id) ?? id)
+          .filter((id) => !finalDeletedIds.includes(id));
+
+        if (resolvedOrder.length > 0) {
           console.log("[topic-detail] Performing final reorder...");
           setSaveStatus("Reordering slides...");
           setSaveProgress(hasFileUploads ? 85 : 90);
@@ -2303,6 +2349,7 @@ export function TopicDetailSection({
               updates: [],
               deletes: [],
               reorder: slideIds,
+              desiredOrder: resolvedOrder,
             })
           );
 
@@ -2375,7 +2422,8 @@ export function TopicDetailSection({
           updatedSlides =
             responseTopic.slides
               ?.filter((slide: any) => !deletedIdsSet.has(slide.id)) // Filter out any deleted slides that might still be in response
-              ?.sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+              ?.filter((slide: any) => slideHasContent(slide, isCertification)) // Filter out ghost/empty slides
+              ?.sort(compareSlidesByPosition)
               .map((slide: any) => {
                 // If this slide had a pending upload, ensure we use the server's imageUrl
                 // If the server didn't return an imageUrl but we had an upload, log a warning
@@ -2401,7 +2449,7 @@ export function TopicDetailSection({
                     | "video"
                     | "quiz"
                     | "test",
-                  orderIndex: slide.orderIndex,
+                  position: slide.position,
                   textHtml: slide.textHtml ?? null,
                   // Use server's imageUrl - it should have the uploaded file URL
                   // Never use blob URLs from the response
@@ -2443,7 +2491,7 @@ export function TopicDetailSection({
           }
         }
         
-        // For newly created slides, invalidate by matching orderIndex
+        // For newly created slides, invalidate by matching tempId/position
         if (
           result.data &&
           "topic" in result.data &&
@@ -2454,7 +2502,7 @@ export function TopicDetailSection({
           );
           for (const tempSlide of tempSlidesWithFiles) {
             const createdSlide = result.data.topic.slides.find(
-              (s: any) => s.orderIndex === tempSlide.orderIndex
+              (s: any) => s.id === tempSlide.id || s.position === tempSlide.position
             );
             if (createdSlide) {
               slideIdsToInvalidate.add(createdSlide.id);
@@ -3463,9 +3511,10 @@ export function TopicDetailSection({
                   </div>
                   <DragOverlay>
                     {activeSlideId ? (() => {
-                      const draggedSlide = slides.find(
+                      const draggedIndex = slides.findIndex(
                         (s) => s.id === activeSlideId
                       );
+                      const draggedSlide = slides[draggedIndex];
                       if (!draggedSlide) return null;
                       return (
                         <div
@@ -3484,7 +3533,7 @@ export function TopicDetailSection({
                             />
                           </div>
                           <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                            Slide {draggedSlide.orderIndex + 1}
+                            Slide {draggedIndex + 1}
                           </div>
                         </div>
                       );
@@ -3612,7 +3661,8 @@ export function TopicDetailSection({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4">
                 {localSlides
                   .filter((s) => !deletedSlideIds.has(s.id))
-                  .map((slide) => {
+                  .sort(compareSlidesByPosition)
+                  .map((slide, index) => {
                     const isSelected = bulkDeleteSelectedIds.has(slide.id);
                     return (
                       <Card
@@ -3659,7 +3709,7 @@ export function TopicDetailSection({
                           </div>
                         </div>
                         <div className="px-2 py-1 text-center text-xs font-medium text-muted-foreground border-t bg-muted/30 flex-shrink-0">
-                          Slide {slide.orderIndex + 1}
+                          Slide {index + 1}
                         </div>
                       </Card>
                     );

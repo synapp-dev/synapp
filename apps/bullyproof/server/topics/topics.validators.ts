@@ -45,7 +45,7 @@ export type GetTopicByIdParams = z.infer<typeof getTopicByIdSchema>;
 // Schema for creating a slide
 export const createSlideSchema = z.object({
   topicId: z.string().trim().min(1).max(500),
-  orderIndex: z.number().int().min(0),
+  position: z.string().trim().min(1).max(100),
   kind: z.enum(["text", "image", "video"]).default("image"),
   imageUrl: z.union([z.string().url(), z.null()]).optional(),
   videoUrl: z.union([z.string().url(), z.null()]).optional(),
@@ -56,6 +56,29 @@ export const createSlideSchema = z.object({
 
 export type CreateSlideParams = z.infer<typeof createSlideSchema>;
 
+// Schema for creating a slide with position (topic-scoped API)
+export const createSlideWithPositionSchema = z.object({
+  kind: z.enum(["text", "image", "video"]).default("image"),
+  afterSlideId: z.string().trim().min(1).max(500).optional().nullable(),
+  position: z.string().trim().max(100).optional().nullable(),
+  imageUrl: z.union([z.string(), z.null()]).optional(),
+  videoUrl: z.union([z.string().url(), z.null()]).optional(),
+  textHtml: z.union([z.string(), z.null()]).optional().default(""),
+  videoStartS: z.union([z.number(), z.null()]).optional(),
+  videoEndS: z.union([z.number(), z.null()]).optional(),
+});
+
+export type CreateSlideWithPositionParams = z.infer<
+  typeof createSlideWithPositionSchema
+>;
+
+// Schema for bulk deleting slides
+export const deleteSlidesSchema = z.object({
+  ids: z.array(z.string().trim().min(1).max(500)).min(1),
+});
+
+export type DeleteSlidesParams = z.infer<typeof deleteSlidesSchema>;
+
 // Schema for updating a slide
 export const updateSlideSchema = z.object({
   kind: z.enum(["text", "image", "video"]).optional(),
@@ -64,7 +87,7 @@ export const updateSlideSchema = z.object({
   textHtml: z.union([z.string(), z.null()]).optional(),
   videoStartS: z.union([z.number(), z.null()]).optional(),
   videoEndS: z.union([z.number(), z.null()]).optional(),
-  orderIndex: z.number().int().min(0).optional(),
+  position: z.string().trim().max(100).optional(),
 });
 
 export type UpdateSlideParams = z.infer<typeof updateSlideSchema>;

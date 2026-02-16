@@ -23,6 +23,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { curriculumStages, topics } from "@/server/db/schema";
@@ -106,21 +107,19 @@ function ThumbnailImage({ signedUrl, alt }: { signedUrl: string | null; alt: str
 
 // Helper function to get slide stats
 function getSlideStatsForCard(topic: TopicWithSlides) {
-  // Sort slides by orderIndex to ensure correct order
-  const slides = (topic.slides || []).sort(
-    (a, b) => a.orderIndex - b.orderIndex
-  );
+  // Sort slides by position to ensure correct order
+  const slides = (topic.slides || []).sort(compareSlidesByPosition);
   const totalSlides = slides.length;
   const imageSlides = slides.filter((s) => s.kind === "image").length;
   const videoSlides = slides.filter((s) => s.kind === "video").length;
 
-  // Get all image slides sorted by orderIndex
+  // Get all image slides sorted by position
   const imageSlidesList: TopicSlide[] = slides
     .filter((s) => s.kind === "image" && s.imageUrl)
-    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .sort(compareSlidesByPosition)
     .map((s) => ({
       id: s.id,
-      orderIndex: s.orderIndex,
+      position: s.position,
       kind: s.kind,
       imageUrl: s.imageUrl,
       signedUrl: s.signedUrl,
@@ -699,7 +698,7 @@ type Topic = typeof topics.$inferSelect;
 type TopicSlide = {
   id: string;
   topicId: string;
-  orderIndex: number;
+  position: string;
   kind: string; // "text" | "image" | "video" from schema
   imageUrl: string | null;
   videoUrl: string | null;
@@ -924,15 +923,15 @@ export function StageDetailSection({
   };
 
   const getSlideStats = (topic: TopicWithSlides) => {
-    // Sort slides by orderIndex to ensure correct order
+    // Sort slides by position to ensure correct order
     const slides = (topic.slides || []).sort(
-      (a, b) => a.orderIndex - b.orderIndex
+      (a, b) => a.position.localeCompare(b.position)
     );
     const totalSlides = slides.length;
     const imageSlides = slides.filter((s) => s.kind === "image").length;
     const videoSlides = slides.filter((s) => s.kind === "video").length;
 
-    // Find the first image slide by orderIndex (not just any image slide)
+    // Find the first image slide by position (not just any image slide)
     const firstImageSlide = slides.find(
       (s) => s.kind === "image" && s.imageUrl
     );

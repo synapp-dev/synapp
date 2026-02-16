@@ -10,6 +10,7 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { SlideRenderer, type SlideData } from "@/components/organisms/slide-renderer";
@@ -69,11 +70,11 @@ export function TopicPreviewDialog({
 
   const slides: SlideData[] =
     topic?.slides
-      ?.sort((a, b) => a.orderIndex - b.orderIndex)
+      ?.sort(compareSlidesByPosition)
       .map((slide) => ({
         id: slide.id,
         kind: slide.kind as "text" | "image" | "video",
-        orderIndex: slide.orderIndex,
+        position: slide.position,
         textHtml: slide.textHtml ?? null,
         imageUrl: slide.imageUrl ?? null,
         videoUrl: slide.videoUrl ?? null,

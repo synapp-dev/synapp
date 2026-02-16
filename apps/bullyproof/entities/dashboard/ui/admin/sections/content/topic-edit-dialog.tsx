@@ -30,6 +30,10 @@ import {
   Plus,
   Save,
 } from "lucide-react";
+import {
+  compareSlidesByPosition,
+  generatePositionBetween,
+} from "@/server/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import type { topics, topicSlides } from "@/server/db/schema";
 import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
@@ -86,9 +90,7 @@ export function TopicEditDialog({
         if (result.data) {
           setTopic(result.data);
           setSlides(
-            (result.data.slides ?? []).sort(
-              (a, b) => a.orderIndex - b.orderIndex
-            )
+            (result.data.slides ?? []).sort(compareSlidesByPosition)
           );
         } else if (result.error) {
           setError(result.error.message ?? "Failed to fetch topic");
@@ -112,19 +114,13 @@ export function TopicEditDialog({
 
     if (newIndex < 0 || newIndex >= newSlides.length) return;
 
-    // Swap orderIndex values
-    const tempOrder = newSlides[index].orderIndex;
-    newSlides[index].orderIndex = newSlides[newIndex].orderIndex;
-    newSlides[newIndex].orderIndex = tempOrder;
+    // Swap position values
+    const tempPos = newSlides[index].position;
+    newSlides[index].position = newSlides[newIndex].position;
+    newSlides[newIndex].position = tempPos;
 
-    // Swap array positions
-    [newSlides[index], newSlides[newIndex]] = [
-      newSlides[newIndex],
-      newSlides[index],
-    ];
-
-    // Re-sort by orderIndex
-    setSlides(newSlides.sort((a, b) => a.orderIndex - b.orderIndex));
+    // Re-sort by position
+    setSlides(newSlides.sort(compareSlidesByPosition));
   };
 
   const handleDeleteSlide = (slideId: string) => {
@@ -144,12 +140,16 @@ export function TopicEditDialog({
   };
 
   const handleAddSlide = () => {
-    const newOrderIndex =
-      slides.length > 0 ? Math.max(...slides.map((s) => s.orderIndex)) + 1 : 0;
+    const sortedSlides = [...slides].sort(compareSlidesByPosition);
+    const lastPosition =
+      sortedSlides.length > 0
+        ? sortedSlides[sortedSlides.length - 1]?.position
+        : null;
+    const newPosition = generatePositionBetween(lastPosition, null);
     const newSlide: Slide = {
       id: `temp-${Date.now()}`,
       topicId: topicId!,
-      orderIndex: newOrderIndex,
+      position: newPosition,
       kind: "text",
       textHtml: "",
       imageUrl: null,
@@ -164,7 +164,7 @@ export function TopicEditDialog({
       updatedAt: new Date().toISOString(),
     };
     setSlides(
-      [...slides, newSlide].sort((a, b) => a.orderIndex - b.orderIndex)
+      [...slides, newSlide].sort(compareSlidesByPosition)
     );
     setEditingSlideId(newSlide.id);
   };
@@ -246,7 +246,7 @@ export function TopicEditDialog({
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2 text-base">
                         {getSlideIcon(slide.kind)}
-                        <span>Slide {slide.orderIndex + 1}</span>
+                        <span>Slide {index + 1}</span>
                         <Badge variant={getSlideBadgeVariant(slide.kind)}>
                           {slide.kind}
                         </Badge>
@@ -298,7 +298,7 @@ export function TopicEditDialog({
                         onCancel={() => setEditingSlideId(null)}
                       />
                     ) : (
-                      <SlidePreview slide={slide} />
+                      <SlidePreview slide={slide} slideNumber={index + 1} />
                     )}
                   </CardContent>
                 </Card>
@@ -339,7 +339,13 @@ export function TopicEditDialog({
   );
 }
 
-function SlidePreview({ slide }: { slide: Slide }) {
+function SlidePreview({
+  slide,
+  slideNumber,
+}: {
+  slide: Slide;
+  slideNumber: number;
+}) {
   return (
     <div className="space-y-4">
       {slide.kind === "text" && slide.textHtml && (
@@ -352,7 +358,7 @@ function SlidePreview({ slide }: { slide: Slide }) {
         <div className="space-y-2">
           <img
             src={toStorageUrl(slide.imageUrl) ?? slide.imageUrl}
-            alt={`Slide ${slide.orderIndex}`}
+            alt={`Slide ${slideNumber}`}
             className="w-full rounded-md border max-h-64 object-contain"
           />
           {slide.officialNotes && (
@@ -390,7 +396,7 @@ function SlidePreview({ slide }: { slide: Slide }) {
                     className="w-full h-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    title={`Video content for slide ${slide.orderIndex}`}
+                    title={`Video content for slide ${slideNumber}`}
                   />
                 ) : (
                   <video

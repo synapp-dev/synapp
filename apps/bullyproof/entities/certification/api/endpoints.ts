@@ -328,7 +328,7 @@ export const certificationApi = {
       create(
         topicId: string,
         payload: {
-          orderIndex: number;
+          position: string;
           kind: "image" | "video" | "text";
           imageUrl?: string | null;
           videoUrl?: string | null;
@@ -355,7 +355,7 @@ export const certificationApi = {
           textHtml?: string | null;
           videoStartS?: number | null;
           videoEndS?: number | null;
-          orderIndex?: number;
+          position?: string;
         }
       ): Promise<ApiResult<Slide>> {
         return apiFetch<Slide>(

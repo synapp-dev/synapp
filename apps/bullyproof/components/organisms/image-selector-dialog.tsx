@@ -451,20 +451,21 @@ export function ImageSelectorDialog({
 
   const handleConfirmSelection = () => {
     if (allowMultipleSelection && onSelectMultipleImages) {
-      // Collect all selected images
+      // Collect all selected images in logical order
       const selectedImages: Array<{ imageData: Blob; blobUrl: string }> = [];
 
-      // Get selected PDF pages
-      pdfPages.forEach((page) => {
-        if (selectedImageIds.has(page.id)) {
-          selectedImages.push({
-            imageData: page.imageData,
-            blobUrl: page.blobUrl,
-          });
-        }
-      });
+      // Get selected PDF pages sorted by page number (1, 2, 3, 5, 10...)
+      const selectedPdfPages = pdfPages
+        .filter((page) => selectedImageIds.has(page.id))
+        .sort((a, b) => a.pageNumber - b.pageNumber);
+      for (const page of selectedPdfPages) {
+        selectedImages.push({
+          imageData: page.imageData,
+          blobUrl: page.blobUrl,
+        });
+      }
 
-      // Get selected single images
+      // Get selected single images (append after PDF pages, in upload order)
       singleImages.forEach((image) => {
         if (selectedImageIds.has(image.id)) {
           selectedImages.push({

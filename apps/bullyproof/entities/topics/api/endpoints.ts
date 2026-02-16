@@ -91,7 +91,7 @@ export const topicsApi = {
   slides: {
     create(payload: {
       topicId: string;
-      orderIndex: number;
+      position: string;
       kind?: "text" | "image" | "video";
       imageUrl?: string | null;
       videoUrl?: string | null;
@@ -113,7 +113,7 @@ export const topicsApi = {
         textHtml?: string | null;
         videoStartS?: number | null;
         videoEndS?: number | null;
-        orderIndex?: number;
+        position?: string;
       }
     ): Promise<ApiResult<any>> {
       return apiFetch<any>(`/topic-slides/${encodeURIComponent(slideId)}`, {

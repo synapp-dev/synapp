@@ -15,7 +15,7 @@
  * - operations: JSON string with structure:
  *   {
  *     topicId: string;
- *     creates: Array<{ orderIndex: number; kind: "text" | "image" | "video"; ... }>;
+ *     creates: Array<{ position?: string; kind: "text" | "image" | "video"; ... }>;
  *     updates: Array<{ id: string; kind?: string; ... }>;
  *     deletes: string[];
  *     reorder: string[];
@@ -30,6 +30,7 @@
  */
 import { NextResponse } from "next/server";
 import { topicsRepo } from "@/server/topics/topics.repo";
+import { topicsService } from "@/server/topics/topics.service";
 import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
@@ -39,6 +40,8 @@ import { db } from "@/server/db/drizzle";
 import { topicSlides } from "@/server/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 import { getTopicSlideStoragePath } from "@/server/lib/slide-storage-path";
+import { generateNKeysBetween } from "fractional-indexing";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 
 // Configure route to handle large payloads
 export const runtime = "nodejs";
@@ -190,7 +193,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { topicId, creates, updates, deletes, reorder } = parsedOperations;
+    const { topicId, creates, updates, deletes, reorder, desiredOrder } =
+      parsedOperations;
 
     if (!topicId) {
       console.error("[bulk-save] ERROR: Missing topicId - returning 400");
@@ -223,7 +227,7 @@ export async function POST(request: Request) {
         console.log(`[bulk-save] Attempting to delete slide:`, {
           id: slideId,
           kind: slideData?.slide?.kind || "unknown",
-          orderIndex: slideData?.slide?.orderIndex,
+          position: slideData?.slide?.position,
           imageUrl: slideData?.slide?.imageUrl ? "exists" : "missing",
           videoUrl: slideData?.slide?.videoUrl ? "exists" : "missing",
           textHtml: slideData?.slide?.textHtml ? "exists" : "missing",
@@ -273,11 +277,8 @@ export async function POST(request: Request) {
       console.log("[bulk-save] No slides to delete");
     }
 
-    // Step 2: Get current slides to determine max orderIndex
+    // Step 2: Get current slides (for position calculation when creating)
     console.log("[bulk-save] Step 2: Getting current topic data...");
-    console.log(
-      `[bulk-save] Calling topicsRepo.getWithDetails with topicId: ${topicId}`
-    );
     let currentTopicData;
     try {
       currentTopicData = await topicsRepo.getWithDetails(topicId);
@@ -293,11 +294,11 @@ export async function POST(request: Request) {
       throw error;
     }
 
-    const maxOrderIndex =
-      currentTopicData?.slides && currentTopicData.slides.length > 0
-        ? Math.max(...currentTopicData.slides.map((s) => s.orderIndex))
-        : -1;
-    console.log(`[bulk-save] Max orderIndex: ${maxOrderIndex}`);
+    const existingSlides = currentTopicData?.slides ?? [];
+    const lastPosition =
+      existingSlides.length > 0
+        ? existingSlides[existingSlides.length - 1].position
+        : null;
 
     // Step 2.5: Filter creates - skip image slides that have no corresponding file in formData (prevents ghost slides)
     let filteredCreates = creates && Array.isArray(creates) ? creates : [];
@@ -330,21 +331,15 @@ export async function POST(request: Request) {
       }
     }
 
-    // Step 3: Create new slides with temporary high orderIndex to avoid conflicts
+    // Step 3: Create new slides with positions (append at end; reorder will fix)
     console.log("[bulk-save] Step 3: Creating new slides...");
-    // Store mapping of tempId -> created slide ID for file uploads
     const tempIdToSlideIdMap = new Map<string, string>();
     const createdSlideIds: string[] = [];
     if (filteredCreates.length > 0) {
       console.log(`[bulk-save] Found ${filteredCreates.length} slide(s) to create`);
-      
-      // Batch create slides using single insert with multiple values
-      const createPayloads = filteredCreates.map((slideData: any, i: number) => {
-        // Use a temporary high orderIndex to avoid unique constraint violations
-        // We'll reorder everything after all operations
-        const tempOrderIndex = maxOrderIndex + 1000 + i;
+      const newPositions = generateNKeysBetween(lastPosition, null, filteredCreates.length);
 
-        // Ensure textHtml is set for text slides
+      const createPayloads = filteredCreates.map((slideData: any, i: number) => {
         const textHtml =
           slideData.kind === "text"
             ? slideData.textHtml || ""
@@ -352,9 +347,9 @@ export async function POST(request: Request) {
 
         const payload = {
           topicId,
-          orderIndex: tempOrderIndex,
+          position: slideData.position ?? newPositions[i],
           kind: slideData.kind,
-          imageUrl: null, // Don't set imageUrl yet, we'll upload file first
+          imageUrl: null,
           videoUrl: slideData.videoUrl || null,
           textHtml: textHtml || null,
           videoStartS: slideData.videoStartS || null,
@@ -396,7 +391,7 @@ export async function POST(request: Request) {
             console.log(`[bulk-save] Created slide:`, {
               id: slide.id,
               kind: slide.kind,
-              orderIndex: slide.orderIndex,
+              position: slide.position,
               topicId: slide.topicId,
               imageUrl: slide.imageUrl || null,
               videoUrl: slide.videoUrl || null,
@@ -552,7 +547,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Step 4: Update existing slides (but don't update orderIndex here)
+    // Step 4: Update existing slides (reorder handles positions)
     console.log("[bulk-save] Step 4: Updating existing slides...");
     if (updates && Array.isArray(updates) && updates.length > 0) {
       console.log(`[bulk-save] Found ${updates.length} slide(s) to update`);
@@ -560,7 +555,7 @@ export async function POST(request: Request) {
         console.log(`[bulk-save] Updating slide:`, {
           id: slideData.id,
           kind: slideData.kind,
-          orderIndex: slideData.orderIndex,
+          position: slideData.position || null,
           imageUrl: slideData.imageUrl || null,
           videoUrl: slideData.videoUrl || null,
           textHtml: slideData.textHtml ? (slideData.textHtml.substring(0, 50) + "...") : null,
@@ -570,8 +565,8 @@ export async function POST(request: Request) {
         });
         
         const updateData: any = { ...slideData };
-        delete updateData.id; // Remove id from update data
-        delete updateData.orderIndex; // Don't update orderIndex here, reorder handles it
+        delete updateData.id;
+        delete updateData.position; // Reorder handles positions
 
         // If there's an uploaded file for this slide, use its URL
         if (uploadedUrls[slideData.id]) {
@@ -607,70 +602,66 @@ export async function POST(request: Request) {
       console.log("[bulk-save] No slides to update");
     }
 
-    // Step 5: Reorder slides (this will normalize orderIndex and handle all slides)
+    // Step 5: Reorder slides (assigns positions to all slides)
     console.log("[bulk-save] Step 5: Reordering slides...");
-    // Build the final order: merge existing slides (from reorder) with new slides (from creates)
-    if (reorder && Array.isArray(reorder) && reorder.length > 0) {
-      console.log(`[bulk-save] Reorder array has ${reorder.length} slide(s)`);
-      // Filter out deleted slide IDs from reorder array
-      const validReorderIds = reorder.filter(
-        (slideId) => !deletedSlideIds.has(slideId)
-      );
+
+    let finalOrder: string[] | null = null;
+
+    // Prefer desiredOrder when present: canonical list of IDs (existing + temp) in final order.
+    // Resolve temp IDs and filter deleted for a single source of truth.
+    if (desiredOrder && Array.isArray(desiredOrder) && desiredOrder.length > 0) {
+      console.log(`[bulk-save] Using desiredOrder with ${desiredOrder.length} slide(s)`);
+      finalOrder = desiredOrder
+        .map((id: string) => tempIdToSlideIdMap.get(id) ?? id)
+        .filter((id: string) => !deletedSlideIds.has(id));
       console.log(
-        `[bulk-save] After filtering deleted slides, ${validReorderIds.length} slide(s) remain`
+        `[bulk-save] After resolving temp IDs and filtering deleted, ${finalOrder.length} slide(s) remain`
+      );
+    } else if (reorder && Array.isArray(reorder) && reorder.length > 0) {
+      // Fallback: legacy merge of reorder + creates
+      console.log(`[bulk-save] Reorder array has ${reorder.length} slide(s)`);
+      const validReorderIds = reorder.filter(
+        (slideId: string) => !deletedSlideIds.has(slideId)
       );
 
-      // Create pairs of [orderIndex, slideId] for new slides
       const newSlidePositions: Array<[number, string]> = [];
       if (filteredCreates.length > 0 && createdSlideIds.length > 0) {
-        filteredCreates.forEach((createData: any, index: number) => {
+        filteredCreates.forEach((_, index: number) => {
           if (index < createdSlideIds.length) {
             newSlidePositions.push([
-              createData.orderIndex,
+              validReorderIds.length + index,
               createdSlideIds[index],
             ]);
           }
         });
-        // Sort by orderIndex
         newSlidePositions.sort((a, b) => a[0] - b[0]);
       }
 
-      // Build final order by inserting new slides at their intended positions
-      // The orderIndex values from creates represent the final position in the sorted array
-      // The reorder array contains existing slide IDs in the order they appear in the frontend's sorted array
-      // The frontend has already calculated the correct order, so we just need to merge them correctly
-
-      // Calculate total number of slides in final order
       const totalSlides = validReorderIds.length + newSlidePositions.length;
-
-      const finalOrder: string[] = [];
+      finalOrder = [];
       let existingIndex = 0;
       let newSlideIndex = 0;
 
-      // Build final order by going through each position
       for (
         let currentPosition = 0;
         currentPosition < totalSlides;
         currentPosition++
       ) {
-        // Check if a new slide should be inserted at this position
         if (
           newSlideIndex < newSlidePositions.length &&
           newSlidePositions[newSlideIndex][0] === currentPosition
         ) {
-          // Insert new slide at this position
           finalOrder.push(newSlidePositions[newSlideIndex][1]);
           newSlideIndex++;
         } else if (existingIndex < validReorderIds.length) {
-          // This position should be filled by an existing slide
-          // The reorder array contains existing slides in their final order
-          // We place them sequentially, skipping positions where new slides go
           finalOrder.push(validReorderIds[existingIndex]);
           existingIndex++;
         }
       }
-
       console.log(`[bulk-save] Final order has ${finalOrder.length} slide(s)`);
+    }
+
+    if (finalOrder && finalOrder.length > 0) {
 
       // Validate that all slides belong to this topic (security check)
       if (finalOrder.length > 0) {
@@ -729,10 +720,13 @@ export async function POST(request: Request) {
       }
 
       console.log(
-        `[bulk-save] Calling topicsRepo.reorderSlides with topicId: ${topicId}`
+        `[bulk-save] Calling topicsService.reorderSlides with topicId: ${topicId}`
       );
       try {
-        await topicsRepo.reorderSlides(topicId, finalOrder);
+        await topicsService.reorderSlides({ userId }, {
+          topicId,
+          slideIds: finalOrder,
+        });
         console.log("[bulk-save] Successfully reordered slides");
       } catch (error: any) {
         console.error("[bulk-save] ERROR: Failed to reorder slides:", {
@@ -751,12 +745,15 @@ export async function POST(request: Request) {
         const topicDataAfterOps = await topicsRepo.getWithDetails(topicId);
         if (topicDataAfterOps?.slides && topicDataAfterOps.slides.length > 0) {
           const slideIds = topicDataAfterOps.slides
-            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .sort(compareSlidesByPosition)
             .map((s) => s.id);
           console.log(
             `[bulk-save] Normalizing order for ${slideIds.length} slide(s)`
           );
-          await topicsRepo.reorderSlides(topicId, slideIds);
+          await topicsService.reorderSlides({ userId }, {
+            topicId,
+            slideIds,
+          });
           console.log("[bulk-save] Successfully normalized slide order");
         }
       } catch (error: any) {
@@ -811,7 +808,7 @@ export async function POST(request: Request) {
         console.log(`[bulk-save] [cleanup] Checking slide:`, {
           id: slide.id,
           kind: slide.kind,
-          orderIndex: slide.orderIndex,
+          position: slide.position,
           imageUrl: slide.imageUrl || null,
           videoUrl: slide.videoUrl || null,
           textHtml: slide.textHtml ? (slide.textHtml.substring(0, 50) + "...") : null,
@@ -843,7 +840,7 @@ export async function POST(request: Request) {
           // Slide has no content fields at all - safe to delete
           emptySlideIds.push(slide.id);
           console.log(
-            `[bulk-save] [cleanup] Marking clearly empty slide for deletion: ${slide.id} (kind: ${slide.kind}, orderIndex: ${slide.orderIndex}, no URLs at all)`
+            `[bulk-save] [cleanup] Marking clearly empty slide for deletion: ${slide.id} (kind: ${slide.kind}, position: ${slide.position}, no URLs at all)`
           );
           continue;
         }
@@ -856,7 +853,7 @@ export async function POST(request: Request) {
           // slideHasContent already returns true on uncertainty, so if it returns false, we're sure
           emptySlideIds.push(slide.id);
           console.log(
-            `[bulk-save] [cleanup] Marking verified empty slide for deletion: ${slide.id} (kind: ${slide.kind}, orderIndex: ${slide.orderIndex})`
+            `[bulk-save] [cleanup] Marking verified empty slide for deletion: ${slide.id} (kind: ${slide.kind}, position: ${slide.position})`
           );
         } else {
           console.log(
@@ -880,7 +877,7 @@ export async function POST(request: Request) {
             console.log(`[bulk-save] [cleanup] Slide to delete:`, {
               id: slide.id,
               kind: slide.kind,
-              orderIndex: slide.orderIndex,
+              position: slide.position,
               imageUrl: slide.imageUrl ? "exists but invalid" : "missing",
               videoUrl: slide.videoUrl ? "exists" : "missing",
               textHtml: slide.textHtml ? "exists" : "missing",
@@ -956,11 +953,14 @@ export async function POST(request: Request) {
         const remainingTopicData = await topicsRepo.getWithDetails(topicId);
         if (remainingTopicData?.slides && remainingTopicData.slides.length > 0) {
           const remainingSlideIds = remainingTopicData.slides
-            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .sort(compareSlidesByPosition)
             .map((s) => s.id);
           
           if (remainingSlideIds.length > 0) {
-            await topicsRepo.reorderSlides(topicId, remainingSlideIds);
+            await topicsService.reorderSlides({ userId }, {
+              topicId,
+              slideIds: remainingSlideIds,
+            });
             console.log(
               `[bulk-save] [cleanup] Reordered ${remainingSlideIds.length} remaining slides`
             );
@@ -1000,7 +1000,7 @@ export async function POST(request: Request) {
             remainingEmptySlides.map((s: any) => ({
               id: s.id,
               kind: s.kind,
-              orderIndex: s.orderIndex,
+              position: s.position,
             }))
           );
         } else {
@@ -1035,9 +1035,24 @@ export async function POST(request: Request) {
       finalTopicData = { ...finalTopicData, slides: slidesWithUrls };
     }
 
+    // Include tempId->slideId mapping so chunked frontend can resolve desiredOrder
+    const createdSlideMapping: Record<string, string> = {};
+    filteredCreates.forEach((createData: any, index: number) => {
+      const tempId = createData.tempId;
+      if (tempId && index < createdSlideIds.length) {
+        createdSlideMapping[tempId] = createdSlideIds[index];
+      }
+    });
+
     console.log("[bulk-save] SUCCESS: Returning response");
     return NextResponse.json(
-      { success: true, topic: finalTopicData },
+      {
+        success: true,
+        topic: finalTopicData,
+        ...(Object.keys(createdSlideMapping).length > 0 && {
+          createdSlideMapping,
+        }),
+      },
       { status: 200 }
     );
   } catch (e: any) {

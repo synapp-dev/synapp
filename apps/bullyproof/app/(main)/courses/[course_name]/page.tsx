@@ -40,6 +40,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@workspace/ui/components/chart";
+import { compareSlidesByPosition } from "@/server/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type {
   certificationCourses,
@@ -154,13 +155,13 @@ export default function CoursePage() {
   // Helper function to extract image slides from a topic
   const getImageSlidesForTopic = (topic: Topic): TopicSlide[] => {
     if (!topic.slides) return [];
-    const slides = topic.slides.sort((a, b) => a.orderIndex - b.orderIndex);
+    const slides = [...topic.slides].sort(compareSlidesByPosition);
     return slides
       .filter((s) => s.kind === "image")
-      .sort((a, b) => a.orderIndex - b.orderIndex)
+      .sort(compareSlidesByPosition)
       .map((s) => ({
         id: s.id,
-        orderIndex: s.orderIndex,
+        position: s.position,
         kind: s.kind,
         imageUrl: s.imageUrl,
         signedUrl: (s as any).signedUrl || null,
