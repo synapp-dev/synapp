@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@workspace/ui/components/tooltip";
 import { Toaster } from "@workspace/ui/components/sonner";
 import { Analytics } from '@vercel/analytics/next';
+import { ActivityHeartbeat } from "@/components/molecules/activity-heartbeat";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
           disableTransitionOnChange
           enableColorScheme
         >
+          <ActivityHeartbeat />
           <Analytics />
           {children}
           <Toaster position="top-center" />
