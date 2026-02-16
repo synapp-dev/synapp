@@ -1,0 +1,149 @@
+%% Lesson Recommendation System - Comprehensive Flowchart
+%% All test cases (TC-000A through TC-079) mapped to flow phases
+%% To export PNG: run "pnpm run flowchart:lesson" (requires Chrome) or paste into https://mermaid.live
+flowchart TB
+    Start([User Opens Wizard]) --> Step0[Step 0: Teach vs View]
+    
+    subgraph Phase0 [Phase 0: Entry and Feedback Guard]
+        Step0 --> Choice{Choice?}
+        Choice -->|TC-000B View| Browse[Browse Lesson Library]
+        Browse --> NavContent[Navigate to Content]
+        Choice -->|TC-000A Teach| CheckFeedback{TC-000E: Outstanding Feedback?}
+        CheckFeedback -->|Yes TC-000D| FeedbackGate[Feedback Gate]
+        FeedbackGate --> GateUI[Purple alert: Feedback required\nList lessons + Go to lesson\nBack to Teach/View]
+        CheckFeedback -->|No TC-000C| Step1
+    end
+
+    subgraph Phase1 [Phase 1: Class Selection Step 1]
+        Step1[Step 1: Class Selection]
+        Step1 --> ClassesSelected{Classes Selected?}
+        ClassesSelected -->|No TC-035| ErrNoClasses[Error: Disable proceed]
+        ClassesSelected -->|Yes| CheckPerm{TC-045/046/047: Permissions OK?}
+        CheckPerm -->|No| ErrPerm[Error: Prevent proceeding]
+        CheckPerm -->|Yes| TC068[TC-068: 10+ classes - Performance]
+    end
+
+    subgraph Phase2 [Phase 2: Curriculum Stage]
+        TC068 --> StageCheck{Curriculum Stage?}
+        StageCheck -->|TC-018 Single| NormalFlow[Normal flow]
+        StageCheck -->|TC-019 Multiple| StageSelect[Stage selection required]
+        StageCheck -->|TC-020 Class in multiple| ShowAll[Show all stages, allow selection]
+        StageCheck -->|TC-021 No match| Fallback1[Fallback topic]
+        StageCheck -->|TC-048 Multi year codes| StageSelect
+        StageCheck -->|TC-049 No year match| Fallback1
+        StageCheck -->|TC-050 No topics in stage| ErrNoTopics[Error: Choose different]
+    end
+
+    subgraph Phase3 [Phase 3: Recommendation Step 2]
+        NormalFlow --> RecCheck{Recommendation Check}
+        StageSelect --> RecCheck
+        ShowAll --> RecCheck
+        Fallback1 --> RecCheck
+        
+        RecCheck --> Basic{Basic Logic}
+        Basic -->|TC-001| NoComplete[No completed, no active: First topic]
+        Basic -->|TC-002| InOrder[Completed in order: Next topic]
+        Basic -->|TC-003| OutOfOrder[Completed out of order: Earliest incomplete]
+        Basic -->|TC-004| AllDone[All done in stage: Next stage]
+        Basic -->|TC-005| MultiSame[Multiple classes same completion]
+        Basic -->|TC-006| MultiDiff[Multiple classes different: Same stage or incompatibility]
+        
+        RecCheck --> ActiveSingle{Active Lesson - Single Class?}
+        ActiveSingle -->|TC-007 Preparing| AmberPrep[Amber alert, Go to lesson]
+        ActiveSingle -->|TC-008 Ready| BlueReady[Blue alert, Go to lesson]
+        ActiveSingle -->|TC-009 In Progress| RedBlock1[Red block, Go to Live Lesson]
+        ActiveSingle -->|TC-010 Feedback| RedBlock2[Red block, Go to Feedback]
+        ActiveSingle -->|TC-011| PrepPlusTopic[Preparing + completed topics]
+        
+        RecCheck --> ActiveMulti{Active Lesson - Multi Class?}
+        ActiveMulti -->|TC-012| AllSamePrep[All same preparing]
+        ActiveMulti -->|TC-013| SomePrep[Some preparing: Add to lesson]
+        ActiveMulti -->|TC-014| DiffPrep[Different preparing lessons]
+        ActiveMulti -->|TC-015| PrepPlusLive[Preparing + Live: Live blocks]
+        ActiveMulti -->|TC-016| ReadyPrep[Ready + Preparing: Cancel and combine]
+        ActiveMulti -->|TC-017| AllDiff[All different active lessons]
+        
+        RecCheck --> TopicEdge{Topic Edge Cases}
+        TopicEdge -->|TC-022| MultiGap[Multiple gaps: Earliest]
+        TopicEdge -->|TC-023| LastFirst[Last first: Topic 1]
+        TopicEdge -->|TC-024| MiddleFirst[Middle first: Topic 1]
+        TopicEdge -->|TC-025| TopicsActive[Topics + active lessons]
+        TopicEdge -->|TC-026| CrossStage[Cross stage: Upper first]
+        
+        RecCheck --> Combo{Combination}
+        Combo -->|TC-027| AllThree[Completed + Preparing + Live]
+        Combo -->|TC-028| MixedStates[Mixed class states]
+        Combo -->|TC-029| PrepDiffTopic[Preparing diff topic than recommended]
+        
+        RecCheck --> DataEdge{Data Edge Cases}
+        DataEdge -->|TC-030| MissingTopic[Missing topic: Unknown Topic]
+        DataEdge -->|TC-031| MissingStage[Missing stage: Fallback]
+        DataEdge -->|TC-032| LongTitle[Long title: Truncate + tooltip]
+        DataEdge -->|TC-033| NoSlides[No slides: 0 slides badge]
+        DataEdge -->|TC-034| NoYearCodes[No year codes: Fallback]
+        
+        RecCheck --> UIState{UI State}
+        UIState -->|TC-041| Loading[Loading state]
+        UIState -->|TC-042| Error[Error state: Retry]
+        UIState -->|TC-043| Partial[Partial data load]
+        UIState -->|TC-044| Rapid[Rapid class changes: Debounce]
+        
+        RecCheck --> Reasons{Recommendation Reasons}
+        Reasons -->|TC-056| NextReason[Next topic reason]
+        Reasons -->|TC-057| YearMatch[Fallback year match]
+        Reasons -->|TC-058| FinalFallback[Final fallback]
+        Reasons -->|TC-059| OutOfOrderReason[Out-of-order reason]
+        
+        RecCheck --> Visual{Visual/Layout}
+        Visual -->|TC-060| ManyLessons[Many lessons: Scrollable]
+        Visual -->|TC-061| LongNames[Long names: Truncate]
+        Visual -->|TC-062| ManyYears[Many year codes: Overflow]
+        Visual -->|TC-063| Responsive[Responsive layout]
+        
+        RecCheck --> Buttons{Button States}
+        Buttons -->|TC-051| BtnGoLesson[Go to lesson]
+        Buttons -->|TC-052| BtnAdd[Add to lesson + Choose topic]
+        Buttons -->|TC-053| BtnLive[Go to Live Lesson only]
+        Buttons -->|TC-054| BtnProceed[Proceed with chevrons]
+        Buttons -->|TC-055| BtnMulti[Go to lesson for each]
+        
+        RecCheck --> CancelCombine{Cancel and Combine}
+        CancelCombine -->|TC-077| CancelAll[Cancel all, create combined]
+        CancelCombine -->|TC-078| CancelOwned[Cancel owned only]
+        CancelCombine -->|TC-079| CancelConfirm[Cancel confirmation dialog]
+        
+        RecCheck --> Perf{Performance}
+        Perf -->|TC-068| ManyClasses[10+ classes]
+        Perf -->|TC-069| ManyTopics[50+ topics]
+        Perf -->|TC-070| Concurrent[Concurrent requests]
+    end
+
+    subgraph Phase4 [Phase 4: Actions and Navigation]
+        NoComplete --> Actions
+        InOrder --> Actions
+        OutOfOrder --> Actions
+        AllDone --> Actions
+        MultiSame --> Actions
+        MultiDiff --> Actions
+        AmberPrep --> Actions
+        BlueReady --> Actions
+        PrepPlusTopic --> Actions
+        
+        Actions{Navigation Actions}
+        Actions -->|TC-036| NavPrepare[Navigate to prepare]
+        Actions -->|TC-037| NavReady[Navigate to lesson]
+        Actions -->|TC-038| NavLive[Navigate to run-lesson]
+        Actions -->|TC-039| AddClass[Add class to lesson]
+        Actions -->|TC-040| AddFail[Add class fails: Retry]
+        
+        Actions --> Integration{Integration}
+        Integration -->|TC-064| ToTopic[To topic selection]
+        Integration -->|TC-065| SkipTopic[Skip to confirmation]
+        Integration -->|TC-066| Back[Back: Preserve selections]
+        Integration -->|TC-067| Close[Close: Reset state]
+    end
+
+    NavPrepare --> CreateLesson[Create Lesson]
+    NavReady --> CreateLesson
+    ToTopic --> CreateLesson
+    SkipTopic --> CreateLesson

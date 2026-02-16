@@ -22,13 +22,15 @@
     "fix:certification-order": "tsx scripts/fix-certification-topic-order.ts",
     "migrate:slide-paths": "tsx scripts/migrate-slide-storage-paths.ts",
     "migrate:slide-paths-remote": "tsx scripts/invoke-migrate-edge-function.ts",
-    "rollback:slide-paths": "tsx scripts/rollback-slide-storage-paths.ts"
+    "rollback:slide-paths": "tsx scripts/rollback-slide-storage-paths.ts",
+    "backfill:slide-positions": "tsx scripts/backfill-slide-positions.ts",
+    "flowchart:lesson": "mmdc -i misc/lesson-flow-comprehensive.mmd -o misc/lesson-flow-comprehensive.png"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.1.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@hookform/resolvers": "^5.1.1",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.51.0",
@@ -45,6 +47,7 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.3",
     "embla-carousel-react": "^8.6.0",
+    "fractional-indexing": "^3.2.0",
     "html-to-image": "^1.11.13",
     "input-otp": "^1.4.2",
     "jose": "^6.0.12",
@@ -71,6 +74,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.9",
     "@types/react": "^19",

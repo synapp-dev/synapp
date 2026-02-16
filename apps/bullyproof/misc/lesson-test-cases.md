@@ -2,7 +2,59 @@
 
 This document lists all possible scenarios, edge cases, and outliers that need to be tested and have applicable UI implementations for the lesson recommendation system.
 
+## Flow Overview
+
+1. **Entry**: User opens lesson wizard (e.g., from hero "Start new lesson" or lessons page)
+2. **Step 0**: Choose "Prepare & Teach Lesson" or "Browse Lesson Library"
+3. **Feedback Guard**: If Teach selected, API checks for outstanding feedback (lessons with `status=feedback` owned by current teacher). If any exist, user must address them before proceeding.
+4. **Step 1**: Class selection
+5. **Step 2**: Recommendation (with active lessons handling, curriculum stage logic)
+6. **Step 3**: Topic selection (optional if recommendation used)
+7. **Step 4**: Confirmation (Prepare lesson / Start lesson)
+
+Lesson lifecycle: `preparing` → `ready` → `in_progress` → `feedback` → `completed`
+
 ## Test Case Categories
+
+### 0. Wizard Entry and Feedback Guard
+
+#### TC-000A: Wizard Opens with Teach vs View Choice
+**Scenario**: User opens the lesson wizard
+**Expected**: Show two options to choose from
+**UI**:
+- Card: "Prepare & Teach Lesson" – Set up a lesson to deliver to a class
+- Card: "Browse Lesson Library" – Explore lesson materials without teaching
+
+#### TC-000B: User Clicks Browse Lesson Library
+**Scenario**: User selects "Browse Lesson Library"
+**Expected**: Close wizard and navigate to content
+**UI**:
+- Wizard closes
+- Navigate to `/schools/{schoolSlug}/content`
+
+#### TC-000C: Prepare & Teach with No Outstanding Feedback
+**Scenario**: User clicks "Prepare & Teach Lesson" and has no lessons awaiting feedback
+**Expected**: Proceed to class selection (Step 1)
+**UI**:
+- Loading indicator while checking outstanding feedback
+- Navigate to Step 1 (Class selection)
+
+#### TC-000D: Prepare & Teach with Outstanding Feedback (Feedback Gate)
+**Scenario**: User clicks "Prepare & Teach Lesson" and has one or more lessons in "feedback" status that they own
+**Expected**: Block progression, show feedback gate
+**UI**:
+- Purple alert: "Feedback required before starting another lesson"
+- List of outstanding feedback lessons (LessonCard for each)
+- "Go to lesson" button per lesson (navigates to `/schools/{schoolSlug}/lessons/{lessonId}/feedback`)
+- "Back" button returns to Teach vs View screen
+- User cannot proceed to class selection until feedback is completed (or navigates away to complete it)
+
+#### TC-000E: Outstanding Feedback Definition
+**Scenario**: System determines if teacher has outstanding feedback
+**Expected**: Lessons with `status=feedback` and `createdByUserId` = current teacher
+**Note**: Used to gate starting new lessons; distinct from TC-010 (selected class has feedback lesson at recommendation step).
+
+---
 
 ### 1. Basic Recommendation Scenarios
 
@@ -105,8 +157,9 @@ This document lists all possible scenarios, edge cases, and outliers that need t
 - Action: Navigate to live lesson, cannot proceed
 
 #### TC-010: Class Has Feedback Lesson
-**Scenario**: Selected class has a lesson in "feedback" status
+**Scenario**: Selected class has a lesson in "feedback" status (at recommendation step, after passing feedback gate)
 **Expected**: Block new lesson creation, show feedback required message
+**Note**: Differs from Feedback Guard (TC-000D): Feedback Guard blocks at wizard start for lessons *owned by the teacher*; TC-010 blocks when a *selected class* has a lesson in feedback status at the recommendation step.
 **UI**:
 - Red blocking alert: "Feedback Required"
 - Show lesson details (topic, status, owner)
@@ -514,7 +567,7 @@ This document lists all possible scenarios, edge cases, and outliers that need t
 
 ---
 
-### 18. Cancel and Combine Lesson Scenarios
+### 16. Cancel and Combine Lesson Scenarios
 
 #### TC-077: Cancel Multiple Owned Lessons and Create Combined
 **Scenario**: User owns multiple active lessons (ready/preparing) for different classes
@@ -544,7 +597,7 @@ This document lists all possible scenarios, edge cases, and outliers that need t
 - Buttons: "Cancel Lesson" (destructive) + "Keep Lesson" (secondary)
 - After confirmation: Cancel lesson, refresh recommendations
 
-### 19. Performance Scenarios
+### 17. Performance Scenarios
 
 #### TC-068: Many Classes Selected (10+)
 **Scenario**: User selects 10+ classes
@@ -565,9 +618,10 @@ This document lists all possible scenarios, edge cases, and outliers that need t
 
 ## Test Case Summary
 
-**Total Test Cases**: 79
+**Total Test Cases**: 84
 
 **Categories**:
+- Wizard Entry and Feedback Guard: 5 cases
 - Basic Recommendation: 6 cases
 - Active Lessons (Single Class): 5 cases
 - Active Lessons (Multiple Classes): 5 cases
@@ -591,6 +645,7 @@ This document lists all possible scenarios, edge cases, and outliers that need t
 ## Implementation Priority
 
 **P0 (Critical)**:
+- TC-000A through TC-000E (Wizard entry and feedback guard)
 - TC-001 through TC-016 (Basic flows and active lesson scenarios)
 - TC-018, TC-019 (Curriculum stage scenarios)
 - TC-036 through TC-040 (Navigation and adding classes)
