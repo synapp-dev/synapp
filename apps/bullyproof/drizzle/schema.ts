@@ -343,8 +343,10 @@ export const userProfile = pgTable("user_profile", {
 	avatarUrl: text("avatar_url"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+	lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: 'string' }),
 	metadata: jsonb().default({}),
 }, (table) => [
+	index("idx_user_profile_last_seen_at").using("btree", table.lastSeenAt.desc().nullsLast().op("timestamptz_ops")),
 	foreignKey({
 			columns: [table.id],
 			foreignColumns: [usersInAuth.id],

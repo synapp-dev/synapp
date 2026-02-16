@@ -1447,6 +1447,10 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
+      update_my_last_seen: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
     }
     Enums: {
       invite_status: "PENDING" | "ACCEPTED" | "CANCELLED" | "EXPIRED"
