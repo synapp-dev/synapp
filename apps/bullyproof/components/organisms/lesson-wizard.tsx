@@ -739,20 +739,13 @@ export function LessonWizard({
         throw new Error("Lesson ID (UUID) not returned from API. Please try again.");
       }
 
-      isRedirectingAfterCreationRef.current = true;
-
       queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
       queryClient.invalidateQueries({ queryKey: ["lesson-recommendations"] });
 
-      clearWizardParams();
-      handleOpenChange(false);
-
+      // Hard redirect - full page navigation wipes all state, params, and wizard
       const url = `/schools/${schoolId}/lessons/${lessonId}/${redirectPath}`;
-      router.push(redirectPath === "run-lesson" ? `${url}?dialog=present` : url);
-
-      setTimeout(() => {
-        isRedirectingAfterCreationRef.current = false;
-      }, 500);
+      const fullUrl = redirectPath === "run-lesson" ? `${url}?dialog=present` : url;
+      window.location.replace(fullUrl);
     } catch (err: any) {
       console.error("Failed to create lesson:", err);
       setError(err.message || "Failed to create lesson. Please try again.");

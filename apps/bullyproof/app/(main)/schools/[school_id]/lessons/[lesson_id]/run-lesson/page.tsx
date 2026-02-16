@@ -173,6 +173,13 @@ export default function LessonRunLessonPage({
     }
   }, [searchParams, isLessonCreator]);
 
+  // Fallback: when lesson status becomes feedback (e.g. from visibility refetch if realtime missed it),
+  // auto-navigate to feedback page. Primary path is LessonStatusRedirect realtime listener in layout.
+  useEffect(() => {
+    if (!lessonData || !isLessonCreator || lessonData.status !== "feedback") return;
+    router.replace(`/schools/${school_id}/lessons/${lesson_id}/feedback`);
+  }, [lessonData?.status, isLessonCreator, router, school_id, lesson_id]);
+
   // Show loading state while checking permissions
   if (isLoadingLesson || !currentUser || !lessonData) {
     return (

@@ -33,7 +33,7 @@ export function LessonStatusRedirect({
         console.log(
           `[LessonStatusRedirect] Redirecting to feedback page (status: ${oldStatus} -> ${newStatus})`
         );
-        router.push(`/schools/${schoolId}/lessons/${lessonId}/feedback`);
+        router.replace(`/schools/${schoolId}/lessons/${lessonId}/feedback`);
       }
     },
     [pathname, router, schoolId, lessonId]
