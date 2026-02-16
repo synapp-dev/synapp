@@ -1031,38 +1031,20 @@ export const classes = pgTable("classes", {
 	unique("classes_school_code_unique").on(table.schoolId, table.code),
 ]);
 
-export const lessons = pgTable("lessons", {
+export const curriculumStages = pgTable("curriculum_stages", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	schoolId: uuid("school_id").notNull(),
-	topicId: uuid("topic_id").notNull(),
-	createdByUserId: uuid("created_by_user_id"),
-	status: text().default('preparing').notNull(),
-	scheduledFor: timestamp("scheduled_for", { withTimezone: true, mode: 'string' }),
+	code: text().notNull(),
+	name: text().notNull(),
+	sortIndex: smallint("sort_index").notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	metadata: jsonb().default({}),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	slug: text().notNull(),
 }, (table) => [
-	index("idx_lessons_school_id").using("btree", table.schoolId.asc().nullsLast().op("uuid_ops")),
-	index("idx_lessons_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
-	foreignKey({
-			columns: [table.createdByUserId],
-			foreignColumns: [userProfile.id],
-			name: "lessons_created_by_user_id_fkey"
-		}),
-	foreignKey({
-			columns: [table.schoolId],
-			foreignColumns: [schools.id],
-			name: "lessons_school_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.topicId],
-			foreignColumns: [topics.id],
-			name: "lessons_topic_id_fkey"
-		}).onDelete("restrict"),
-	pgPolicy("lessons_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid) OR has_any_role(ARRAY['SCHOOL_ADMIN'::text], school_id) OR has_any_role(ARRAY['TEACHER'::text], school_id))` }),
-	pgPolicy("lessons_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
-	pgPolicy("lessons_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	pgPolicy("lessons_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
-	check("lessons_status_check", sql`status = ANY (ARRAY['preparing'::text, 'ready'::text, 'in_progress'::text, 'feedback'::text, 'completed'::text, 'cancelled'::text])`),
+	unique("curriculum_stages_code_key").on(table.code),
+	unique("curriculum_stages_name_key").on(table.name),
+	unique("curriculum_stages_sort_index_key").on(table.sortIndex),
+	unique("curriculum_stages_slug_key").on(table.slug),
+	check("curriculum_stages_code_chk", sql`code ~ '^S[0-9]+$'::text`),
 ]);
 
 export const topics = pgTable("topics", {
@@ -1099,20 +1081,38 @@ export const schoolYears = pgTable("school_years", {
 	unique("school_years_sort_index_key").on(table.sortIndex),
 ]);
 
-export const curriculumStages = pgTable("curriculum_stages", {
+export const lessons = pgTable("lessons", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
-	code: text().notNull(),
-	name: text().notNull(),
-	slug: text().notNull(),
-	sortIndex: smallint("sort_index").notNull(),
+	schoolId: uuid("school_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	createdByUserId: uuid("created_by_user_id"),
+	status: text().default('preparing').notNull(),
+	scheduledFor: timestamp("scheduled_for", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	metadata: jsonb().default({}),
 }, (table) => [
-	unique("curriculum_stages_code_key").on(table.code),
-	unique("curriculum_stages_name_key").on(table.name),
-	unique("curriculum_stages_slug_key").on(table.slug),
-	unique("curriculum_stages_sort_index_key").on(table.sortIndex),
-	check("curriculum_stages_code_chk", sql`code ~ '^S[0-9]+$'::text`),
+	index("idx_lessons_school_id").using("btree", table.schoolId.asc().nullsLast().op("uuid_ops")),
+	index("idx_lessons_topic_id").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.createdByUserId],
+			foreignColumns: [userProfile.id],
+			name: "lessons_created_by_user_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.schoolId],
+			foreignColumns: [schools.id],
+			name: "lessons_school_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [topics.id],
+			name: "lessons_topic_id_fkey"
+		}).onDelete("restrict"),
+	pgPolicy("lessons_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(has_any_role(ARRAY['PLATFORM_ADMIN'::text, 'PLATFORM_STAFF'::text], NULL::uuid) OR has_any_role(ARRAY['SCHOOL_ADMIN'::text], school_id) OR has_any_role(ARRAY['TEACHER'::text], school_id))` }),
+	pgPolicy("lessons_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("lessons_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("lessons_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("lessons_status_check", sql`status = ANY (ARRAY['preparing'::text, 'ready'::text, 'in_progress'::text, 'feedback'::text, 'completed'::text, 'cancelled'::text])`),
 ]);
 
 export const topicSlides = pgTable("topic_slides", {
@@ -1516,6 +1516,29 @@ export const topicLessonPlans = pgTable("topic_lesson_plans", {
 	pgPolicy("topic_lesson_plans_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
 ]);
 
+export const feedbackTickets = pgTable("feedback_tickets", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	userId: uuid("user_id").notNull(),
+	type: text().notNull(),
+	pagePath: text("page_path").notNull(),
+	description: text().notNull(),
+	screenshotUrl: text("screenshot_url"),
+	status: text().default('open').notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	adminNotes: jsonb("admin_notes").default([]),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
+}, (table) => [
+	foreignKey({
+			columns: [table.userId],
+			foreignColumns: [userProfile.id],
+			name: "feedback_tickets_user_id_fkey"
+		}),
+	pgPolicy("Users can insert their own feedback tickets", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(auth.uid() = user_id)`  }),
+	pgPolicy("Users can read their own feedback tickets", { as: "permissive", for: "select", to: ["authenticated"] }),
+	check("feedback_tickets_status_check", sql`status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text, 'closed'::text])`),
+	check("feedback_tickets_type_check", sql`type = ANY (ARRAY['bug'::text, 'feature'::text, 'question'::text, 'feedback'::text])`),
+]);
+
 export const schoolLevelAssignments = pgTable("school_level_assignments", {
 	schoolId: uuid("school_id").notNull(),
 	levelId: uuid("level_id").notNull(),
@@ -1667,29 +1690,6 @@ export const lessonSlideNotes = pgTable("lesson_slide_notes", {
 		}).onDelete("restrict"),
 	primaryKey({ columns: [table.lessonId, table.topicSlideId], name: "lesson_slide_notes_pkey"}),
 ]);
-
-export const feedbackTickets = pgTable("feedback_tickets", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	userId: uuid("user_id").notNull(),
-	type: text().notNull(),
-	pagePath: text("page_path").notNull(),
-	description: text().notNull(),
-	screenshotUrl: text("screenshot_url"),
-	status: text().default('open').notNull(),
-	adminNotes: jsonb("admin_notes").default([]),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
-}, (table) => [
-	index("idx_feedback_tickets_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
-	foreignKey({
-			columns: [table.userId],
-			foreignColumns: [userProfile.id],
-			name: "feedback_tickets_user_id_fkey"
-		}),
-	check("feedback_tickets_type_check", sql`type = ANY (ARRAY['bug'::text, 'feature'::text, 'question'::text, 'feedback'::text])`),
-	check("feedback_tickets_status_check", sql`status = ANY (ARRAY['open'::text, 'in_progress'::text, 'resolved'::text, 'closed'::text])`),
-]);
-
 export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
 	topicId: uuid("topic_id"),
 	title: text(),
@@ -1705,23 +1705,6 @@ export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }),
 	questions: jsonb(),
 }).with({ securityInvoker: true }).as(sql`SELECT id, topic_id, title, description, passing_score_percentage, time_limit_minutes, max_attempts, is_required, sequence_type, sort_order, status, created_at, updated_at, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qq.id, 'quiz_id', qq.quiz_id, 'question_text', qq.question_text, 'question_type', qq.question_type, 'allow_multiple_selections', qq.allow_multiple_selections, 'explanation', qq.explanation, 'points', qq.points, 'order_index', qq.order_index, 'question_urls', qq.question_urls, 'created_at', qq.created_at, 'updated_at', qq.updated_at, 'answers', COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', qa.id, 'question_id', qa.question_id, 'answer_text', qa.answer_text, 'is_correct', qa.is_correct, 'order_index', qa.order_index, 'created_at', qa.created_at, 'updated_at', qa.updated_at) ORDER BY qa.order_index) AS jsonb_agg FROM quiz_answers qa WHERE qa.question_id = qq.id), '[]'::jsonb)) ORDER BY qq.order_index) AS jsonb_agg FROM quiz_questions qq WHERE qq.quiz_id = ctq.id), '[]'::jsonb) AS questions FROM course_topic_quizzes ctq`);
-
-export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
-	name: text(),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	teacherCount: bigint("teacher_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	classCount: bigint("class_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	schoolAdminCount: bigint("school_admin_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
-	activeLicence: boolean("active_licence"),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	staffCount: bigint("staff_count", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	lessonCount: bigint("lesson_count", { mode: "number" }),
-}).with({ securityInvoker: true }).as(sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, (EXISTS ( SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status)) AS active_licence, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_STAFF'::text), 0::bigint) AS staff_count, COALESCE(( SELECT count(*) AS count FROM lessons l WHERE l.school_id = s.id), 0::bigint) AS lesson_count FROM schools s`);
 
 export const vStageThresholds = pgView("v_stage_thresholds", {	stageId: uuid("stage_id"),
 	minSortIndex: smallint("min_sort_index"),
@@ -1754,6 +1737,23 @@ export const vLessonSlidesEffective = pgView("v_lesson_slides_effective", {	less
 	effectiveNotes: text("effective_notes"),
 	teacherUserId: uuid("teacher_user_id"),
 }).with({ securityInvoker: true }).as(sql`SELECT l.id AS lesson_id, l.topic_id, ts.id AS topic_slide_id, ts.order_index, ts.kind, ts.text_html, ts.image_url, ts.video_url, ts.video_start_s, ts.video_end_s, COALESCE(lsn.notes_richtext, tsn.notes_richtext, ts.official_notes, t.official_notes) AS effective_notes, l.created_by_user_id AS teacher_user_id FROM lessons l JOIN topics t ON t.id = l.topic_id JOIN topic_slides ts ON ts.topic_id = t.id LEFT JOIN lesson_slide_notes lsn ON lsn.lesson_id = l.id AND lsn.topic_slide_id = ts.id LEFT JOIN teacher_slide_notes tsn ON tsn.teacher_user_id = l.created_by_user_id AND tsn.topic_slide_id = ts.id ORDER BY l.id, ts.order_index`);
+
+export const vSchoolsStatistics = pgView("v_schools_statistics", {	id: uuid(),
+	name: text(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	teacherCount: bigint("teacher_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	classCount: bigint("class_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	schoolAdminCount: bigint("school_admin_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	schoolLicenceCount: bigint("school_licence_count", { mode: "number" }),
+	activeLicence: boolean("active_licence"),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	staffCount: bigint("staff_count", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	lessonCount: bigint("lesson_count", { mode: "number" }),
+}).with({ securityInvoker: true }).as(sql`SELECT id, name, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'TEACHER'::text), 0::bigint) AS teacher_count, COALESCE(( SELECT count(*) AS count FROM classes c WHERE c.school_id = s.id), 0::bigint) AS class_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_ADMIN'::text), 0::bigint) AS school_admin_count, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_LICENCE'::text), 0::bigint) AS school_licence_count, (EXISTS ( SELECT 1 FROM school_licences sl WHERE sl.school_id = s.id AND sl.status = 'ACTIVE'::licence_status)) AS active_licence, COALESCE(( SELECT count(*) AS count FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.school_id = s.id AND r.key = 'SCHOOL_STAFF'::text), 0::bigint) AS staff_count, COALESCE(( SELECT count(*) AS count FROM lessons l WHERE l.school_id = s.id), 0::bigint) AS lesson_count FROM schools s`);
 
 export const vClassesYears = pgView("v_classes_years", {	id: uuid(),
 	schoolId: uuid("school_id"),
@@ -1881,11 +1881,7 @@ export const vSchoolsEnriched = pgView("v_schools_enriched", {	id: uuid(),
 	sector: jsonb(),
 	levels: jsonb(),
 	levelBadge: text("level_badge"),
-}).as(sql`SELECT sch.id, sch.name, sch.code, sch.slug, sch.email_domain, sch.address, sch.joined_at, sch.created_at, CASE WHEN st.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', st.id, 'code', st.code, 'name', st.name) END AS state, CASE WHEN sec.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', sec.id, 'key', sec.key, 'name', sec.name) END AS sector, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', lvl.id, 'key', lvl.key, 'name', lvl.name) ORDER BY lvl.key) AS jsonb_agg FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id), '[]'::jsonb) AS levels, b.level_badge FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id LEFT JOIN school_level_badge b ON b.school_id = sch.id`);
-
-export const schoolLevelBadge = pgView("school_level_badge", {	schoolId: uuid("school_id"),
-	levelBadge: text("level_badge"),
-}).as(sql`SELECT id AS school_id, COALESCE(( SELECT CASE WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 12 THEN 'P–12'::text WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 10 THEN 'P–10'::text WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 6 THEN 'Primary'::text WHEN min(y.sort_index) >= 7 AND max(y.sort_index) = 12 THEN 'Secondary'::text WHEN count(*) > 0 THEN 'Custom'::text ELSE 'Unknown'::text END AS "case" FROM school_year_assignments sya JOIN school_years y ON y.id = sya.school_year_id WHERE sya.school_id = s.id), 'Unknown'::text) AS level_badge FROM schools s`);
+}).with({ securityInvoker: true }).as(sql`SELECT sch.id, sch.name, sch.code, sch.slug, sch.email_domain, sch.address, sch.joined_at, sch.created_at, CASE WHEN st.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', st.id, 'code', st.code, 'name', st.name) END AS state, CASE WHEN sec.id IS NULL THEN NULL::jsonb ELSE jsonb_build_object('id', sec.id, 'key', sec.key, 'name', sec.name) END AS sector, COALESCE(( SELECT jsonb_agg(jsonb_build_object('id', lvl.id, 'key', lvl.key, 'name', lvl.name) ORDER BY lvl.key) AS jsonb_agg FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id), '[]'::jsonb) AS levels, b.level_badge FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id LEFT JOIN school_level_badge b ON b.school_id = sch.id`);
 
 export const vSchoolsReadable = pgView("v_schools_readable", {	id: uuid(),
 	name: text(),
@@ -1903,4 +1899,8 @@ export const vSchoolsReadable = pgView("v_schools_readable", {	id: uuid(),
 	sector: text(),
 	levels: text(),
 	levelBadge: text("level_badge"),
-}).as(sql`SELECT sch.id, sch.name, sch.code, sch.state_id, sch.sector_id, sch.email_domain, sch.address, sch.joined_at, sch.created_at, sch.slug, sch.banner_url, sch.avatar_url, lower(st.code) AS state, sec.key AS sector, ARRAY( SELECT lvl.name FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id ORDER BY ( CASE lvl.key WHEN 'primary'::text THEN 1 WHEN 'secondary'::text THEN 2 ELSE 99 END)) AS levels, b.level_badge FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id LEFT JOIN school_level_badge b ON b.school_id = sch.id`);
+}).with({ securityInvoker: true }).as(sql`SELECT sch.id, sch.name, sch.code, sch.state_id, sch.sector_id, sch.email_domain, sch.address, sch.joined_at, sch.created_at, sch.slug, sch.banner_url, sch.avatar_url, lower(st.code) AS state, sec.key AS sector, ARRAY( SELECT lvl.name FROM school_level_assignments sla JOIN school_levels lvl ON lvl.id = sla.level_id WHERE sla.school_id = sch.id ORDER BY ( CASE lvl.key WHEN 'primary'::text THEN 1 WHEN 'secondary'::text THEN 2 ELSE 99 END)) AS levels, b.level_badge FROM schools sch LEFT JOIN states st ON st.id = sch.state_id LEFT JOIN school_sectors sec ON sec.id = sch.sector_id LEFT JOIN school_level_badge b ON b.school_id = sch.id`);
+
+export const schoolLevelBadge = pgView("school_level_badge", {	schoolId: uuid("school_id"),
+	levelBadge: text("level_badge"),
+}).with({ securityInvoker: true }).as(sql`SELECT id AS school_id, COALESCE(( SELECT CASE WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 12 THEN 'P–12'::text WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 10 THEN 'P–10'::text WHEN min(y.sort_index) = 0 AND max(y.sort_index) = 6 THEN 'Primary'::text WHEN min(y.sort_index) >= 7 AND max(y.sort_index) = 12 THEN 'Secondary'::text WHEN count(*) > 0 THEN 'Custom'::text ELSE 'Unknown'::text END AS "case" FROM school_year_assignments sya JOIN school_years y ON y.id = sya.school_year_id WHERE sya.school_id = s.id), 'Unknown'::text) AS level_badge FROM schools s`);

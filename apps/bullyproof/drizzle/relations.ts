@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, classes, topics, curriculumStages, schoolLevels, schoolYears, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, topicLessonPlans, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, teacherSlideNotes, lessonSlideNotes, feedbackTickets } from "./schema";
+import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, classes, curriculumStages, topics, schoolLevels, schoolYears, topicSlides, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, teacherSlideNotes, lessonSlideNotes } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -150,6 +150,7 @@ export const userProfileRelations = relations(userProfile, ({one, many}) => ({
 	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
 	courseRatings: many(courseRatings),
 	topicLessonPlans: many(topicLessonPlans),
+	feedbackTickets: many(feedbackTickets),
 	teacherClasses: many(teacherClasses),
 	teacherSlideNotes: many(teacherSlideNotes),
 }));
@@ -434,11 +435,11 @@ export const classesRelations = relations(classes, ({one, many}) => ({
 }));
 
 export const topicsRelations = relations(topics, ({one, many}) => ({
-	lessons: many(lessons),
 	curriculumStage: one(curriculumStages, {
 		fields: [topics.stageId],
 		references: [curriculumStages.id]
 	}),
+	lessons: many(lessons),
 	topicSlides: many(topicSlides),
 	topicLessonPlans: many(topicLessonPlans),
 }));
@@ -612,6 +613,13 @@ export const topicLessonPlansRelations = relations(topicLessonPlans, ({one}) => 
 	}),
 }));
 
+export const feedbackTicketsRelations = relations(feedbackTickets, ({one}) => ({
+	userProfile: one(userProfile, {
+		fields: [feedbackTickets.userId],
+		references: [userProfile.id]
+	}),
+}));
+
 export const schoolLevelAssignmentsRelations = relations(schoolLevelAssignments, ({one}) => ({
 	schoolLevel: one(schoolLevels, {
 		fields: [schoolLevelAssignments.levelId],
@@ -697,12 +705,5 @@ export const lessonSlideNotesRelations = relations(lessonSlideNotes, ({one}) => 
 	topicSlide: one(topicSlides, {
 		fields: [lessonSlideNotes.topicSlideId],
 		references: [topicSlides.id]
-	}),
-}));
-
-export const feedbackTicketsRelations = relations(feedbackTickets, ({one}) => ({
-	userProfile: one(userProfile, {
-		fields: [feedbackTickets.userId],
-		references: [userProfile.id]
 	}),
 }));
