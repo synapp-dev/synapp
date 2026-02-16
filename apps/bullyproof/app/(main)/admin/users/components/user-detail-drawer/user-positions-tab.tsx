@@ -38,11 +38,17 @@ interface UserPosition {
 interface UserPositionsTabProps {
   user: UserWithRolesAndSchools;
   schools: School[];
+  /** When set, only show positions for this school */
+  scopedSchoolId?: string;
+  /** When false, hide edit/add/delete controls */
+  canEdit?: boolean;
 }
 
 export function UserPositionsTab({
   user,
   schools,
+  scopedSchoolId,
+  canEdit = true,
 }: UserPositionsTabProps) {
   const queryClient = useQueryClient();
   const [editingPositions, setEditingPositions] = useState<
@@ -73,23 +79,31 @@ export function UserPositionsTab({
     },
   });
 
-  // Group positions by school
+  // Group positions by school (filter to scopedSchoolId when set)
   const positionsBySchool = new Map<string, UserPosition[]>();
-  positions.forEach((pos) => {
+  const positionsToUse = scopedSchoolId
+    ? positions.filter((pos) => pos.schoolId === scopedSchoolId)
+    : positions;
+  positionsToUse.forEach((pos) => {
     if (!positionsBySchool.has(pos.schoolId)) {
       positionsBySchool.set(pos.schoolId, []);
     }
     positionsBySchool.get(pos.schoolId)!.push(pos);
   });
 
-  // Get schools that have roles but no positions yet
+  // Get schools that have roles but no positions yet (filter to scoped when set)
   const schoolsWithRoles = new Set(
     user.schoolRoles.map((sr) => sr.schoolId).filter(Boolean) as string[]
   );
   const schoolsWithPositions = new Set(positionsBySchool.keys());
-  const schoolsNeedingPositions = Array.from(schoolsWithRoles).filter(
+  let schoolsNeedingPositions = Array.from(schoolsWithRoles).filter(
     (schoolId) => !schoolsWithPositions.has(schoolId)
   );
+  if (scopedSchoolId) {
+    schoolsNeedingPositions = schoolsNeedingPositions.filter(
+      (id) => id === scopedSchoolId
+    );
+  }
 
   const handleSavePosition = async (
     positionId: string,
@@ -346,96 +360,120 @@ export function UserPositionsTab({
                               >
                                 <Input
                                   value={currentValue}
-                                  onChange={(e) => {
-                                    setEditingPositions((prev) => ({
-                                      ...prev,
-                                      [pos.id]: e.target.value,
-                                    }));
-                                    setError(null);
-                                  }}
-                                  onBlur={() => {
-                                    if (
-                                      currentValue.trim() !== pos.position &&
-                                      currentValue.trim()
-                                    ) {
-                                      handleSavePosition(
-                                        pos.id,
-                                        pos.schoolId,
-                                        currentValue
-                                      );
-                                    } else {
-                                      // Reset if unchanged
-                                      setEditingPositions((prev) => {
-                                        const updated = { ...prev };
-                                        delete updated[pos.id];
-                                        return updated;
-                                      });
-                                    }
-                                  }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.currentTarget.blur();
-                                    } else if (e.key === "Escape") {
-                                      setEditingPositions((prev) => {
-                                        const updated = { ...prev };
-                                        delete updated[pos.id];
-                                        return updated;
-                                      });
-                                    }
-                                  }}
+                                  onChange={
+                                    canEdit
+                                      ? (e) => {
+                                          setEditingPositions((prev) => ({
+                                            ...prev,
+                                            [pos.id]: e.target.value,
+                                          }));
+                                          setError(null);
+                                        }
+                                      : undefined
+                                  }
+                                  onBlur={
+                                    canEdit
+                                      ? () => {
+                                          if (
+                                            currentValue.trim() !==
+                                              pos.position &&
+                                            currentValue.trim()
+                                          ) {
+                                            handleSavePosition(
+                                              pos.id,
+                                              pos.schoolId,
+                                              currentValue
+                                            );
+                                          } else {
+                                            setEditingPositions((prev) => {
+                                              const updated = { ...prev };
+                                              delete updated[pos.id];
+                                              return updated;
+                                            });
+                                          }
+                                        }
+                                      : undefined
+                                  }
+                                  onKeyDown={
+                                    canEdit
+                                      ? (e) => {
+                                          if (e.key === "Enter") {
+                                            e.currentTarget.blur();
+                                          } else if (e.key === "Escape") {
+                                            setEditingPositions((prev) => {
+                                              const updated = { ...prev };
+                                              delete updated[pos.id];
+                                              return updated;
+                                            });
+                                          }
+                                        }
+                                      : undefined
+                                  }
                                   placeholder="Enter position"
-                                  disabled={isSavingThis || isDeletingThis}
+                                  disabled={
+                                    isSavingThis || isDeletingThis || !canEdit
+                                  }
+                                  readOnly={!canEdit}
                                   className="flex-1"
                                 />
-                                {isEditing && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => {
-                                      if (
-                                        currentValue.trim() !== pos.position &&
-                                        currentValue.trim()
-                                      ) {
-                                        handleSavePosition(
-                                          pos.id,
-                                          pos.schoolId,
-                                          currentValue
-                                        );
-                                      } else {
-                                        setEditingPositions((prev) => {
-                                          const updated = { ...prev };
-                                          delete updated[pos.id];
-                                          return updated;
-                                        });
-                                      }
-                                    }}
-                                    disabled={isSavingThis}
-                                  >
-                                    {isSavingThis ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      <Save className="h-4 w-4" />
+                                {canEdit && (
+                                  <>
+                                    {isEditing && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          if (
+                                            currentValue.trim() !==
+                                              pos.position &&
+                                            currentValue.trim()
+                                          ) {
+                                            handleSavePosition(
+                                              pos.id,
+                                              pos.schoolId,
+                                              currentValue
+                                            );
+                                          } else {
+                                            setEditingPositions((prev) => {
+                                              const updated = { ...prev };
+                                              delete updated[pos.id];
+                                              return updated;
+                                            });
+                                          }
+                                        }}
+                                        disabled={isSavingThis}
+                                      >
+                                        {isSavingThis ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Save className="h-4 w-4" />
+                                        )}
+                                      </Button>
                                     )}
-                                  </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() =>
+                                        handleDeletePosition(pos.id)
+                                      }
+                                      disabled={
+                                        isDeletingThis || isSavingThis
+                                      }
+                                    >
+                                      {isDeletingThis ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        <X className="h-4 w-4 text-destructive" />
+                                      )}
+                                    </Button>
+                                  </>
                                 )}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => handleDeletePosition(pos.id)}
-                                  disabled={isDeletingThis || isSavingThis}
-                                >
-                                  {isDeletingThis ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    <X className="h-4 w-4 text-destructive" />
-                                  )}
-                                </Button>
                               </div>
                             );
                           })}
 
                           {/* Add new position input if less than 2 positions */}
-                          {schoolPositions.length < 2 && (
+                          {canEdit && schoolPositions.length < 2 && (
                             <div className="flex items-center gap-2">
                               <Input
                                 value={newPositions[schoolId] || ""}
@@ -501,7 +539,7 @@ export function UserPositionsTab({
       )}
 
       {/* Schools with roles but no positions */}
-      {schoolsNeedingPositions.length > 0 && (
+      {canEdit && schoolsNeedingPositions.length > 0 && (
         <>
           {positionsBySchool.size > 0 && <Separator className="my-8" />}
           <div className="space-y-4">

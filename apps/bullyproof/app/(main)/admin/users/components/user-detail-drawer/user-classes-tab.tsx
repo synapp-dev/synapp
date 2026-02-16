@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -13,11 +14,20 @@ import {
   AlertTitle,
 } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
-import { AlertCircle, GraduationCap } from "lucide-react";
+import { Button } from "@workspace/ui/components/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
+import { AlertCircle, GraduationCap, Loader2, X } from "lucide-react";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { extractSchoolMetadata } from "./utils";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
+import { useClasses } from "@/entities/classes/model/store";
 
 interface UserClass {
   classId: string;
@@ -32,23 +42,33 @@ interface UserClass {
 interface UserClassesTabProps {
   user: UserWithRolesAndSchools;
   schools: School[];
+  /** When set, only show classes for this school */
+  scopedSchoolId?: string;
+  /** When true, show assign/remove controls. Default true for admin drawer. */
+  canEdit?: boolean;
 }
 
 export function UserClassesTab({
   user,
   schools,
+  scopedSchoolId,
+  canEdit = true,
 }: UserClassesTabProps) {
-  // Fetch classes for this user
+  const queryClient = useQueryClient();
+
+  // Fetch classes for this user (optional schoolId filter)
   const {
     data: userClasses = [],
     isLoading,
     error: fetchError,
   } = useQuery<UserClass[]>({
-    queryKey: ["user-classes", user.id],
+    queryKey: ["user-classes", user.id, scopedSchoolId ?? "all"],
     queryFn: async () => {
-      const result = await apiFetch<UserClass[]>(
-        `/users/${user.id}/classes`
-      );
+      const url =
+        scopedSchoolId !== undefined
+          ? `/users/${user.id}/classes?schoolId=${scopedSchoolId}`
+          : `/users/${user.id}/classes`;
+      const result = await apiFetch<UserClass[]>(url);
       if (result.error) {
         throw new Error(result.error.message || "Failed to fetch classes");
       }
@@ -56,14 +76,62 @@ export function UserClassesTab({
     },
   });
 
-  // Group classes by school
+  // Classes at the scoped school (for assign dropdown when canEdit)
+  const { classes: schoolClasses = [] } = useClasses(
+    scopedSchoolId ? { schoolId: scopedSchoolId } : undefined
+  );
+
+  const [assignSelectValue, setAssignSelectValue] = useState("");
+
+  const toggleClassMutation = useMutation({
+    mutationFn: async ({
+      classId,
+      action,
+    }: {
+      classId: string;
+      action: "add" | "remove";
+    }) => {
+      const result = await apiFetch<{ success: boolean }>(
+        `/users/${user.id}/classes`,
+        {
+          method: "POST",
+          body: JSON.stringify({ classId, action }),
+        }
+      );
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to update class");
+      }
+      return result.data;
+    },
+    onSuccess: () => {
+      setAssignSelectValue("");
+      queryClient.invalidateQueries({
+        queryKey: ["user-classes", user.id],
+      });
+    },
+  });
+
+  // Group classes by school (filter to scoped when set)
   const classesBySchool = new Map<string, UserClass[]>();
-  userClasses.forEach((cls) => {
+  const userClassesToUse = scopedSchoolId
+    ? userClasses.filter((cls) => cls.schoolId === scopedSchoolId)
+    : userClasses;
+  userClassesToUse.forEach((cls) => {
     if (!classesBySchool.has(cls.schoolId)) {
       classesBySchool.set(cls.schoolId, []);
     }
     classesBySchool.get(cls.schoolId)!.push(cls);
   });
+
+  const userClassIds = useMemo(
+    () => new Set(userClassesToUse.map((c) => c.classId)),
+    [userClassesToUse]
+  );
+  const availableToAssign = useMemo(
+    () =>
+      schoolClasses.filter((c) => !userClassIds.has(c.id) && c.active !== false),
+    [schoolClasses, userClassIds]
+  );
 
   if (isLoading) {
     return (
@@ -117,6 +185,43 @@ export function UserClassesTab({
             This user has no classes assigned.
           </AlertDescription>
         </Alert>
+      )}
+
+      {canEdit && scopedSchoolId && availableToAssign.length > 0 && (
+        <Card className="border">
+          <CardContent className="px-4 py-4 space-y-3">
+            <h3 className="text-lg font-semibold">Assign class</h3>
+            <div className="flex items-center gap-2">
+              <Select
+                value={assignSelectValue}
+                onValueChange={(classId) => {
+                  if (classId) {
+                    setAssignSelectValue(classId);
+                    toggleClassMutation.mutate(
+                      { classId, action: "add" },
+                      {
+                        onSettled: () => setAssignSelectValue(""),
+                      }
+                    );
+                  }
+                }}
+                disabled={toggleClassMutation.isPending}
+              >
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Select a class to assign..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableToAssign.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                      {c.code ? ` (${c.code})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {classesBySchool.size > 0 && (
@@ -185,12 +290,35 @@ export function UserClassesTab({
                                   )}
                                 </div>
                               </div>
-                              <Badge
-                                variant={cls.active ? "default" : "secondary"}
-                                className="ml-2"
-                              >
-                                {cls.active ? "Active" : "Inactive"}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant={
+                                    cls.active ? "default" : "secondary"
+                                  }
+                                  className="ml-2"
+                                >
+                                  {cls.active ? "Active" : "Inactive"}
+                                </Badge>
+                                {canEdit && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() =>
+                                      toggleClassMutation.mutate({
+                                        classId: cls.classId,
+                                        action: "remove",
+                                      })
+                                    }
+                                    disabled={toggleClassMutation.isPending}
+                                  >
+                                    {toggleClassMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <X className="h-4 w-4 text-destructive" />
+                                    )}
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
