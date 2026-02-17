@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from "react";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp, HelpCircle } from "lucide-react";
+import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp, HelpCircle, SquareArrowOutUpRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -352,7 +352,6 @@ export default function LessonRunLessonPage({
   const primaryButtonLabel = isInProgress
     ? (currentSlideNum != null ? `Continue lesson from slide ${currentSlideNum}` : "Continue Lesson")
     : "Start lesson";
-  const presentDialogButtonLabel = isInProgress ? "Continue Lesson" : "Start Lesson";
 
   // Map API slides to SlideData for dialog preview (opening slide or current if in progress)
   const rawSlides = liveStateData?.data?.slides ?? [];
@@ -507,9 +506,10 @@ export default function LessonRunLessonPage({
               </Button>
               <Button
                 onClick={handlePresentAccept}
-                className="bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90"
+                className="bg-[var(--brand-bullyproof-primary)] text-secondary hover:bg-[var(--brand-bullyproof-primary)]/90 gap-2"
               >
-                {presentDialogButtonLabel}
+                Open New Tab
+                <SquareArrowOutUpRight className="h-5 w-5" />
               </Button>
             </div>
           </DialogFooter>
