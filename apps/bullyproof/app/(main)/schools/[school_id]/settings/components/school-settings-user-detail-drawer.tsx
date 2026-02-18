@@ -13,6 +13,21 @@ import {
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@workspace/ui/components/alert-dialog";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
 import { Pencil } from "lucide-react";
 import { RoleBadges } from "@/components/atoms/role-badges";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
@@ -27,8 +42,10 @@ import { UserPositionsTab } from "@/app/(main)/admin/users/components/user-detai
 import { UserClassesTab } from "@/app/(main)/admin/users/components/user-detail-drawer/user-classes-tab";
 import { extractSchoolMetadata } from "@/app/(main)/admin/users/components/user-detail-drawer/utils";
 import { useCanEditSchoolRoles } from "@/hooks/use-can-edit-school-roles";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { getDisplayName } from "@/app/(main)/admin/users/components/user-detail-drawer/utils";
 import type { TabType } from "@/app/(main)/admin/users/components/user-detail-drawer/types";
+import { apiFetch } from "@/lib/api/fetcher.client";
 
 interface SchoolSettingsUserDetailDrawerProps {
   user: UserWithRolesAndSchools | null;
@@ -66,10 +83,14 @@ export function SchoolSettingsUserDetailDrawer({
     Set<string>
   >(new Set());
   const [isSavingEditSchoolRoles, setIsSavingEditSchoolRoles] = useState(false);
+  const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+  const [isRemovingUser, setIsRemovingUser] = useState(false);
+  const [removeUserError, setRemoveUserError] = useState<string | null>(null);
 
   const { roles } = useRoles();
   const { data: schools = [] } = useListSchoolsQuery({ limit: 100 });
   const { canEdit: canEditSchoolRoles } = useCanEditSchoolRoles(schoolId);
+  const adminUsersAccess = useFeatureAccess("/admin/users");
 
   const staffRole = useMemo(
     () => roles.find((r) => r.key === "SCHOOL_STAFF"),
@@ -213,6 +234,39 @@ export function SchoolSettingsUserDetailDrawer({
     }
   };
 
+  const handleRemoveUserFromSchool = async () => {
+    if (!user) return;
+
+    setIsRemovingUser(true);
+    setRemoveUserError(null);
+
+    try {
+      const result = await apiFetch<{
+        success: boolean;
+        removed: number;
+        failed: number;
+      }>(`/schools/${schoolId}/users/remove`, {
+        method: "POST",
+        body: JSON.stringify({ userIds: [user.id] }),
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message || "Failed to remove user from school");
+      }
+
+      setRemoveConfirmOpen(false);
+      onUserUpdate?.();
+      onOpenChange(false);
+    } catch (err: unknown) {
+      console.error("[REMOVE USER FROM SCHOOL] Error:", err);
+      setRemoveUserError(
+        err instanceof Error ? err.message : "An unexpected error occurred"
+      );
+    } finally {
+      setIsRemovingUser(false);
+    }
+  };
+
   if (!user) {
     return null;
   }
@@ -238,11 +292,26 @@ export function SchoolSettingsUserDetailDrawer({
             activeTab={activeTab}
             onTabChange={updateTab}
             visibleTabs={["details", "roles", "positions", "classes"]}
+            dangerAction={
+              canEditSchoolRoles
+                ? {
+                    label: "Remove user",
+                    onClick: () => {
+                      setRemoveUserError(null);
+                      setRemoveConfirmOpen(true);
+                    },
+                  }
+                : undefined
+            }
           />
           <main className="flex flex-1 flex-col overflow-hidden min-h-0 pt-2 pr-6 pl-4">
             <div className="flex-1 overflow-y-auto">
               {activeTab === "details" && (
-                <UserDetailsCard user={user} onUserUpdate={onUserUpdate} />
+                <UserDetailsCard
+                  user={user}
+                  onUserUpdate={onUserUpdate}
+                  canEdit={adminUsersAccess.hasAccess}
+                />
               )}
 
               {activeTab === "roles" && (
@@ -345,6 +414,46 @@ export function SchoolSettingsUserDetailDrawer({
         }}
         isSaving={isSavingEditSchoolRoles}
       />
+
+      <AlertDialog
+        open={removeConfirmOpen}
+        onOpenChange={(open) => {
+          setRemoveConfirmOpen(open);
+          if (!open) {
+            setRemoveUserError(null);
+            setIsRemovingUser(false);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{`Remove user from ${schoolName}`}</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove this user&apos;s roles, positions, and class
+              associations for this school.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {removeUserError && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{removeUserError}</AlertDescription>
+            </Alert>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingUser}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleRemoveUserFromSchool();
+              }}
+              disabled={isRemovingUser}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {isRemovingUser ? "Removing..." : "Remove user"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

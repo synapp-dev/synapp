@@ -128,6 +128,7 @@ function SchoolsSectionContent() {
       normalizedTab &&
       [
         "onboarding",
+        "activation",
         "details",
         "users",
         "classes",
@@ -138,6 +139,7 @@ function SchoolsSectionContent() {
     ) {
       return normalizedTab as
         | "onboarding"
+        | "activation"
         | "details"
         | "users"
         | "classes"
@@ -497,6 +499,7 @@ function SchoolsSectionContent() {
   const handleTabChange = (
     tab:
       | "onboarding"
+      | "activation"
       | "details"
       | "users"
       | "classes"

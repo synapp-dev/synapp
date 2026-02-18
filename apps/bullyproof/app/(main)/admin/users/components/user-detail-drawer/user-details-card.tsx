@@ -22,9 +22,14 @@ import { usersApi } from "@/entities/users/api/endpoints";
 interface UserDetailsCardProps {
   user: UserWithRolesAndSchools | null;
   onUserUpdate?: () => void;
+  canEdit?: boolean;
 }
 
-export function UserDetailsCard({ user, onUserUpdate }: UserDetailsCardProps) {
+export function UserDetailsCard({
+  user,
+  onUserUpdate,
+  canEdit = true,
+}: UserDetailsCardProps) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -126,7 +131,7 @@ export function UserDetailsCard({ user, onUserUpdate }: UserDetailsCardProps) {
                 )}
               </Button>
             </div>
-          ) : (
+          ) : canEdit ? (
             <Button
               variant="outline"
               size="sm"
@@ -138,7 +143,7 @@ export function UserDetailsCard({ user, onUserUpdate }: UserDetailsCardProps) {
               <Pencil className="mr-2 h-4 w-4" />
               Edit
             </Button>
-          )}
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -154,8 +159,8 @@ export function UserDetailsCard({ user, onUserUpdate }: UserDetailsCardProps) {
               id="firstName"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
-              disabled={!editing}
-              className={!editing ? "bg-muted" : ""}
+              disabled={!canEdit || !editing}
+              className={!canEdit || !editing ? "bg-muted" : ""}
             />
           </div>
           <div className="space-y-1.5">
@@ -169,8 +174,8 @@ export function UserDetailsCard({ user, onUserUpdate }: UserDetailsCardProps) {
               id="lastName"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
-              disabled={!editing}
-              className={!editing ? "bg-muted" : ""}
+              disabled={!canEdit || !editing}
+              className={!canEdit || !editing ? "bg-muted" : ""}
             />
           </div>
         </div>
@@ -187,8 +192,8 @@ export function UserDetailsCard({ user, onUserUpdate }: UserDetailsCardProps) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            disabled={!editing}
-            className={!editing ? "bg-muted" : ""}
+            disabled={!canEdit || !editing}
+            className={!canEdit || !editing ? "bg-muted" : ""}
           />
         </div>
 

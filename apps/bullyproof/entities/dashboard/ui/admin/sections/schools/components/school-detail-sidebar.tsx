@@ -16,6 +16,7 @@ import {
 } from "@workspace/ui/components/sidebar";
 import {
   Rocket,
+  ToggleRight,
   Eye,
   Users,
   GraduationCap,
@@ -28,6 +29,7 @@ import {
 
 type TabId =
   | "onboarding"
+  | "activation"
   | "details"
   | "users"
   | "classes"
@@ -44,6 +46,7 @@ interface SchoolDetailSidebarProps {
 
 const navItems = [
   { id: "onboarding", name: "Onboarding", icon: Rocket },
+  { id: "activation", name: "Activation", icon: ToggleRight },
   { id: "details", name: "Details", icon: Eye },
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },

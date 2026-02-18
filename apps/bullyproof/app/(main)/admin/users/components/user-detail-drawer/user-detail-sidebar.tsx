@@ -20,6 +20,10 @@ interface UserDetailSidebarProps {
   onTabChange: (tab: TabType) => void;
   canManageFeatures?: boolean;
   onDeleteClick?: () => void;
+  dangerAction?: {
+    label: string;
+    onClick: () => void;
+  };
   /** When provided, only show these tabs. Omits History, Features, and Delete. */
   visibleTabs?: TabType[];
 }
@@ -42,10 +46,12 @@ export function UserDetailSidebar({
   onTabChange,
   canManageFeatures,
   onDeleteClick,
+  dangerAction,
   visibleTabs,
 }: UserDetailSidebarProps) {
   const tabsToShow = visibleTabs ?? (TAB_CONFIG.map((c) => c.tab) as TabType[]);
   const showDelete = !visibleTabs && onDeleteClick;
+  const showDangerAction = !showDelete && dangerAction;
 
   return (
     <div className="hidden md:flex flex-col w-48 shrink-0 bg-transparent">
@@ -96,6 +102,20 @@ export function UserDetailSidebar({
                               <span>Delete user</span>
                             </SidebarMenuButton>
                           </FeatureGuard>
+                        </SidebarMenuItem>
+                      </>
+                    )}
+                    {showDangerAction && (
+                      <>
+                        <SidebarSeparator className="!mx-0 !ml-0 my-1" />
+                        <SidebarMenuItem>
+                          <SidebarMenuButton
+                            onClick={dangerAction.onClick}
+                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span>{dangerAction.label}</span>
+                          </SidebarMenuButton>
                         </SidebarMenuItem>
                       </>
                     )}

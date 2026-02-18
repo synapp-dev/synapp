@@ -130,6 +130,7 @@ import {
   Shield,
   Key,
   Rocket,
+  ToggleRight,
   Eye,
   Activity,
   CheckCircle2,
@@ -165,6 +166,7 @@ import { UserDetailDrawer } from "@/app/(main)/admin/users/components/user-detai
 import { ImportClassesDialog } from "./import-classes-dialog";
 import { BulkRoleDialog } from "./bulk-role-dialog";
 import { SchoolFeaturesTab } from "./school-features-tab";
+import { SchoolActivationTab } from "./school-activation-tab";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
@@ -181,6 +183,7 @@ import {
 
 type TabId =
   | "onboarding"
+  | "activation"
   | "details"
   | "users"
   | "classes"
@@ -200,6 +203,7 @@ interface SchoolDetailDrawerProps {
 
 const navItems = [
   { id: "onboarding", name: "Onboarding", icon: Rocket },
+  { id: "activation", name: "Activation", icon: ToggleRight },
   { id: "details", name: "Details", icon: Eye },
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },
@@ -1459,6 +1463,11 @@ function SchoolDetailDrawerContent({
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* Details Section */}
+              {activeSection === "activation" && (
+                <SchoolActivationTab school={school} />
               )}
 
               {/* Details Section */}
