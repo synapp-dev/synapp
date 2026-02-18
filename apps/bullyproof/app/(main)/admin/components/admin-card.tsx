@@ -13,6 +13,7 @@ import {
   BookOpenText,
   Component,
   TicketCheck,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -43,6 +44,7 @@ const iconMap: Record<string, LucideIcon> = {
   HelpCircle,
   Component,
   TicketCheck,
+  FolderOpen,
 };
 
 export function AdminCard({

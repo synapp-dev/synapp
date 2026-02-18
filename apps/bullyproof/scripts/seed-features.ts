@@ -55,6 +55,7 @@ async function seedFeatures() {
       { key: '/admin/schools', name: 'Admin: Schools', description: 'Access to admin schools section', category: 'page', section: 'admin' },
       { key: '/admin/users', name: 'Admin: Users', description: 'Access to admin users section', category: 'page', section: 'admin' },
       { key: '/admin/features', name: 'Admin: Features', description: 'Access to admin features section', category: 'page', section: 'admin' },
+      { key: '/admin/resources', name: 'Admin: Resources', description: 'Access to admin resources library', category: 'page', section: 'admin' },
       { key: '/admin/classes', name: 'Admin: Classes', description: 'Access to admin classes section', category: 'page', section: 'admin' },
       { key: '/admin/lessons', name: 'Admin: Lessons', description: 'Access to admin lessons section', category: 'page', section: 'admin' },
       { key: '/admin/culture-ratings', name: 'Admin: Culture Ratings', description: 'Access to admin culture ratings section', category: 'page', section: 'admin' },

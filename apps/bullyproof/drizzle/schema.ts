@@ -575,6 +575,49 @@ export const schools = pgTable("schools", {
 	unique("schools_slug_key").on(table.slug),
 ]);
 
+export const resourceFiles = pgTable("resource_files", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	folderId: uuid("folder_id").notNull(),
+	displayName: text("display_name").notNull(),
+	storagePath: text("storage_path").notNull(),
+	mimeType: text("mime_type"),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+	scopeType: text("scope_type").notNull(),
+	schoolId: uuid("school_id"),
+	uploadedBy: uuid("uploaded_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_resource_files_folder").using("btree", table.folderId.asc().nullsLast().op("uuid_ops")),
+	index("idx_resource_files_scope").using("btree", table.scopeType.asc().nullsLast().op("text_ops"), table.schoolId.asc().nullsLast().op("uuid_ops")),
+	uniqueIndex("ux_resource_files_folder_display_name").using("btree", sql`folder_id`, sql`lower(display_name)`),
+	foreignKey({
+			columns: [table.folderId],
+			foreignColumns: [resourceFolders.id],
+			name: "resource_files_folder_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.schoolId],
+			foreignColumns: [schools.id],
+			name: "resource_files_school_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.uploadedBy],
+			foreignColumns: [userProfile.id],
+			name: "resource_files_uploaded_by_fkey"
+		}).onDelete("set null"),
+	pgPolicy("resource_files_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("resource_files_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("resource_files_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("resource_files_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("resource_files_display_name_not_empty", sql`char_length(TRIM(BOTH FROM display_name)) > 0`),
+	check("resource_files_scope_school_consistency", sql`((scope_type = 'global'::text) AND (school_id IS NULL)) OR ((scope_type = 'school'::text) AND (school_id IS NOT NULL))`),
+	check("resource_files_scope_type_check", sql`scope_type = ANY (ARRAY['global'::text, 'school'::text])`),
+	check("resource_files_size_bytes_non_negative", sql`size_bytes >= 0`),
+	check("resource_files_storage_path_not_empty", sql`char_length(TRIM(BOTH FROM storage_path)) > 0`),
+]);
+
 export const schoolLicences = pgTable("school_licences", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	schoolId: uuid("school_id").notNull(),
@@ -596,6 +639,46 @@ export const schoolLicences = pgTable("school_licences", {
 			name: "school_licences_school_id_fkey"
 		}).onDelete("cascade"),
 	check("school_licences_plan_length_check", sql`(plan_length >= 1) AND (plan_length <= 5)`),
+]);
+
+export const resourceFolders = pgTable("resource_folders", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	parentId: uuid("parent_id"),
+	name: text().notNull(),
+	slug: text().notNull(),
+	scopeType: text("scope_type").notNull(),
+	schoolId: uuid("school_id"),
+	createdBy: uuid("created_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	description: text(),
+}, (table) => [
+	index("idx_resource_folders_parent_id").using("btree", table.parentId.asc().nullsLast().op("uuid_ops")),
+	index("idx_resource_folders_scope").using("btree", table.scopeType.asc().nullsLast().op("text_ops"), table.schoolId.asc().nullsLast().op("text_ops")),
+	uniqueIndex("ux_resource_folders_sibling_name").using("btree", sql`COALESCE(parent_id, '00000000-0000-0000-0000-000000000000'::uui`, sql`scope_type`, sql`COALESCE(school_id, '00000000-0000-0000-0000-000000000000'::uui`, sql`lower(name)`),
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [userProfile.id],
+			name: "resource_folders_created_by_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.parentId],
+			foreignColumns: [table.id],
+			name: "resource_folders_parent_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.schoolId],
+			foreignColumns: [schools.id],
+			name: "resource_folders_school_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("resource_folders_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("resource_folders_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("resource_folders_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("resource_folders_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("resource_folders_name_not_empty", sql`char_length(TRIM(BOTH FROM name)) > 0`),
+	check("resource_folders_scope_school_consistency", sql`((scope_type = 'global'::text) AND (school_id IS NULL)) OR ((scope_type = 'school'::text) AND (school_id IS NOT NULL))`),
+	check("resource_folders_scope_type_check", sql`scope_type = ANY (ARRAY['global'::text, 'school'::text])`),
+	check("resource_folders_slug_not_empty", sql`char_length(TRIM(BOTH FROM slug)) > 0`),
 ]);
 
 export const schoolInvites = pgTable("school_invites", {
@@ -1723,6 +1806,35 @@ export const teacherClasses = pgTable("teacher_classes", {
 			name: "teacher_classes_user_id_fkey"
 		}).onDelete("cascade"),
 	primaryKey({ columns: [table.userId, table.classId], name: "teacher_classes_pkey"}),
+]);
+
+export const resourceFileTopics = pgTable("resource_file_topics", {
+	fileId: uuid("file_id").notNull(),
+	topicId: uuid("topic_id").notNull(),
+	createdBy: uuid("created_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_resource_file_topics_file").using("btree", table.fileId.asc().nullsLast().op("uuid_ops")),
+	index("idx_resource_file_topics_topic").using("btree", table.topicId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [userProfile.id],
+			name: "resource_file_topics_created_by_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.fileId],
+			foreignColumns: [resourceFiles.id],
+			name: "resource_file_topics_file_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.topicId],
+			foreignColumns: [topics.id],
+			name: "resource_file_topics_topic_id_fkey"
+		}).onDelete("cascade"),
+	primaryKey({ columns: [table.fileId, table.topicId], name: "resource_file_topics_pkey"}),
+	pgPolicy("resource_file_topics_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`true`  }),
+	pgPolicy("resource_file_topics_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	pgPolicy("resource_file_topics_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 ]);
 export const vQuizEnriched = pgView("v_quiz_enriched", {	id: uuid(),
 	topicId: uuid("topic_id"),

@@ -48,6 +48,7 @@ export const PAGE_FEATURES = {
   ADMIN_SCHOOLS: "/admin/schools",
   ADMIN_USERS: "/admin/users",
   ADMIN_FEATURES: "/admin/features",
+  ADMIN_RESOURCES: "/admin/resources",
   ADMIN_CLASSES: "/admin/classes",
   ADMIN_LESSONS: "/admin/lessons",
   ADMIN_CULTURE_RATINGS: "/admin/culture-ratings",

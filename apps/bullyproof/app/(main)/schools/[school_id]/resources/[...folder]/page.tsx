@@ -3,15 +3,19 @@
 import { useEffect, useState } from "react";
 import { ResourceBrowserClient } from "../resource-browser-client";
 
-export default function LegacyInfoPacksRoute({
+export default function SchoolResourcesFolderPage({
   params,
 }: {
-  params: Promise<{ school_id: string }>;
+  params: Promise<{ school_id: string; folder: string[] }>;
 }) {
   const [schoolSlug, setSchoolSlug] = useState<string>("");
+  const [folderSegments, setFolderSegments] = useState<string[]>([]);
 
   useEffect(() => {
-    params.then(({ school_id }) => setSchoolSlug(school_id));
+    params.then(({ school_id, folder }) => {
+      setSchoolSlug(school_id);
+      setFolderSegments(folder ?? []);
+    });
   }, [params]);
 
   if (!schoolSlug) return null;
@@ -19,7 +23,7 @@ export default function LegacyInfoPacksRoute({
   return (
     <ResourceBrowserClient
       schoolSlug={schoolSlug}
-      initialFolderSegments={["info-packs"]}
+      initialFolderSegments={folderSegments}
     />
   );
 }

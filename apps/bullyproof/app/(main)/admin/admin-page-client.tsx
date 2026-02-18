@@ -9,7 +9,7 @@ import { useFeaturesAccess } from "@/hooks/use-features-access";
 export function AdminPageClient() {
   const adminItems = getEnabledAdminItems();
   const adminFeatureKeys = useMemo(
-    () => adminItems.map((item) => item.featureKey),
+    () => [...new Set([...adminItems.map((item) => item.featureKey), "/admin"])],
     [adminItems]
   );
   const featuresAccess = useFeaturesAccess(adminFeatureKeys);
@@ -17,11 +17,19 @@ export function AdminPageClient() {
   const itemsWithAccess = useMemo(() => {
     return adminItems
       .filter((item) => {
-        const access = featuresAccess[item.featureKey];
+        const access =
+          featuresAccess[item.featureKey] ??
+          (item.featureKey === "/admin/resources"
+            ? featuresAccess["/admin"]
+            : undefined);
         return access?.visible ?? false;
       })
       .map((item) => {
-        const access = featuresAccess[item.featureKey];
+        const access =
+          featuresAccess[item.featureKey] ??
+          (item.featureKey === "/admin/resources"
+            ? featuresAccess["/admin"]
+            : undefined);
         const locked = access?.visible && !access?.hasAccess;
         return {
           ...item,

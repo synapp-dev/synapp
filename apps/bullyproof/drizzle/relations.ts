@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, teacherSlideNotes, topicSlides, classes, topics, curriculumStages, schoolLevels, schoolYears, lessonSlideNotes, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, permissionTemplates, permissionTemplateRules, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses } from "./schema";
+import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, resourceFolders, resourceFiles, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, teacherSlideNotes, topicSlides, classes, topics, curriculumStages, schoolLevels, schoolYears, lessonSlideNotes, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, permissionTemplates, permissionTemplateRules, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, resourceFileTopics } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -134,6 +134,8 @@ export const userProfileRelations = relations(userProfile, ({one, many}) => ({
 		references: [usersInAuth.id]
 	}),
 	slideViewingSessions: many(slideViewingSessions),
+	resourceFiles: many(resourceFiles),
+	resourceFolders: many(resourceFolders),
 	featurePermissions: many(featurePermissions),
 	courseTopicProgresses: many(courseTopicProgress),
 	lessonFeedbacks: many(lessonFeedback),
@@ -154,6 +156,7 @@ export const userProfileRelations = relations(userProfile, ({one, many}) => ({
 	topicLessonPlans: many(topicLessonPlans),
 	feedbackTickets: many(feedbackTickets),
 	teacherClasses: many(teacherClasses),
+	resourceFileTopics: many(resourceFileTopics),
 }));
 
 export const oauthClientsInAuthRelations = relations(oauthClientsInAuth, ({many}) => ({
@@ -240,7 +243,9 @@ export const schoolsRelations = relations(schools, ({one, many}) => ({
 		fields: [schools.stateId],
 		references: [states.id]
 	}),
+	resourceFiles: many(resourceFiles),
 	schoolLicences: many(schoolLicences),
+	resourceFolders: many(resourceFolders),
 	schoolInvites: many(schoolInvites),
 	featurePermissions: many(featurePermissions),
 	classes: many(classes),
@@ -257,6 +262,42 @@ export const schoolSectorsRelations = relations(schoolSectors, ({many}) => ({
 
 export const statesRelations = relations(states, ({many}) => ({
 	schools: many(schools),
+}));
+
+export const resourceFilesRelations = relations(resourceFiles, ({one, many}) => ({
+	resourceFolder: one(resourceFolders, {
+		fields: [resourceFiles.folderId],
+		references: [resourceFolders.id]
+	}),
+	school: one(schools, {
+		fields: [resourceFiles.schoolId],
+		references: [schools.id]
+	}),
+	userProfile: one(userProfile, {
+		fields: [resourceFiles.uploadedBy],
+		references: [userProfile.id]
+	}),
+	resourceFileTopics: many(resourceFileTopics),
+}));
+
+export const resourceFoldersRelations = relations(resourceFolders, ({one, many}) => ({
+	resourceFiles: many(resourceFiles),
+	userProfile: one(userProfile, {
+		fields: [resourceFolders.createdBy],
+		references: [userProfile.id]
+	}),
+	resourceFolder: one(resourceFolders, {
+		fields: [resourceFolders.parentId],
+		references: [resourceFolders.id],
+		relationName: "resourceFolders_parentId_resourceFolders_id"
+	}),
+	resourceFolders: many(resourceFolders, {
+		relationName: "resourceFolders_parentId_resourceFolders_id"
+	}),
+	school: one(schools, {
+		fields: [resourceFolders.schoolId],
+		references: [schools.id]
+	}),
 }));
 
 export const schoolLicencesRelations = relations(schoolLicences, ({one}) => ({
@@ -464,6 +505,7 @@ export const topicsRelations = relations(topics, ({one, many}) => ({
 	}),
 	lessons: many(lessons),
 	topicLessonPlans: many(topicLessonPlans),
+	resourceFileTopics: many(resourceFileTopics),
 }));
 
 export const curriculumStagesRelations = relations(curriculumStages, ({many}) => ({
@@ -721,5 +763,20 @@ export const teacherClassesRelations = relations(teacherClasses, ({one}) => ({
 	userProfile: one(userProfile, {
 		fields: [teacherClasses.userId],
 		references: [userProfile.id]
+	}),
+}));
+
+export const resourceFileTopicsRelations = relations(resourceFileTopics, ({one}) => ({
+	userProfile: one(userProfile, {
+		fields: [resourceFileTopics.createdBy],
+		references: [userProfile.id]
+	}),
+	resourceFile: one(resourceFiles, {
+		fields: [resourceFileTopics.fileId],
+		references: [resourceFiles.id]
+	}),
+	topic: one(topics, {
+		fields: [resourceFileTopics.topicId],
+		references: [topics.id]
 	}),
 }));

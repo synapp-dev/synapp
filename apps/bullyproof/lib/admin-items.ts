@@ -13,6 +13,7 @@ import {
   Ticket,
   TicketCheck,
   Database,
+  FolderOpen,
 } from "lucide-react";
 
 export interface AdminItem {
@@ -66,6 +67,15 @@ export const adminItemsConfig: AdminItem[] = [
     iconName: "Component",
     description: "Manage feature access control and permissions",
     featureKey: "/admin/features",
+    enabled: true,
+  },
+  {
+    title: "Resources",
+    url: "/admin/resources",
+    icon: FolderOpen,
+    iconName: "FolderOpen",
+    description: "Manage folder-based resource documents",
+    featureKey: "/admin/resources",
     enabled: true,
   },
   {
@@ -151,6 +161,8 @@ export const adminSegmentToFeatureKey: Record<string, string> = {
   "audit-logs": "/admin/audit-logs",
   "support-tools": "/admin/support-tools",
   tickets: "/admin/tickets",
+  // Use /admin guard so route works before /admin/resources feature is seeded.
+  resources: "/admin",
   migrations: "/admin/content",
 };
 
@@ -180,6 +192,8 @@ export function getAdminItemsByCategory() {
 
   enabledItems.forEach((item) => {
     if (item.title === "Content") {
+      categoryMap["Content"].push(item);
+    } else if (item.title === "Resources") {
       categoryMap["Content"].push(item);
     } else if (
       item.title === "Schools" ||
