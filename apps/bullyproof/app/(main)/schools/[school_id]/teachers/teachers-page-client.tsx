@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, Fragment } from "react";
+import { useQueries } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -9,11 +10,6 @@ import {
 import { Separator } from "@workspace/ui/components/separator";
 import { RoleBadges } from "@/components/atoms/role-badges";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar";
 import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
@@ -38,6 +34,9 @@ import {
 } from "@/entities/me/api/endpoints";
 import { useSchoolStore } from "@/stores/school-store";
 import Link from "next/link";
+import Image from "next/image";
+import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
+import { getUserPositionsOptions } from "@/entities/users/api/user-details-queries";
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -66,6 +65,7 @@ export default function TeachersPageClient() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
+  const schoolAvatar = useStorageImageUrl(currentSchool?.avatarUrl ?? null);
 
   useEffect(() => {
     async function fetchUsers() {
@@ -245,6 +245,28 @@ export default function TeachersPageClient() {
     return roleMap;
   }, [filteredUsers, currentSchool?.id, selectedRole]);
 
+  const userPositionsQueries = useQueries({
+    queries: usersWithValidRoles.map((user) =>
+      getUserPositionsOptions(user.id)
+    ),
+  });
+
+  const positionsByUserId = useMemo(() => {
+    const schoolId = currentSchool?.id;
+    if (!schoolId) return new Map<string, string[]>();
+
+    const map = new Map<string, string[]>();
+    usersWithValidRoles.forEach((user, index) => {
+      const data = userPositionsQueries[index]?.data ?? [];
+      const positions = data
+        .filter((position) => position.schoolId === schoolId)
+        .map((position) => position.position.trim())
+        .filter((position) => position.length > 0);
+      map.set(user.id, positions);
+    });
+    return map;
+  }, [currentSchool?.id, userPositionsQueries, usersWithValidRoles]);
+
   // Section order: School Admins first, then Teaching (AP Teacher etc), then Staff
   const sectionOrder = (a: string, b: string) => {
     const order: Record<string, number> = {
@@ -266,19 +288,12 @@ export default function TeachersPageClient() {
     return `${firstName} ${lastName}`.trim() || user.email;
   };
 
-  const getInitials = (user: UserWithRolesAndSchools) => {
-    const firstName = user.firstName || "";
-    const lastName = user.lastName || "";
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) {
-      return firstName[0].toUpperCase();
-    }
-    if (user.email) {
-      return user.email[0].toUpperCase();
-    }
-    return "U";
+  const getSchoolInitials = () => {
+    const schoolName = currentSchool?.name?.trim() || "";
+    if (!schoolName) return "S";
+    const words = schoolName.split(/\s+/).filter(Boolean);
+    if (words.length === 1) return words[0]![0]!.toUpperCase();
+    return `${words[0]![0] ?? ""}${words[1]![0] ?? ""}`.toUpperCase();
   };
 
   // Convert teacher name to URL-friendly slug
@@ -324,13 +339,14 @@ export default function TeachersPageClient() {
     const schoolSlug = currentSchool?.slug || "";
     const firstName = user.firstName?.trim() || "";
     const lastName = user.lastName?.trim() || "";
+    const positions = positionsByUserId.get(user.id) ?? [];
 
     return (
       <Link
         href={`/schools/${schoolSlug}/teachers/${teacherSlug}`}
-        className="block"
+        className="block group"
       >
-        <Card className="hover:shadow-md transition-shadow h-full relative">
+        <Card className="h-full relative transform-gpu will-change-transform transition-all duration-300 ease-out hover:shadow-md hover:bg-[var(--brand-bullyproof-primary)] hover:scale-[1.01] hover:-translate-y-1">
           <CardHeader className="w-full h-full flex items-end justify-start">
             <RoleBadges
               roles={roles}
@@ -338,20 +354,56 @@ export default function TeachersPageClient() {
               size="sm"
               className="absolute top-4 right-4 shrink-0"
             />
-            <div className="flex items-end gap-3">
-              <Avatar className="h-12 w-12 flex-shrink-0">
-                <AvatarImage src={user.avatarUrl || undefined} />
-                <AvatarFallback>{getInitials(user)}</AvatarFallback>
-              </Avatar>
+            <div className="flex items-center gap-2">
+              <div className="h-16 w-16 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                {schoolAvatar.url ? (
+                  <Image
+                    src={schoolAvatar.url}
+                    alt={currentSchool?.name ?? "School"}
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <span className="text-sm font-semibold text-muted-foreground">
+                    {getSchoolInitials()}
+                  </span>
+                )}
+              </div>
               <div className="min-w-0 flex-1 pb-0.5">
-                {firstName ? (
-                  <div className="font-medium text-sm text-muted-foreground truncate">
-                    {firstName}
+                {firstName || lastName ? (
+                  <div className="flex items-baseline gap-1.5 min-w-0 origin-left transform-gpu transition-transform duration-300 ease-out group-hover:scale-[1.03]">
+                    <span className="text-xl font-light text-foreground/90 truncate transition-colors duration-200 ease-in-out group-hover:text-secondary">
+                      {firstName || "—"}
+                    </span>
+                    <span className="text-xl font-extrabold text-foreground truncate transition-colors duration-200 ease-in-out group-hover:text-secondary">
+                      {lastName || "—"}
+                    </span>
                   </div>
-                ) : null}
-                <div className="font-bold text-lg truncate">
-                  {lastName || fullName || user.email}
-                </div>
+                ) : (
+                  <div className="text-xl font-semibold truncate origin-left transform-gpu transition-[transform,color] duration-300 ease-out group-hover:scale-[1.03] group-hover:text-secondary">
+                    {fullName || user.email}
+                  </div>
+                )}
+                {positions.length > 0 ? (
+                  <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-xs text-muted-foreground capitalize transition-colors duration-200 ease-in-out group-hover:text-secondary/85">
+                    {positions.map((position, index) => (
+                      <span
+                        key={`${user.id}-${position}-${index}`}
+                        className="inline-flex items-center gap-x-1"
+                      >
+                        {index > 0 ? (
+                          <span aria-hidden className="opacity-50">
+                            •
+                          </span>
+                        ) : null}
+                        <span>{position}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-1 h-3 w-24 opacity-0" aria-hidden />
+                )}
               </div>
             </div>
           </CardHeader>
@@ -383,7 +435,7 @@ export default function TeachersPageClient() {
           <CategoryIcon className="h-5 w-5" />
           {title}
         </h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {users.map((user) => (
             <div key={`${user.id}-${sectionRole.roleKey}`} className="h-full">
               {renderTeacherCard(user, sectionRole)}
@@ -493,7 +545,7 @@ export default function TeachersPageClient() {
 
       {/* Teachers Grid by Category */}
       {loading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           {[...Array(6)].map((_, i) => (
             <TeacherCardSkeleton key={i} />
           ))}

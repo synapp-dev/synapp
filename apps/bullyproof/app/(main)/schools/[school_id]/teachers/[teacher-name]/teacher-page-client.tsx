@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -8,7 +8,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   ArrowLeft,
   Mail,
@@ -19,11 +18,10 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { Separator } from "@workspace/ui/components/separator";
+import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
-import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
-import { lessonsApi } from "@/entities/lessons/api/endpoints";
+import { type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
-import { apiFetch } from "@/lib/api/fetcher.client";
 import {
   Carousel,
   CarouselContent,
@@ -33,6 +31,13 @@ import {
 } from "@workspace/ui/components/carousel";
 import { RoleBadges } from "@/components/atoms/role-badges";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
+import {
+  useUserClasses,
+  useUserPositions,
+  useUsersBySchool,
+} from "@/entities/users/api/user-details-queries";
+import { useLessonsByTeacherAtSchool } from "@/entities/lessons/api/useLessonsByTeacherAtSchool";
+import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 
 interface TeacherPageClientProps {
   teacherSlug: string;
@@ -52,71 +57,32 @@ function TeacherPageSkeleton({ schoolSlug }: { schoolSlug?: string }) {
           Back to Teachers
         </Link>
         <div className="text-sm text-muted-foreground">/</div>
-        <Skeleton className="h-4 w-32" />
+        <div className="h-4 w-28 rounded-sm border-2 border-dashed border-border/30 opacity-40" />
       </div>
 
       {/* Profile banner skeleton */}
-      <div className="relative rounded-lg overflow-hidden h-[280px] bg-muted">
-        <div
-          className="absolute inset-0 bg-gradient-to-t from-[var(--brand-bullyproof-primary)] via-[var(--brand-bullyproof-primary)]/50 to-transparent opacity-60"
-          aria-hidden
-        />
+      <div className="relative rounded-lg overflow-hidden h-[280px] border-2 border-dashed border-border/25 opacity-35">
         <div className="relative h-full flex items-end gap-6 pt-8 px-8 pb-4">
-          <Skeleton className="h-24 w-24 rounded-lg flex-shrink-0" />
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-10 w-56" />
+          <div className="h-[106px] w-[106px] rounded-lg border-2 border-dashed border-border/30" />
+          <div className="flex flex-col gap-3 pb-2">
+            <div className="h-7 w-48 rounded-sm border-2 border-dashed border-border/30" />
+            <div className="h-4 w-36 rounded-sm border-2 border-dashed border-border/30" />
           </div>
         </div>
       </div>
 
       {/* Classes + Lessons skeleton */}
       <div className="grid gap-6 lg:grid-cols-4">
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <GraduationCap className="h-5 w-5" />
-              Classes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-2">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-3">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Lessons
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-4">
-              <Skeleton className="h-40 w-64 shrink-0" />
-              <Skeleton className="h-40 w-64 shrink-0" />
-              <Skeleton className="h-40 w-64 shrink-0" />
-            </div>
-          </CardContent>
-        </Card>
+        <div className="lg:col-span-1">
+          <div className="h-[400px] rounded-md border-2 border-dashed border-border/30 opacity-35" />
+        </div>
+        <div className="lg:col-span-3">
+          <div className="h-[340px] rounded-md border-2 border-dashed border-border/30 opacity-35" />
+        </div>
       </div>
     </div>
   );
 }
-
-type TeacherClass = {
-  classId: string;
-  className: string;
-  classCode: string | null;
-  schoolId: string;
-  schoolSlug: string | null;
-  schoolName: string | null;
-  active: boolean;
-  createdAt: string;
-};
 
 function nameToSlug(name: string): string {
   return name
@@ -129,116 +95,45 @@ export default function TeacherPageClient({
   teacherSlug,
   schoolSlug,
 }: TeacherPageClientProps) {
-  const [teacher, setTeacher] = useState<UserWithRolesAndSchools | null>(null);
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [teacherClasses, setTeacherClasses] = useState<TeacherClass[]>([]);
-  const [loading, setLoading] = useState(!!schoolSlug && !!teacherSlug);
-
   // Resolve school from URL slug - don't rely on store timing
   const { data: school, isLoading: schoolLoading } = useSchoolBySlugQuery(
     schoolSlug || null,
     { enabled: !!schoolSlug }
   );
   const schoolId = school?.id;
+  const usersQuery = useUsersBySchool(schoolId, 100);
+  const users = usersQuery.data ?? [];
 
-  useEffect(() => {
-    if (!schoolId || !teacherSlug) return;
+  const teacher = useMemo(() => {
+    const normalizedSlug = teacherSlug.toLowerCase().trim();
+    return (
+      users.find((user) => {
+        const firstName = user.firstName || "";
+        const lastName = user.lastName || "";
+        const fullName = `${firstName} ${lastName}`.trim();
+        return nameToSlug(fullName) === normalizedSlug;
+      }) ?? null
+    );
+  }, [teacherSlug, users]);
 
-    const controller = new AbortController();
+  const positionsQuery = useUserPositions(teacher?.id ?? null);
+  const teacherPositions = useMemo(() => {
+    if (!schoolId) return [];
+    return (positionsQuery.data ?? [])
+      .filter((position) => position.schoolId === schoolId)
+      .map((position) => position.position.trim())
+      .filter((position) => position.length > 0);
+  }, [positionsQuery.data, schoolId]);
 
-    async function fetchTeacherData() {
-      try {
-        setLoading(true);
-        setTeacher(null);
-        setLessons([]);
-        setTeacherClasses([]);
+  const classesQuery = useUserClasses(teacher?.id ?? null, schoolId ?? null);
+  const teacherClasses = classesQuery.data ?? [];
 
-        const usersResult = await meApi.get.listAllUsers({
-          schoolId: schoolId,
-          limit: 100,
-        });
-
-        if (controller.signal.aborted) return;
-        if (usersResult.error || !usersResult.data) {
-          console.error("Failed to fetch users:", usersResult.error);
-          setLoading(false);
-          return;
-        }
-
-        const normalizedSlug = teacherSlug.toLowerCase().trim();
-
-        // Match by slug: "jourdain-girton" must match user with name "Jourdain Girton"
-        const foundTeacher = usersResult.data.users.find((user) => {
-          const firstName = user.firstName || "";
-          const lastName = user.lastName || "";
-          const fullName = `${firstName} ${lastName}`.trim();
-          const userSlug = nameToSlug(fullName);
-          return userSlug === normalizedSlug;
-        });
-
-        if (controller.signal.aborted) return;
-        if (!foundTeacher) {
-          setLoading(false);
-          return;
-        }
-
-        setTeacher(foundTeacher);
-
-        // Fetch classes at this school
-        const classesResult = await apiFetch<TeacherClass[]>(
-          `/users/${foundTeacher.id}/classes?schoolId=${schoolId}`
-        );
-        if (!controller.signal.aborted && !classesResult.error && classesResult.data) {
-          setTeacherClasses(classesResult.data);
-        }
-
-        const lessonsResult = await lessonsApi.get.list({
-          teacherId: foundTeacher.id,
-          schoolId: schoolId,
-          limit: 50,
-        });
-
-        if (controller.signal.aborted) return;
-        if (!lessonsResult.error && lessonsResult.data) {
-          const lessonsWithDetails = await Promise.all(
-            lessonsResult.data.map(async (lesson) => {
-              const lessonDetailResult = await lessonsApi.get.byId(lesson.id);
-              if (controller.signal.aborted) return lesson;
-              if (!lessonDetailResult.error && lessonDetailResult.data) {
-                const detail = lessonDetailResult.data;
-                return {
-                  ...lesson,
-                  topic: detail.topic,
-                  assignedClasses: detail.assignedClasses || [],
-                  teacher: detail.teacher ?? {
-                    id: foundTeacher.id,
-                    firstName: foundTeacher.firstName,
-                    lastName: foundTeacher.lastName,
-                    email: foundTeacher.email,
-                  },
-                };
-              }
-              return lesson;
-            })
-          );
-          if (!controller.signal.aborted) {
-            setLessons(lessonsWithDetails);
-          }
-        }
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error("Failed to fetch teacher data:", error);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchTeacherData();
-    return () => controller.abort();
-  }, [schoolId, teacherSlug]);
+  const lessonsQuery = useLessonsByTeacherAtSchool(
+    teacher?.id ?? null,
+    schoolId ?? null,
+    10
+  );
+  const lessons: Lesson[] = lessonsQuery.data ?? [];
 
   // Call hooks unconditionally (before any early returns) to satisfy Rules of Hooks
   const schoolBanner = useStorageImageUrl(school?.bannerUrl ?? null);
@@ -276,9 +171,12 @@ export default function TeacherPageClient({
 
   const isReady = !!schoolSlug && !!teacherSlug;
   const isWaitingForSchool = isReady && schoolLoading;
-  const isFetchingTeacher = isReady && loading;
+  const isLoadingUsers = isReady && !!schoolId && usersQuery.isLoading;
+  const isLoadingTeacherData =
+    !!teacher &&
+    (positionsQuery.isLoading || classesQuery.isLoading || lessonsQuery.isLoading);
 
-  if (!isReady || isWaitingForSchool || isFetchingTeacher) {
+  if (!isReady || isWaitingForSchool || isLoadingUsers || isLoadingTeacherData) {
     return <TeacherPageSkeleton schoolSlug={schoolSlug} />;
   }
 
@@ -310,7 +208,30 @@ export default function TeacherPageClient({
     avatar: "600ms",
     name: "700ms",
     roles: "850ms",
+    classesPanelMs: 1025,
   } as const;
+
+  const CLASSES_STAGGER = {
+    startAfterPanelMs: 220,
+    incrementDelaySec: 0.14,
+    settleMs: 260,
+  } as const;
+
+  const classesPanelDelay = `${TEACHER_BANNER_ANIMATION_DELAYS.classesPanelMs}ms`;
+  const classRowsBaseDelaySec =
+    (TEACHER_BANNER_ANIMATION_DELAYS.classesPanelMs +
+      CLASSES_STAGGER.startAfterPanelMs) /
+    1000;
+  const lessonsPanelDelayMs =
+    TEACHER_BANNER_ANIMATION_DELAYS.classesPanelMs +
+    (teacherClasses.length > 0
+      ? Math.round(
+          (CLASSES_STAGGER.startAfterPanelMs +
+            teacherClasses.length * CLASSES_STAGGER.incrementDelaySec * 1000) +
+            CLASSES_STAGGER.settleMs
+        )
+      : 240);
+  const lessonsPanelDelay = `${lessonsPanelDelayMs}ms`;
 
   return (
     <div className="space-y-6">
@@ -329,16 +250,12 @@ export default function TeacherPageClient({
 
       {/* Profile Banner - same treatment as school home header */}
       {!imagesReady ? (
-        <div className="relative rounded-lg overflow-hidden h-[280px] bg-muted">
-          <div
-            className="absolute inset-0 bg-gradient-to-t from-[var(--brand-bullyproof-primary)] via-[var(--brand-bullyproof-primary)]/50 to-transparent opacity-60"
-            aria-hidden
-          />
+        <div className="relative rounded-lg overflow-hidden h-[280px] border-2 border-dashed border-border/25 opacity-35">
           <div className="relative h-full flex items-end gap-6 pt-8 px-8 pb-4">
-            <Skeleton className="h-24 w-24 rounded-lg flex-shrink-0" />
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-6 w-32" />
-              <Skeleton className="h-10 w-56" />
+            <div className="h-[106px] w-[106px] rounded-lg border-2 border-dashed border-border/30 flex-shrink-0" />
+            <div className="flex flex-col gap-3 pb-2">
+              <div className="h-7 w-48 rounded-sm border-2 border-dashed border-border/30" />
+              <div className="h-4 w-36 rounded-sm border-2 border-dashed border-border/30" />
             </div>
           </div>
         </div>
@@ -387,10 +304,10 @@ export default function TeacherPageClient({
                   alt={school?.name ?? "School"}
                   width={600}
                   height={600}
-                  className="w-auto h-24 rounded-lg object-cover"
+                  className="w-auto h-[106px] rounded-lg object-cover"
                 />
               ) : (
-                <div className="h-24 w-24 rounded-lg bg-white/20 flex items-center justify-center overflow-hidden">
+                <div className="h-[106px] w-[106px] rounded-lg bg-white/20 flex items-center justify-center overflow-hidden">
                   <Image
                     src="/images/bp-small-logo.svg"
                     alt=""
@@ -409,12 +326,43 @@ export default function TeacherPageClient({
                   animationFillMode: "forwards",
                 }}
               >
-                {firstName ? (
-                  <div className="text-xl font-medium text-white/90">{firstName}</div>
+                {firstName || lastName ? (
+                  <div
+                    className="flex items-baseline gap-1.5 flex-wrap min-w-0"
+                    style={{ textShadow: "0 2px 8px rgba(0, 0, 0, 0.45)" }}
+                  >
+                    <span className="text-3xl font-normal text-white/90">
+                      {firstName || "—"}
+                    </span>
+                    <span className="text-3xl font-black text-white">
+                      {lastName || "—"}
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className="text-3xl font-semibold text-white"
+                    style={{ textShadow: "0 2px 8px rgba(0, 0, 0, 0.45)" }}
+                  >
+                    {fullName || teacher.email}
+                  </div>
+                )}
+                {teacherPositions.length > 0 ? (
+                  <div
+                    className="text-base font-light text-white/85 mt-1 flex items-center gap-2 flex-wrap capitalize"
+                    style={{ textShadow: "0 1px 6px rgba(0, 0, 0, 0.4)" }}
+                  >
+                    {teacherPositions.map((position, index) => (
+                      <span key={`${position}-${index}`} className="inline-flex items-center gap-2">
+                        {index > 0 ? (
+                          <span aria-hidden className="opacity-50">
+                            •
+                          </span>
+                        ) : null}
+                        <span>{position}</span>
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
-                <div className="text-4xl font-bold text-white">
-                  {lastName || fullName || teacher.email}
-                </div>
               </div>
               <div
                 className="flex items-center gap-3 flex-wrap opacity-0 animate-slide-left-fade-in"
@@ -455,48 +403,64 @@ export default function TeacherPageClient({
 
       <div className="grid gap-6 lg:grid-cols-4">
         {/* Classes assigned at this school */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <GraduationCap className="h-5 w-5" />
+        <div
+          className="lg:col-span-1 opacity-0 animate-slide-up-fade-in"
+          style={{
+            animationDelay: classesPanelDelay,
+            animationFillMode: "forwards",
+          }}
+        >
+          <div className="mb-4 ml-1">
+            <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <GraduationCap className="h-4 w-4" />
               Classes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {teacherClasses.length === 0 ? (
-              <div className="text-center py-6">
-                <p className="text-sm text-muted-foreground">
-                  No classes assigned at this school.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3 max-h-[400px] overflow-auto">
-                {teacherClasses.map((c) => (
-                  <Link
+            </h3>
+          </div>
+          {teacherClasses.length === 0 ? (
+            <div className="h-[400px] rounded-md border-2 border-dashed border-border/35 bg-muted/40 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground text-center px-6">
+                No classes assigned at this school.
+              </p>
+            </div>
+          ) : (
+            <ScrollArea className="max-h-[400px] pr-2">
+              <div className="flex flex-col gap-3">
+                {teacherClasses.map((c, index) => (
+                  <StaggeredAnimation
                     key={c.classId}
-                    href={`/schools/${schoolSlug}/classes`}
-                    className="block"
+                    index={index}
+                    baseDelay={classRowsBaseDelaySec}
+                    incrementDelay={CLASSES_STAGGER.incrementDelaySec}
+                    fadeDirection="left"
                   >
-                    <Card className="py-2.5 px-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 shrink-0 fill-amber-500 text-amber-500" />
-                        <span className="text-sm">{c.className}</span>
+                    <Link href={`/schools/${schoolSlug}/classes`} className="block">
+                      <div className="w-full rounded-md border bg-background/70 py-2.5 px-4 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-2">
+                          <Star className="h-4 w-4 shrink-0 fill-amber-500 text-amber-500" />
+                          <span className="text-sm">{c.className}</span>
+                        </div>
                       </div>
-                    </Card>
-                  </Link>
+                    </Link>
+                  </StaggeredAnimation>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </ScrollArea>
+          )}
+        </div>
 
         {/* Lessons carousel - lessons this teacher owns */}
-        <Card className="lg:col-span-3">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <BookOpen className="h-5 w-5" />
+        <div
+          className="lg:col-span-3 opacity-0 animate-slide-up-fade-in"
+          style={{
+            animationDelay: lessonsPanelDelay,
+            animationFillMode: "forwards",
+          }}
+        >
+          <div className="mb-4 flex flex-row items-center justify-between ml-1">
+            <h3 className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+              <BookOpen className="h-4 w-4" />
               Lessons
-            </CardTitle>
+            </h3>
             {lessons.length > 0 ? (
               <Link
                 href={`/schools/${schoolSlug}/lessons`}
@@ -505,42 +469,40 @@ export default function TeacherPageClient({
                 View all
               </Link>
             ) : null}
-          </CardHeader>
-          <CardContent>
-            {lessons.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-muted-foreground">
-                  No lessons for this teacher at this school.
-                </p>
-              </div>
-            ) : (
-              <Carousel
-                opts={{
-                  align: "start",
-                  loop: false,
-                }}
-                className="w-full"
-              >
-                <CarouselContent className="-ml-2">
-                  {lessons.map((lesson) => (
-                    <CarouselItem
-                      key={lesson.id}
-                      className="pl-2 basis-[min(300px,90vw)] md:basis-[320px]"
-                    >
-                      <LessonCard
-                        lesson={lesson}
-                        schoolSlug={schoolSlug}
-                        displayOnly={false}
-                      />
-                    </CarouselItem>
-                  ))}
-                </CarouselContent>
-                <CarouselPrevious className="-left-4" />
-                <CarouselNext className="-right-4" />
-              </Carousel>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+          {lessons.length === 0 ? (
+            <div className="h-[340px] rounded-md border-2 border-dashed border-border/35 bg-muted/40 flex items-center justify-center">
+              <p className="text-sm text-muted-foreground text-center px-6">
+                No lessons for this teacher at this school.
+              </p>
+            </div>
+          ) : (
+            <Carousel
+              opts={{
+                align: "start",
+                loop: false,
+              }}
+              className="w-full pb-12"
+            >
+              <CarouselContent className="-ml-2">
+                {lessons.map((lesson) => (
+                  <CarouselItem
+                    key={lesson.id}
+                    className="pl-2 basis-[min(300px,90vw)] md:basis-[320px]"
+                  >
+                    <LessonCard
+                      lesson={lesson}
+                      schoolSlug={schoolSlug}
+                      displayOnly={false}
+                    />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="left-1/2 top-auto bottom-0 -translate-y-0 -translate-x-[calc(100%+0.375rem)] z-10" />
+              <CarouselNext className="left-1/2 right-auto top-auto bottom-0 -translate-y-0 translate-x-[0.375rem] z-10" />
+            </Carousel>
+          )}
+        </div>
       </div>
     </div>
   );
