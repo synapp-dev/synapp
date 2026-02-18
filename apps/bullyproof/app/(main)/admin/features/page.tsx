@@ -26,6 +26,7 @@ import {
   Loader2,
   AlertCircle,
   ChevronRight,
+  Layers,
 } from "lucide-react";
 import { Label } from "@workspace/ui/components/label";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -198,6 +199,26 @@ function AdminFeaturesDashboardContent() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Permission Templates shortcut */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold">Quick Actions</h2>
+        <button
+          onClick={() => router.push("/admin/features/permission-templates")}
+          className="group border rounded-lg p-5 text-left w-full max-w-md hover:border-primary/50 hover:bg-accent/50 transition-colors flex items-center gap-3"
+        >
+          <div className="p-2 rounded-lg bg-primary/10 text-primary">
+            <Layers className="h-5 w-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold">Permission Templates</h3>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              One-click unlock or lock permission bundles for schools
+            </p>
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+        </button>
       </div>
 
       {/* Section cards grouped by category */}

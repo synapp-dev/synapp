@@ -1482,6 +1482,41 @@ export const courseRatings = pgTable("course_ratings", {
 	check("course_ratings_rating_check", sql`(rating >= 1) AND (rating <= 5)`),
 ]);
 
+export const permissionTemplates = pgTable("permission_templates", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	name: text().notNull(),
+	description: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+}, (table) => [
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [userProfile.id],
+			name: "permission_templates_created_by_fkey"
+		}).onDelete("set null"),
+]);
+
+export const permissionTemplateRules = pgTable("permission_template_rules", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	templateId: uuid("template_id").notNull(),
+	featureKey: text("feature_key").notNull(),
+	level: text().notNull(),
+	roleKey: text("role_key"),
+	enabled: boolean().default(true).notNull(),
+	visible: boolean(),
+}, (table) => [
+	index("idx_permission_template_rules_template_id").using("btree", table.templateId.asc().nullsLast().op("uuid_ops")),
+	uniqueIndex("uq_permission_template_rules").using("btree", sql`template_id`, sql`feature_key`, sql`level`, sql`COALESCE(role_key, ''::text)`),
+	foreignKey({
+			columns: [table.templateId],
+			foreignColumns: [permissionTemplates.id],
+			name: "permission_template_rules_template_id_fkey"
+		}).onDelete("cascade"),
+	check("permission_template_rules_level_check", sql`level = ANY (ARRAY['school'::text, 'school_role'::text])`),
+	check("permission_template_rules_role_key_check", sql`((level = 'school_role'::text) AND (role_key IS NOT NULL)) OR ((level = 'school'::text) AND (role_key IS NULL))`),
+]);
+
 export const flowStateInAuth = auth.table("flow_state", {
 	id: uuid().notNull(),
 	userId: uuid("user_id"),
