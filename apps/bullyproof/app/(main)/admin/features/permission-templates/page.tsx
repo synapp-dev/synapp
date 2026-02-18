@@ -286,7 +286,7 @@ function ApplyRevokeDialog({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const { data: schools = [], isLoading } = useListSchoolsQuery(
-    { limit: 200 },
+    { limit: 100 },
     { enabled: true }
   );
 
@@ -316,6 +316,7 @@ function ApplyRevokeDialog({
   const ruleSummary = (() => {
     const byRole = new Map<string, string[]>();
     for (const r of template.rules ?? []) {
+      if (!r.enabled) continue;
       if (r.level === "school_role" && r.roleKey) {
         const arr = byRole.get(r.roleKey) ?? [];
         if (!arr.includes(r.featureKey)) arr.push(r.featureKey);
@@ -327,13 +328,31 @@ function ApplyRevokeDialog({
       }
     }
     return Array.from(byRole.entries())
-      .map(([role, keys]) => `${role}: ${keys.length} feature(s)`)
+      .map(([role, keys]) => `${role}: ${keys.length} enabled feature(s)`)
       .join("; ");
+  })();
+
+  const permissionMatrixRows = (() => {
+    const rows = new Map<string, Set<string>>();
+    for (const rule of template.rules ?? []) {
+      if (!rule.enabled) continue;
+      const roleLabel =
+        rule.level === "school_role" && rule.roleKey ? rule.roleKey : "SCHOOL";
+      const existing = rows.get(rule.featureKey) ?? new Set<string>();
+      existing.add(roleLabel);
+      rows.set(rule.featureKey, existing);
+    }
+    return Array.from(rows.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([featureKey, roles]) => ({
+        featureKey,
+        roles: Array.from(roles).sort((a, b) => a.localeCompare(b)),
+      }));
   })();
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-5xl">
         <DialogHeader>
           <DialogTitle>
             {action === "apply" ? "Unlock" : "Lock"} &quot;{template.name}&quot;
@@ -350,33 +369,60 @@ function ApplyRevokeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2 max-h-64 overflow-y-auto border rounded-md p-3">
-          <div className="flex gap-2 mb-2">
-            <Button type="button" variant="outline" size="sm" onClick={selectAll}>
-              Select all
-            </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
-              Clear
-            </Button>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="border rounded-md p-3 min-h-0">
+            <div className="text-sm font-medium mb-2">Permission matrix</div>
+            <div className="max-h-72 overflow-y-auto space-y-2">
+              {permissionMatrixRows.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No enabled permission rules in this template.
+                </p>
+              ) : (
+                permissionMatrixRows.map((row) => (
+                  <div
+                    key={row.featureKey}
+                    className="rounded-md border bg-muted/20 px-3 py-2"
+                  >
+                    <div className="text-sm font-medium">{row.featureKey}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {row.roles.join(", ")}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-          {isLoading ? (
-            <Skeleton className="h-24 w-full" />
-          ) : (
-            schools.map((school) => (
-              <div
-                key={school.id}
-                className="flex items-center gap-2 py-1.5 hover:bg-accent/50 rounded px-2 cursor-pointer"
-                onClick={() => toggleSchool(school.id)}
-              >
-                <Checkbox
-                  checked={selectedIds.has(school.id)}
-                  onCheckedChange={() => toggleSchool(school.id)}
-                />
-                <School className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{school.name}</span>
-              </div>
-            ))
-          )}
+
+          <div className="space-y-2 border rounded-md p-3 min-h-0">
+            <div className="flex gap-2 mb-2">
+              <Button type="button" variant="outline" size="sm" onClick={selectAll}>
+                Select all
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
+                Clear
+              </Button>
+            </div>
+            <div className="max-h-72 overflow-y-auto">
+              {isLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                schools.map((school) => (
+                  <div
+                    key={school.id}
+                    className="flex items-center gap-2 py-1.5 hover:bg-accent/50 rounded px-2 cursor-pointer"
+                    onClick={() => toggleSchool(school.id)}
+                  >
+                    <Checkbox
+                      checked={selectedIds.has(school.id)}
+                      onCheckedChange={() => toggleSchool(school.id)}
+                    />
+                    <School className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{school.name}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
 
         <DialogFooter>

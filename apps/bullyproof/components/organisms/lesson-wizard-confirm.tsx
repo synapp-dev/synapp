@@ -130,6 +130,7 @@ export function LessonWizardConfirm({
     schoolId: schoolId ?? undefined,
     limit: 100, // API limit is 1-100
     offset: 0,
+    enabled: Boolean(isAdminRestricted && schoolId),
   });
 
   const schoolUsersExcludingSelf = useMemo(() => {

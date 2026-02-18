@@ -192,6 +192,9 @@ export const permissionTemplatesService = {
     }
 
     for (const schoolId of schoolIds) {
+      // Replace mode: wipe school-scoped permissions before applying this template.
+      await featuresRepo.clearSchoolScopedPermissions(schoolId);
+
       for (const rule of template.rules) {
         const [feature] = await permissionTemplatesRepo.getFeatureByKey(
           rule.featureKey

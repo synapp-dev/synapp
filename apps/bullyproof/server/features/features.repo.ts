@@ -284,6 +284,27 @@ export const featuresRepo = {
   },
 
   /**
+   * Remove all school-scoped permissions for a school.
+   * Clears:
+   * - school-level rows where targetId = schoolId
+   * - school_role-level rows where schoolId matches
+   */
+  clearSchoolScopedPermissions: (schoolId: string) => {
+    return db.delete(featurePermissions).where(
+      or(
+        and(
+          eq(featurePermissions.level, "school"),
+          eq(featurePermissions.targetId, schoolId)
+        ),
+        and(
+          eq(featurePermissions.level, "school_role"),
+          eq(featurePermissions.schoolId, schoolId)
+        )
+      )
+    );
+  },
+
+  /**
    * Get all permissions for a user (across all features)
    * This includes user-level, school_role-level, school-level, role-level, and global permissions
    */

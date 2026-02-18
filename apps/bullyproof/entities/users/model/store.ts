@@ -13,11 +13,13 @@ export function useUsers(filters?: {
   schoolId?: string;
   limit?: number;
   offset?: number;
+  enabled?: boolean;
 }) {
   // Extract pagination params with defaults
   const limit = filters?.limit ?? 50;
   const offset = filters?.offset ?? 0;
   const fetchAll = limit === -1;
+  const enabled = filters?.enabled ?? true;
   
   // Normalize filters for query key
   const normalizedFilters = filters
@@ -94,6 +96,7 @@ export function useUsers(filters?: {
     staleTime: normalizedFilters ? 0 : 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
     refetchOnMount: true,
+    enabled,
   });
 
   return {
