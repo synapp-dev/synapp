@@ -73,11 +73,6 @@ async function assertCanUpdateSchool(ctx: AuthContext, schoolId: string) {
   }
   const hasAdminSchools = await checkFeatureAccess(ctx.userId, "/admin/schools");
   if (hasAdminSchools) return;
-  const roles = await getUserScopedRoles(ctx.userId);
-  const isSchoolAdminAtSchool = roles.school.some(
-    (r) => r.schoolId === schoolId && r.roleKey === "SCHOOL_ADMIN"
-  );
-  if (isSchoolAdminAtSchool) return;
   throw new Error("Unauthorized to update school");
 }
 

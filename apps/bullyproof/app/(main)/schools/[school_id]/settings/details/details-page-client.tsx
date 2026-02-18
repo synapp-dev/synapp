@@ -7,6 +7,7 @@ import { useSchoolStore } from "@/stores/school-store";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import { SchoolDetailsForm, type SchoolForDetailsForm } from "@/entities/school/ui/school-details-form";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
@@ -27,6 +28,7 @@ export function DetailsPageClient({ schoolSlug }: DetailsPageClientProps) {
   const { data: school, isLoading } = useSchoolBySlugQuery(slug, {
     enabled: !!slug,
   });
+  const { hasAccess: canEditDetails } = useFeatureAccess("/admin/schools");
   const schoolId = school?.id ?? currentSchool?.id ?? null;
 
   if (isLoading || !school) {
@@ -73,13 +75,16 @@ export function DetailsPageClient({ schoolSlug }: DetailsPageClientProps) {
             <div>
               <h1 className="text-3xl font-bold">Settings - Details</h1>
               <p className="text-muted-foreground">
-                Edit your school&apos;s basic information
+                {canEditDetails
+                  ? "Edit your school's basic information"
+                  : "View your school's basic information"}
               </p>
             </div>
           </div>
 
           <SchoolDetailsForm
             school={schoolForForm}
+            readOnly={!canEditDetails}
             onSchoolUpdate={() => {
               // Refetch handled by query invalidation if needed
             }}

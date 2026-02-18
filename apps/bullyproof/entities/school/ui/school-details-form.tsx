@@ -28,8 +28,16 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
 import { cn } from "@workspace/ui/lib/utils";
-import { Image, Loader2, Pencil, Save, Check, ChevronsUpDown, AlertCircle } from "lucide-react";
+import { Image, Loader2, Pencil, Save, Check, ChevronsUpDown, AlertCircle, Mail } from "lucide-react";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { statesApi } from "@/entities/states/api/endpoints";
 import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
@@ -184,6 +192,7 @@ export function SchoolDetailsForm({ school, onSchoolUpdate, readOnly = false }: 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [emailDomain, setEmailDomain] = useState("");
@@ -397,7 +406,7 @@ export function SchoolDetailsForm({ school, onSchoolUpdate, readOnly = false }: 
   if (!school) return null;
 
   const editable = !readOnly;
-  const canEdit = editable && !readOnly;
+  const canEdit = editable;
 
   const selectedState = statesData.find((s) => s.id === stateId);
   const selectedSector = sectorsData.find((s) => s.id === sectorId);
@@ -429,51 +438,62 @@ export function SchoolDetailsForm({ school, onSchoolUpdate, readOnly = false }: 
               Created {new Date(school.createdAt).toLocaleDateString()}
             </p>
           )}
-          {canEdit && (
-            <div className="ml-auto">
-              {editing ? (
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleCancel}>
-                    Cancel
-                  </Button>
+          <div className="ml-auto">
+            {canEdit ? (
+              <>
+                {editing ? (
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={handleCancel}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={!hasChanges || saving}
+                      className={
+                        hasChanges && !saving
+                          ? "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
+                          : ""
+                      }
+                    >
+                      {saving ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                ) : (
                   <Button
+                    variant="outline"
                     size="sm"
-                    onClick={handleSave}
-                    disabled={!hasChanges || saving}
-                    className={
-                      hasChanges && !saving
-                        ? "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
-                        : ""
-                    }
+                    onClick={() => {
+                      setEditing(true);
+                      setSaveError(null);
+                    }}
                   >
-                    {saving ? (
-                      <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Save Changes
-                      </>
-                    )}
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
                   </Button>
-                </div>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEditing(true);
-                    setSaveError(null);
-                  }}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </Button>
-              )}
-            </div>
-          )}
+                )}
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRequestDialogOpen(true)}
+              >
+                <Mail className="mr-2 h-4 w-4" />
+                Request update
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -736,6 +756,27 @@ export function SchoolDetailsForm({ school, onSchoolUpdate, readOnly = false }: 
           </Alert>
         )}
       </CardContent>
+      <Dialog open={requestDialogOpen} onOpenChange={setRequestDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Request school details update</DialogTitle>
+            <DialogDescription>
+              If you&apos;d like a change made to your school&apos;s default information,
+              please email{" "}
+              <a
+                href="mailto:support@bullyproofaustralia.org.au"
+                className="underline underline-offset-2"
+              >
+                support@bullyproofaustralia.org.au
+              </a>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setRequestDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
