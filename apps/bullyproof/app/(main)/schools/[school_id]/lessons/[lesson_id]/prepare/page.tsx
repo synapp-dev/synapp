@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Calendar } from "@workspace/ui/components/calendar";
-import { Loader2, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, FileText, AlertCircle, HandMetal, ChevronsRight, TriangleAlert } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, FileText, AlertCircle, HandMetal, ChevronsRight, TriangleAlert, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { toast } from "sonner";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
@@ -140,6 +140,16 @@ export default function LessonPreparePage() {
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
   const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
   const [lessonPlansError, setLessonPlansError] = useState<string | null>(null);
+  type TopicResource = {
+    id: string;
+    displayName: string;
+    mimeType: string | null;
+    sizeBytes: number;
+    createdAt: string;
+  };
+  const [topicResources, setTopicResources] = useState<TopicResource[]>([]);
+  const [isLoadingTopicResources, setIsLoadingTopicResources] = useState(false);
+  const [topicResourcesError, setTopicResourcesError] = useState<string | null>(null);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [slides, setSlides] = useState<SlideData[]>([]);
   const galleryRef = useRef<HTMLDivElement>(null);
@@ -228,6 +238,43 @@ export default function LessonPreparePage() {
     }
   }, [lessonData?.topicId, fetchLessonPlans]);
 
+  const fetchTopicResources = useCallback(async () => {
+    if (!lessonData?.topicId || !lessonData.schoolId) return;
+    try {
+      setIsLoadingTopicResources(true);
+      setTopicResourcesError(null);
+      const headers = await getAuthHeaders();
+      const res = await fetch(
+        `/api/resources/topic-files?topicId=${encodeURIComponent(
+          lessonData.topicId
+        )}&schoolId=${encodeURIComponent(lessonData.schoolId)}`,
+        { headers }
+      );
+      const body = await res.json();
+      if (!res.ok || body?.error) {
+        throw new Error(body?.error || "Failed to load resources");
+      }
+      setTopicResources(Array.isArray(body) ? body : []);
+    } catch (err) {
+      console.error("Failed to fetch topic resources:", err);
+      setTopicResourcesError(
+        err instanceof Error ? err.message : "Failed to load resources"
+      );
+      setTopicResources([]);
+    } finally {
+      setIsLoadingTopicResources(false);
+    }
+  }, [lessonData?.schoolId, lessonData?.topicId]);
+
+  useEffect(() => {
+    if (lessonData?.topicId && lessonData.schoolId) {
+      fetchTopicResources();
+    } else {
+      setTopicResources([]);
+      setTopicResourcesError(null);
+    }
+  }, [lessonData?.schoolId, lessonData?.topicId, fetchTopicResources]);
+
   const handleLessonPlanDownload = async (planId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     try {
@@ -254,6 +301,28 @@ export default function LessonPreparePage() {
       setDownloadedPlan(true);
     } catch (err) {
       toast.error("Failed to download lesson plan", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  };
+
+  const handleTopicResourceDownload = async (
+    fileId: string,
+    e?: React.MouseEvent
+  ) => {
+    e?.stopPropagation();
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/resources/files/${fileId}/download`, {
+        headers,
+      });
+      const body = await res.json();
+      if (!res.ok || body?.error || !body?.url) {
+        throw new Error(body?.error || "Failed to fetch download URL");
+      }
+      window.open(body.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      toast.error("Failed to open resource", {
         description: err instanceof Error ? err.message : "Unknown error",
       });
     }
@@ -628,6 +697,37 @@ export default function LessonPreparePage() {
                 )}
               </div>
             </Card>
+
+            {(isLoadingTopicResources ||
+              topicResourcesError ||
+              topicResources.length > 0) && (
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Topic resources</h3>
+                    {isLoadingTopicResources ? (
+                      <p className="text-sm text-muted-foreground">Loading resources...</p>
+                    ) : topicResourcesError ? (
+                      <p className="text-sm text-destructive">{topicResourcesError}</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {topicResources.map((resource) => (
+                          <button
+                            key={resource.id}
+                            type="button"
+                            onClick={(e) => handleTopicResourceDownload(resource.id, e)}
+                            className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-blue-600 hover:bg-muted hover:underline dark:text-blue-500"
+                          >
+                            <Download className="h-4 w-4 text-muted-foreground" />
+                            <span className="truncate">{resource.displayName}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Skip button - not a step */}
