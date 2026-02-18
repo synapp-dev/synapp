@@ -56,10 +56,10 @@ const data = {
     },
     {
       title: "AP Certification",
-      url: "/courses/amayda-program",
+      url: "/courses",
       icon: BadgeCheck,
       isActive: false,
-      feature: "/courses", // Feature key for access control
+      feature: "/ap-certification", // Dedicated AP certification feature key
     },
     {
       title: "Welcome",

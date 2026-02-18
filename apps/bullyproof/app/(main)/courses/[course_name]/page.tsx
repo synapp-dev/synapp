@@ -668,7 +668,7 @@ export default function CoursePage() {
   const isAdmin = userRole === "admin" || currentUser?.platformRoles?.includes("admin");
 
   return (
-    <FeatureGuard feature="/courses">
+    <FeatureGuard feature="/ap-certification">
       <div className="h-full w-full flex flex-col gap-6 p-6">
       <div className="flex flex-col lg:flex-row gap-6 items-stretch">
         {/* Amayda Program Card - 1/3 width */}
