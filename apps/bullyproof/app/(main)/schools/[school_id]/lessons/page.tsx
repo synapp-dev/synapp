@@ -35,6 +35,7 @@ import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
 import { StartNewLessonCard } from "@/entities/lessons/ui/start-new-lesson-card";
 import { SchoolPageCompactHeader } from "@/components/molecules/school-page-compact-header";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
+import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -540,6 +541,24 @@ export default function LessonsPage({
       ? 2 - displayedMyLessons.length
       : 0;
 
+  const AnimatedLessonGridItem = ({
+    index,
+    children,
+  }: {
+    index: number;
+    children: React.ReactNode;
+  }) => {
+    if (!showContentAnimation) {
+      return <div className="opacity-0">{children}</div>;
+    }
+
+    return (
+      <StaggeredAnimation index={index} fadeDirection="left">
+        {children}
+      </StaggeredAnimation>
+    );
+  };
+
   if (!currentSchool) {
     return (
       <>
@@ -665,17 +684,25 @@ export default function LessonsPage({
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {/* Start New Lesson Card - Always First */}
-                  <StartNewLessonCard onClick={() => setIsWizardOpen(true)} />
-                  {displayedMyLessons.map((lesson) => (
-                    <LessonCard 
-                      key={lesson.id} 
-                      lesson={lesson} 
-                      schoolSlug={schoolSlug}
-                      enhancedHover
-                    />
+                  <AnimatedLessonGridItem index={0}>
+                    <StartNewLessonCard onClick={() => setIsWizardOpen(true)} />
+                  </AnimatedLessonGridItem>
+                  {displayedMyLessons.map((lesson, index) => (
+                    <AnimatedLessonGridItem key={lesson.id} index={index + 1}>
+                      <LessonCard
+                        lesson={lesson}
+                        schoolSlug={schoolSlug}
+                        enhancedHover
+                      />
+                    </AnimatedLessonGridItem>
                   ))}
                   {[...Array(myLessonsPlaceholderCount)].map((_, index) => (
-                    <EmptyLessonPlaceholderCard key={`my-lessons-placeholder-${index}`} />
+                    <AnimatedLessonGridItem
+                      key={`my-lessons-placeholder-${index}`}
+                      index={displayedMyLessons.length + index + 1}
+                    >
+                      <EmptyLessonPlaceholderCard />
+                    </AnimatedLessonGridItem>
                   ))}
                 </div>
               </div>
@@ -712,13 +739,14 @@ export default function LessonsPage({
                 </div>
                 {displayedOtherLessons.length > 0 ? (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {displayedOtherLessons.map((lesson) => (
-                      <LessonCard 
-                        key={lesson.id} 
-                        lesson={lesson} 
-                        schoolSlug={schoolSlug}
-                        enhancedHover
-                      />
+                    {displayedOtherLessons.map((lesson, index) => (
+                      <AnimatedLessonGridItem key={lesson.id} index={index}>
+                        <LessonCard
+                          lesson={lesson}
+                          schoolSlug={schoolSlug}
+                          enhancedHover
+                        />
+                      </AnimatedLessonGridItem>
                     ))}
                   </div>
                 ) : (
