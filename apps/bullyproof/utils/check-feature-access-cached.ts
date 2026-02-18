@@ -11,6 +11,19 @@ export function checkFeatureAccessAndVisibleCached(
   schoolId?: string,
   userRoleIds?: string[]
 ): { hasAccess: boolean; visible: boolean } {
+  if (featureKey === "/ap-certification") {
+    const hasApKey = Boolean(featurePermissions?.[featureKey]);
+    // If AP certification key is not present, inherit /courses in cache.
+    if (!hasApKey) {
+      return checkFeatureAccessAndVisibleCached(
+        featurePermissions,
+        "/courses",
+        schoolId,
+        userRoleIds
+      );
+    }
+  }
+
   if (!featurePermissions || !featurePermissions[featureKey]) {
     return { hasAccess: false, visible: false };
   }

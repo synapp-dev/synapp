@@ -30,6 +30,11 @@ export async function checkFeatureAccess(
 
   // If no permissions exist, feature is disabled by default
   if (permissions.length === 0) {
+    // Backward-compat: AP Certification is a sub-area under /courses.
+    // If /ap-certification has no explicit rows, inherit /courses access.
+    if (featureKey === "/ap-certification") {
+      return checkFeatureAccess(userId, "/courses", schoolId);
+    }
     return false;
   }
 

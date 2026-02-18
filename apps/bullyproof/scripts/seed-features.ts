@@ -36,6 +36,7 @@ async function seedFeatures() {
       { key: '/welcome', name: 'Welcome Page', description: 'Access to the welcome page', category: 'page', section: 'welcome' },
       { key: '/support', name: 'Support Page', description: 'Access to the support page', category: 'page', section: 'support' },
       { key: '/settings', name: 'Settings Page', description: 'Access to the settings page', category: 'page', section: 'dashboard' },
+      { key: '/courses', name: 'Courses', description: 'Access to courses and AP certification pages', category: 'page', section: 'certification' },
       { key: '/ap-certification', name: 'AP Certification', description: 'Access to AP Certification', category: 'page', section: 'certification' },
 
       // Page features – school-scoped

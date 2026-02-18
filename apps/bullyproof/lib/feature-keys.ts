@@ -29,6 +29,7 @@ export const PAGE_FEATURES = {
   WELCOME: "/welcome",
   SUPPORT: "/support",
   SETTINGS: "/settings",
+  COURSES: "/courses",
   AP_CERTIFICATION: "/ap-certification",
 
   // School-scoped pages

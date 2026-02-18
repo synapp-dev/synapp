@@ -59,7 +59,7 @@ const data = {
       url: "/courses/amayda-program",
       icon: BadgeCheck,
       isActive: false,
-      feature: "/ap-certification", // Feature key for access control
+      feature: "/courses", // Feature key for access control
     },
     {
       title: "Welcome",
