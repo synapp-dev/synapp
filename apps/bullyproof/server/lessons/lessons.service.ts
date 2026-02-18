@@ -98,26 +98,39 @@ export const lessonsService = {
     await assertCanViewLessons(ctx, params.teacherId, resolvedSchoolId);
 
     if (params.teacherId) {
-      return await lessonsRepo.getByTeacherId(params.teacherId, params.status);
+      return await lessonsRepo.getByTeacherId(params.teacherId, params.status, {
+        schoolId: resolvedSchoolId,
+        limit: params.limit,
+        offset: params.offset,
+      });
     }
 
     if (params.classId) {
-      return await lessonsRepo.getByClassId(params.classId, params.status);
+      return await lessonsRepo.getByClassId(params.classId, params.status, {
+        limit: params.limit,
+        offset: params.offset,
+      });
     }
 
     if (resolvedSchoolId) {
-      return await lessonsRepo.getBySchoolId(resolvedSchoolId, params.status);
+      return await lessonsRepo.getBySchoolId(resolvedSchoolId, params.status, {
+        limit: params.limit,
+        offset: params.offset,
+      });
     }
 
     if (ctx.userId) {
       const hasAdminLessons = await checkFeatureAccess(ctx.userId, "/admin/lessons");
       if (hasAdminLessons) {
-        return await lessonsRepo.getAll(params.status);
+        return await lessonsRepo.getAll(params.status, params.limit, params.offset);
       }
-      return await lessonsRepo.getByTeacherId(ctx.userId, params.status);
+      return await lessonsRepo.getByTeacherId(ctx.userId, params.status, {
+        limit: params.limit,
+        offset: params.offset,
+      });
     }
 
-    return await lessonsRepo.getAll(params.status);
+    return await lessonsRepo.getAll(params.status, params.limit, params.offset);
   },
 
   async getOutstandingFeedbackLessons(ctx: AuthContext) {

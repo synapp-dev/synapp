@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -14,8 +14,8 @@ import {
 import { LessonWizard } from "@/components/organisms/lesson-wizard";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSchoolStore } from "@/stores/school-store";
-import { useLessons } from "@/entities/lessons/model/store";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
+import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { Eye, EyeOff, Search } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
@@ -62,6 +62,7 @@ export default function LessonsPage({
 }: {
   params: Promise<{ school_id: string }>;
 }) {
+  const ALL_LESSONS_PAGE_SIZE = 10;
   const [schoolId, setSchoolId] = useState<string>("");
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export default function LessonsPage({
   const [showCompletedMyLessons, setShowCompletedMyLessons] = useState(false);
   const [showCompletedOtherLessons, setShowCompletedOtherLessons] = useState(false);
   const [showContentAnimation, setShowContentAnimation] = useState(false);
+  const loadMoreOtherLessonsRef = useRef<HTMLDivElement | null>(null);
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -146,28 +148,254 @@ export default function LessonsPage({
     }
   };
 
-  // Use React Query hook for lessons - fetch "my lessons" separately when filter is "my-lessons"
-  // When filter is "my-lessons", don't pass schoolId so API automatically filters by user token
-  const {
-    lessons,
-    isLoading: loading,
-    isError,
-    error: queryError,
-  } = useLessons({
-    schoolId: filter === "my-lessons" ? undefined : currentSchool?.id,
-    limit: 100,
+  const fetchLessonsPage = async (
+    pageParam: number,
+    params: {
+      schoolId?: string;
+      teacherId?: string;
+      status?: string;
+    }
+  ) => {
+    const result = await lessonsApi.get.list({
+      ...params,
+      limit: ALL_LESSONS_PAGE_SIZE,
+      offset: pageParam,
+    });
+    if (result.error) {
+      throw new Error(result.error.message || "Failed to fetch lessons");
+    }
+    return result.data ?? [];
+  };
+
+  // Fetch My Lessons separately (active + completed), then choose mode in UI.
+  const myActiveLessonsQuery = useInfiniteQuery({
+    queryKey: ["lessons", "my", "active", currentSchool?.id, currentUser?.id],
+    enabled: !!currentSchool?.id && !!currentUser?.id,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchLessonsPage(pageParam, {
+        schoolId: currentSchool?.id,
+        teacherId: currentUser?.id,
+        status: "active",
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < ALL_LESSONS_PAGE_SIZE
+        ? undefined
+        : allPages.length * ALL_LESSONS_PAGE_SIZE,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 
+  const myCompletedLessonsQuery = useInfiniteQuery({
+    queryKey: ["lessons", "my", "completed", currentSchool?.id, currentUser?.id],
+    enabled: !!currentSchool?.id && !!currentUser?.id,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchLessonsPage(pageParam, {
+        schoolId: currentSchool?.id,
+        teacherId: currentUser?.id,
+        status: "completed",
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < ALL_LESSONS_PAGE_SIZE
+        ? undefined
+        : allPages.length * ALL_LESSONS_PAGE_SIZE,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  // Fetch Other Lessons as two separate streams (active + completed).
+  const otherActiveLessonsQuery = useInfiniteQuery({
+    queryKey: ["lessons", "other", "active", currentSchool?.id, currentUser?.id],
+    enabled: filter === "all" && !!currentSchool?.id,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchLessonsPage(pageParam, {
+        schoolId: currentSchool?.id,
+        status: "active",
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < ALL_LESSONS_PAGE_SIZE
+        ? undefined
+        : allPages.length * ALL_LESSONS_PAGE_SIZE,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  const otherCompletedLessonsQuery = useInfiniteQuery({
+    queryKey: ["lessons", "other", "completed", currentSchool?.id, currentUser?.id],
+    enabled: filter === "all" && !!currentSchool?.id,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
+      fetchLessonsPage(pageParam, {
+        schoolId: currentSchool?.id,
+        status: "completed",
+      }),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length < ALL_LESSONS_PAGE_SIZE
+        ? undefined
+        : allPages.length * ALL_LESSONS_PAGE_SIZE,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+  });
+
+  // Fully drain paged results for My Lessons so all active lessons are displayed.
+  useEffect(() => {
+    if (!myActiveLessonsQuery.hasNextPage || myActiveLessonsQuery.isFetchingNextPage) return;
+    void myActiveLessonsQuery.fetchNextPage();
+  }, [myActiveLessonsQuery.hasNextPage, myActiveLessonsQuery.isFetchingNextPage, myActiveLessonsQuery.fetchNextPage]);
+
+  useEffect(() => {
+    if (!myCompletedLessonsQuery.hasNextPage || myCompletedLessonsQuery.isFetchingNextPage) return;
+    void myCompletedLessonsQuery.fetchNextPage();
+  }, [myCompletedLessonsQuery.hasNextPage, myCompletedLessonsQuery.isFetchingNextPage, myCompletedLessonsQuery.fetchNextPage]);
+
+  const hasMoreOtherLessons =
+    filter === "all" &&
+    (!!otherActiveLessonsQuery.hasNextPage || !!otherCompletedLessonsQuery.hasNextPage);
+
+  // Infinite scroll for Other Lessons: fetch next pages only at bottom.
+  useEffect(() => {
+    if (
+      filter !== "all" ||
+      !hasMoreOtherLessons ||
+      !loadMoreOtherLessonsRef.current
+    ) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (!first?.isIntersecting) return;
+
+        if (
+          otherActiveLessonsQuery.hasNextPage &&
+          !otherActiveLessonsQuery.isFetchingNextPage
+        ) {
+          void otherActiveLessonsQuery.fetchNextPage();
+        }
+
+        if (
+          otherCompletedLessonsQuery.hasNextPage &&
+          !otherCompletedLessonsQuery.isFetchingNextPage
+        ) {
+          void otherCompletedLessonsQuery.fetchNextPage();
+        }
+      },
+      { rootMargin: "200px 0px" }
+    );
+
+    observer.observe(loadMoreOtherLessonsRef.current);
+    return () => observer.disconnect();
+  }, [
+    filter,
+    hasMoreOtherLessons,
+    otherActiveLessonsQuery,
+    otherCompletedLessonsQuery,
+  ]);
+
+  const myActiveLessonsRaw = useMemo(
+    () => myActiveLessonsQuery.data?.pages.flat() ?? [],
+    [myActiveLessonsQuery.data]
+  );
+  const myCompletedLessonsRaw = useMemo(
+    () => myCompletedLessonsQuery.data?.pages.flat() ?? [],
+    [myCompletedLessonsQuery.data]
+  );
+  const otherActiveLessonsRaw = useMemo(
+    () => (otherActiveLessonsQuery.data?.pages.flat() ?? []).filter((lesson) => lesson.createdByUserId !== currentUser?.id),
+    [otherActiveLessonsQuery.data, currentUser?.id]
+  );
+  const otherCompletedLessonsRaw = useMemo(
+    () => (otherCompletedLessonsQuery.data?.pages.flat() ?? []).filter((lesson) => lesson.createdByUserId !== currentUser?.id),
+    [otherCompletedLessonsQuery.data, currentUser?.id]
+  );
+
+  const allRawLessonsForDetails = useMemo(() => {
+    const all = [
+      ...myActiveLessonsRaw,
+      ...myCompletedLessonsRaw,
+      ...otherActiveLessonsRaw,
+      ...otherCompletedLessonsRaw,
+    ];
+    const deduped = new Map<string, Lesson>();
+    all.forEach((lesson) => {
+      if (!deduped.has(lesson.id)) deduped.set(lesson.id, lesson as Lesson);
+    });
+    return Array.from(deduped.values());
+  }, [
+    myActiveLessonsRaw,
+    myCompletedLessonsRaw,
+    otherActiveLessonsRaw,
+    otherCompletedLessonsRaw,
+  ]);
+
+  const lessonDetailQueries = useQueries({
+    queries: allRawLessonsForDetails.map((lesson) => ({
+      queryKey: lessonsKeys.detail(lesson.id),
+      queryFn: async () => {
+        const result = await lessonsApi.get.byId(lesson.id);
+        if (result.error) {
+          throw new Error(result.error.message || "Failed to fetch lesson details");
+        }
+        return result.data ?? null;
+      },
+      staleTime: 2 * 60 * 1000,
+      gcTime: 5 * 60 * 1000,
+      initialData: () => queryClient.getQueryData<Lesson | null>(lessonsKeys.detail(lesson.id)),
+    })),
+  });
+
+  const lessonDetailsById = useMemo(() => {
+    const map = new Map<string, Lesson>();
+    lessonDetailQueries.forEach((query) => {
+      if (query.data?.id) map.set(query.data.id, query.data as Lesson);
+    });
+    return map;
+  }, [lessonDetailQueries]);
+
+  const hydrateLessons = useMemo(
+    () => (input: Lesson[]) =>
+      input
+        .map((lesson) => {
+          const cached = queryClient.getQueryData<Lesson | null>(lessonsKeys.detail(lesson.id));
+          if (cached) return { ...lesson, ...cached } as Lesson;
+          const detailed = lessonDetailsById.get(lesson.id);
+          return detailed ? ({ ...lesson, ...detailed } as Lesson) : lesson;
+        })
+        .sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ),
+    [lessonDetailsById, queryClient]
+  );
+
+  const myActiveLessons = useMemo(() => hydrateLessons(myActiveLessonsRaw as Lesson[]), [hydrateLessons, myActiveLessonsRaw]);
+  const myCompletedLessons = useMemo(() => hydrateLessons(myCompletedLessonsRaw as Lesson[]), [hydrateLessons, myCompletedLessonsRaw]);
+  const otherActiveLessons = useMemo(() => hydrateLessons(otherActiveLessonsRaw as Lesson[]), [hydrateLessons, otherActiveLessonsRaw]);
+  const otherCompletedLessons = useMemo(() => hydrateLessons(otherCompletedLessonsRaw as Lesson[]), [hydrateLessons, otherCompletedLessonsRaw]);
+
+  const queryErrors = [
+    myActiveLessonsQuery.error,
+    myCompletedLessonsQuery.error,
+    otherActiveLessonsQuery.error,
+    otherCompletedLessonsQuery.error,
+    lessonDetailQueries.find((q) => q.error)?.error,
+  ].filter(Boolean);
+
+  const loading = [
+    myActiveLessonsQuery.isLoading,
+    myCompletedLessonsQuery.isLoading,
+    filter === "all" ? otherActiveLessonsQuery.isLoading : false,
+    filter === "all" ? otherCompletedLessonsQuery.isLoading : false,
+  ].some(Boolean);
+
+  const isError = queryErrors.length > 0;
   const error = isError
-    ? queryError instanceof Error
-      ? queryError.message
+    ? queryErrors[0] instanceof Error
+      ? (queryErrors[0] as Error).message
       : "Failed to load lessons"
     : null;
-
-  const nonCancelledLessons = useMemo(
-    () => lessons.filter((l) => l.status !== "cancelled"),
-    [lessons]
-  );
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -206,42 +434,17 @@ export default function LessonsPage({
     return "Unknown Teacher";
   };
 
-  // Separate lessons into categories
-  // When filter is "my-lessons", lessons already contains only user's lessons (from API)
-  // When filter is "all", we need to separate them into my lessons and other lessons
-  const { myLessons, otherLessons } = useMemo(() => {
-    if (filter === "my-lessons") {
-      // API already filtered by user, so all lessons are "my lessons"
-      return { myLessons: nonCancelledLessons, otherLessons: [] };
-    }
+  const myLessons = useMemo(
+    () => (showCompletedMyLessons ? myCompletedLessons : myActiveLessons),
+    [showCompletedMyLessons, myCompletedLessons, myActiveLessons]
+  );
 
-    const myLessonsList: Lesson[] = [];
-    const otherLessonsList: Lesson[] = [];
+  const otherLessons = useMemo(
+    () => (showCompletedOtherLessons ? otherCompletedLessons : otherActiveLessons),
+    [showCompletedOtherLessons, otherCompletedLessons, otherActiveLessons]
+  );
 
-    nonCancelledLessons.forEach((lesson) => {
-      if (currentUser?.id && lesson.createdByUserId === currentUser.id) {
-        myLessonsList.push(lesson);
-      } else {
-        otherLessonsList.push(lesson);
-      }
-    });
-
-    return { myLessons: myLessonsList, otherLessons: otherLessonsList };
-  }, [nonCancelledLessons, currentUser?.id, filter]);
-
-  // Filter lessons based on search query and filter dropdown
-  const filteredLessons = useMemo(() => {
-    let lessonsToFilter: Lesson[] = [];
-
-    // Apply filter dropdown
-    if (filter === "my-lessons") {
-      lessonsToFilter = myLessons;
-    } else {
-      // "all" - show all lessons
-      lessonsToFilter = nonCancelledLessons;
-    }
-
-    // Apply search query
+  const filterLessonListBySearch = (lessonsToFilter: Lesson[]) => {
     if (!searchQuery.trim()) return lessonsToFilter;
 
     return lessonsToFilter.filter((lesson) => {
@@ -258,44 +461,38 @@ export default function LessonsPage({
         fuzzySearch(searchQuery, classNames)
       );
     });
-  }, [nonCancelledLessons, myLessons, otherLessons, filter, searchQuery]);
+  };
 
-  // Separate filtered lessons back into categories for display
-  const { filteredMyLessons, filteredOtherLessons } = useMemo(() => {
-    const myLessonsList: Lesson[] = [];
-    const otherLessonsList: Lesson[] = [];
+  const filteredMyLessons = useMemo(
+    () => filterLessonListBySearch(myLessons),
+    [myLessons, searchQuery]
+  );
 
-    filteredLessons.forEach((lesson) => {
-      if (currentUser?.id && lesson.createdByUserId === currentUser.id) {
-        myLessonsList.push(lesson);
-      } else {
-        otherLessonsList.push(lesson);
-      }
-    });
+  const filteredOtherLessons = useMemo(
+    () => filterLessonListBySearch(otherLessons),
+    [otherLessons, searchQuery]
+  );
 
-    return {
-      filteredMyLessons: myLessonsList,
-      filteredOtherLessons: otherLessonsList,
-    };
-  }, [filteredLessons, currentUser?.id]);
+  const displayedMyLessons = filteredMyLessons;
+  const displayedOtherLessons = filteredOtherLessons;
 
-  // Filter out completed lessons from My Lessons unless showCompletedMyLessons is true
-  const displayedMyLessons = useMemo(() => {
-    if (showCompletedMyLessons) return filteredMyLessons;
-    return filteredMyLessons.filter((lesson) => {
-      const displayStatus = getDisplayStatus(lesson.status || "", lesson.scheduledFor);
-      return displayStatus !== "completed";
-    });
-  }, [filteredMyLessons, showCompletedMyLessons]);
+  const filteredLessons = useMemo(
+    () =>
+      [...filteredMyLessons, ...(filter === "all" ? filteredOtherLessons : [])].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [filteredMyLessons, filteredOtherLessons, filter]
+  );
 
-  // Filter out completed lessons from Other Lessons unless showCompletedOtherLessons is true
-  const displayedOtherLessons = useMemo(() => {
-    if (showCompletedOtherLessons) return filteredOtherLessons;
-    return filteredOtherLessons.filter((lesson) => {
-      const displayStatus = getDisplayStatus(lesson.status || "", lesson.scheduledFor);
-      return displayStatus !== "completed";
-    });
-  }, [filteredOtherLessons, showCompletedOtherLessons]);
+  const displayedAllLessonsCombined = useMemo(
+    () =>
+      [...displayedMyLessons, ...displayedOtherLessons].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [displayedMyLessons, displayedOtherLessons]
+  );
 
   // Lesson card skeleton component (matching new vertical layout)
   const LessonCardSkeleton = () => (
@@ -317,6 +514,31 @@ export default function LessonsPage({
       </div>
     </Card>
   );
+
+  const EmptyLessonPlaceholderCard = () => (
+    <Card className="h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none bg-transparent">
+      <CardHeader className="py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row items-center border-muted-foreground/30 border-dashed">
+        <span className="h-3 w-16 rounded-sm bg-muted-foreground/5" />
+      </CardHeader>
+      <CardContent className="p-0 flex-1 flex items-center justify-center bg-card/80 border-x border-muted-foreground/30 border-dashed">
+        <div className="w-full aspect-video rounded-t-md rounded-b-none bg-muted/10" />
+      </CardContent>
+      <CardFooter className="flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start border-muted-foreground/30 border-dashed">
+        <div className="h-1.5 w-20 rounded-sm bg-muted-foreground/5" />
+        <div className="h-5 w-40 rounded-sm bg-muted-foreground/5" />
+        <div className="flex flex-wrap gap-1 mt-1">
+          <span className="h-5 w-16 rounded-full border border-dashed border-muted-foreground/30" />
+        </div>
+      </CardFooter>
+    </Card>
+  );
+
+  const myLessonsPlaceholderCount =
+    !searchQuery.trim() &&
+    filter === "my-lessons" &&
+    displayedMyLessons.length < 2
+      ? 2 - displayedMyLessons.length
+      : 0;
 
   if (!currentSchool) {
     return (
@@ -431,7 +653,7 @@ export default function LessonsPage({
                     {showCompletedMyLessons ? (
                       <>
                         <EyeOff className="h-4 w-4" />
-                        Hide completed
+                        Show active
                       </>
                     ) : (
                       <>
@@ -449,19 +671,23 @@ export default function LessonsPage({
                       key={lesson.id} 
                       lesson={lesson} 
                       schoolSlug={schoolSlug}
+                      enhancedHover
                     />
+                  ))}
+                  {[...Array(myLessonsPlaceholderCount)].map((_, index) => (
+                    <EmptyLessonPlaceholderCard key={`my-lessons-placeholder-${index}`} />
                   ))}
                 </div>
               </div>
             )}
 
             {/* Separator between sections */}
-            {filter === "all" && filteredOtherLessons.length > 0 && (
+            {filter === "all" && displayedAllLessonsCombined.length > 0 && (
               <Separator />
             )}
 
             {/* Other Lessons Section */}
-            {filter === "all" && filteredOtherLessons.length > 0 && (
+            {filter === "all" && displayedAllLessonsCombined.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <h2 className="text-2xl font-semibold">Other Lessons</h2>
@@ -474,7 +700,7 @@ export default function LessonsPage({
                     {showCompletedOtherLessons ? (
                       <>
                         <EyeOff className="h-4 w-4" />
-                        Hide completed
+                        Show active
                       </>
                     ) : (
                       <>
@@ -491,30 +717,33 @@ export default function LessonsPage({
                         key={lesson.id} 
                         lesson={lesson} 
                         schoolSlug={schoolSlug}
+                        enhancedHover
                       />
                     ))}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    All other lessons are completed. Click "Show completed" to see them.
+                    {showCompletedOtherLessons
+                      ? 'No completed lessons found. Click "Show active" to see active lessons.'
+                      : 'No active lessons found. Click "Show completed" to see completed lessons.'}
                   </p>
                 )}
               </div>
             )}
 
-            {/* Empty State */}
-            {filteredLessons.length === 0 && (
+            {filter === "all" && hasMoreOtherLessons && (
+              <div ref={loadMoreOtherLessonsRef} className="h-1 w-full" aria-hidden="true" />
+            )}
+
+            {/* Empty State (search only) */}
+            {filteredLessons.length === 0 && searchQuery.trim() && (
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <div className="col-span-full">
                   <Card>
                     <CardContent className="pt-6">
                       <div className="text-center py-12">
                         <p className="text-muted-foreground">
-                          {searchQuery
-                            ? "No lessons found matching your search."
-                            : filter === "my-lessons"
-                              ? "You haven't created any lessons yet."
-                              : "No lessons found for this school."}
+                          No lessons found matching your search.
                         </p>
                       </div>
                     </CardContent>

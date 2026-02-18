@@ -32,7 +32,7 @@ export const listLessonsSchema = z
     teacherId: z.string().trim().min(1).max(500).optional(),
     classId: z.string().trim().min(1).max(500).optional(),
     topicId: z.string().trim().min(1).max(500).optional(),
-    status: z.enum(['preparing', 'ready', 'in_progress', 'feedback', 'completed', 'cancelled']).optional(),
+    status: z.enum(['preparing', 'ready', 'in_progress', 'feedback', 'completed', 'cancelled', 'active']).optional(),
     limit: z
       .string()
       .optional()

@@ -2,11 +2,25 @@ import { db } from "@/server/db/drizzle";
 import { lessons, topics, lessonClasses, classes, userProfile, curriculumStages, classYears, schoolYears, schools } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc, sql, or } from "drizzle-orm";
 
+function statusFilterClause(status?: string) {
+  if (!status) return undefined;
+  if (status === "active") {
+    return sql`${lessons.status} NOT IN ('cancelled', 'completed')`;
+  }
+  return eq(lessons.status, status as any);
+}
+
 export const lessonsRepo = {
-  getAll: (status?: string) =>
-    status
-      ? db.select().from(lessons).where(eq(lessons.status, status))
-      : db.select().from(lessons),
+  getAll: (status?: string, limit = 50, offset = 0) => {
+    const statusClause = statusFilterClause(status);
+    return (statusClause
+      ? db.select().from(lessons).where(statusClause)
+      : db.select().from(lessons)
+    )
+      .orderBy(desc(lessons.createdAt))
+      .limit(limit)
+      .offset(offset);
+  },
 
   getById: (id: string) =>
     db
@@ -15,16 +29,27 @@ export const lessonsRepo = {
       .where(eq(lessons.id, id))
       .limit(1),
 
-  getByTeacherId: (teacherId: string, status?: string) =>
-    db
-      .select()
-      .from(lessons)
-      .where(
-        status
-          ? and(eq(lessons.createdByUserId, teacherId), eq(lessons.status, status))
-          : eq(lessons.createdByUserId, teacherId)
-      )
-      .orderBy(desc(lessons.createdAt)),
+  getByTeacherId: (
+    teacherId: string,
+    status?: string,
+    options?: { schoolId?: string; limit?: number; offset?: number }
+  ) =>
+    {
+      const statusClause = statusFilterClause(status);
+      return db
+        .select()
+        .from(lessons)
+        .where(
+          and(
+            eq(lessons.createdByUserId, teacherId),
+            ...(statusClause ? [statusClause] : []),
+            ...(options?.schoolId ? [eq(lessons.schoolId, options.schoolId)] : [])
+          )
+        )
+        .orderBy(desc(lessons.createdAt))
+        .limit(options?.limit ?? 50)
+        .offset(options?.offset ?? 0);
+    },
 
   /** Returns lessons with status=feedback owned by teacher, with topic, school, teacher, and assigned classes */
   getOutstandingFeedbackByTeacher: async (teacherId: string) => {
@@ -106,32 +131,52 @@ export const lessonsRepo = {
   getByTopicId: (topicId: string) =>
     db.select().from(lessons).where(eq(lessons.topicId, topicId)),
 
-  getBySchoolId: (schoolId: string, status?: string) =>
-    db
-      .select()
-      .from(lessons)
-      .where(
-        status
-          ? and(eq(lessons.schoolId, schoolId), eq(lessons.status, status))
-          : eq(lessons.schoolId, schoolId)
-      )
-      .orderBy(desc(lessons.createdAt)),
+  getBySchoolId: (
+    schoolId: string,
+    status?: string,
+    options?: { limit?: number; offset?: number }
+  ) =>
+    {
+      const statusClause = statusFilterClause(status);
+      return db
+        .select()
+        .from(lessons)
+        .where(
+          and(
+            eq(lessons.schoolId, schoolId),
+            ...(statusClause ? [statusClause] : [])
+          )
+        )
+        .orderBy(desc(lessons.createdAt))
+        .limit(options?.limit ?? 50)
+        .offset(options?.offset ?? 0);
+    },
 
-  getByClassId: (classId: string, status?: string) =>
-    db
-      .select({
-        lesson: lessons,
-        topic: topics,
-      })
-      .from(lessons)
-      .innerJoin(topics, eq(lessons.topicId, topics.id))
-      .innerJoin(lessonClasses, eq(lessons.id, lessonClasses.lessonId))
-      .where(
-        status
-          ? and(eq(lessonClasses.classId, classId), eq(lessons.status, status))
-          : eq(lessonClasses.classId, classId)
-      )
-      .orderBy(desc(lessons.createdAt)),
+  getByClassId: (
+    classId: string,
+    status?: string,
+    options?: { limit?: number; offset?: number }
+  ) =>
+    {
+      const statusClause = statusFilterClause(status);
+      return db
+        .select({
+          lesson: lessons,
+          topic: topics,
+        })
+        .from(lessons)
+        .innerJoin(topics, eq(lessons.topicId, topics.id))
+        .innerJoin(lessonClasses, eq(lessons.id, lessonClasses.lessonId))
+        .where(
+          and(
+            eq(lessonClasses.classId, classId),
+            ...(statusClause ? [statusClause] : [])
+          )
+        )
+        .orderBy(desc(lessons.createdAt))
+        .limit(options?.limit ?? 50)
+        .offset(options?.offset ?? 0);
+    },
 
   getWithDetails: async (id: string) => {
     const lessonData = await db

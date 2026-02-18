@@ -131,6 +131,28 @@ function formatStatus(status: string): string {
   return status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
+function getStatusHoverSurfaceBg(status: string): string {
+  switch (status) {
+    case "preparing":
+      return "group-hover:bg-yellow-500/[0.01]";
+    case "ready":
+      return "group-hover:bg-green-500/[0.01]";
+    case "scheduled":
+      return "group-hover:bg-blue-500/[0.01]";
+    case "overdue":
+    case "in_progress":
+      return "group-hover:bg-orange-500/[0.01]";
+    case "feedback":
+      return "group-hover:bg-purple-500/[0.01]";
+    case "completed":
+      return "group-hover:bg-gray-500/[0.01]";
+    case "cancelled":
+      return "group-hover:bg-red-500/[0.01]";
+    default:
+      return "group-hover:bg-gray-500/[0.01]";
+  }
+}
+
 export type Lesson = {
   id: string;
   schoolId: string;
@@ -245,6 +267,8 @@ export interface LessonCardProps {
   schoolSlug: string;
   /** When true, renders as a non-clickable div instead of a link */
   displayOnly?: boolean;
+  /** Enables stronger hover treatment used on the lessons page */
+  enhancedHover?: boolean;
 }
 
 // Component to fetch and display lesson card with topic details
@@ -252,6 +276,7 @@ export function LessonCard({
   lesson,
   schoolSlug,
   displayOnly = false,
+  enhancedHover = false,
 }: LessonCardProps) {
   // Fetch topic details to get stageOrder and stage info
   const { data: topicData } = useQuery({
@@ -301,11 +326,20 @@ export function LessonCard({
   const displayStatus = formatStatus(rawDisplayStatus);
   const { bg: statusBg, dot: statusDot, border: statusBorder } = getStatusColors(rawDisplayStatus);
   const isCompleted = rawDisplayStatus === "completed";
+  const interactiveCardClasses = !displayOnly
+    ? enhancedHover
+      ? "group hover:shadow-md hover:scale-[1.02] hover:-translate-y-1.5 transition-all duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+      : "hover:shadow-md transition-shadow"
+    : "";
+  const enhancedSectionHoverClasses =
+    !displayOnly && enhancedHover
+      ? `transition-colors duration-[400ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${getStatusHoverSurfaceBg(rawDisplayStatus)}`
+      : "";
 
   const cardContent = (
-    <Card className={`${!displayOnly ? "hover:shadow-md" : ""} transition-shadow h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none ${statusBg}`}>
+    <Card className={`${interactiveCardClasses} h-full overflow-visible p-0 gap-0 flex flex-col relative border-0 shadow-none ${statusBg}`}>
         {/* CardHeader - Status and teacher info */}
-        <CardHeader className={`py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center ${isCompleted ? '' : statusBorder}`}>
+        <CardHeader className={`py-3 px-4 bg-card/80 border border-b-0 rounded-t-lg flex flex-row justify-between items-center ${isCompleted ? '' : statusBorder} ${enhancedSectionHoverClasses}`}>
           <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
             {isCompleted ? (
               <CheckCheck className="w-3 h-3" />
@@ -327,7 +361,7 @@ export function LessonCard({
           )}
         </CardContent>
         {/* CardFooter - Details (stage, L badge, topic title, classes) */}
-        <CardFooter className={`flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start ${isCompleted ? '' : statusBorder}`}>
+        <CardFooter className={`flex flex-col p-4 pt-3 gap-2 bg-card/80 border border-t-0 rounded-b-lg items-start ${isCompleted ? '' : statusBorder} ${enhancedSectionHoverClasses}`}>
           {/* Curriculum stage name */}
           {stageName && (
             <p className="text-xs font-medium text-muted-foreground">
