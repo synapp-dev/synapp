@@ -62,6 +62,9 @@ export function SchoolDetailSidebar({
   onDeleteClick,
 }: SchoolDetailSidebarProps) {
   const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
+  const { hasAccess: canAccessSchoolActivation } = useFeatureAccess(
+    "admin:school-activation"
+  );
 
   return (
     <div className="hidden md:flex flex-col w-48 shrink-0 bg-transparent">
@@ -78,7 +81,10 @@ export function SchoolDetailSidebar({
                     {navItems.map((item, index) => {
                       const Icon = item.icon;
                       const isOnboarding = item.id === "onboarding";
-                      const isDisabled = item.disabled || (item.id === "features" && !canManageFeatures);
+                      const isDisabled =
+                        item.disabled ||
+                        (item.id === "features" && !canManageFeatures) ||
+                        (item.id === "activation" && !canAccessSchoolActivation);
                       
                       return (
                         <SidebarMenuItem key={item.id}>

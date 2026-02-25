@@ -26,17 +26,20 @@ import {
   Lock,
   Loader2,
   AlertCircle,
-  Layers,
   School,
+  Users,
   Pencil,
 } from "lucide-react";
 import { Checkbox } from "@workspace/ui/components/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { toast } from "sonner";
 import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
+import { rolesApi } from "@/entities/roles/api/endpoints";
 
 type PermissionTemplate = {
   id: string;
   name: string;
+  scope: "school" | "platform_role";
   description: string | null;
   createdAt: string;
   updatedAt: string;
@@ -47,7 +50,7 @@ type PermissionTemplateWithRules = PermissionTemplate & {
   rules: Array<{
     id: string;
     featureKey: string;
-    level: string;
+    level: "school" | "school_role" | "role";
     roleKey: string | null;
     enabled: boolean;
     visible: boolean | null;
@@ -79,11 +82,13 @@ export default function PermissionTemplatesPage() {
   const applyMutation = useMutation({
     mutationFn: async ({
       templateId,
-      schoolIds,
+      targetIds,
+      targetType,
       action,
     }: {
       templateId: string;
-      schoolIds: string[];
+      targetIds: string[];
+      targetType: "school" | "platform_role";
       action: "apply" | "revoke";
     }) => {
       const path =
@@ -93,16 +98,21 @@ export default function PermissionTemplatesPage() {
       const result = await apiFetch<{ applied?: number; revoked?: number }>(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schoolIds }),
+        body: JSON.stringify(
+          targetType === "school"
+            ? { schoolIds: targetIds }
+            : { roleIds: targetIds }
+        ),
       });
       if (result.error) throw new Error(result.error.message);
       return result.data;
     },
     onSuccess: (_, vars) => {
+      const targetLabel = vars.targetType === "school" ? "school" : "platform role";
       toast.success(
         vars.action === "apply"
-          ? `Template applied to ${vars.schoolIds.length} school(s)`
-          : `Template revoked from ${vars.schoolIds.length} school(s)`
+          ? `Template applied to ${vars.targetIds.length} ${targetLabel}(s)`
+          : `Template revoked from ${vars.targetIds.length} ${targetLabel}(s)`
       );
       setApplyDialog(null);
       queryClient.invalidateQueries({ queryKey: ["permission-templates"] });
@@ -113,6 +123,9 @@ export default function PermissionTemplatesPage() {
       toast.error(err.message ?? "Failed to apply/revoke template");
     },
   });
+
+  const schoolTemplates = templates.filter((t) => t.scope !== "platform_role");
+  const platformRoleTemplates = templates.filter((t) => t.scope === "platform_role");
 
   if (templatesError) {
     return (
@@ -135,8 +148,8 @@ export default function PermissionTemplatesPage() {
       <div>
         <h1 className="text-2xl font-bold">Permission Templates</h1>
         <p className="text-muted-foreground">
-          One-click apply or revoke permission bundles for schools. Unlock
-          lessons, content, and role-based access in bulk.
+          One-click apply or revoke permission bundles for schools and platform
+          roles.
         </p>
       </div>
 
@@ -150,27 +163,70 @@ export default function PermissionTemplatesPage() {
           No permission templates found. Create one to get started.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates.map((template) => (
-            <TemplateCard
-              key={template.id}
-              template={template}
-              onApply={() => {
-                fetchTemplateWithRules(template.id).then((t) => {
-                  if (t) setApplyDialog({ template: t, action: "apply" });
-                });
-              }}
-              onRevoke={() => {
-                fetchTemplateWithRules(template.id).then((t) => {
-                  if (t) setApplyDialog({ template: t, action: "revoke" });
-                });
-              }}
-              onOpen={() =>
-                router.push(`/admin/features/permission-templates/${template.id}`)
-              }
-            />
-          ))}
-        </div>
+        <Tabs defaultValue="school" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="school">Schools</TabsTrigger>
+            <TabsTrigger value="platform_role">Platform Roles</TabsTrigger>
+          </TabsList>
+          <TabsContent value="school">
+            {schoolTemplates.length === 0 ? (
+              <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                No school templates found.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {schoolTemplates.map((template) => (
+                  <TemplateCard
+                    key={template.id}
+                    template={template}
+                    onApply={() => {
+                      fetchTemplateWithRules(template.id).then((t) => {
+                        if (t) setApplyDialog({ template: t, action: "apply" });
+                      });
+                    }}
+                    onRevoke={() => {
+                      fetchTemplateWithRules(template.id).then((t) => {
+                        if (t) setApplyDialog({ template: t, action: "revoke" });
+                      });
+                    }}
+                    onOpen={() =>
+                      router.push(`/admin/features/permission-templates/${template.id}`)
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+          <TabsContent value="platform_role">
+            {platformRoleTemplates.length === 0 ? (
+              <div className="border rounded-lg p-8 text-center text-muted-foreground">
+                No platform role templates found.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {platformRoleTemplates.map((template) => (
+                  <TemplateCard
+                    key={template.id}
+                    template={template}
+                    onApply={() => {
+                      fetchTemplateWithRules(template.id).then((t) => {
+                        if (t) setApplyDialog({ template: t, action: "apply" });
+                      });
+                    }}
+                    onRevoke={() => {
+                      fetchTemplateWithRules(template.id).then((t) => {
+                        if (t) setApplyDialog({ template: t, action: "revoke" });
+                      });
+                    }}
+                    onOpen={() =>
+                      router.push(`/admin/features/permission-templates/${template.id}`)
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       {applyDialog && (
@@ -181,7 +237,8 @@ export default function PermissionTemplatesPage() {
           onSubmit={(schoolIds) => {
             applyMutation.mutate({
               templateId: applyDialog.template.id,
-              schoolIds,
+              targetIds: schoolIds,
+              targetType: applyDialog.template.scope,
               action: applyDialog.action,
             });
           }}
@@ -213,6 +270,7 @@ function TemplateCard({
   onRevoke: () => void;
   onOpen: () => void;
 }) {
+  const isSchoolTemplate = template.scope === "school";
   return (
     <div
       className="border rounded-lg p-5 flex flex-col gap-3 cursor-pointer hover:bg-accent/30 transition-colors"
@@ -220,10 +278,17 @@ function TemplateCard({
     >
       <div className="flex items-start gap-3">
         <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
-          <Layers className="h-5 w-5" />
+          {isSchoolTemplate ? (
+            <School className="h-5 w-5" />
+          ) : (
+            <Users className="h-5 w-5" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h3 className="font-semibold">{template.name}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {isSchoolTemplate ? "School template" : "Platform role template"}
+          </p>
           {template.description && (
             <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
               {template.description}
@@ -284,11 +349,22 @@ function ApplyRevokeDialog({
   isPending: boolean;
 }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const targetType = template.scope;
+  const isSchoolMode = targetType === "school";
 
   const { data: schools = [], isLoading } = useListSchoolsQuery(
     { limit: 100 },
-    { enabled: true }
+    { enabled: isSchoolMode }
   );
+  const { data: platformRoles = [], isLoading: isLoadingRoles } = useQuery({
+    queryKey: ["roles", "platform", "permission-template-dialog"],
+    enabled: !isSchoolMode,
+    queryFn: async () => {
+      const result = await rolesApi.get.list({ scope: "platform" });
+      if (result.error) throw new Error(result.error.message);
+      return result.data ?? [];
+    },
+  });
 
   const toggleSchool = (id: string) => {
     setSelectedIds((prev) => {
@@ -300,14 +376,22 @@ function ApplyRevokeDialog({
   };
 
   const selectAll = () => {
-    setSelectedIds(new Set(schools.map((s) => s.id)));
+    setSelectedIds(
+      new Set(
+        isSchoolMode ? schools.map((s) => s.id) : platformRoles.map((r) => r.id)
+      )
+    );
   };
 
   const clearAll = () => setSelectedIds(new Set());
 
   const handleSubmit = () => {
     if (selectedIds.size === 0) {
-      toast.error("Select at least one school");
+      toast.error(
+        isSchoolMode
+          ? "Select at least one school"
+          : "Select at least one platform role"
+      );
       return;
     }
     onSubmit(Array.from(selectedIds));
@@ -317,7 +401,7 @@ function ApplyRevokeDialog({
     const byRole = new Map<string, string[]>();
     for (const r of template.rules ?? []) {
       if (!r.enabled) continue;
-      if (r.level === "school_role" && r.roleKey) {
+      if ((r.level === "school_role" || r.level === "role") && r.roleKey) {
         const arr = byRole.get(r.roleKey) ?? [];
         if (!arr.includes(r.featureKey)) arr.push(r.featureKey);
         byRole.set(r.roleKey, arr);
@@ -337,7 +421,9 @@ function ApplyRevokeDialog({
     for (const rule of template.rules ?? []) {
       if (!rule.enabled) continue;
       const roleLabel =
-        rule.level === "school_role" && rule.roleKey ? rule.roleKey : "SCHOOL";
+        (rule.level === "school_role" || rule.level === "role") && rule.roleKey
+          ? rule.roleKey
+          : "SCHOOL";
       const existing = rows.get(rule.featureKey) ?? new Set<string>();
       existing.add(roleLabel);
       rows.set(rule.featureKey, existing);
@@ -359,8 +445,12 @@ function ApplyRevokeDialog({
           </DialogTitle>
           <DialogDescription>
             {action === "apply"
-              ? "Select schools to unlock this permission template for."
-              : "Select schools to revoke this template from."}
+              ? isSchoolMode
+                ? "Select schools to unlock this permission template for."
+                : "Select platform roles to unlock this permission template for."
+              : isSchoolMode
+                ? "Select schools to revoke this template from."
+                : "Select platform roles to revoke this template from."}
             {ruleSummary && (
               <span className="block mt-2 text-xs text-muted-foreground">
                 Rules: {ruleSummary}
@@ -403,21 +493,27 @@ function ApplyRevokeDialog({
               </Button>
             </div>
             <div className="max-h-72 overflow-y-auto">
-              {isLoading ? (
+              {isSchoolMode && isLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : !isSchoolMode && isLoadingRoles ? (
                 <Skeleton className="h-24 w-full" />
               ) : (
-                schools.map((school) => (
+                (isSchoolMode ? schools : platformRoles).map((target) => (
                   <div
-                    key={school.id}
+                    key={target.id}
                     className="flex items-center gap-2 py-1.5 hover:bg-accent/50 rounded px-2 cursor-pointer"
-                    onClick={() => toggleSchool(school.id)}
+                    onClick={() => toggleSchool(target.id)}
                   >
                     <Checkbox
-                      checked={selectedIds.has(school.id)}
-                      onCheckedChange={() => toggleSchool(school.id)}
+                      checked={selectedIds.has(target.id)}
+                      onCheckedChange={() => toggleSchool(target.id)}
                     />
-                    <School className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{school.name}</span>
+                    {isSchoolMode ? (
+                      <School className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="text-sm">{target.name}</span>
                   </div>
                 ))
               )}
@@ -434,7 +530,8 @@ function ApplyRevokeDialog({
             disabled={selectedIds.size === 0 || isPending}
           >
             {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {action === "apply" ? "Unlock" : "Lock"} ({selectedIds.size} school
+            {action === "apply" ? "Unlock" : "Lock"} ({selectedIds.size}{" "}
+            {isSchoolMode ? "school" : "platform role"}
             {selectedIds.size !== 1 ? "s" : ""})
           </Button>
         </DialogFooter>

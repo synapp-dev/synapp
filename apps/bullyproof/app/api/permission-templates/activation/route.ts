@@ -1,15 +1,6 @@
 import { NextResponse } from "next/server";
-import {
-  permissionTemplatesService,
-  type ActivationTemplateKey,
-} from "@/server/permission-templates/permission-templates.service";
+import { permissionTemplatesService } from "@/server/permission-templates/permission-templates.service";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-
-const VALID_ACTIVATION_KEYS: ActivationTemplateKey[] = [
-  "school-locked",
-  "school-certification-enabled",
-  "school-lessons-enabled",
-];
 
 export async function GET(request: Request) {
   try {
@@ -38,9 +29,9 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { schoolId, activationKey } = body as {
+    const { schoolId, templateId } = body as {
       schoolId?: string;
-      activationKey?: ActivationTemplateKey;
+      templateId?: string;
     };
 
     if (!schoolId || typeof schoolId !== "string") {
@@ -49,21 +40,16 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    if (!activationKey || !VALID_ACTIVATION_KEYS.includes(activationKey)) {
+    if (!templateId || typeof templateId !== "string") {
       return NextResponse.json(
-        {
-          error:
-            "activationKey must be one of: school-locked, school-certification-enabled, school-lessons-enabled",
-        },
+        { error: "templateId is required" },
         { status: 400 }
       );
     }
 
-    const result = await permissionTemplatesService.applyActivationStage(
-      { userId },
-      activationKey,
-      schoolId
-    );
+    const result = await permissionTemplatesService.applyActivationTemplate({
+      userId,
+    }, templateId, schoolId);
     return NextResponse.json(result, { status: 200 });
   } catch (e: unknown) {
     console.error(e);

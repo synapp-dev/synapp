@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useMeStore } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import {
   getTutorialForPathname,
   type TutorialConfig,
 } from "@/config/school-tutorials";
 import { SchoolPageTutorialDialog } from "./school-page-tutorial-dialog";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 /**
  * SchoolPageTutorialGuard component
@@ -18,7 +18,7 @@ import { SchoolPageTutorialDialog } from "./school-page-tutorial-dialog";
  */
 export function SchoolPageTutorialGuard() {
   const pathname = usePathname();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
   const { isLoading } = useCurrentUser();
   const [tutorialConfig, setTutorialConfig] = useState<TutorialConfig | null>(
     null

@@ -21,6 +21,7 @@ import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { FeedbackDialog } from "@/components/organisms/feedback-dialog";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useMeStore } from "@/entities/me/model/store";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 import {
   getTutorialForPathname,
   type TutorialConfig,
@@ -29,7 +30,8 @@ import { SchoolPageTutorialDialog } from "@/components/molecules/school-page-tut
 
 export function AppHeader() {
   const pathname = usePathname();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
   const [tutorialConfig, setTutorialConfig] = useState<TutorialConfig | null>(
     null
   );
@@ -160,10 +162,17 @@ export function AppHeader() {
           <Breadcrumb />
         </div>
         <div className="flex items-center gap-2 px-4">
-          <FeatureGuard feature="system:impersonate">
-            <ImpersonateMenu />
-            <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
-          </FeatureGuard>
+          {viewAsUser ? (
+            <>
+              <ImpersonateMenu />
+              <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
+            </>
+          ) : (
+            <FeatureGuard feature="system:impersonate">
+              <ImpersonateMenu />
+              <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
+            </FeatureGuard>
+          )}
           {tutorialConfig && (
             <>
               <Button

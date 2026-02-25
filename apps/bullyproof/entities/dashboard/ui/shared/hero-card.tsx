@@ -2,7 +2,7 @@ import { Card, CardDescription } from "@workspace/ui/components/card";
 import { CardHeader } from "@workspace/ui/components/card";
 import { CardContent } from "@workspace/ui/components/card";
 import Image from "next/image";
-import { useMeStore } from "@/entities/me/model/store";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 interface HeroCardProps {
   currentTime: Date;
@@ -11,7 +11,7 @@ interface HeroCardProps {
 }
 
 export function HeroCard({ currentTime, userTitle, defaultName = "User" }: HeroCardProps) {
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
 
   // Get user name
   const firstName = currentUser?.firstName || "";

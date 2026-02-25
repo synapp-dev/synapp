@@ -14,12 +14,12 @@ import { MAINTENANCE_FEATURE_KEY } from "@/lib/feature-keys";
 export function MaintenanceRedirectGuard() {
   const router = useRouter();
   const pathname = usePathname();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const effectiveUser = useMeStore((s) => s.viewAsUser ?? s.currentUser);
   const featuresAccess = useFeaturesAccess([MAINTENANCE_FEATURE_KEY]);
   const maintenance = featuresAccess[MAINTENANCE_FEATURE_KEY];
   const hasMaintenanceAccess = maintenance?.hasAccess ?? false;
   const effectiveMaintenance =
-    hasMaintenanceAccess && !currentUser?.maintenanceBypass;
+    hasMaintenanceAccess && !effectiveUser?.maintenanceBypass;
 
   useEffect(() => {
     if (effectiveMaintenance && pathname !== "/maintenance") {

@@ -83,6 +83,7 @@ export const COMPONENT_FEATURES = {
 export const ACTION_FEATURES = {
   DELETE_USER: "admin:delete-user",
   DELETE_SCHOOL: "admin:delete-school",
+  SCHOOL_ACTIVATION: "admin:school-activation",
   CANCEL_LESSON: "lessons:cancel-lesson",
   TAKE_OVER_LESSON: "lessons:take-over-lesson",
   /** School-admin can assign/remove school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) for users at their school only */

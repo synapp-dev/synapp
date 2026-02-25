@@ -1,10 +1,12 @@
 export const schoolKeys = {
   all: () => ["schools"] as const,
   list: () => [...schoolKeys.all(), "list"] as const,
+  latest: () => [...schoolKeys.all(), "latest"] as const,
   listSchools: (params?: {
     limit?: number;
     offset?: number;
     search?: string;
+    sort?: "latest";
   }) => [...schoolKeys.all(), "listSchools", params] as const,
   searchSchools: (params: { query: string; limit?: number }) =>
     [...schoolKeys.all(), "search", params] as const,

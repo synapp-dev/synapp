@@ -7,7 +7,7 @@ import {
 } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 
-export type PermissionTemplateRuleLevel = "school" | "school_role";
+export type PermissionTemplateRuleLevel = "school" | "school_role" | "role";
 
 export type PermissionTemplateRule = {
   id: string;
@@ -30,6 +30,8 @@ export type PermissionTemplateRuleInput = {
 export type PermissionTemplate = {
   id: string;
   name: string;
+  templateKey: string | null;
+  scope: "school" | "platform_role";
   description: string | null;
   createdAt: string;
   updatedAt: string;
@@ -54,6 +56,13 @@ export const permissionTemplatesRepo = {
       .where(eq(permissionTemplates.name, name))
       .limit(1),
 
+  getByScope: (scope: "school" | "platform_role") =>
+    db
+      .select()
+      .from(permissionTemplates)
+      .where(eq(permissionTemplates.scope, scope))
+      .orderBy(permissionTemplates.name),
+
   getWithRules: async (templateId: string) => {
     const templateRows = await db
       .select()
@@ -74,6 +83,7 @@ export const permissionTemplatesRepo = {
 
   create: (data: {
     name: string;
+    scope?: "school" | "platform_role";
     description?: string;
     createdBy?: string;
   }) =>
@@ -81,6 +91,7 @@ export const permissionTemplatesRepo = {
       .insert(permissionTemplates)
       .values({
         name: data.name,
+        scope: data.scope ?? "school",
         description: data.description ?? null,
         createdBy: data.createdBy ?? null,
       })
@@ -88,7 +99,11 @@ export const permissionTemplatesRepo = {
 
   update: (
     id: string,
-    data: { name?: string; description?: string | null }
+    data: {
+      name?: string;
+      scope?: "school" | "platform_role";
+      description?: string | null;
+    }
   ) =>
     db
       .update(permissionTemplates)
@@ -116,7 +131,10 @@ export const permissionTemplatesRepo = {
         templateId: data.templateId,
         featureKey: data.featureKey,
         level: data.level,
-        roleKey: data.level === "school_role" ? data.roleKey ?? null : null,
+        roleKey:
+          data.level === "school_role" || data.level === "role"
+            ? data.roleKey ?? null
+            : null,
         enabled: data.enabled ?? true,
         visible: data.visible ?? null,
       })
@@ -144,7 +162,10 @@ export const permissionTemplatesRepo = {
           templateId,
           featureKey: r.featureKey,
           level: r.level,
-          roleKey: r.level === "school_role" ? r.roleKey ?? null : null,
+          roleKey:
+            r.level === "school_role" || r.level === "role"
+              ? r.roleKey ?? null
+              : null,
           enabled: r.enabled ?? true,
           visible: r.visible ?? null,
         }))

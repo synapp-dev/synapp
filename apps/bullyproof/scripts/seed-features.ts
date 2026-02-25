@@ -23,6 +23,7 @@ async function seedFeatures() {
       // Action features – admin
       { key: 'admin:delete-user', name: 'Delete User', description: 'Delete users from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
       { key: 'admin:delete-school', name: 'Delete School', description: 'Delete schools from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
+      { key: 'admin:school-activation', name: 'School Activation', description: 'Access to the school drawer Activation tab in admin schools', category: 'action', section: 'admin' },
 
       // Action features – lessons
       { key: 'lessons:cancel-lesson', name: 'Cancel Lesson', description: 'Cancel lessons from the lesson sidebar (owner, or INTRADARK_DEV/PLATFORM_ADMIN). Sets status to cancelled for data persistence.', category: 'action', section: 'schools-lessons' },
@@ -294,6 +295,22 @@ async function seedFeatures() {
       });
     }
 
+    // School activation: INTRADARK_DEV, PLATFORM_ADMIN, PLATFORM_MODERATOR can access
+    const schoolActivationFeature = insertedFeatures.find(f => f.key === 'admin:school-activation');
+    if (schoolActivationFeature) {
+      for (const role of [intradarkDevRole, platformAdminRole, platformModeratorRole]) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: schoolActivationFeature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: true,
+            visible: true,
+          });
+        }
+      }
+    }
+
     // School manage user roles: SCHOOL_ADMIN gets access (for settings page role management)
     const manageSchoolUserRolesFeature = insertedFeatures.find(f => f.key === 'school:manage-school-user-roles');
     if (manageSchoolUserRolesFeature && schoolAdminRole.length > 0) {
@@ -478,6 +495,25 @@ async function seedFeatures() {
         .onConflictDoNothing()
         .returning();
       
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // School activation: globally visible but not enabled (specific platform roles get role override)
+    if (schoolActivationFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: schoolActivationFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+
       if (result.length > 0) {
         globalPermissionsCreated++;
       }

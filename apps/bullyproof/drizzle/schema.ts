@@ -1565,21 +1565,6 @@ export const courseRatings = pgTable("course_ratings", {
 	check("course_ratings_rating_check", sql`(rating >= 1) AND (rating <= 5)`),
 ]);
 
-export const permissionTemplates = pgTable("permission_templates", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	name: text().notNull(),
-	description: text(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	createdBy: uuid("created_by"),
-}, (table) => [
-	foreignKey({
-			columns: [table.createdBy],
-			foreignColumns: [userProfile.id],
-			name: "permission_templates_created_by_fkey"
-		}).onDelete("set null"),
-]);
-
 export const permissionTemplateRules = pgTable("permission_template_rules", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	templateId: uuid("template_id").notNull(),
@@ -1596,8 +1581,27 @@ export const permissionTemplateRules = pgTable("permission_template_rules", {
 			foreignColumns: [permissionTemplates.id],
 			name: "permission_template_rules_template_id_fkey"
 		}).onDelete("cascade"),
-	check("permission_template_rules_level_check", sql`level = ANY (ARRAY['school'::text, 'school_role'::text])`),
-	check("permission_template_rules_role_key_check", sql`((level = 'school_role'::text) AND (role_key IS NOT NULL)) OR ((level = 'school'::text) AND (role_key IS NULL))`),
+	check("permission_template_rules_level_check", sql`level = ANY (ARRAY['school'::text, 'school_role'::text, 'role'::text])`),
+	check("permission_template_rules_role_key_check", sql`((level = ANY (ARRAY['school_role'::text, 'role'::text])) AND (role_key IS NOT NULL)) OR ((level = 'school'::text) AND (role_key IS NULL))`),
+]);
+
+export const permissionTemplates = pgTable("permission_templates", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	name: text().notNull(),
+	description: text(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+	scope: text().default('school').notNull(),
+	templateKey: text("template_key").generatedAlwaysAs(sql`NULLIF(TRIM(BOTH '-'::text FROM regexp_replace(lower(name), '[^a-z0-9]+'::text, '-'::text, 'g'::text)), ''::text)`),
+}, (table) => [
+	uniqueIndex("permission_templates_template_key_uidx").using("btree", table.templateKey.asc().nullsLast().op("text_ops")),
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [userProfile.id],
+			name: "permission_templates_created_by_fkey"
+		}).onDelete("set null"),
+	check("permission_templates_scope_check", sql`scope = ANY (ARRAY['school'::text, 'platform_role'::text])`),
 ]);
 
 export const flowStateInAuth = auth.table("flow_state", {

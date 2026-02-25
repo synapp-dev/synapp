@@ -5,13 +5,13 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { LiveActivityFeed } from "./components/live-activity-feed";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
-import { useMeStore } from "@/entities/me/model/store";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 import { HeroCard } from "@/entities/dashboard/ui/shared/hero-card";
 
 export function HeroSection() {
   const [date, setDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
 
   // Update time every minute
   useEffect(() => {

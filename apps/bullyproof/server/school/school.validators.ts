@@ -22,11 +22,13 @@ export const listSchoolsQuerySchema = z
         }
       ),
     search: z.string().trim().max(100).optional(),
+    sort: z.enum(["latest"]).optional(),
   })
   .transform((v) => ({
     limit: v.limit ?? 50,
     offset: v.offset ?? 0,
     search: v.search,
+    sort: v.sort,
   }));
 
 export type ListSchoolsQuery = z.infer<typeof listSchoolsQuerySchema>;

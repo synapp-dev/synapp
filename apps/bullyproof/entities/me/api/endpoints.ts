@@ -73,8 +73,14 @@ export const meApi = {
       const query = includeFeatures ? "?includeFeatures=true" : "";
       return apiFetch<UserProfileWithFeatures | null>(`/me${query}`);
     },
-    userById(id: string): Promise<ApiResult<UserProfile | null>> {
-      return apiFetch<UserProfile | null>(`/users/${encodeURIComponent(id)}`);
+    userById(
+      id: string,
+      includeFeatures?: boolean
+    ): Promise<ApiResult<UserProfileWithFeatures | null>> {
+      const query = includeFeatures ? "?includeFeatures=true" : "";
+      return apiFetch<UserProfileWithFeatures | null>(
+        `/users/${encodeURIComponent(id)}${query}`
+      );
     },
     userByEmail(email: string): Promise<ApiResult<UserProfile | null>> {
       return apiFetch<UserProfile | null>(

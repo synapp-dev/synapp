@@ -19,6 +19,7 @@ export const schoolRepo = {
     offset: number;
     search?: string;
     schoolIds?: string[];
+    sort?: "latest";
   }) => {
     const hasSearch =
       typeof params.search === "string" && params.search.trim().length > 0;
@@ -97,8 +98,14 @@ export const schoolRepo = {
     }
 
     if (!hasSearch) {
+      const latestSortExpr = sql`COALESCE(${vSchoolsReadable.joinedAt}, ${vSchoolsReadable.createdAt})`;
       const rows = await queryWithWhere
-        .orderBy(asc(vSchoolsReadable.name))
+        .orderBy(
+          params.sort === "latest"
+            ? desc(latestSortExpr)
+            : asc(vSchoolsReadable.name),
+          asc(vSchoolsReadable.name)
+        )
         .limit(params.limit)
         .offset(params.offset);
       return rows;

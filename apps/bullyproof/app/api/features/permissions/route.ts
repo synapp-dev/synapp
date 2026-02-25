@@ -43,9 +43,9 @@ export async function GET(request: Request) {
         { status: 400 }
       );
     }
-    if (level !== "global" && level !== "school_role" && !targetId) {
+    if (level !== "global" && level !== "role" && level !== "school_role" && !targetId) {
       return NextResponse.json(
-        { error: "targetId is required for role, school, and user levels" },
+        { error: "targetId is required for school and user levels" },
         { status: 400 }
       );
     }

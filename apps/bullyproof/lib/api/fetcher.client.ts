@@ -3,6 +3,7 @@
 
 import type { RequestInit } from "next/dist/server/web/spec-extension/request";
 import { createBrowserClient } from "@/utils/supabase/client";
+import { useMeStore } from "@/entities/me/model/store";
 
 type ApiOk<T> = { data: T; error: null };
 type ApiErr = { data: null; error: { message: string; status?: number } };
@@ -38,6 +39,18 @@ export async function apiFetch<T>(
   init?: RequestInit
 ): Promise<ApiResult<T>> {
   const req = await withAuth(init);
+  const method = (req.method ?? "GET").toUpperCase();
+  const isViewMode = useMeStore.getState().viewAsUser !== null;
+  if (isViewMode && method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    return {
+      data: null,
+      error: {
+        message:
+          "Read-only view mode is active. Stop viewing as another user to perform this action.",
+        status: 403,
+      },
+    };
+  }
 
   const url = `/api${path}`;
 

@@ -77,7 +77,11 @@ export async function GET(
     }
 
     const { id } = await params;
-    const user = await meService.getUserById({ userId }, { id });
+    const { searchParams } = new URL(request.url);
+    const includeFeatures = searchParams.get("includeFeatures") === "true";
+    const user = includeFeatures
+      ? await meService.getUserByIdForViewMode({ userId }, { id }, true)
+      : await meService.getUserById({ userId }, { id });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });

@@ -36,12 +36,14 @@ export async function PATCH(
     }
     const { id } = await params;
     const body = await request.json();
-    const { name, description, rules } = body;
+    const { name, description, rules, scope } = body;
     const template = await permissionTemplatesService.update(
       { userId },
       id,
       {
         name: typeof name === "string" ? name : undefined,
+        scope:
+          scope === "platform_role" || scope === "school" ? scope : undefined,
         description:
           description !== undefined
             ? (typeof description === "string" ? description : null)
@@ -56,7 +58,7 @@ export async function PATCH(
                 visible?: boolean | null;
               }) => ({
                 featureKey: r.featureKey,
-                level: r.level as "school" | "school_role",
+                level: r.level as "school" | "school_role" | "role",
                 roleKey: r.roleKey,
                 enabled: typeof r.enabled === "boolean" ? r.enabled : undefined,
                 visible:

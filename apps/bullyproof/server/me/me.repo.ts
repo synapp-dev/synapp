@@ -4,6 +4,7 @@ import {
   vSchoolsEnriched,
   userRoles,
   roles,
+  schools,
 } from "@/drizzle/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 
@@ -41,8 +42,24 @@ export const meRepo = {
     }
 
     return db
-      .select()
+      .select({
+        id: vSchoolsEnriched.id,
+        name: vSchoolsEnriched.name,
+        code: vSchoolsEnriched.code,
+        slug: vSchoolsEnriched.slug,
+        emailDomain: vSchoolsEnriched.emailDomain,
+        address: vSchoolsEnriched.address,
+        joinedAt: vSchoolsEnriched.joinedAt,
+        createdAt: vSchoolsEnriched.createdAt,
+        state: vSchoolsEnriched.state,
+        sector: vSchoolsEnriched.sector,
+        levels: vSchoolsEnriched.levels,
+        levelBadge: vSchoolsEnriched.levelBadge,
+        bannerUrl: schools.bannerUrl,
+        avatarUrl: schools.avatarUrl,
+      })
       .from(vSchoolsEnriched)
+      .leftJoin(schools, eq(schools.id, vSchoolsEnriched.id))
       .where(inArray(vSchoolsEnriched.id, schoolIds))
       .limit(limit);
   },

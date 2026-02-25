@@ -22,11 +22,11 @@ export function useFeatureAccess(
   isError: boolean;
   error: Error | null;
 } {
-  const currentUser = useMeStore((s) => s.currentUser);
+  const effectiveUser = useMeStore((s) => s.viewAsUser ?? s.currentUser);
   const { isLoading: isLoadingUser, isError: isErrorUser, error: userError } = useCurrentUser();
 
   const { hasAccess, visible } = useMemo(() => {
-    if (!currentUser || !featureKey) {
+    if (!effectiveUser || !featureKey) {
       return { hasAccess: false, visible: false };
     }
     // Platform-level features (/admin*, system:*) never use school context
@@ -35,12 +35,12 @@ export function useFeatureAccess(
         ? undefined
         : schoolId;
     return checkFeatureAccessAndVisibleCached(
-      currentUser.featurePermissions,
+      effectiveUser.featurePermissions,
       featureKey,
       effectiveSchoolId,
-      currentUser.roleIds
+      effectiveUser.roleIds
     );
-  }, [currentUser?.featurePermissions, featureKey, schoolId, currentUser?.roleIds]);
+  }, [effectiveUser?.featurePermissions, featureKey, schoolId, effectiveUser?.roleIds]);
 
   return {
     hasAccess,

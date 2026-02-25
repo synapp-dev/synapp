@@ -3,9 +3,9 @@ import { getUserOrganisationRolesByUserId } from "@/providers/postgres/user_orga
 
 export async function GET(
   _req: Request,
-  { params }: { params: { user_id: string } }
+  { params }: { params: Promise<{ user_id: string }> }
 ) {
-  const { user_id } = params;
+  const { user_id } = await params;
   if (!user_id) {
     return NextResponse.json(
       { success: false, error: "User ID required", data: [] },
@@ -25,9 +25,9 @@ export async function GET(
 
 export async function POST(
   req: Request,
-  { params }: { params: { user_id: string } }
+  { params }: { params: Promise<{ user_id: string }> }
 ) {
-  const { user_id } = params;
+  const { user_id } = await params;
   if (!user_id) {
     return NextResponse.json(
       { success: false, error: "User ID required", data: null },

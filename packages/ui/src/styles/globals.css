@@ -429,6 +429,24 @@
       transform: translateY(0);
     }
   }
+  @keyframes overviewBannerPanZoomRight {
+    0% {
+      background-position: 50% 50%;
+      transform: scale(1);
+    }
+    100% {
+      background-position: 62% 50%;
+      transform: scale(1.03);
+    }
+  }
+  @keyframes overviewFadeOut {
+    0% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
   @keyframes slide-left-fade-in {
     0% {
       opacity: 0;

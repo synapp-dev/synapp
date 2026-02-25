@@ -305,6 +305,18 @@ export const featuresRepo = {
   },
 
   /**
+   * Remove all platform role-scoped permissions for a role.
+   */
+  clearRoleScopedPermissions: (roleId: string) => {
+    return db.delete(featurePermissions).where(
+      and(
+        eq(featurePermissions.level, "role"),
+        eq(featurePermissions.targetId, roleId)
+      )
+    );
+  },
+
+  /**
    * Get all permissions for a user (across all features)
    * This includes user-level, school_role-level, school-level, role-level, and global permissions
    */

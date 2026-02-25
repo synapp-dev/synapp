@@ -9,7 +9,7 @@ import { useSchoolStore } from "@/stores/school-store";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { School, Users } from "lucide-react";
+import { GraduationCap, School, Users } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -103,6 +103,20 @@ export function SettingsPageClient({ schoolSlug }: SettingsPageClientProps) {
                   </CardTitle>
                   <CardDescription className="text-sm text-muted-foreground">
                     Manage users at your school
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            </Link>
+
+            <Link href={`${basePath}/classes`}>
+              <Card className="transition-all h-full hover:shadow-md hover:border-primary/50 cursor-pointer">
+                <CardHeader>
+                  <CardTitle className="flex flex-row items-center gap-2">
+                    <GraduationCap className="h-5 w-5" />
+                    Classes
+                  </CardTitle>
+                  <CardDescription className="text-sm text-muted-foreground">
+                    Add and manage classes for your school
                   </CardDescription>
                 </CardHeader>
               </Card>

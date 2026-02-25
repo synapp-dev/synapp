@@ -14,6 +14,7 @@ export function useListSchoolsQuery(
     limit?: number;
     offset?: number;
     search?: string;
+    sort?: "latest";
   },
   options?: {
     enabled?: boolean;
@@ -30,6 +31,25 @@ export function useListSchoolsQuery(
     enabled: options?.enabled,
     // Keep previous results during background refetch to avoid UI flicker (TanStack v5)
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useLatestSchoolQuery(
+  options?: { enabled?: boolean }
+): UseQueryResult<School | null, Error> {
+  return useQuery<School | null, Error>({
+    queryKey: schoolKeys.latest(),
+    queryFn: async () => {
+      const { data, error } = await schoolApi.get.listSchools({
+        limit: 1,
+        offset: 0,
+        sort: "latest",
+      });
+      if (error) throw new Error(error.message);
+      return data?.[0] ?? null;
+    },
+    staleTime: 60_000,
+    enabled: options?.enabled,
   });
 }
 

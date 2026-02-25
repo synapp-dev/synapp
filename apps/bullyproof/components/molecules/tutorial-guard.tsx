@@ -2,8 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useMeStore } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 /**
  * TutorialGuard component
@@ -16,7 +16,7 @@ import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 export function TutorialGuard() {
   const router = useRouter();
   const pathname = usePathname();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
   const { isLoading } = useCurrentUser();
 
   useEffect(() => {

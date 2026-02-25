@@ -24,7 +24,6 @@ import {
 } from "@workspace/ui/components/command";
 import {
   ArrowLeftRight,
-  School as SchoolIcon,
   Check,
   Search as SearchIcon,
   Loader2,
@@ -36,6 +35,7 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import {
   useMySchoolsQuery,
+  useSchoolsForUserQuery,
   type School as MeSchool,
 } from "@/entities/me/model/useMySchoolsQuery";
 import {
@@ -45,6 +45,7 @@ import {
 } from "@/entities/school/model/useListSchoolsQuery";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useSchoolStore } from "@/stores/school-store";
+import { useMeStore } from "@/entities/me/model/store";
 import { cn } from "@workspace/ui/lib/utils";
 import { StorageImage } from "@/components/atoms/storage-image";
 
@@ -200,6 +201,8 @@ export function SchoolSwitcher() {
   const displayState = isMobile ? "expanded" : state;
   const router = useRouter();
   const pathname = usePathname();
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
+  const isViewMode = !!viewAsUser;
 
   // School store
   const activeSchoolFromStore = useSchoolStore((s) => s.getActiveSchool());
@@ -225,6 +228,7 @@ export function SchoolSwitcher() {
 
   // Users with admin_schools can load and search all schools; others see only their schools
   const { hasAccess: canAccessAllSchools } = useFeatureAccess("/admin/schools");
+  const canAccessAllSchoolsForSwitcher = canAccessAllSchools && !isViewMode;
 
   // Fetch schools using TanStack Query based on feature access
   const {
@@ -233,8 +237,15 @@ export function SchoolSwitcher() {
     error: mySchoolsError,
   } = useMySchoolsQuery(
     { limit: 5, random: true },
-    { enabled: !canAccessAllSchools }
+    { enabled: !canAccessAllSchoolsForSwitcher && !isViewMode }
   );
+
+  // In view mode, always scope schools to the selected user assignments.
+  const {
+    data: viewAsSchools = [],
+    isLoading: viewAsSchoolsLoading,
+    error: viewAsSchoolsError,
+  } = useSchoolsForUserQuery(viewAsUser?.id ?? "", { limit: 100 });
 
   // Default list (no search)
   const {
@@ -242,24 +253,40 @@ export function SchoolSwitcher() {
     isLoading: allSchoolsLoading,
     isFetching: allSchoolsFetching,
     error: allSchoolsError,
-  } = useListSchoolsQuery({ limit: 5 }, { enabled: canAccessAllSchools });
+  } = useListSchoolsQuery({ limit: 5 }, { enabled: canAccessAllSchoolsForSwitcher });
 
   // Search list (separate cache and hook)
   const { data: searchedSchools = [], isFetching: searching } =
     useSearchSchoolsQuery(
       { query: debouncedSearch, limit: 5 },
-      { enabled: canAccessAllSchools }
+      { enabled: canAccessAllSchoolsForSwitcher }
     );
 
   // Use the appropriate data based on feature access
   const adminSchools = debouncedSearch ? searchedSchools : allSchools;
-  const schools = canAccessAllSchools ? adminSchools : mySchools;
-  const isLoading = canAccessAllSchools ? allSchoolsLoading : mySchoolsLoading;
-  const error = canAccessAllSchools ? allSchoolsError : mySchoolsError;
+  const schools = isViewMode
+    ? viewAsSchools
+    : canAccessAllSchoolsForSwitcher
+      ? adminSchools
+      : mySchools;
+  const isLoading = isViewMode
+    ? viewAsSchoolsLoading
+    : canAccessAllSchoolsForSwitcher
+      ? allSchoolsLoading
+      : mySchoolsLoading;
+  const error = isViewMode
+    ? viewAsSchoolsError
+    : canAccessAllSchoolsForSwitcher
+      ? allSchoolsError
+      : mySchoolsError;
 
   // Check if user has access to only one school (based on base list, not search results)
   // This prevents the component from switching between popover and simple button during search
-  const baseSchools = canAccessAllSchools ? allSchools : mySchools;
+  const baseSchools = isViewMode
+    ? viewAsSchools
+    : canAccessAllSchoolsForSwitcher
+      ? allSchools
+      : mySchools;
   const hasOnlyOneSchool = baseSchools.length === 1;
 
   // Ensure component is mounted on client side
@@ -298,7 +325,10 @@ export function SchoolSwitcher() {
 
     // If not on a school page, only use currentSchool (not lastAccessedSchool fallback)
     // This ensures deselected schools don't reappear
-    if (currentSchool) {
+    if (
+      currentSchool &&
+      (!isViewMode || schools.some((school) => school.id === currentSchool.id))
+    ) {
       setSelectedSchool(currentSchool as School);
       return;
     }
@@ -338,10 +368,24 @@ export function SchoolSwitcher() {
     schools,
     hasOnlyOneSchool,
     baseSchools,
+    isViewMode,
     setCurrentSchool,
     mounted,
     isLoading,
+    schools,
   ]);
+
+  // In view mode, keep school store consistent with the viewed user's assignments.
+  useEffect(() => {
+    if (!isViewMode || !currentSchool) return;
+    const isAssignedToViewedUser = schools.some(
+      (school) => school.id === currentSchool.id
+    );
+    if (!isAssignedToViewedUser) {
+      clearCurrentSchool();
+      setSelectedSchool(null);
+    }
+  }, [isViewMode, currentSchool, schools, clearCurrentSchool]);
 
   // Debounce search input by 300ms and only enable when length >= 2
   useEffect(() => {
@@ -421,11 +465,15 @@ export function SchoolSwitcher() {
   }
 
   // Show no schools state only when not searching
-  const isSearchingAdmin = canAccessAllSchools && debouncedSearch.length > 0;
+  const isSearchingAdmin =
+    canAccessAllSchoolsForSwitcher && debouncedSearch.length > 0;
   if (!isSearchingAdmin) {
-    const noAdminSchools = canAccessAllSchools && allSchools.length === 0;
-    const noUserSchools = !canAccessAllSchools && mySchools.length === 0;
-    if (noAdminSchools || noUserSchools) {
+    const noAdminSchools =
+      canAccessAllSchoolsForSwitcher && allSchools.length === 0;
+    const noUserSchools =
+      !canAccessAllSchoolsForSwitcher && !isViewMode && mySchools.length === 0;
+    const noViewAsSchools = isViewMode && viewAsSchools.length === 0;
+    if (noAdminSchools || noUserSchools || noViewAsSchools) {
       return (
         <StateWrapper>
           <div className="text-muted-foreground text-sm">
@@ -538,7 +586,7 @@ export function SchoolSwitcher() {
               <Command className="[&_[data-slot=command-input-wrapper]_svg]:hidden">
                 {(() => {
                   const showSpinner =
-                    canAccessAllSchools &&
+                    canAccessAllSchoolsForSwitcher &&
                     search.trim().length >= 2 &&
                     (search !== debouncedSearch || searching);
                   const hasText = search.length > 0;
@@ -576,7 +624,7 @@ export function SchoolSwitcher() {
                   {(() => {
                     // Check if we're currently searching/loading
                     const isSearching =
-                      canAccessAllSchools &&
+                      canAccessAllSchoolsForSwitcher &&
                       search.trim().length >= 2 &&
                       (search !== debouncedSearch || searching);
                     return (
@@ -606,7 +654,7 @@ export function SchoolSwitcher() {
                           }
                           className="flex items-center gap-2"
                         >
-                          <SchoolIcon className="h-3.5 w-3.5" />
+                          <SchoolAvatarOrBadge school={school} size="sm" />
                           <div className="flex flex-col flex-1 min-w-0">
                             <span className="font-medium truncate">
                               {school.name}

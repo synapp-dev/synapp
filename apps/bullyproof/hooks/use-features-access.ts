@@ -25,24 +25,24 @@ export function useFeaturesAccess(
   featureKeys: string[],
   schoolId?: string
 ): Record<string, FeatureAccessResult> {
-  const currentUser = useMeStore((s) => s.currentUser);
+  const effectiveUser = useMeStore((s) => s.viewAsUser ?? s.currentUser);
 
   const featuresAccess = useMemo(() => {
-    if (!currentUser || featureKeys.length === 0) {
+    if (!effectiveUser || featureKeys.length === 0) {
       return {};
     }
 
     const result: Record<string, FeatureAccessResult> = {};
     for (const featureKey of featureKeys) {
       result[featureKey] = checkFeatureAccessAndVisibleCached(
-        currentUser.featurePermissions,
+        effectiveUser.featurePermissions,
         featureKey,
         schoolId,
-        currentUser.roleIds
+        effectiveUser.roleIds
       );
     }
     return result;
-  }, [currentUser?.featurePermissions, featureKeys, schoolId, currentUser?.roleIds]);
+  }, [effectiveUser?.featurePermissions, featureKeys, schoolId, effectiveUser?.roleIds]);
 
   return featuresAccess;
 }

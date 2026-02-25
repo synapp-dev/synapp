@@ -7,7 +7,6 @@ import { TooltipProvider } from "@workspace/ui/components/tooltip";
 import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 
 const SIDEBAR_WIDTH = "16rem";
-const SIDEBAR_WIDTH_MOBILE = "18rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
 
 type RightSidebarContextProps = {

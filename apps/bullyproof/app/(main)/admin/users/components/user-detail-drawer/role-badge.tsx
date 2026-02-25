@@ -17,6 +17,7 @@ export function RoleBadge({
   className,
 }: RoleBadgeProps) {
   const roleKey = role.key || "";
+  const badgeTextShadowClass = "[text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_3px_rgba(0,0,0,0.58)]";
 
   const getBadgeClasses = (roleKey: string) => {
     if (roleKey === "TEACHER") {
@@ -73,7 +74,7 @@ export function RoleBadge({
         className="h-3 w-3"
         style={!isSelected ? { color: roleColor } : undefined}
       />
-      {role.name}
+      <span className={badgeTextShadowClass}>{role.name}</span>
     </Badge>
   );
 }

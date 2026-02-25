@@ -3,6 +3,8 @@
 import { Badge } from "@workspace/ui/components/badge";
 import { cn } from "@workspace/ui/lib/utils";
 import { Award, FileBadge2, Shield, ShieldCheck, Users as UsersIcon } from "lucide-react";
+import Image from "next/image";
+import type { ComponentType } from "react";
 
 export interface RoleBadgeItem {
   roleKey: string;
@@ -24,11 +26,29 @@ function getRolePriority(roleKey: string): number {
 }
 
 function getBadgeClasses(roleKey: string, isPlatform: boolean): string {
+  const normalizedRoleKey = roleKey.toUpperCase();
+
+  if (normalizedRoleKey === "INTRADARK_DEV") {
+    return "bg-gradient-to-br from-[#ffd86f] via-[#c29b32] to-[#7b5a00] text-white border-[#c29b32]/60";
+  }
+  if (isPlatform && normalizedRoleKey === "PLATFORM_MODERATOR") {
+    return "bg-gradient-to-br from-[#2aa6ae] via-[#00858e] to-[#00626a] text-white border-[#00858e]/60";
+  }
+  if (isPlatform && normalizedRoleKey === "PLATFORM_STAFF") {
+    return "bg-gradient-to-br from-[#6f9fbd] via-[#5b86a3] to-[#3f6784] text-white border-[#5b86a3]/60";
+  }
+  if (
+    isPlatform &&
+    (normalizedRoleKey === "GOVERNMENT_VIEWER" ||
+      normalizedRoleKey === "GOVERNMENT_ADMIN")
+  ) {
+    return "bg-gradient-to-br from-[#9ca3af] via-[#6b7280] to-[#4b5563] text-white border-[#6b7280]/60";
+  }
   if (roleKey === "TEACHER") {
     return "bg-[var(--role-teacher)] text-[var(--role-teacher-text)] border-[var(--role-teacher)]/50";
   }
-  if (isPlatform && roleKey === "PLATFORM_ADMIN") {
-    return "bg-[var(--role-platform-admin)] text-[var(--role-platform-admin-text)] border-[var(--role-platform-admin)]/50";
+  if (isPlatform && normalizedRoleKey === "PLATFORM_ADMIN") {
+    return "bg-gradient-to-br from-[#f3967f] via-[var(--role-platform-admin)] to-[#c95f41] text-[var(--role-platform-admin-text)] border-[var(--role-platform-admin)]/60";
   }
   if (!isPlatform && roleKey === "SCHOOL_ADMIN") {
     return "bg-[var(--role-school-admin)] text-[var(--role-school-admin-text)] border-[var(--role-school-admin)]/50";
@@ -42,7 +62,14 @@ function getBadgeClasses(roleKey: string, isPlatform: boolean): string {
   return "";
 }
 
-function getRoleIcon(roleKey: string, isAdmin: boolean, roleName?: string) {
+function getRoleIcon(
+  roleKey: string,
+  isAdmin: boolean,
+  roleName?: string
+): string | ComponentType<{ className?: string }> {
+  const normalizedRoleKey = roleKey.toUpperCase();
+
+  if (normalizedRoleKey === "INTRADARK_DEV") return "/images/intradark-blue-star.svg";
   if (roleKey === "SCHOOL_LICENCE") return FileBadge2;
   if (roleKey === "SCHOOL_ADMIN") return Shield;
   if (isAdmin) return ShieldCheck; // PLATFORM_ADMIN
@@ -77,6 +104,11 @@ export function RoleBadges({
   });
 
   const iconClass = size === "sm" ? "h-4 w-4" : "h-5 w-5";
+  const badgeTextShadowClass = "[text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_3px_rgba(0,0,0,0.58)]";
+  const badgeIconShadowClass =
+    "[filter:drop-shadow(0_1px_0_rgba(255,255,255,0.22))_drop-shadow(0_2px_3px_rgba(0,0,0,0.58))]";
+  const intradarkIconShadowClass =
+    "[filter:drop-shadow(0_1px_0_rgba(255,255,255,0.11))_drop-shadow(0_1px_2px_rgba(0,0,0,0.29))]";
   const isJoined = variant === "joined";
 
   return (
@@ -93,8 +125,12 @@ export function RoleBadges({
         const isAdmin =
           roleKey.includes("ADMIN") || roleKey.includes("admin");
         const badgeClasses = getBadgeClasses(roleKey, isPlatform);
-        const RoleIcon = getRoleIcon(roleKey, isAdmin, role.roleName);
+        const roleIcon = getRoleIcon(roleKey, isAdmin, role.roleName);
+        const RoleIcon = typeof roleIcon === "string" ? null : roleIcon;
         const displayName = role.roleName || roleKey || "Unknown";
+        const isIntradarkDev =
+          typeof roleIcon === "string" &&
+          roleIcon === "/images/intradark-blue-star.svg";
 
         const isFirst = idx === 0;
         const isLast = idx === sortedRoles.length - 1;
@@ -129,8 +165,28 @@ export function RoleBadges({
               borderRadiusClass
             )}
           >
-            <RoleIcon className={iconClass} />
-            {displayName}
+            {typeof roleIcon === "string" ? (
+              <Image
+                src={roleIcon}
+                alt="Role Icon"
+                aria-hidden="true"
+                className={cn(
+                  iconClass,
+                  isIntradarkDev ? intradarkIconShadowClass : badgeIconShadowClass,
+                  isIntradarkDev && "motion-safe:animate-spin-slow",
+                  isIntradarkDev && "!h-3 !w-3"
+                )}
+                width={12}
+                height={12}
+              />
+            ) : (
+              RoleIcon && (
+                <RoleIcon
+                  className={cn(iconClass, "text-current", badgeIconShadowClass)}
+                />
+              )
+            )}
+            <span className={badgeTextShadowClass}>{displayName}</span>
           </Badge>
         );
       })}

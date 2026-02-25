@@ -7,6 +7,7 @@ import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useQuery } from "@tanstack/react-query";
 import { meApi } from "@/entities/me/api/endpoints";
 import { AddClassesDialog } from "./add-classes-dialog";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 /**
  * TeacherClassesGuard component
@@ -21,7 +22,8 @@ import { AddClassesDialog } from "./add-classes-dialog";
  * - Dialog hasn't been dismissed in metadata
  */
 export function TeacherClassesGuard() {
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
   const { isLoading } = useCurrentUser();
   const { hasAccess: isTeacher } = useFeatureAccess("system:teacher-access");
   const { hasAccess: hasClassesFeature } = useFeatureAccess("/school/classes");
@@ -113,6 +115,11 @@ export function TeacherClassesGuard() {
   ]);
 
   if (!isTeacher) {
+    return null;
+  }
+
+  // Suppress this onboarding dialog while impersonating to avoid cross-account prompts.
+  if (viewAsUser) {
     return null;
   }
 

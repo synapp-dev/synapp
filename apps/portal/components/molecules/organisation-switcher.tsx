@@ -115,6 +115,9 @@ export function OrganisationSwitcher() {
   // If there's only one organisation, render a simple button without dropdown but still include create option
   if (organisations.length === 1) {
     const organisation = organisations[0];
+    if (!organisation) {
+      return null;
+    }
     return (
       <>
         <SidebarMenu>

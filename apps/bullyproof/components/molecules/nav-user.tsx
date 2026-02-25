@@ -29,11 +29,11 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar";
 import Link from "next/link";
-import { useMeStore } from "@/entities/me/model/store";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
 
   const name =
     currentUser?.fullName ||

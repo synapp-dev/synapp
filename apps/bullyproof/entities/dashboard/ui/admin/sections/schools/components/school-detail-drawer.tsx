@@ -95,6 +95,7 @@ import { schoolLevelsApi } from "@/entities/school-levels/api/endpoints";
 import { statesApi } from "@/entities/states/api/endpoints";
 import { schoolSectorsApi } from "@/entities/school-sectors/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useRoles, useUsers } from "@/entities/users/model/store";
 import { userKeys } from "@/entities/users/model/keys";
 import { UsersTable } from "@/entities/users/ui/users-table";
@@ -265,6 +266,10 @@ function SchoolDetailDrawerContent({
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const {
+    hasAccess: canAccessSchoolActivation,
+    isLoading: isLoadingSchoolActivationAccess,
+  } = useFeatureAccess("admin:school-activation");
   const [activeSection, setActiveSection] = useState<TabId>(
     initialTab || "onboarding"
   );
@@ -354,9 +359,35 @@ function SchoolDetailDrawerContent({
 
   // Handle tab change
   const handleTabChange = (tab: TabId) => {
+    if (
+      tab === "activation" &&
+      !isLoadingSchoolActivationAccess &&
+      !canAccessSchoolActivation
+    ) {
+      return;
+    }
     setActiveSection(tab);
     onTabChange?.(tab);
   };
+
+  useEffect(() => {
+    if (
+      !open ||
+      activeSection !== "activation" ||
+      isLoadingSchoolActivationAccess ||
+      canAccessSchoolActivation
+    ) {
+      return;
+    }
+    setActiveSection("onboarding");
+    onTabChange?.("onboarding");
+  }, [
+    open,
+    activeSection,
+    canAccessSchoolActivation,
+    isLoadingSchoolActivationAccess,
+    onTabChange,
+  ]);
   const [classes, setClasses] = useState<ClassWithYearCodes[]>([]);
   const [loadingClasses, setLoadingClasses] = useState(false);
 
@@ -1140,7 +1171,12 @@ function SchoolDetailDrawerContent({
                     <SelectItem
                       key={item.id}
                       value={item.id}
-                      disabled={item.disabled}
+                      disabled={
+                        item.disabled ||
+                        (item.id === "activation" &&
+                          !isLoadingSchoolActivationAccess &&
+                          !canAccessSchoolActivation)
+                      }
                     >
                       {item.name}
                     </SelectItem>

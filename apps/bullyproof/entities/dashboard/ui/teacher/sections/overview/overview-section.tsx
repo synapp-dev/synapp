@@ -15,13 +15,14 @@ import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
 import { StartNewLessonCard } from "@/entities/lessons/ui/start-new-lesson-card";
 import { useLessons } from "@/entities/lessons/model/store";
 import type { LessonWithDetails } from "@/entities/lessons/model/store";
-import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
+import { useMySchoolsQuery, useSchoolsForUserQuery } from "@/entities/me/model/useMySchoolsQuery";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { useCertificationTopicsByCourseCode } from "@/entities/certification/model/topics-store";
 import { TopicCertificate } from "@/components/molecules/topic-certificate";
 import CountUp from "react-countup";
 import { cn } from "@workspace/ui/lib/utils";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 type UserClass = {
   classId: string;
@@ -35,7 +36,7 @@ type UserClass = {
 };
 
 const MyClassesCard = ({ className }: { className?: string }) => {
-  const currentUser = useMeStore((state) => state.currentUser);
+  const currentUser = useEffectiveUser();
   const activeSchool = useSchoolStore((state) => state.getActiveSchool());
 
   const { data, isLoading, isError } = useQuery<UserClass[]>({
@@ -151,8 +152,13 @@ function getTopLesson(lessons: LessonWithDetails[], currentUserId: string | unde
 }
 
 const MyLessonsCard = ({ className }: { className?: string }) => {
-  const currentUser = useMeStore((state) => state.currentUser);
-  const { data: schools = [] } = useMySchoolsQuery({ limit: 50 });
+  const currentUser = useEffectiveUser();
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
+  const { data: mySchools = [] } = useMySchoolsQuery({ limit: 50 });
+  const { data: viewAsSchools = [] } = useSchoolsForUserQuery(viewAsUser?.id ?? "", {
+    limit: 100,
+  });
+  const schools = viewAsUser ? viewAsSchools : mySchools;
   const schoolIdToSlug = useMemo(() => {
     const m = new Map<string, string>();
     for (const s of schools) {
@@ -289,7 +295,7 @@ function SchoolHeaderCard() {
 }
 
 function CompletedLessonsCard() {
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
   const activeSchool = useSchoolStore((s) => s.getActiveSchool());
   const { lessons, isLoading } = useLessons({ teacherId: currentUser?.id, limit: 100 });
   const completedCount = useMemo(
@@ -321,7 +327,7 @@ function CompletedLessonsCard() {
 }
 
 function APCertificationCard() {
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
 
   const { data: course } = useQuery({
     queryKey: ["certification-course", "amayda-program"],

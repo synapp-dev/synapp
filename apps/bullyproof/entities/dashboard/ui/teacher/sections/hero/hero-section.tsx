@@ -27,6 +27,8 @@ import { LessonFeedbackForm, type LessonForFeedback } from "@/components/organis
 import { checkFeatureAccessAndVisibleCached } from "@/utils/check-feature-access-cached";
 import { getDisplayStatus, getStatusColors } from "@/utils/lesson-status";
 import { CheckCheck } from "lucide-react";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
+import { useSchoolsForUserQuery } from "@/entities/me/model/useMySchoolsQuery";
 
 type LessonWithDetails = {
   id: string;
@@ -52,13 +54,18 @@ export function TeacherHeroSection() {
   const [isSchoolDialogOpen, setIsSchoolDialogOpen] = useState(false);
   const [isPendingFeedbackOpen, setIsPendingFeedbackOpen] = useState(false);
   const [hasShownFeedbackDialog, setHasShownFeedbackDialog] = useState(false);
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
   const teacherId = currentUser?.id;
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
 
   // Fetch user's schools
-  const { data: schools = [], isLoading: isLoadingSchools } = useMySchoolsQuery({
+  const { data: mySchools = [], isLoading: isLoadingMySchools } = useMySchoolsQuery({
     limit: 50,
   });
+  const { data: viewAsSchools = [], isLoading: isLoadingViewAsSchools } =
+    useSchoolsForUserQuery(viewAsUser?.id ?? "", { limit: 100 });
+  const schools = viewAsUser ? viewAsSchools : mySchools;
+  const isLoadingSchools = viewAsUser ? isLoadingViewAsSchools : isLoadingMySchools;
 
   // Check if lessons feature is enabled for any of the user's schools
   const hasLessonsFeature = useMemo(() => {

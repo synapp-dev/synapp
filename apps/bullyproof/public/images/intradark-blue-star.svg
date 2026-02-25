@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_2" data-name="Layer 2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41.79 36.19">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #00497d;
+      }
+
+      .cls-2 {
+        fill: #0483c8;
+      }
+
+      .cls-3 {
+        fill: #4c9ccb;
+      }
+    </style>
+  </defs>
+  <g id="Layer_1-2" data-name="Layer 1">
+    <g id="Group_274" data-name="Group 274">
+      <g id="Group_273" data-name="Group 273">
+        <g id="Group_270" data-name="Group 270">
+          <path id="Path_62" data-name="Path 62" class="cls-3" d="M18.29,13.57l7.83-4.52-2.61,4.52-2.61,4.52h-10.45l7.83-4.52Z"/>
+          <path id="Path_63" data-name="Path 63" class="cls-3" d="M23.51,4.52L31.34,0l-2.61,4.52-2.61,4.52h-10.45l7.83-4.52Z"/>
+          <path id="Path_64" data-name="Path 64" class="cls-3" d="M7.83,13.57l7.83-4.52-2.61,4.52-2.61,4.52H0l7.83-4.52Z"/>
+        </g>
+        <g id="Group_271" data-name="Group 271">
+          <path id="Path_65" data-name="Path 65" class="cls-1" d="M18.29,22.62l-7.83-4.52h10.45l2.61,4.52,2.61,4.52-7.83-4.52Z"/>
+          <path id="Path_66" data-name="Path 66" class="cls-1" d="M7.83,22.62L0,18.09h10.45l2.61,4.52,2.61,4.52-7.83-4.51Z"/>
+          <path id="Path_67" data-name="Path 67" class="cls-1" d="M23.51,31.67l-7.83-4.52h10.45l2.61,4.52,2.61,4.52-7.83-4.52Z"/>
+        </g>
+        <g id="Group_272" data-name="Group 272">
+          <path id="Path_68" data-name="Path 68" class="cls-2" d="M26.12,18.1v-9.05l-2.61,4.52-2.61,4.52,2.61,4.52,2.61,4.52v-9.05Z"/>
+          <path id="Path_69" data-name="Path 69" class="cls-2" d="M31.35,9.05V0l-2.61,4.52-2.61,4.52,2.61,4.52,2.61,4.52v-9.05Z"/>
+          <path id="Path_70" data-name="Path 70" class="cls-2" d="M31.35,27.14v-9.05l-2.61,4.52-2.61,4.52,2.61,4.52,2.61,4.52v-9.04Z"/>
+        </g>
+        <path id="Path_179" data-name="Path 179" class="cls-3" d="M10.45,27.14v-9.05l7.83,4.52,7.83,4.52-7.83,4.52-7.83,4.52v-9.04Z"/>
+        <path id="Path_180" data-name="Path 180" class="cls-2" d="M10.45,9.05V0l7.83,4.52,7.83,4.52-7.83,4.52-7.83,4.52v-9.05Z"/>
+        <path id="Path_181" data-name="Path 181" class="cls-1" d="M26.12,18.1v-9.05l7.83,4.52,7.83,4.52-7.83,4.52-7.83,4.52v-9.05Z"/>
+      </g>
+    </g>
+  </g>
+</svg>

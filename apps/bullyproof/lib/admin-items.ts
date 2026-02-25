@@ -12,7 +12,7 @@ import {
   Component,
   Ticket,
   TicketCheck,
-  Database,
+  DatabaseZap,
   FolderOpen,
 } from "lucide-react";
 
@@ -97,6 +97,15 @@ export const adminItemsConfig: AdminItem[] = [
     enabled: false,
   },
   {
+    title: "Reports",
+    url: "/admin/reports",
+    icon: FileText,
+    iconName: "FileText",
+    description: "View platform reporting dashboards",
+    featureKey: "/admin/reports",
+    enabled: true,
+  },
+  {
     title: "Culture Ratings",
     url: "/admin/culture-ratings",
     icon: BarChart3,
@@ -104,7 +113,6 @@ export const adminItemsConfig: AdminItem[] = [
     description: "View culture rating analytics and reports",
     featureKey: "/admin/culture-ratings",
     enabled: true,
-    disabled: true,
   },
   {
     title: "Audit Logs",
@@ -114,7 +122,6 @@ export const adminItemsConfig: AdminItem[] = [
     description: "Review system activity and changes",
     featureKey: "/admin/audit-logs",
     enabled: true,
-    disabled: true,
   },
   {
     title: "Support Tools",
@@ -124,7 +131,6 @@ export const adminItemsConfig: AdminItem[] = [
     description: "Access support and troubleshooting tools",
     featureKey: "/admin/support-tools",
     enabled: true,
-    disabled: true,
   },
   {
     title: "Tickets",
@@ -138,10 +144,10 @@ export const adminItemsConfig: AdminItem[] = [
   {
     title: "Migrations",
     url: "/admin/migrations",
-    icon: Database,
-    iconName: "Database",
+    icon: DatabaseZap,
+    iconName: "DatabaseZap",
     description: "Run one-off database migrations",
-    featureKey: "/admin/content",
+    featureKey: "/admin/migrations",
     enabled: true,
   },
 ];
@@ -157,13 +163,13 @@ export const adminSegmentToFeatureKey: Record<string, string> = {
   features: "/admin/features",
   classes: "/admin/classes",
   lessons: "/admin/lessons",
+  reports: "/admin/reports",
   "culture-ratings": "/admin/culture-ratings",
   "audit-logs": "/admin/audit-logs",
   "support-tools": "/admin/support-tools",
   tickets: "/admin/tickets",
-  // Use /admin guard so route works before /admin/resources feature is seeded.
-  resources: "/admin",
-  migrations: "/admin/content",
+  resources: "/admin/resources",
+  migrations: "/admin/migrations",
 };
 
 /**
@@ -203,7 +209,7 @@ export function getAdminItemsByCategory() {
       categoryMap["Clients"].push(item);
     } else if (item.title === "Lessons") {
       categoryMap["Lessons"].push(item);
-    } else if (item.title === "Culture Ratings") {
+    } else if (item.title === "Reports" || item.title === "Culture Ratings") {
       categoryMap["Reporting"].push(item);
     } else if (item.title === "Audit Logs") {
       categoryMap["System Settings"].push(item);

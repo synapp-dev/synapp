@@ -667,18 +667,18 @@ export const courseRatingsRelations = relations(courseRatings, ({one}) => ({
 	}),
 }));
 
-export const permissionTemplatesRelations = relations(permissionTemplates, ({one, many}) => ({
-	userProfile: one(userProfile, {
-		fields: [permissionTemplates.createdBy],
-		references: [userProfile.id]
-	}),
-	permissionTemplateRules: many(permissionTemplateRules),
-}));
-
 export const permissionTemplateRulesRelations = relations(permissionTemplateRules, ({one}) => ({
 	permissionTemplate: one(permissionTemplates, {
 		fields: [permissionTemplateRules.templateId],
 		references: [permissionTemplates.id]
+	}),
+}));
+
+export const permissionTemplatesRelations = relations(permissionTemplates, ({one, many}) => ({
+	permissionTemplateRules: many(permissionTemplateRules),
+	userProfile: one(userProfile, {
+		fields: [permissionTemplates.createdBy],
+		references: [userProfile.id]
 	}),
 }));
 

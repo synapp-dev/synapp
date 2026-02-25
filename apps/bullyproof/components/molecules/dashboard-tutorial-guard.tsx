@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { useMeStore } from "@/entities/me/model/store";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { DashboardTutorialDialog } from "./dashboard-tutorial-dialog";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 /**
  * DashboardTutorialGuard component
@@ -17,7 +17,7 @@ import { DashboardTutorialDialog } from "./dashboard-tutorial-dialog";
  */
 export function DashboardTutorialGuard() {
   const pathname = usePathname();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
   const { isLoading } = useCurrentUser();
   const [dialogOpen, setDialogOpen] = useState(false);
 

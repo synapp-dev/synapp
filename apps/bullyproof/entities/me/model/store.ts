@@ -32,11 +32,23 @@ export type UserProfileWithFeatures = UserProfile & {
 
 type MeState = {
   currentUser: UserProfileWithFeatures | null;
+  viewAsUser: UserProfileWithFeatures | null;
+  viewAsStartedAt: number | null;
   setCurrentUser: (user: UserProfileWithFeatures | null) => void;
+  startViewAsMode: (user: UserProfileWithFeatures) => void;
+  stopViewAsMode: () => void;
 };
 
 export const useMeStore = create<MeState>((set) => ({
   currentUser: null,
+  viewAsUser: null,
+  viewAsStartedAt: null,
   setCurrentUser: (user) => set({ currentUser: user }),
+  startViewAsMode: (user) =>
+    set({
+      viewAsUser: user,
+      viewAsStartedAt: Date.now(),
+    }),
+  stopViewAsMode: () => set({ viewAsUser: null, viewAsStartedAt: null }),
 }));
 

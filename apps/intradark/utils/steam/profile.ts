@@ -92,11 +92,16 @@ export async function fetchSteamProfile(
       return null;
     }
 
+    const playerSummary = data.response.players[0];
+    if (!playerSummary) {
+      return null;
+    }
+
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:74',message:'fetchSteamProfile success',data:{steamid:data.response.players[0].steamid,personaname:data.response.players[0].personaname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:74',message:'fetchSteamProfile success',data:{steamid:playerSummary.steamid,personaname:playerSummary.personaname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
     // #endregion
 
-    return data.response.players[0];
+    return playerSummary;
   } catch (error) {
     // #region agent log
     fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:78',message:'fetchSteamProfile exception',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
@@ -130,7 +135,7 @@ export function steamProfileToDbFormat(
     realname: player.realname || null,
     primaryclanid: player.primaryclanid ? BigInt(player.primaryclanid).toString() : null,
     timecreated: player.timecreated ? new Date(player.timecreated * 1000).toISOString() : null,
-    gameid: player.gameid || null,
+    gameid: player.gameid ? Number(player.gameid) : null,
     gameserverip: player.gameserverip || null,
     gameextrainfo: player.gameextrainfo || null,
     cityid: player.cityid || null,

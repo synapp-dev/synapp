@@ -169,12 +169,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const displayState = isMobile ? "expanded" : state;
   const pathname = usePathname();
   const router = useRouter();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const effectiveUser = useMeStore((s) => s.viewAsUser ?? s.currentUser);
   const maintenanceFeaturesAccess = useFeaturesAccess([MAINTENANCE_FEATURE_KEY]);
   const hasMaintenanceAccess = maintenanceFeaturesAccess[MAINTENANCE_FEATURE_KEY]?.hasAccess ?? false;
-  const effectiveMaintenanceMode = hasMaintenanceAccess && !currentUser?.maintenanceBypass;
+  const effectiveMaintenanceMode = hasMaintenanceAccess && !effectiveUser?.maintenanceBypass;
   // Listen for real-time status changes to user's lessons
-  useUserLessonsStatusRealtime(currentUser?.id);
+  useUserLessonsStatusRealtime(effectiveUser?.id);
 
   // When maintenance mode is enabled for the user (and not bypassed), show only the maintenance menu
   if (effectiveMaintenanceMode) {
@@ -216,10 +216,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   // Check if welcome tutorial is completed
   const isWelcomeCompleted = React.useMemo(() => {
-    if (!currentUser?.metadata) return false;
-    const metadata = currentUser.metadata as any;
+    if (!effectiveUser?.metadata) return false;
+    const metadata = effectiveUser.metadata as any;
     return metadata?.tutorials?.welcome?.completed === true;
-  }, [currentUser]);
+  }, [effectiveUser]);
 
   const platformItems = React.useMemo(() => {
     // If welcome is not completed, only show Welcome
@@ -414,7 +414,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Fetch in-progress lesson on mount and when user changes
   // Wait for session to be ready before fetching
   React.useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!effectiveUser?.id) return;
 
     let retryCount = 0;
     const maxRetries = 3;
@@ -428,7 +428,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         
         // Only fetch if we have a valid session token
         if (sessionData?.session?.access_token) {
-          fetchInProgressLesson(currentUser.id);
+          fetchInProgressLesson(effectiveUser.id);
         } else if (retryCount < maxRetries) {
           // Retry after a short delay if token isn't ready yet
           retryCount++;
@@ -451,7 +451,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         clearTimeout(retryTimeout);
       }
     };
-  }, [currentUser?.id, fetchInProgressLesson]);
+  }, [effectiveUser?.id, fetchInProgressLesson]);
 
   const handleLiveLessonClick = React.useCallback((e: React.MouseEvent) => {
     e.preventDefault();

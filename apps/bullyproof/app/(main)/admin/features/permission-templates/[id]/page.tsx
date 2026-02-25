@@ -7,7 +7,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { useRoles } from "@/entities/users/model/store";
+import { rolesApi } from "@/entities/roles/api/endpoints";
 import { RoleBadges } from "@/components/atoms/role-badges";
+import { sortPlatformRoles } from "@/lib/platform-role-order";
 import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Input } from "@workspace/ui/components/input";
@@ -56,7 +58,7 @@ import { AlertCircle, ArrowLeft, Loader2, Pencil, Save } from "lucide-react";
 type TemplateRule = {
   id: string;
   featureKey: string;
-  level: "school" | "school_role";
+  level: "school" | "school_role" | "role";
   roleKey: string | null;
   enabled: boolean;
   visible: boolean | null;
@@ -65,6 +67,7 @@ type TemplateRule = {
 type PermissionTemplateWithRules = {
   id: string;
   name: string;
+  scope: "school" | "platform_role";
   description: string | null;
   createdAt: string;
   updatedAt: string;
@@ -75,6 +78,7 @@ type PermissionTemplateWithRules = {
 type PermissionTemplateListItem = {
   id: string;
   name: string;
+  scope: "school" | "platform_role";
   description: string | null;
   createdAt: string;
   updatedAt: string;
@@ -89,7 +93,7 @@ type Feature = {
   category: string | null;
 };
 
-type ScopeKey = "SCHOOL_ADMIN" | "TEACHER" | "SCHOOL_STAFF" | "SCHOOL_LICENCE";
+type ScopeKey = string;
 
 type MatrixCell = {
   enabled: boolean;
@@ -98,6 +102,10 @@ type MatrixCell = {
 
 type MatrixState = Record<string, Record<ScopeKey, MatrixCell>>;
 
+const EMPTY_SCOPES: ScopeKey[] = [];
+type PlatformRole = { id: string; key: string; name: string };
+const EMPTY_PLATFORM_ROLES: PlatformRole[] = [];
+
 const SCOPE_LABELS: Record<ScopeKey, string> = {
   SCHOOL_ADMIN: "School Admin",
   TEACHER: "AP Teacher",
@@ -105,13 +113,12 @@ const SCOPE_LABELS: Record<ScopeKey, string> = {
   SCHOOL_LICENCE: "School Licence",
 };
 
-const ROLE_SCOPES: ScopeKey[] = [
+const SCHOOL_ROLE_SCOPES: ScopeKey[] = [
   "SCHOOL_ADMIN",
   "TEACHER",
   "SCHOOL_STAFF",
   "SCHOOL_LICENCE",
 ];
-const ALL_SCOPES: ScopeKey[] = [...ROLE_SCOPES];
 
 function isSchoolTemplateFeatureKey(featureKey: string): boolean {
   if (!featureKey) return false;
@@ -127,33 +134,27 @@ function buildEmptyCell(): MatrixCell {
 
 function buildInitialMatrix(
   featureKeys: string[],
-  rules: TemplateRule[]
+  rules: TemplateRule[],
+  scopes: ScopeKey[],
+  templateScope: "school" | "platform_role"
 ): MatrixState {
   const state: MatrixState = {};
   for (const featureKey of featureKeys) {
-    state[featureKey] = {
-      SCHOOL_ADMIN: buildEmptyCell(),
-      TEACHER: buildEmptyCell(),
-      SCHOOL_STAFF: buildEmptyCell(),
-      SCHOOL_LICENCE: buildEmptyCell(),
-    };
+    state[featureKey] = Object.fromEntries(
+      scopes.map((scope) => [scope, buildEmptyCell()])
+    );
   }
 
   for (const rule of rules) {
-    const scope: ScopeKey | null =
-      rule.level === "school_role" &&
-      rule.roleKey &&
-      ROLE_SCOPES.includes(rule.roleKey as ScopeKey)
-        ? (rule.roleKey as ScopeKey)
-        : null;
+    const scope: ScopeKey | null = rule.roleKey;
+    const expectedLevel = templateScope === "school" ? "school_role" : "role";
+    if (rule.level !== expectedLevel) continue;
     if (!scope) continue;
+    if (!scopes.includes(scope)) continue;
     if (!state[rule.featureKey]) {
-      state[rule.featureKey] = {
-        SCHOOL_ADMIN: buildEmptyCell(),
-        TEACHER: buildEmptyCell(),
-        SCHOOL_STAFF: buildEmptyCell(),
-        SCHOOL_LICENCE: buildEmptyCell(),
-      };
+      state[rule.featureKey] = Object.fromEntries(
+        scopes.map((key) => [key, buildEmptyCell()])
+      );
     }
     state[rule.featureKey][scope] = {
       enabled: rule.enabled,
@@ -221,26 +222,57 @@ export default function PermissionTemplateDetailsPage() {
   const schoolRoleLabels = useMemo(() => {
     const map = new Map<string, string>();
     for (const role of roles) {
-      if (ROLE_SCOPES.includes(role.key as ScopeKey)) {
+      if (SCHOOL_ROLE_SCOPES.includes(role.key as ScopeKey)) {
         map.set(role.key, role.name);
       }
     }
     return map;
   }, [roles]);
 
+  const { data: platformRolesData } = useQuery<PlatformRole[]>({
+    queryKey: ["roles", "platform", "permission-template-editor"],
+    queryFn: async () => {
+      const result = await rolesApi.get.list({ scope: "platform" });
+      if (result.error) throw new Error(result.error.message);
+      return result.data ?? [];
+    },
+  });
+  const sortedPlatformRoles = useMemo(
+    () => sortPlatformRoles(platformRolesData ?? EMPTY_PLATFORM_ROLES),
+    [platformRolesData]
+  );
+
+  const templateScope = template?.scope ?? "school";
+  const allScopes = useMemo<ScopeKey[]>(() => {
+    if (templateScope === "platform_role") {
+      return sortedPlatformRoles
+        .map((role) => role.key)
+        .filter((key): key is string => Boolean(key))
+    }
+    return SCHOOL_ROLE_SCOPES;
+  }, [sortedPlatformRoles, templateScope]);
+
   const featureKeys = useMemo(() => {
     const keys = new Set(
       features
         .map((f) => f.key)
-        .filter((featureKey) => isSchoolTemplateFeatureKey(featureKey))
+        .filter((featureKey) =>
+          templateScope === "school"
+            ? isSchoolTemplateFeatureKey(featureKey)
+            : true
+        )
     );
     for (const rule of template?.rules ?? []) {
-      if (isSchoolTemplateFeatureKey(rule.featureKey)) {
+      const canInclude =
+        templateScope === "school"
+          ? isSchoolTemplateFeatureKey(rule.featureKey)
+          : true;
+      if (canInclude) {
         keys.add(rule.featureKey);
       }
     }
     return Array.from(keys).sort((a, b) => a.localeCompare(b));
-  }, [features, template?.rules]);
+  }, [features, template?.rules, templateScope]);
 
   const featureByKey = useMemo(() => {
     return new Map(features.map((feature) => [feature.key, feature]));
@@ -248,10 +280,14 @@ export default function PermissionTemplateDetailsPage() {
 
   useEffect(() => {
     if (!template) return;
-    setMatrix(buildInitialMatrix(featureKeys, template.rules));
+    setMatrix(buildInitialMatrix(featureKeys, template.rules, allScopes, templateScope));
+  }, [template, featureKeys, allScopes, templateScope]);
+
+  useEffect(() => {
+    if (!template) return;
     setDraftName(template.name);
     setDraftDescription(template.description ?? "");
-  }, [template, featureKeys]);
+  }, [template]);
 
   const updateCell = (
     featureKey: string,
@@ -262,10 +298,7 @@ export default function PermissionTemplateDetailsPage() {
       ...prev,
       [featureKey]: {
         ...(prev[featureKey] ?? {
-          SCHOOL_ADMIN: buildEmptyCell(),
-          TEACHER: buildEmptyCell(),
-          SCHOOL_STAFF: buildEmptyCell(),
-          SCHOOL_LICENCE: buildEmptyCell(),
+          ...Object.fromEntries(allScopes.map((key) => [key, buildEmptyCell()])),
         }),
         [scope]: {
           ...(prev[featureKey]?.[scope] ?? buildEmptyCell()),
@@ -275,38 +308,82 @@ export default function PermissionTemplateDetailsPage() {
     }));
   };
 
+  const setColumnAccess = (scope: ScopeKey, enabled: boolean) => {
+    setMatrix((prev) => {
+      const next: MatrixState = { ...prev };
+      for (const featureKey of featureKeys) {
+        const existingRow =
+          prev[featureKey] ??
+          Object.fromEntries(allScopes.map((key) => [key, buildEmptyCell()]));
+        const existingCell = existingRow[scope] ?? buildEmptyCell();
+        next[featureKey] = {
+          ...existingRow,
+          [scope]: {
+            ...existingCell,
+            enabled,
+            // Access implies visibility.
+            visible: enabled ? true : existingCell.visible,
+          },
+        };
+      }
+      return next;
+    });
+  };
+
+  const setColumnVisible = (scope: ScopeKey, visible: boolean) => {
+    setMatrix((prev) => {
+      const next: MatrixState = { ...prev };
+      for (const featureKey of featureKeys) {
+        const existingRow =
+          prev[featureKey] ??
+          Object.fromEntries(allScopes.map((key) => [key, buildEmptyCell()]));
+        const existingCell = existingRow[scope] ?? buildEmptyCell();
+        next[featureKey] = {
+          ...existingRow,
+          [scope]: {
+            ...existingCell,
+            visible,
+          },
+        };
+      }
+      return next;
+    });
+  };
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!templateId) throw new Error("Missing template ID");
       const rules: Array<{
         featureKey: string;
-        level: "school" | "school_role";
+        level: "school" | "school_role" | "role";
         roleKey?: string;
         enabled: boolean;
         visible: boolean;
       }> = [];
 
-      const preservedSchoolRules = (template.rules ?? []).filter(
-        (rule) =>
-          rule.level === "school" && isSchoolTemplateFeatureKey(rule.featureKey)
-      );
-      for (const rule of preservedSchoolRules) {
-        rules.push({
-          featureKey: rule.featureKey,
-          level: "school",
-          enabled: rule.enabled,
-          visible: rule.visible ?? rule.enabled,
-        });
+      if (template.scope === "school") {
+        const preservedSchoolRules = (template.rules ?? []).filter(
+          (rule) =>
+            rule.level === "school" && isSchoolTemplateFeatureKey(rule.featureKey)
+        );
+        for (const rule of preservedSchoolRules) {
+          rules.push({
+            featureKey: rule.featureKey,
+            level: "school",
+            enabled: rule.enabled,
+            visible: rule.visible ?? rule.enabled,
+          });
+        }
       }
 
       for (const featureKey of featureKeys) {
         const row = matrix[featureKey];
         if (!row) continue;
-        for (const scope of ALL_SCOPES) {
+        for (const scope of allScopes) {
           const cell = row[scope] ?? buildEmptyCell();
           rules.push({
             featureKey,
-            level: "school_role",
+            level: template.scope === "school" ? "school_role" : "role",
             roleKey: scope,
             enabled: cell.enabled,
             visible: cell.visible,
@@ -377,14 +454,19 @@ export default function PermissionTemplateDetailsPage() {
       return result.data;
     },
     onSuccess: (sourceTemplate) => {
+      const expectedLevel = template.scope === "school" ? "school_role" : "role";
+      const canIncludeFeature = (featureKey: string) =>
+        template.scope === "school"
+          ? isSchoolTemplateFeatureKey(featureKey)
+          : true;
       const importedRules = (sourceTemplate.rules ?? []).filter(
         (rule) =>
-          isSchoolTemplateFeatureKey(rule.featureKey) &&
-          rule.level === "school_role" &&
+          canIncludeFeature(rule.featureKey) &&
+          rule.level === expectedLevel &&
           !!rule.roleKey &&
-          ROLE_SCOPES.includes(rule.roleKey as ScopeKey)
+          allScopes.includes(rule.roleKey as ScopeKey)
       );
-      setMatrix(buildInitialMatrix(featureKeys, importedRules));
+      setMatrix(buildInitialMatrix(featureKeys, importedRules, allScopes, template.scope));
       toast.success(`Imported rules from "${sourceTemplate.name}"`);
     },
     onError: (err: Error) => {
@@ -456,8 +538,9 @@ export default function PermissionTemplateDetailsPage() {
             <div>
               <CardTitle>Permission Matrix</CardTitle>
               <CardDescription>
-                Configure `Access` and `Visible` for each feature per scope. Visible
-                allows display; Access controls functionality.
+                Configure `Access` and `Visible` for each feature per{" "}
+                {template.scope === "school" ? "school role" : "platform role"}.
+                Visible allows display; Access controls functionality.
               </CardDescription>
             </div>
             <div className="w-full max-w-sm flex items-center gap-2">
@@ -471,6 +554,7 @@ export default function PermissionTemplateDetailsPage() {
                 <SelectContent>
                   {templates
                     .filter((item) => item.id !== template.id)
+                    .filter((item) => item.scope === template.scope)
                     .map((item) => (
                       <SelectItem key={item.id} value={item.id}>
                         {item.name}
@@ -500,14 +584,20 @@ export default function PermissionTemplateDetailsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[240px]">Feature</TableHead>
-                  {ALL_SCOPES.map((scope) => (
+                  {allScopes.map((scope) => (
                     <TableHead key={scope} className="min-w-[180px]">
                       <RoleBadges
                         roles={[
                           {
                             roleKey: scope,
-                            roleName: schoolRoleLabels.get(scope) || SCOPE_LABELS[scope],
-                            isPlatform: false,
+                            roleName:
+                              template.scope === "school"
+                                ? schoolRoleLabels.get(scope) || SCOPE_LABELS[scope]
+                                : (platformRolesData ?? EMPTY_PLATFORM_ROLES).find(
+                                    (role) => role.key === scope
+                                  )?.name ||
+                                  scope,
+                            isPlatform: template.scope === "platform_role",
                           },
                         ]}
                         variant="joined"
@@ -518,14 +608,58 @@ export default function PermissionTemplateDetailsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
+                <TableRow className="bg-muted/30">
+                  <TableCell className="font-medium text-xs text-muted-foreground">
+                    Column controls
+                  </TableCell>
+                  {allScopes.map((scope) => {
+                    const allAccessEnabled =
+                      featureKeys.length > 0 &&
+                      featureKeys.every((featureKey) => {
+                        const row = matrix[featureKey];
+                        const cell = row?.[scope] ?? buildEmptyCell();
+                        return cell.enabled;
+                      });
+                    const allVisibleEnabled =
+                      featureKeys.length > 0 &&
+                      featureKeys.every((featureKey) => {
+                        const row = matrix[featureKey];
+                        const cell = row?.[scope] ?? buildEmptyCell();
+                        return cell.visible;
+                      });
+                    return (
+                      <TableCell key={`column-controls-${scope}`}>
+                        <div className="flex items-center gap-4">
+                          <label className="flex items-center gap-2 text-xs">
+                            <Checkbox
+                              checked={allAccessEnabled}
+                              onCheckedChange={(checked) =>
+                                setColumnAccess(scope, Boolean(checked))
+                              }
+                            />
+                            All access
+                          </label>
+                          <label className="flex items-center gap-2 text-xs">
+                            <Checkbox
+                              checked={allVisibleEnabled}
+                              onCheckedChange={(checked) =>
+                                setColumnVisible(scope, Boolean(checked))
+                              }
+                            />
+                            All visible
+                          </label>
+                        </div>
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
                 {featureKeys.map((featureKey) => {
                   const feature = featureByKey.get(featureKey);
-                  const row = matrix[featureKey] ?? {
-                    SCHOOL_ADMIN: buildEmptyCell(),
-                    TEACHER: buildEmptyCell(),
-                    SCHOOL_STAFF: buildEmptyCell(),
-                    SCHOOL_LICENCE: buildEmptyCell(),
-                  };
+                  const row =
+                    matrix[featureKey] ??
+                    Object.fromEntries(
+                      allScopes.map((scope) => [scope, buildEmptyCell()])
+                    );
 
                   return (
                     <TableRow key={featureKey}>
@@ -535,7 +669,7 @@ export default function PermissionTemplateDetailsPage() {
                           {featureKey}
                         </div>
                       </TableCell>
-                      {ALL_SCOPES.map((scope) => {
+                      {allScopes.map((scope) => {
                         const cell = row[scope] ?? buildEmptyCell();
                         return (
                           <TableCell key={`${featureKey}-${scope}`}>
@@ -546,6 +680,9 @@ export default function PermissionTemplateDetailsPage() {
                                   onCheckedChange={(checked) =>
                                     updateCell(featureKey, scope, {
                                       enabled: Boolean(checked),
+                                      visible: Boolean(checked)
+                                        ? true
+                                        : cell.visible,
                                     })
                                   }
                                 />

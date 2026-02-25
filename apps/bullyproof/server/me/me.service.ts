@@ -28,6 +28,89 @@ async function assertCanAccessUserProfile(
   await assertFeature(ctx, "/admin/users");
 }
 
+function resolveMaintenanceBypass(user: any): boolean {
+  return !!(
+    process.env.MAINTENANCE_BYPASS_DEV_KEY &&
+    (user?.metadata as Record<string, unknown> | null)?.devKey ===
+      process.env.MAINTENANCE_BYPASS_DEV_KEY
+  );
+}
+
+async function buildUserWithFeaturePermissions(userId: string, user: any) {
+  const permissions = await featuresRepo.getUserPermissions(userId);
+  const userRolesData = await db
+    .select({
+      roleId: userRoles.roleId,
+      schoolId: userRoles.schoolId,
+    })
+    .from(userRoles)
+    .where(eq(userRoles.userId, userId));
+
+  const userSchoolIds = userRolesData
+    .map((ur) => ur.schoolId)
+    .filter((id): id is string => id !== null);
+  const userRoleIds = userRolesData.map((ur) => ur.roleId);
+
+  const featurePermissionsMap: Record<
+    string,
+    {
+      global?: { enabled: boolean; visible: boolean | null };
+      schools: Record<string, { enabled: boolean; visible: boolean | null }>;
+      roles: Record<string, { enabled: boolean; visible: boolean | null }>;
+      schoolRoles: Record<
+        string,
+        Record<string, { enabled: boolean; visible: boolean | null }>
+      >;
+      user?: { enabled: boolean; visible: boolean | null };
+    }
+  > = {};
+
+  permissions.forEach((p) => {
+    const featureKey = p.feature.key;
+    if (!featurePermissionsMap[featureKey]) {
+      featurePermissionsMap[featureKey] = {
+        schools: {},
+        roles: {},
+        schoolRoles: {},
+      };
+    }
+
+    const level = p.permission.level;
+    const enabled = p.permission.enabled;
+    const visible = p.permission.visible ?? null;
+    const levelValue = { enabled, visible };
+
+    if (level === "global") {
+      featurePermissionsMap[featureKey].global = levelValue;
+    } else if (level === "school" && p.permission.targetId) {
+      featurePermissionsMap[featureKey].schools[p.permission.targetId] = levelValue;
+    } else if (
+      level === "school_role" &&
+      p.permission.targetId &&
+      (p.permission as any).schoolId
+    ) {
+      const schoolId = (p.permission as any).schoolId as string;
+      if (!featurePermissionsMap[featureKey].schoolRoles[schoolId]) {
+        featurePermissionsMap[featureKey].schoolRoles[schoolId] = {};
+      }
+      featurePermissionsMap[featureKey].schoolRoles[schoolId][p.permission.targetId] =
+        levelValue;
+    } else if (level === "role" && p.permission.targetId) {
+      featurePermissionsMap[featureKey].roles[p.permission.targetId] = levelValue;
+    } else if (level === "user") {
+      featurePermissionsMap[featureKey].user = levelValue;
+    }
+  });
+
+  return {
+    ...user,
+    featurePermissions: featurePermissionsMap,
+    schoolIds: userSchoolIds,
+    roleIds: userRoleIds,
+    maintenanceBypass: resolveMaintenanceBypass(user),
+  };
+}
+
 export const meService = {
   async getUserById(ctx: AuthContext, params: unknown) {
     const { id } = getUserByIdSchema.parse(params);
@@ -35,6 +118,34 @@ export const meService = {
 
     const rows = await meRepo.getProfileByUserId(id);
     return rows[0] ?? null;
+  },
+
+  async getUserByIdForViewMode(
+    ctx: AuthContext,
+    params: unknown,
+    includeFeaturePermissions = false
+  ) {
+    const { id } = getUserByIdSchema.parse(params);
+    if (!ctx.userId) {
+      throw new Error("Unauthorized");
+    }
+
+    // View-as simulation is only available to users who can use impersonation.
+    await assertFeature(ctx, "system:impersonate");
+
+    const rows = await meRepo.getProfileByUserId(id);
+    const user = rows[0] ?? null;
+    if (!user) return null;
+
+    if (includeFeaturePermissions) {
+      try {
+        return await buildUserWithFeaturePermissions(id, user);
+      } catch (error) {
+        console.error("Failed to load feature permissions for view mode:", error);
+      }
+    }
+
+    return { ...user, maintenanceBypass: resolveMaintenanceBypass(user) };
   },
 
   async getUserByEmail(ctx: AuthContext, params: unknown) {
@@ -52,97 +163,12 @@ export const meService = {
     const rows = await meRepo.getProfileByUserId(ctx.userId);
     const user = rows[0] ?? null;
 
-    const maintenanceBypass = !!(
-      process.env.MAINTENANCE_BYPASS_DEV_KEY &&
-      (user?.metadata as Record<string, unknown> | null)?.devKey ===
-        process.env.MAINTENANCE_BYPASS_DEV_KEY
-    );
+    const maintenanceBypass = resolveMaintenanceBypass(user);
 
     // Optionally include feature permissions
     if (user && includeFeaturePermissions) {
       try {
-        // Get all permissions for the user (across all schools)
-        const permissions = await featuresRepo.getUserPermissions(ctx.userId);
-        
-        // Get user's roles and schools to build permission map
-        const userRolesData = await db
-          .select({
-            roleId: userRoles.roleId,
-            schoolId: userRoles.schoolId,
-          })
-          .from(userRoles)
-          .where(eq(userRoles.userId, ctx.userId));
-        
-        const userSchoolIds = userRolesData
-          .map((ur) => ur.schoolId)
-          .filter((id): id is string => id !== null);
-        
-        const userRoleIds = userRolesData.map((ur) => ur.roleId);
-
-        // Build a map: featureKey -> { global?, schools, roles, schoolRoles, user? } with { enabled, visible } per level
-        const featurePermissionsMap: Record<
-          string,
-          {
-            global?: { enabled: boolean; visible: boolean | null };
-            schools: Record<string, { enabled: boolean; visible: boolean | null }>;
-            roles: Record<string, { enabled: boolean; visible: boolean | null }>;
-            schoolRoles: Record<string, Record<string, { enabled: boolean; visible: boolean | null }>>;
-            user?: { enabled: boolean; visible: boolean | null };
-          }
-        > = {};
-
-        permissions.forEach((p) => {
-          const featureKey = p.feature.key;
-          if (!featurePermissionsMap[featureKey]) {
-            featurePermissionsMap[featureKey] = {
-              schools: {},
-              roles: {},
-              schoolRoles: {},
-            };
-          }
-
-          const level = p.permission.level;
-          const enabled = p.permission.enabled;
-          const visible = p.permission.visible ?? null;
-          const levelValue = { enabled, visible };
-
-          if (level === "global") {
-            featurePermissionsMap[featureKey].global = levelValue;
-          } else if (level === "school" && p.permission.targetId) {
-            featurePermissionsMap[featureKey].schools[p.permission.targetId] = levelValue;
-          } else if (level === "school_role" && p.permission.targetId && (p.permission as any).schoolId) {
-            const schoolId = (p.permission as any).schoolId as string;
-            if (!featurePermissionsMap[featureKey].schoolRoles[schoolId]) {
-              featurePermissionsMap[featureKey].schoolRoles[schoolId] = {};
-            }
-            featurePermissionsMap[featureKey].schoolRoles[schoolId][p.permission.targetId] = levelValue;
-          } else if (level === "role" && p.permission.targetId) {
-            featurePermissionsMap[featureKey].roles[p.permission.targetId] = levelValue;
-          } else if (level === "user") {
-            featurePermissionsMap[featureKey].user = levelValue;
-          }
-        });
-
-        const result = {
-          ...user,
-          featurePermissions: featurePermissionsMap,
-          // Also include user's school IDs and role IDs for convenience
-          schoolIds: userSchoolIds,
-          roleIds: userRoleIds,
-          maintenanceBypass,
-        };
-
-        // Debug logging for lessons
-        if (featurePermissionsMap["/school/lessons"]) {
-          console.log("[/school/lessons] User feature permissions loaded:", {
-            userId: ctx.userId,
-            schoolIds: userSchoolIds,
-            roleIds: userRoleIds,
-            lessonsPermission: featurePermissionsMap["/school/lessons"],
-          });
-        }
-
-        return result;
+        return await buildUserWithFeaturePermissions(ctx.userId, user);
       } catch (error) {
         // If feature permissions fail to load, return user without them
         console.error("Failed to load feature permissions:", error);

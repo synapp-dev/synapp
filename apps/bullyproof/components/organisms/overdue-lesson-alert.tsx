@@ -21,7 +21,8 @@ import { Clock, PlayCircle } from "lucide-react";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { LessonTopicThumbnail } from "@/entities/lessons/ui/lesson-card";
 import { useMeStore } from "@/entities/me/model/store";
-import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
+import { useMySchoolsQuery, useSchoolsForUserQuery } from "@/entities/me/model/useMySchoolsQuery";
+import { useEffectiveUser } from "@/hooks/use-effective-user";
 
 type LessonWithDetails = {
   id: string;
@@ -91,7 +92,8 @@ function addDismissedLessonId(lessonId: string): void {
 export function OverdueLessonAlert() {
   const router = useRouter();
   const pathname = usePathname();
-  const currentUser = useMeStore((s) => s.currentUser);
+  const currentUser = useEffectiveUser();
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
 
   const runLessonMatch = pathname?.match(/^\/schools\/[^/]+\/lessons\/([^/]+)\/run-lesson/);
   const currentLessonIdFromPath = runLessonMatch?.[1] ?? null;
@@ -107,7 +109,11 @@ export function OverdueLessonAlert() {
   }, []);
 
   // Fetch user's schools for school name and slug
-  const { data: schools = [] } = useMySchoolsQuery({ limit: 50 });
+  const { data: mySchools = [] } = useMySchoolsQuery({ limit: 50 });
+  const { data: viewAsSchools = [] } = useSchoolsForUserQuery(viewAsUser?.id ?? "", {
+    limit: 100,
+  });
+  const schools = viewAsUser ? viewAsSchools : mySchools;
 
   // Fetch lessons with status 'ready', filter overdue (by date), enrich with details
   const { data: overdueLessonsRaw } = useQuery({

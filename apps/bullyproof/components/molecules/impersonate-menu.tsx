@@ -1,4 +1,7 @@
-import { useState } from "react";
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Command,
   CommandDialog,
@@ -9,7 +12,7 @@ import {
   CommandList,
 } from "@workspace/ui/components/command";
 import { Button } from "@workspace/ui/components/button";
-import { Drama, VenetianMask } from "lucide-react";
+import { Drama, Loader2, VenetianMask } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import {
   Tooltip,
@@ -17,76 +20,203 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+import { RoleBadges } from "@/components/atoms/role-badges";
+import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
+import { useMeStore } from "@/entities/me/model/store";
 
-// Dummy user data
-const dummyUsers = [
-  {
-    id: "1",
-    name: "John Smith",
-    email: "john.smith@example.com",
-    role: "Teacher",
-  },
-  {
-    id: "2",
-    name: "Sarah Johnson",
-    email: "sarah.johnson@example.com",
-    role: "Principal",
-  },
-  {
-    id: "3",
-    name: "Mike Davis",
-    email: "mike.davis@example.com",
-    role: "Teacher",
-  },
-  {
-    id: "4",
-    name: "Emily Wilson",
-    email: "emily.wilson@example.com",
-    role: "Counselor",
-  },
-  {
-    id: "5",
-    name: "David Brown",
-    email: "david.brown@example.com",
-    role: "Teacher",
-  },
-  {
-    id: "6",
-    name: "Lisa Anderson",
-    email: "lisa.anderson@example.com",
-    role: "Vice Principal",
-  },
-  {
-    id: "7",
-    name: "Tom Miller",
-    email: "tom.miller@example.com",
-    role: "Teacher",
-  },
-  {
-    id: "8",
-    name: "Jennifer Taylor",
-    email: "jennifer.taylor@example.com",
-    role: "Teacher",
-  },
-];
+const SEARCH_DEBOUNCE_MS = 1000;
+const PLATFORM_ROLE_DISPLAY_NAMES: Record<string, string> = {
+  INTRADARK_DEV: "Intradark Dev",
+  PLATFORM_ADMIN: "Platform Admin",
+  PLATFORM_MODERATOR: "Platform Moderator",
+  PLATFORM_STAFF: "Platform Staff",
+  GOVERNMENT_ADMIN: "Government Admin",
+  GOVERNMENT_VIEWER: "Government Viewer",
+};
 
 export function ImpersonateMenu() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<
-    (typeof dummyUsers)[0] | null
-  >(null);
+  const [search, setSearch] = useState("");
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isStartingMode, setIsStartingMode] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
+  const viewAsStartedAt = useMeStore((s) => s.viewAsStartedAt);
+  const startViewAsMode = useMeStore((s) => s.startViewAsMode);
+  const stopViewAsMode = useMeStore((s) => s.stopViewAsMode);
 
-  const handleUserSelect = (user: (typeof dummyUsers)[0]) => {
-    console.log("Impersonating user:", user);
-    setSelectedUser(user);
+  const selectedUserName = useMemo(() => {
+    if (!viewAsUser) return "";
+    const name = `${viewAsUser.firstName ?? ""} ${viewAsUser.lastName ?? ""}`.trim();
+    return name || viewAsUser.email || "Selected user";
+  }, [viewAsUser]);
+
+  const selectedUserInitials = useMemo(() => {
+    if (!selectedUserName) return "U";
+    const tokens = selectedUserName.split(" ").filter(Boolean);
+    if (tokens.length === 1) return tokens[0][0]?.toUpperCase() ?? "U";
+    return `${tokens[0][0] ?? ""}${tokens[1][0] ?? ""}`.toUpperCase();
+  }, [selectedUserName]);
+
+  const selectedRoleLabel = useMemo(() => {
+    if (!viewAsUser) return "User";
+    const metadataRoles = (viewAsUser.metadata as any)?.roles;
+    if (Array.isArray(metadataRoles) && metadataRoles.length > 0) {
+      return String(metadataRoles[0]?.name ?? metadataRoles[0] ?? "User");
+    }
+    return "User";
+  }, [viewAsUser]);
+
+  const selectedSchoolsLabel = useMemo(() => {
+    if (!viewAsUser) return "Not available";
+    const schools = (viewAsUser.metadata as any)?.schools;
+    if (Array.isArray(schools) && schools.length > 0) {
+      return schools
+        .slice(0, 2)
+        .map((s: any) => s?.name ?? s?.schoolName ?? String(s))
+        .join(", ");
+    }
+    return "Not available";
+  }, [viewAsUser]);
+
+  const sessionDurationLabel = useMemo(() => {
+    if (!viewAsStartedAt) return "Just started";
+    const elapsedMs = Date.now() - viewAsStartedAt;
+    const elapsedMin = Math.max(1, Math.floor(elapsedMs / 60_000));
+    return `${elapsedMin} minute${elapsedMin === 1 ? "" : "s"}`;
+  }, [viewAsStartedAt, open]);
+
+  const startedAtLabel = useMemo(() => {
+    if (!viewAsStartedAt) return "Just now";
+    return new Date(viewAsStartedAt).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }, [viewAsStartedAt]);
+
+  const fetchUsers = async (query: string) => {
+    setIsLoadingUsers(true);
+    setLoadError(null);
+    const { data, error } = await meApi.get.listAllUsers({
+      limit: 50,
+      search: query || undefined,
+    });
+    if (error) {
+      setUsers([]);
+      setLoadError(error.message || "Failed to load users.");
+    } else {
+      setUsers(data?.users ?? []);
+    }
+    setIsLoadingUsers(false);
+  };
+
+  useEffect(() => {
+    if (!open || !!viewAsUser) return;
+    const trimmedSearch = search.trim();
+    if (!trimmedSearch) {
+      setUsers([]);
+      setLoadError(null);
+      setIsLoadingUsers(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      void fetchUsers(trimmedSearch);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [open, search, viewAsUser]);
+
+  const getUserDisplayName = (user: UserWithRolesAndSchools) => {
+    const name = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
+    return name || user.email;
+  };
+
+  const getPlatformRoleName = (roleKey: string) => {
+    if (!roleKey) return "Unknown Role";
+    if (PLATFORM_ROLE_DISPLAY_NAMES[roleKey]) {
+      return PLATFORM_ROLE_DISPLAY_NAMES[roleKey];
+    }
+    return roleKey
+      .toLowerCase()
+      .split("_")
+      .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : ""))
+      .join(" ");
+  };
+
+  const getRoleRenderData = (user: UserWithRolesAndSchools) => {
+    const platformRoles = user.platformRoles.map((roleKey) => ({
+      roleKey,
+      roleName: getPlatformRoleName(roleKey),
+      isPlatform: true,
+    }));
+
+    const rolesBySchool = new Map<
+      string,
+      {
+        schoolName?: string;
+        roles: Array<{ roleKey: string; roleName: string; isPlatform: false }>;
+      }
+    >();
+
+    user.schoolRoles.forEach((schoolRole) => {
+      if (!schoolRole.roleKey) return;
+      const schoolId = schoolRole.schoolId || "unknown";
+      if (!rolesBySchool.has(schoolId)) {
+        rolesBySchool.set(schoolId, {
+          schoolName: schoolRole.schoolName || undefined,
+          roles: [],
+        });
+      }
+      rolesBySchool.get(schoolId)!.roles.push({
+        roleKey: schoolRole.roleKey,
+        roleName: schoolRole.roleName || schoolRole.roleKey,
+        isPlatform: false,
+      });
+    });
+
+    const schoolRoleGroups = Array.from(rolesBySchool.entries()).map(
+      ([schoolId, value]) => ({
+        schoolId,
+        schoolName: value.schoolName,
+        roles: value.roles,
+      })
+    );
+
+    return { platformRoles, schoolRoleGroups };
+  };
+
+  const getUserSearchText = (user: UserWithRolesAndSchools) => {
+    const roleTerms = [
+      ...user.platformRoles,
+      ...user.schoolRoles.flatMap((sr) => [sr.roleKey || "", sr.roleName || "", sr.schoolName || ""]),
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return `${getUserDisplayName(user)} ${user.email} ${roleTerms}`;
+  };
+
+  const handleUserSelect = async (user: UserWithRolesAndSchools) => {
+    setIsStartingMode(true);
+    setLoadError(null);
+    const { data, error } = await meApi.get.userById(user.id, true);
+    if (error || !data) {
+      setLoadError(error?.message || "Failed to load user permissions.");
+      setIsStartingMode(false);
+      return;
+    }
+
+    startViewAsMode(data);
+    setIsStartingMode(false);
     setOpen(false);
-    // TODO: Implement actual impersonation logic
+    router.replace("/dashboard");
   };
 
   const handleStopImpersonating = () => {
-    setSelectedUser(null);
+    stopViewAsMode();
+    setSearch("");
+    setLoadError(null);
     setOpen(false);
-    // TODO: Implement stop impersonation logic
   };
 
   const handleImpersonatingButtonClick = () => {
@@ -95,7 +225,7 @@ export function ImpersonateMenu() {
 
   return (
     <>
-      {selectedUser ? (
+      {viewAsUser ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -108,7 +238,7 @@ export function ImpersonateMenu() {
             >
               <VenetianMask className="h-5 w-5 animate-float-gentle" />
               <span className="truncate max-w-[120px]">
-                {selectedUser.name}
+                {selectedUserName}
               </span>
             </Button>
           </TooltipTrigger>
@@ -136,8 +266,9 @@ export function ImpersonateMenu() {
       <CommandDialog
         open={open}
         onOpenChange={setOpen}
+        className="w-[95vw] sm:max-w-4xl"
       >
-        {selectedUser ? (
+        {viewAsUser ? (
           // Impersonation Status View
           <>
             <div className="px-4 py-3 border-b">
@@ -155,16 +286,13 @@ export function ImpersonateMenu() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                   <span className="text-orange-600 font-semibold text-sm">
-                    {selectedUser.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
+                    {selectedUserInitials}
                   </span>
                 </div>
                 <div>
-                  <h3 className="font-medium">{selectedUser.name}</h3>
+                  <h3 className="font-medium">{selectedUserName}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedUser.email}
+                    {viewAsUser.email}
                   </p>
                 </div>
               </div>
@@ -172,26 +300,28 @@ export function ImpersonateMenu() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b">
                   <span className="text-sm font-medium">Role</span>
-                  <Badge variant="secondary">{selectedUser.role}</Badge>
+                  <Badge variant="secondary">{selectedRoleLabel}</Badge>
                 </div>
 
                 <div className="flex justify-between items-center py-2 border-b">
                   <span className="text-sm font-medium">Assigned Schools</span>
                   <span className="text-sm text-muted-foreground">
-                    Lincoln Elementary, Roosevelt High
+                    {selectedSchoolsLabel}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center py-2 border-b">
                   <span className="text-sm font-medium">Session Duration</span>
                   <span className="text-sm text-muted-foreground">
-                    2 minutes
+                    {sessionDurationLabel}
                   </span>
                 </div>
 
                 <div className="flex justify-between items-center py-2">
                   <span className="text-sm font-medium">Started At</span>
-                  <span className="text-sm text-muted-foreground">2:34 PM</span>
+                  <span className="text-sm text-muted-foreground">
+                    {startedAtLabel}
+                  </span>
                 </div>
               </div>
 
@@ -214,29 +344,80 @@ export function ImpersonateMenu() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Use this tool to see what the selected user sees when browsing
-                the platform.
+                the platform. View mode is read-only.
               </p>
             </div>
-            <CommandInput placeholder="Search users to impersonate..." />
+            <CommandInput
+              placeholder="Search users to impersonate..."
+              value={search}
+              onValueChange={setSearch}
+            />
             <CommandList>
-              <CommandEmpty>No users found.</CommandEmpty>
+              {isLoadingUsers || isStartingMode ? (
+                <div className="px-4 py-8 text-sm text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading users...
+                </div>
+              ) : loadError ? (
+                <div className="px-4 py-6 text-sm text-destructive">{loadError}</div>
+              ) : (
+                <CommandEmpty>
+                  {search.trim()
+                    ? "No users found."
+                    : "Type at least one character to search users."}
+                </CommandEmpty>
+              )}
               <CommandGroup heading="Users">
-                {dummyUsers.map((user) => (
+                {users.map((user) => (
                   <CommandItem
                     key={user.id}
-                    value={`${user.name} ${user.email}`}
-                    onSelect={() => handleUserSelect(user)}
+                    value={getUserSearchText(user)}
+                    onSelect={() => void handleUserSelect(user)}
                   >
                     <div className="flex w-full items-center justify-between gap-2">
                       <div className="flex flex-col">
-                        <span className="font-medium">{user.name}</span>
+                        <span className="font-medium">{getUserDisplayName(user)}</span>
                         <span className="text-sm text-muted-foreground">
                           {user.email}
                         </span>
                       </div>
-                      <Badge variant="secondary" className="shrink-0">
-                        {user.role}
-                      </Badge>
+                      <div className="flex max-w-[60%] flex-wrap justify-end gap-1">
+                        {(() => {
+                          const { platformRoles, schoolRoleGroups } = getRoleRenderData(user);
+                          return (
+                            <>
+                              {platformRoles.length > 0 && (
+                                <RoleBadges
+                                  roles={platformRoles}
+                                  variant="joined"
+                                  size="sm"
+                                />
+                              )}
+                              {schoolRoleGroups.map((group) => (
+                                <div
+                                  key={`school-role-group-${user.id}-${group.schoolId}`}
+                                  className="flex items-center gap-0"
+                                >
+                                  <RoleBadges
+                                    roles={group.roles}
+                                    variant="joined"
+                                    size="sm"
+                                    lastConnectsToRight={!!group.schoolName}
+                                  />
+                                  {group.schoolName && (
+                                    <Badge
+                                      variant="outline"
+                                      className="border-l-0 rounded-r-md rounded-l-none bg-transparent pl-5 -ml-2 z-0 pr-2 py-1 text-muted-foreground"
+                                    >
+                                      {group.schoolName}
+                                    </Badge>
+                                  )}
+                                </div>
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </CommandItem>
                 ))}

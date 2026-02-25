@@ -1,44 +1,37 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/fetcher.client";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useRoles } from "@/entities/users/model/store";
 import type { School } from "./schools-table-columns";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
-import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
-import { Separator } from "@workspace/ui/components/separator";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { toast } from "sonner";
-import {
-  AlertCircle,
-  BadgeCheck,
-  FileLock2,
-  Loader2,
-  Lock,
-  Presentation,
-} from "lucide-react";
-
-type ActivationStageKey =
-  | "school-locked"
-  | "school-certification-enabled"
-  | "school-lessons-enabled";
-
-type ActivationTemplateSummary = {
-  key: ActivationStageKey;
-  templateId: string;
-  name: string;
-  description: string | null;
-  ruleCount: number;
-};
+import { AlertCircle, Layers, Loader2 } from "lucide-react";
 
 type Feature = {
   id: string;
@@ -54,151 +47,61 @@ type FeaturePermission = {
   visible?: boolean | null;
 };
 
+type ActivationTemplateRule = {
+  id: string;
+  templateId: string;
+  featureKey: string;
+  level: "school" | "school_role" | "role";
+  roleKey: string | null;
+  enabled: boolean;
+  visible: boolean | null;
+};
+
+type ActivationTemplate = {
+  id: string;
+  name: string;
+  templateKey: string | null;
+  description: string | null;
+  scope: "school" | "platform_role";
+  rules: ActivationTemplateRule[];
+};
+
 interface SchoolActivationTabProps {
   school: School;
 }
 
-const ACTIVATION_FEATURE_KEYS = [
-  "/courses",
-  "/school/home",
-  "/school/teachers",
-  "/school/classes",
-  "/school/lessons",
-  "/school/resources",
-] as const;
-
-const STAGE_ORDER: ActivationStageKey[] = [
-  "school-locked",
-  "school-certification-enabled",
-  "school-lessons-enabled",
-];
-
-const STAGE_META: Record<
-  ActivationStageKey,
-  {
-    title: string;
-    description: string;
-    icon: typeof Lock;
-  }
-> = {
-  "school-locked": {
-    title: "Fully locked",
-    description:
-      "Users can access dashboard, but AP Certification and school navigation are locked.",
-    icon: Lock,
-  },
-  "school-certification-enabled": {
-    title: "Certification access",
-    description:
-      "AP Certification and core school navigation are enabled, while lessons stay role-limited.",
-    icon: BadgeCheck,
-  },
-  "school-lessons-enabled": {
-    title: "Lessons and Resource access",
-    description:
-      "AP Certification plus school lessons/resources and school navigation are enabled.",
-    icon: Presentation,
-  },
+const ACTIVATION_TEMPLATE_PRIORITY: Record<string, number> = {
+  "school-locked": 0,
+  "enable-courses-certification": 1,
+  "school-certification-enabled": 1,
+  "full-school-unlock": 2,
+  "school-lessons-enabled": 2,
 };
 
-type StageExpectation = {
-  level: "school" | "school_role";
-  roleKey?: "TEACHER" | "SCHOOL_ADMIN" | "SCHOOL_STAFF";
-  featureKey: string;
-  enabled: boolean;
-  visible: boolean;
-};
+function toTemplateKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-function buildExpectations(stage: ActivationStageKey): StageExpectation[] {
-  if (stage === "school-locked") {
-    const result: StageExpectation[] = ACTIVATION_FEATURE_KEYS.map((featureKey) => ({
-      level: "school",
-      featureKey,
-      enabled: false,
-      visible: false,
-    }));
-    for (const roleKey of ["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF"] as const) {
-      for (const featureKey of ACTIVATION_FEATURE_KEYS) {
-        result.push({
-          level: "school_role",
-          roleKey,
-          featureKey,
-          enabled: false,
-          visible: false,
-        });
-      }
-    }
-    return result;
-  }
-
-  if (stage === "school-certification-enabled") {
-    const baselineEnabled = [
-      "/courses",
-      "/school/home",
-      "/school/teachers",
-      "/school/classes",
-      "/school/resources",
-    ];
-    return [
-      ...baselineEnabled.map((featureKey) => ({
-        level: "school" as const,
-        featureKey,
-        enabled: true,
-        visible: true,
-      })),
-      {
-        level: "school" as const,
-        featureKey: "/school/lessons",
-        enabled: false,
-        visible: true,
-      },
-      {
-        level: "school_role" as const,
-        roleKey: "TEACHER" as const,
-        featureKey: "/school/lessons",
-        enabled: true,
-        visible: true,
-      },
-      {
-        level: "school_role" as const,
-        roleKey: "SCHOOL_ADMIN" as const,
-        featureKey: "/school/lessons",
-        enabled: false,
-        visible: true,
-      },
-      {
-        level: "school_role" as const,
-        roleKey: "SCHOOL_STAFF" as const,
-        featureKey: "/school/lessons",
-        enabled: false,
-        visible: true,
-      },
-    ];
-  }
-
-  const result: StageExpectation[] = ACTIVATION_FEATURE_KEYS.map((featureKey) => ({
-    level: "school",
-    featureKey,
-    enabled: true,
-    visible: true,
-  }));
-  for (const roleKey of ["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF"] as const) {
-    for (const featureKey of ACTIVATION_FEATURE_KEYS) {
-      result.push({
-        level: "school_role",
-        roleKey,
-        featureKey,
-        enabled: true,
-        visible: true,
-      });
-    }
-  }
-  return result;
+function toTitleCase(value: string): string {
+  return value.replace(/\w\S*/g, (word) => {
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
 }
 
 export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
   const queryClient = useQueryClient();
   const { roles } = useRoles();
+  const [pendingTemplate, setPendingTemplate] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  const {
+    hasAccess: canAccessActivation,
+    isLoading: isLoadingActivationAccess,
+  } = useFeatureAccess("admin:school-activation");
 
   const { data: features = [], isLoading: isLoadingFeatures } = useQuery<Feature[]>({
     queryKey: ["features", "activation"],
@@ -209,34 +112,55 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
     },
   });
 
-  const featureIdByKey = useMemo(() => {
-    return new Map(features.map((feature) => [feature.key, feature.id]));
-  }, [features]);
+  const featureIdByKey = useMemo(
+    () => new Map(features.map((feature) => [feature.key, feature.id])),
+    [features]
+  );
 
-  const roleIdByKey = useMemo(() => {
-    return new Map(
-      roles
-        .filter((role) =>
-          ["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF"].includes(role.key)
-        )
-        .map((role) => [role.key, role.id])
-    );
-  }, [roles]);
+  const roleIdByKey = useMemo(
+    () => new Map(roles.map((role) => [role.key, role.id])),
+    [roles]
+  );
 
   const {
     data: activationTemplates = [],
     isLoading: isLoadingActivationTemplates,
     error: activationTemplatesError,
-  } = useQuery<ActivationTemplateSummary[]>({
+  } = useQuery<ActivationTemplate[]>({
     queryKey: ["activation-templates"],
     queryFn: async () => {
-      const result = await apiFetch<{ templates: ActivationTemplateSummary[] }>(
+      const result = await apiFetch<{ templates: ActivationTemplate[] }>(
         "/permission-templates/activation"
       );
       if (result.error) throw new Error(result.error.message);
       return result.data?.templates ?? [];
     },
   });
+
+  const templateRoleKeys = useMemo(() => {
+    const roleKeys = new Set<string>();
+    for (const template of activationTemplates) {
+      for (const rule of template.rules ?? []) {
+        if (rule.level === "school_role" && rule.roleKey) {
+          roleKeys.add(rule.roleKey);
+        }
+      }
+    }
+    return [...roleKeys];
+  }, [activationTemplates]);
+
+  const sortedTemplates = useMemo(() => {
+    return [...activationTemplates].sort((a, b) => {
+      const keyA = a.templateKey ?? toTemplateKey(a.name);
+      const keyB = b.templateKey ?? toTemplateKey(b.name);
+      const priorityA =
+        ACTIVATION_TEMPLATE_PRIORITY[keyA] ?? Number.MAX_SAFE_INTEGER;
+      const priorityB =
+        ACTIVATION_TEMPLATE_PRIORITY[keyB] ?? Number.MAX_SAFE_INTEGER;
+      if (priorityA !== priorityB) return priorityA - priorityB;
+      return keyA.localeCompare(keyB);
+    });
+  }, [activationTemplates]);
 
   const { data: schoolPermissions = [], isLoading: isLoadingSchoolPermissions } =
     useQuery<FeaturePermission[]>({
@@ -254,11 +178,16 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
     data: schoolRolePermissionsByRole = {},
     isLoading: isLoadingSchoolRolePermissions,
   } = useQuery<Record<string, FeaturePermission[]>>({
-    queryKey: ["activation-school-role-permissions", school.id, roleIdByKey.size],
-    enabled: roleIdByKey.size > 0,
+    queryKey: [
+      "activation-school-role-permissions",
+      school.id,
+      templateRoleKeys.join(","),
+      roleIdByKey.size,
+    ],
+    enabled: roleIdByKey.size > 0 && templateRoleKeys.length > 0,
     queryFn: async () => {
       const entries = await Promise.all(
-        (["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF"] as const)
+        templateRoleKeys
           .filter((roleKey) => roleIdByKey.has(roleKey))
           .map(async (roleKey) => {
             const roleId = roleIdByKey.get(roleKey)!;
@@ -274,20 +203,20 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
   });
 
   const applyMutation = useMutation({
-    mutationFn: async (activationKey: ActivationStageKey) => {
+    mutationFn: async (templateId: string) => {
       const result = await apiFetch<{
-        activationKey: ActivationStageKey;
+        templateId: string;
         templateName: string;
       }>("/permission-templates/activation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ schoolId: school.id, activationKey }),
+        body: JSON.stringify({ schoolId: school.id, templateId }),
       });
       if (result.error) throw new Error(result.error.message);
       return result.data;
     },
     onSuccess: (data) => {
-      toast.success(`Applied ${data?.templateName ?? "activation template"}`);
+      toast.success(`Applied ${data?.templateName ?? "permission template"}`);
       queryClient.invalidateQueries({ queryKey: ["activation-templates"] });
       queryClient.invalidateQueries({
         queryKey: ["activation-school-permissions", school.id],
@@ -298,18 +227,21 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
       queryClient.invalidateQueries({ queryKey: ["features"] });
     },
     onError: (err: Error) => {
-      toast.error(err.message ?? "Failed to apply activation stage");
+      toast.error(err.message ?? "Failed to apply activation template");
     },
   });
 
-  const currentStage = useMemo<ActivationStageKey | null>(() => {
-    if (featureIdByKey.size === 0) return null;
+  const templateActiveById = useMemo(() => {
+    const result = new Map<string, boolean>();
+    if (featureIdByKey.size === 0) return result;
 
     const schoolPermissionByFeatureId = new Map(
       schoolPermissions.map((permission) => [permission.featureId, permission])
     );
     const rolePermissionByRoleAndFeatureId = new Map<string, FeaturePermission>();
-    for (const [roleKey, permissions] of Object.entries(schoolRolePermissionsByRole)) {
+    for (const [roleKey, permissions] of Object.entries(
+      schoolRolePermissionsByRole
+    )) {
       for (const permission of permissions) {
         rolePermissionByRoleAndFeatureId.set(
           `${roleKey}:${permission.featureId}`,
@@ -318,45 +250,62 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
       }
     }
 
-    const matchesStage = (stage: ActivationStageKey) => {
-      const expectations = buildExpectations(stage);
-      for (const expectation of expectations) {
-        const featureId = featureIdByKey.get(expectation.featureKey);
-        if (!featureId) return false;
+    const doesRuleMatch = (rule: ActivationTemplateRule) => {
+      const featureId = featureIdByKey.get(rule.featureKey);
+      if (!featureId) return false;
 
-        const permission =
-          expectation.level === "school"
-            ? schoolPermissionByFeatureId.get(featureId)
-            : rolePermissionByRoleAndFeatureId.get(
-                `${expectation.roleKey}:${featureId}`
-              );
-        if (!permission) return false;
+      const permission =
+        rule.level === "school"
+          ? schoolPermissionByFeatureId.get(featureId)
+          : rule.level === "school_role" && rule.roleKey
+            ? rolePermissionByRoleAndFeatureId.get(`${rule.roleKey}:${featureId}`)
+            : undefined;
+      if (!permission) return false;
 
-        const effectiveVisible =
-          permission.visible === null || permission.visible === undefined
-            ? permission.enabled
-            : permission.visible;
-        if (
-          permission.enabled !== expectation.enabled ||
-          effectiveVisible !== expectation.visible
-        ) {
-          return false;
-        }
-      }
-      return true;
+      const expectedVisible = rule.visible ?? rule.enabled;
+      const actualVisible =
+        permission.visible === null || permission.visible === undefined
+          ? permission.enabled
+          : permission.visible;
+      return (
+        permission.enabled === rule.enabled && actualVisible === expectedVisible
+      );
     };
 
-    for (const stage of STAGE_ORDER) {
-      if (matchesStage(stage)) return stage;
+    for (const template of activationTemplates) {
+      if (!template.rules || template.rules.length === 0) {
+        result.set(template.id, false);
+        continue;
+      }
+      result.set(template.id, template.rules.every(doesRuleMatch));
     }
-    return null;
-  }, [featureIdByKey, schoolPermissions, schoolRolePermissionsByRole]);
+
+    return result;
+  }, [
+    activationTemplates,
+    featureIdByKey,
+    schoolPermissions,
+    schoolRolePermissionsByRole,
+  ]);
 
   const isLoading =
+    isLoadingActivationAccess ||
     isLoadingFeatures ||
     isLoadingActivationTemplates ||
     isLoadingSchoolPermissions ||
     isLoadingSchoolRolePermissions;
+
+  if (!isLoadingActivationAccess && !canAccessActivation) {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Activation unavailable</AlertTitle>
+        <AlertDescription>
+          You do not have permission to use school activation templates.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (activationTemplatesError) {
     return (
@@ -382,9 +331,11 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
     );
   }
 
-  const templateByKey = new Map(
-    activationTemplates.map((template) => [template.key, template])
-  );
+  const handleConfirmApply = () => {
+    if (!pendingTemplate) return;
+    applyMutation.mutate(pendingTemplate.id);
+    setPendingTemplate(null);
+  };
 
   return (
     <div className="space-y-6 pb-6">
@@ -392,76 +343,128 @@ export function SchoolActivationTab({ school }: SchoolActivationTabProps) {
         <CardHeader>
           <CardTitle>Activation</CardTitle>
           <CardDescription>
-            Apply named role-aware templates to control AP Certification and school
-            navigation access for this school.
+            Apply school permission templates. A template is marked as active when all
+            of its rules match this school&apos;s current permissions.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {currentStage ? (
-            <Badge variant="secondary">
-              Current stage: {STAGE_META[currentStage].title}
-            </Badge>
+          {sortedTemplates.length === 0 ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>No school templates found</AlertTitle>
+              <AlertDescription>
+                Create school-scoped permission templates in Admin Features.
+              </AlertDescription>
+            </Alert>
           ) : (
-            <Badge variant="outline">Current stage: custom/unknown</Badge>
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {sortedTemplates.map((template) => {
+                const isActive = templateActiveById.get(template.id) ?? false;
+                const isPending =
+                  applyMutation.isPending && applyMutation.variables === template.id;
+                const templateKey = template.templateKey ?? toTemplateKey(template.name);
+                const displayName = toTitleCase(template.name);
+
+                return (
+                  <Card
+                    key={template.id}
+                    className={`h-full flex flex-col ${
+                      isActive
+                        ? "border-green-500 bg-green-50/40 dark:bg-green-950/20"
+                        : ""
+                    }`}
+                  >
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Layers className="h-4 w-4" />
+                        {displayName}
+                      </CardTitle>
+                      <CardDescription>
+                        {template.description || "No description"}
+                      </CardDescription>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {templateKey}
+                      </p>
+                    </CardHeader>
+                    <CardContent className="flex-1" />
+                    <CardFooter className="border-t flex flex-col items-stretch gap-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">
+                          Rules: {template.rules?.length ?? 0}
+                        </span>
+                        {isActive ? (
+                          <Badge variant="secondary">Template active</Badge>
+                        ) : (
+                          <Badge variant="outline">Not active</Badge>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className={`w-full ${
+                          isActive
+                            ? "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
+                            : ""
+                        }`}
+                        variant={isActive ? "outline" : "default"}
+                        onClick={() =>
+                          setPendingTemplate({ id: template.id, name: template.name })
+                        }
+                        disabled={applyMutation.isPending}
+                        data-template-id={template.id}
+                      >
+                        {isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {isActive ? "Re-apply template" : "Apply template"}
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
           )}
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {STAGE_ORDER.map((stageKey) => {
-              const meta = STAGE_META[stageKey];
-              const template = templateByKey.get(stageKey);
-              const Icon = meta.icon;
-              const isCurrent = currentStage === stageKey;
-              const isPending =
-                applyMutation.isPending && applyMutation.variables === stageKey;
-
-              return (
-                <Card
-                  key={stageKey}
-                  className={isCurrent ? "border-primary ring-1 ring-primary/30" : ""}
-                >
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      {meta.title}
-                    </CardTitle>
-                    <CardDescription>{meta.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-xs text-muted-foreground">
-                      Template: {template?.name ?? stageKey}
-                    </div>
-                    <Button
-                      size="sm"
-                      className="w-full"
-                      variant={isCurrent ? "outline" : "default"}
-                      onClick={() => applyMutation.mutate(stageKey)}
-                      disabled={applyMutation.isPending}
-                    >
-                      {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {isCurrent ? "Re-apply current stage" : "Apply stage"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
         </CardContent>
       </Card>
 
-      <Separator />
-
-      <Card className="border-dashed">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileLock2 className="h-4 w-4" />
-            Content access
-          </CardTitle>
-          <CardDescription>
-            Reserved for later. Content-specific activation logic will be added in a
-            future iteration.
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <Dialog
+        open={pendingTemplate !== null}
+        onOpenChange={(open) => {
+          if (!open && !applyMutation.isPending) {
+            setPendingTemplate(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apply template</DialogTitle>
+            <DialogDescription>
+              {pendingTemplate
+                ? `You're about to apply the ${toTitleCase(
+                    pendingTemplate.name
+                  )} template to ${school.name}.`
+                : "You're about to apply a template."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPendingTemplate(null)}
+              disabled={applyMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmApply}
+              disabled={applyMutation.isPending || !pendingTemplate}
+            >
+              {applyMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Confirm apply
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -8,7 +8,7 @@
  */
 export function extractSteamId(claimedId: string): string | null {
   const match = claimedId.match(/^https?:\/\/steamcommunity\.com\/openid\/id\/(\d+)$/);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 /**

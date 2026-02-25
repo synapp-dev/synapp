@@ -13,27 +13,34 @@ export async function POST(
     }
     const { id } = await params;
     const body = await request.json();
-    const { schoolIds } = body;
-    if (!Array.isArray(schoolIds) || schoolIds.length === 0) {
+    const { schoolIds, roleIds } = body;
+    const validSchoolIds = Array.isArray(schoolIds)
+      ? schoolIds.filter((s: unknown): s is string => typeof s === "string")
+      : [];
+    const validRoleIds = Array.isArray(roleIds)
+      ? roleIds.filter((r: unknown): r is string => typeof r === "string")
+      : [];
+    if (validSchoolIds.length === 0 && validRoleIds.length === 0) {
       return NextResponse.json(
-        { error: "schoolIds array is required and must not be empty" },
+        {
+          error:
+            "Either schoolIds or roleIds array is required and must not be empty",
+        },
         { status: 400 }
       );
     }
-    const validIds = schoolIds.filter(
-      (s: unknown): s is string => typeof s === "string"
-    );
-    if (validIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one valid school ID is required" },
-        { status: 400 }
-      );
-    }
-    const result = await permissionTemplatesService.revokeFromSchools(
-      { userId },
-      id,
-      validIds
-    );
+    const result =
+      validSchoolIds.length > 0
+        ? await permissionTemplatesService.revokeFromSchools(
+            { userId },
+            id,
+            validSchoolIds
+          )
+        : await permissionTemplatesService.revokeFromPlatformRoles(
+            { userId },
+            id,
+            validRoleIds
+          );
     return NextResponse.json(result, { status: 200 });
   } catch (e: unknown) {
     console.error(e);

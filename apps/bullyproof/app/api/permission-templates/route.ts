@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const body = await request.json();
-    const { name, description, rules } = body;
+    const { name, description, rules, scope } = body;
     if (!name || typeof name !== "string") {
       return NextResponse.json(
         { error: "name is required" },
@@ -36,6 +36,8 @@ export async function POST(request: Request) {
       { userId },
       {
         name,
+        scope:
+          scope === "platform_role" || scope === "school" ? scope : undefined,
         description: typeof description === "string" ? description : undefined,
         rules: Array.isArray(rules)
           ? rules.map(
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
                 visible?: boolean | null;
               }) => ({
                 featureKey: r.featureKey,
-                level: r.level as "school" | "school_role",
+                level: r.level as "school" | "school_role" | "role",
                 roleKey: r.roleKey,
                 enabled: typeof r.enabled === "boolean" ? r.enabled : undefined,
                 visible:
