@@ -24,6 +24,7 @@ async function seedFeatures() {
       { key: 'admin:delete-user', name: 'Delete User', description: 'Delete users from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
       { key: 'admin:delete-school', name: 'Delete School', description: 'Delete schools from the admin panel (restricted to INTRADARK_DEV)', category: 'action', section: 'admin' },
       { key: 'admin:school-activation', name: 'School Activation', description: 'Access to the school drawer Activation tab in admin schools', category: 'action', section: 'admin' },
+      { key: 'admin:schools-view-school-status', name: 'Admin: Schools View School Status', description: 'Show school status badge on school home metadata row', category: 'action', section: 'admin' },
 
       // Action features – lessons
       { key: 'lessons:cancel-lesson', name: 'Cancel Lesson', description: 'Cancel lessons from the lesson sidebar (owner, or INTRADARK_DEV/PLATFORM_ADMIN). Sets status to cancelled for data persistence.', category: 'action', section: 'schools-lessons' },
@@ -31,6 +32,7 @@ async function seedFeatures() {
 
       // Action features – school settings
       { key: 'school:manage-school-user-roles', name: 'Manage School User Roles', description: 'School admin can assign/remove school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) for users at their school only', category: 'action', section: 'schools-settings' },
+      { key: 'school:settings-certification', name: 'School Settings Certification', description: 'School admin can view teacher AMAYDA certification progress in school settings for their school only', category: 'action', section: 'schools-settings' },
 
       // Page features – top-level
       { key: '/dashboard', name: 'Dashboard', description: 'Access to the dashboard', category: 'page', section: 'dashboard' },
@@ -311,6 +313,29 @@ async function seedFeatures() {
       }
     }
 
+    // School status badge visibility: INTRADARK_DEV, PLATFORM_ADMIN, PLATFORM_MODERATOR, PLATFORM_STAFF can access
+    const schoolsViewSchoolStatusFeature = insertedFeatures.find(
+      (f) => f.key === 'admin:schools-view-school-status'
+    );
+    if (schoolsViewSchoolStatusFeature) {
+      for (const role of [
+        intradarkDevRole,
+        platformAdminRole,
+        platformModeratorRole,
+        platformStaffRole,
+      ]) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: schoolsViewSchoolStatusFeature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: true,
+            visible: true,
+          });
+        }
+      }
+    }
+
     // School manage user roles: SCHOOL_ADMIN gets access (for settings page role management)
     const manageSchoolUserRolesFeature = insertedFeatures.find(f => f.key === 'school:manage-school-user-roles');
     if (manageSchoolUserRolesFeature && schoolAdminRole.length > 0) {
@@ -320,6 +345,23 @@ async function seedFeatures() {
         targetId: schoolAdminRole[0].id,
         enabled: true,
       });
+    }
+    const schoolSettingsCertificationFeature = insertedFeatures.find(
+      (f) => f.key === 'school:settings-certification'
+    );
+    // School settings certification: INTRADARK_DEV, PLATFORM_ADMIN, PLATFORM_MODERATOR get global role access
+    if (schoolSettingsCertificationFeature) {
+      for (const role of [intradarkDevRole, platformAdminRole, platformModeratorRole]) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: schoolSettingsCertificationFeature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: true,
+            visible: true,
+          });
+        }
+      }
     }
 
     // Cancel lesson: TEACHER, SCHOOL_ADMIN, INTRADARK_DEV, PLATFORM_ADMIN get access
@@ -519,6 +561,25 @@ async function seedFeatures() {
       }
     }
 
+    // School status badge visibility: globally hidden (specific platform roles get role override)
+    if (schoolsViewSchoolStatusFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: schoolsViewSchoolStatusFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: false,
+        })
+        .onConflictDoNothing()
+        .returning();
+
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
     // School manage user roles: globally visible but not enabled (SCHOOL_ADMIN gets via role)
     if (manageSchoolUserRolesFeature) {
       const result = await db
@@ -529,6 +590,24 @@ async function seedFeatures() {
           targetId: null,
           enabled: false,
           visible: true,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (result.length > 0) {
+        globalPermissionsCreated++;
+      }
+    }
+
+    // School settings certification: globally hidden (SCHOOL_ADMIN gets school_role permission per school)
+    if (schoolSettingsCertificationFeature) {
+      const result = await db
+        .insert(featurePermissions)
+        .values({
+          featureId: schoolSettingsCertificationFeature.id,
+          level: 'global',
+          targetId: null,
+          enabled: false,
+          visible: false,
         })
         .onConflictDoNothing()
         .returning();
@@ -615,6 +694,28 @@ async function seedFeatures() {
           if (result.length > 0) {
             permissionsCreated++;
           }
+        }
+      }
+    }
+
+    // School_role permissions: SCHOOL_ADMIN gets school settings certification at each school they are assigned to
+    if (schoolAdminRole.length > 0 && schoolSettingsCertificationFeature) {
+      for (const school of allSchools) {
+        const result = await db
+          .insert(featurePermissions)
+          .values({
+            featureId: schoolSettingsCertificationFeature.id,
+            level: 'school_role' as const,
+            targetId: schoolAdminRole[0].id,
+            schoolId: school.id,
+            enabled: true,
+            visible: true,
+          })
+          .onConflictDoNothing()
+          .returning();
+
+        if (result.length > 0) {
+          permissionsCreated++;
         }
       }
     }

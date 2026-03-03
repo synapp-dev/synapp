@@ -8,6 +8,7 @@ import {
 } from "./school.validators";
 import { schoolRepo } from "./school.repo";
 import { curriculumRepo } from "../curriculum/curriculum.repo";
+import { permissionTemplatesService } from "../permission-templates/permission-templates.service";
 import { getUserScopedRoles } from "../auth/rbac";
 import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
@@ -23,6 +24,33 @@ type AuthContext = {
   userId: string | null;
   roles?: string[];
 };
+
+type SchoolStatus = "onboarding" | "ready" | "active" | "certification";
+
+function resolveSchoolStatus(row: {
+  id: string;
+  teacherCount?: number | null;
+  classCount?: number | null;
+  schoolAdminCount?: number | null;
+  schoolLicenceCount?: number | null;
+}, fullUnlockActiveBySchoolId: Record<string, boolean>, certificationUnlockActiveBySchoolId: Record<string, boolean>): SchoolStatus {
+  const teacherCount = Number(row.teacherCount ?? 0);
+  const classCount = Number(row.classCount ?? 0);
+  const schoolAdminCount = Number(row.schoolAdminCount ?? 0);
+  const schoolLicenceCount = Number(row.schoolLicenceCount ?? 0);
+
+  const isReady =
+    teacherCount >= 1 &&
+    classCount >= 1 &&
+    schoolAdminCount >= 1 &&
+    schoolLicenceCount >= 1;
+  const isActive = !!fullUnlockActiveBySchoolId[row.id];
+  const isCertification = !!certificationUnlockActiveBySchoolId[row.id];
+
+  if (isActive) return "active";
+  if (isCertification) return "certification";
+  return isReady ? "ready" : "onboarding";
+}
 
 async function assertCanListSchools(ctx: AuthContext) {
   if (!ctx.userId) {
@@ -113,7 +141,24 @@ export const schoolService = {
     };
 
     const rows = await schoolRepo.getAllPaginated(queryParams);
-    return rows;
+    const schoolIds = rows.map((row) => row.id).filter(Boolean);
+    const fullUnlockActiveBySchoolId =
+      await permissionTemplatesService.getFullSchoolUnlockActiveBySchoolIds(
+        schoolIds
+      );
+    const certificationUnlockActiveBySchoolId =
+      await permissionTemplatesService.getCertificationUnlockActiveBySchoolIds(
+        schoolIds
+      );
+
+    return rows.map((row) => ({
+      ...row,
+      status: resolveSchoolStatus(
+        row,
+        fullUnlockActiveBySchoolId,
+        certificationUnlockActiveBySchoolId
+      ),
+    }));
   },
   async getYearsForSchool(ctx: AuthContext, schoolId: string) {
     await assertCanViewSchool(ctx, schoolId);
@@ -132,7 +177,23 @@ export const schoolService = {
     // Check if user has permission to view this specific school
     await assertCanViewSchool(ctx, school.id);
 
-    return school;
+    const fullUnlockActiveBySchoolId =
+      await permissionTemplatesService.getFullSchoolUnlockActiveBySchoolIds([
+        school.id,
+      ]);
+    const certificationUnlockActiveBySchoolId =
+      await permissionTemplatesService.getCertificationUnlockActiveBySchoolIds([
+        school.id,
+      ]);
+
+    return {
+      ...school,
+      status: resolveSchoolStatus(
+        school,
+        fullUnlockActiveBySchoolId,
+        certificationUnlockActiveBySchoolId
+      ),
+    };
   },
 
   async getSchoolStats(ctx: AuthContext, schoolIdOrSlug: string) {

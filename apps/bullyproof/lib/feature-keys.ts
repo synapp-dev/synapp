@@ -88,6 +88,8 @@ export const ACTION_FEATURES = {
   TAKE_OVER_LESSON: "lessons:take-over-lesson",
   /** School-admin can assign/remove school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) for users at their school only */
   MANAGE_SCHOOL_USER_ROLES: "school:manage-school-user-roles",
+  /** School-admin can view school teachers' AMAYDA certification progress at their school only */
+  VIEW_SCHOOL_CERTIFICATION: "school:settings-certification",
 } as const;
 
 // ─── Valid Categories ────────────────────────────────────────────────────────

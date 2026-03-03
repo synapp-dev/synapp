@@ -362,4 +362,138 @@ export const permissionTemplatesService = {
       templateName: template.name,
     };
   },
+
+  async getFullSchoolUnlockActiveBySchoolIds(schoolIds: string[]) {
+    return this.getTemplateActiveBySchoolIds("full-school-unlock", schoolIds);
+  },
+
+  async getCertificationUnlockActiveBySchoolIds(schoolIds: string[]) {
+    return this.getTemplateActiveBySchoolIds(
+      "enable-courses-certification",
+      schoolIds
+    );
+  },
+
+  async getTemplateActiveBySchoolIds(templateKey: string, schoolIds: string[]) {
+    const uniqueSchoolIds = [...new Set(schoolIds.filter(Boolean))];
+    const statusBySchoolId: Record<string, boolean> = Object.fromEntries(
+      uniqueSchoolIds.map((schoolId) => [schoolId, false])
+    );
+
+    if (uniqueSchoolIds.length === 0) {
+      return statusBySchoolId;
+    }
+
+    const templateRows = await permissionTemplatesRepo.getByScopeAndTemplateKey(
+      "school",
+      templateKey
+    );
+    const template = templateRows[0];
+    if (!template) {
+      return statusBySchoolId;
+    }
+
+    const templateWithRules = await permissionTemplatesRepo.getWithRules(template.id);
+    const rules = templateWithRules?.rules ?? [];
+    if (rules.length === 0) {
+      return statusBySchoolId;
+    }
+
+    const featureIdByKey = new Map<string, string>();
+    const roleIdByKey = new Map<string, string>();
+    const roleKeys = new Set<string>();
+
+    for (const rule of rules) {
+      if (!featureIdByKey.has(rule.featureKey)) {
+        const [feature] = await permissionTemplatesRepo.getFeatureByKey(
+          rule.featureKey
+        );
+        if (feature) {
+          featureIdByKey.set(rule.featureKey, feature.id);
+        }
+      }
+      if (rule.level === "school_role" && rule.roleKey) {
+        roleKeys.add(rule.roleKey);
+      }
+    }
+
+    for (const roleKey of roleKeys) {
+      const [role] = await permissionTemplatesRepo.getRoleByKey(roleKey);
+      if (role) {
+        roleIdByKey.set(roleKey, role.id);
+      }
+    }
+
+    const featureIds = [...new Set(featureIdByKey.values())];
+    const roleIds = [...new Set(roleIdByKey.values())];
+    if (featureIds.length === 0) {
+      return statusBySchoolId;
+    }
+
+    const permissions = await permissionTemplatesRepo.getSchoolTemplatePermissions({
+      schoolIds: uniqueSchoolIds,
+      featureIds,
+      roleIds,
+    });
+
+    const schoolPermissionBySchoolAndFeature = new Map<string, { enabled: boolean; visible: boolean | null }>();
+    const schoolRolePermissionBySchoolRoleAndFeature = new Map<
+      string,
+      { enabled: boolean; visible: boolean | null }
+    >();
+
+    for (const permission of permissions) {
+      if (permission.level === "school" && permission.targetId) {
+        schoolPermissionBySchoolAndFeature.set(
+          `${permission.targetId}:${permission.featureId}`,
+          { enabled: permission.enabled, visible: permission.visible }
+        );
+      } else if (
+        permission.level === "school_role" &&
+        permission.schoolId &&
+        permission.targetId
+      ) {
+        schoolRolePermissionBySchoolRoleAndFeature.set(
+          `${permission.schoolId}:${permission.targetId}:${permission.featureId}`,
+          { enabled: permission.enabled, visible: permission.visible }
+        );
+      }
+    }
+
+    for (const schoolId of uniqueSchoolIds) {
+      const isActive = rules.every((rule) => {
+        const featureId = featureIdByKey.get(rule.featureKey);
+        if (!featureId) return false;
+
+        const permission =
+          rule.level === "school"
+            ? schoolPermissionBySchoolAndFeature.get(`${schoolId}:${featureId}`)
+            : rule.level === "school_role" && rule.roleKey
+              ? (() => {
+                  const roleId = roleIdByKey.get(rule.roleKey);
+                  if (!roleId) return undefined;
+                  return schoolRolePermissionBySchoolRoleAndFeature.get(
+                    `${schoolId}:${roleId}:${featureId}`
+                  );
+                })()
+              : undefined;
+
+        if (!permission) return false;
+
+        const expectedVisible = rule.visible ?? rule.enabled;
+        const actualVisible =
+          permission.visible === null || permission.visible === undefined
+            ? permission.enabled
+            : permission.visible;
+
+        return (
+          permission.enabled === rule.enabled && actualVisible === expectedVisible
+        );
+      });
+
+      statusBySchoolId[schoolId] = isActive;
+    }
+
+    return statusBySchoolId;
+  },
 };

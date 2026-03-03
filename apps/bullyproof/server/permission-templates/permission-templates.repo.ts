@@ -4,8 +4,9 @@ import {
   permissionTemplateRules,
   features,
   roles,
+  featurePermissions,
 } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray, or } from "drizzle-orm";
 
 export type PermissionTemplateRuleLevel = "school" | "school_role" | "role";
 
@@ -38,6 +39,15 @@ export type PermissionTemplate = {
   createdBy: string | null;
 };
 
+export type SchoolTemplatePermission = {
+  featureId: string;
+  level: "school" | "school_role";
+  targetId: string | null;
+  schoolId: string | null;
+  enabled: boolean;
+  visible: boolean | null;
+};
+
 export const permissionTemplatesRepo = {
   getAll: () =>
     db.select().from(permissionTemplates).orderBy(permissionTemplates.name),
@@ -62,6 +72,21 @@ export const permissionTemplatesRepo = {
       .from(permissionTemplates)
       .where(eq(permissionTemplates.scope, scope))
       .orderBy(permissionTemplates.name),
+
+  getByScopeAndTemplateKey: (
+    scope: "school" | "platform_role",
+    templateKey: string
+  ) =>
+    db
+      .select()
+      .from(permissionTemplates)
+      .where(
+        and(
+          eq(permissionTemplates.scope, scope),
+          eq(permissionTemplates.templateKey, templateKey)
+        )
+      )
+      .limit(1),
 
   getWithRules: async (templateId: string) => {
     const templateRows = await db
@@ -178,4 +203,48 @@ export const permissionTemplatesRepo = {
 
   getRoleByKey: (key: string) =>
     db.select().from(roles).where(eq(roles.key, key)).limit(1),
+
+  getSchoolTemplatePermissions: async (params: {
+    schoolIds: string[];
+    featureIds: string[];
+    roleIds?: string[];
+  }): Promise<SchoolTemplatePermission[]> => {
+    if (params.schoolIds.length === 0 || params.featureIds.length === 0) {
+      return [];
+    }
+
+    const schoolCondition = and(
+      eq(featurePermissions.level, "school"),
+      inArray(featurePermissions.featureId, params.featureIds),
+      inArray(featurePermissions.targetId, params.schoolIds)
+    );
+
+    const shouldQuerySchoolRole = (params.roleIds?.length ?? 0) > 0;
+    const schoolRoleCondition = shouldQuerySchoolRole
+      ? and(
+          eq(featurePermissions.level, "school_role"),
+          inArray(featurePermissions.featureId, params.featureIds),
+          inArray(featurePermissions.schoolId, params.schoolIds),
+          inArray(featurePermissions.targetId, params.roleIds!)
+        )
+      : undefined;
+
+    const whereCondition = schoolRoleCondition
+      ? or(schoolCondition, schoolRoleCondition)
+      : schoolCondition;
+
+    const rows = await db
+      .select({
+        featureId: featurePermissions.featureId,
+        level: featurePermissions.level,
+        targetId: featurePermissions.targetId,
+        schoolId: featurePermissions.schoolId,
+        enabled: featurePermissions.enabled,
+        visible: featurePermissions.visible,
+      })
+      .from(featurePermissions)
+      .where(whereCondition);
+
+    return rows as SchoolTemplatePermission[];
+  },
 };

@@ -2,6 +2,32 @@ import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type { vSchoolsReadable } from "@/drizzle/schema";
 
 type School = typeof vSchoolsReadable.$inferSelect;
+export type SchoolCertificationStatusRow = {
+  userId: string;
+  userName: string;
+  userEmail: string;
+  roles: Array<{
+    roleKey: string;
+    roleName: string;
+    isPlatform: boolean;
+  }>;
+  status: "not_started" | "in_progress" | "completed";
+  progressPercentage: number;
+  completedTopics: number;
+  totalTopics: number;
+  completedAt: string | null;
+  isCompleted: boolean;
+  isApTeacher: boolean;
+};
+
+export type SchoolCertificationStatusResponse = {
+  course: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  rows: SchoolCertificationStatusRow[];
+};
 
 export const schoolApi = {
   get: {
@@ -60,6 +86,13 @@ export const schoolApi = {
       ApiResult<Array<{ year: { id: string; code: string; displayName: string; levelId: string; sortIndex: number }; level: { id: string; name: string; key: string } }>>
     > {
       return apiFetch(`/schools/${encodeURIComponent(schoolId)}/years`);
+    },
+    certificationStatus(
+      schoolId: string
+    ): Promise<ApiResult<SchoolCertificationStatusResponse>> {
+      return apiFetch(
+        `/schools/${encodeURIComponent(schoolId)}/certification`
+      );
     },
   },
   post: {
