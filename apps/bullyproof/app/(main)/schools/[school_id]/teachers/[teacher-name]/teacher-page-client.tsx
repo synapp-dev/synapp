@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -20,7 +20,10 @@ import Link from "next/link";
 import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
-import { type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
+import {
+  meApi,
+  type UserWithRolesAndSchools,
+} from "@/entities/me/api/endpoints";
 import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
 import {
   Carousel,
@@ -33,8 +36,6 @@ import { RoleBadges } from "@/components/atoms/role-badges";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import {
   useUserClasses,
-  useUserPositions,
-  useUsersBySchool,
 } from "@/entities/users/api/user-details-queries";
 import { useLessonsByTeacherAtSchool } from "@/entities/lessons/api/useLessonsByTeacherAtSchool";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
@@ -95,35 +96,85 @@ export default function TeacherPageClient({
   teacherSlug,
   schoolSlug,
 }: TeacherPageClientProps) {
+  const USERS_BATCH_SIZE = 100;
   // Resolve school from URL slug - don't rely on store timing
   const { data: school, isLoading: schoolLoading } = useSchoolBySlugQuery(
     schoolSlug || null,
     { enabled: !!schoolSlug }
   );
   const schoolId = school?.id;
-  const usersQuery = useUsersBySchool(schoolId, 100);
-  const users = usersQuery.data ?? [];
+  const [teacher, setTeacher] = useState<UserWithRolesAndSchools | null>(null);
+  const [teacherLookupLoading, setTeacherLookupLoading] = useState(false);
 
-  const teacher = useMemo(() => {
-    const normalizedSlug = teacherSlug.toLowerCase().trim();
-    return (
-      users.find((user) => {
-        const firstName = user.firstName || "";
-        const lastName = user.lastName || "";
-        const fullName = `${firstName} ${lastName}`.trim();
-        return nameToSlug(fullName) === normalizedSlug;
-      }) ?? null
-    );
-  }, [teacherSlug, users]);
+  useEffect(() => {
+    let isCancelled = false;
 
-  const positionsQuery = useUserPositions(teacher?.id ?? null);
+    async function resolveTeacherBySlug() {
+      const normalizedSlug = teacherSlug.toLowerCase().trim();
+      if (!schoolId || !normalizedSlug) {
+        setTeacher(null);
+        setTeacherLookupLoading(false);
+        return;
+      }
+
+      setTeacherLookupLoading(true);
+      setTeacher(null);
+
+      let offset = 0;
+
+      try {
+        while (!isCancelled) {
+          const result = await meApi.get.listAllUsers({
+            schoolId,
+            limit: USERS_BATCH_SIZE,
+            offset,
+          });
+
+          if (isCancelled) return;
+          if (result.error || !result.data) break;
+
+          const { users, totalCount } = result.data;
+          const matchedTeacher =
+            users.find((user) => {
+              const firstName = user.firstName || "";
+              const lastName = user.lastName || "";
+              const fullName = `${firstName} ${lastName}`.trim();
+              return nameToSlug(fullName) === normalizedSlug;
+            }) ?? null;
+
+          if (matchedTeacher) {
+            setTeacher(matchedTeacher);
+            return;
+          }
+
+          const updatedOffset = offset + users.length;
+          const hasMoreUsers = users.length > 0 && updatedOffset < totalCount;
+          if (!hasMoreUsers) break;
+          offset = updatedOffset;
+        }
+      } catch (error) {
+        console.error("Failed to resolve teacher:", error);
+      } finally {
+        if (!isCancelled) {
+          setTeacherLookupLoading(false);
+        }
+      }
+    }
+
+    void resolveTeacherBySlug();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [schoolId, teacherSlug]);
+
   const teacherPositions = useMemo(() => {
     if (!schoolId) return [];
-    return (positionsQuery.data ?? [])
+    return (teacher?.schoolPositions ?? [])
       .filter((position) => position.schoolId === schoolId)
       .map((position) => position.position.trim())
       .filter((position) => position.length > 0);
-  }, [positionsQuery.data, schoolId]);
+  }, [schoolId, teacher?.schoolPositions]);
 
   const classesQuery = useUserClasses(teacher?.id ?? null, schoolId ?? null);
   const teacherClasses = classesQuery.data ?? [];
@@ -171,10 +222,10 @@ export default function TeacherPageClient({
 
   const isReady = !!schoolSlug && !!teacherSlug;
   const isWaitingForSchool = isReady && schoolLoading;
-  const isLoadingUsers = isReady && !!schoolId && usersQuery.isLoading;
+  const isLoadingUsers = isReady && !!schoolId && teacherLookupLoading;
   const isLoadingTeacherData =
     !!teacher &&
-    (positionsQuery.isLoading || classesQuery.isLoading || lessonsQuery.isLoading);
+    (classesQuery.isLoading || lessonsQuery.isLoading);
 
   if (!isReady || isWaitingForSchool || isLoadingUsers || isLoadingTeacherData) {
     return <TeacherPageSkeleton schoolSlug={schoolSlug} />;

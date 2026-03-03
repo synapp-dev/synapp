@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Fragment } from "react";
-import { useQueries } from "@tanstack/react-query";
+import { useState, useEffect, useMemo, Fragment, useCallback, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -36,7 +35,6 @@ import { useSchoolStore } from "@/stores/school-store";
 import Link from "next/link";
 import Image from "next/image";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
-import { getUserPositionsOptions } from "@/entities/users/api/user-details-queries";
 
 // Simple fuzzy search function
 function fuzzySearch(query: string, text: string): boolean {
@@ -60,45 +58,147 @@ function fuzzySearch(query: string, text: string): boolean {
 }
 
 export default function TeachersPageClient() {
+  const USERS_BATCH_SIZE = 100;
   const currentSchool = useSchoolStore((state) => state.currentSchool);
   const [users, setUsers] = useState<UserWithRolesAndSchools[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [nextOffset, setNextOffset] = useState(0);
+  const [hasMoreUsers, setHasMoreUsers] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState<string>("all");
+  const isCancelledRef = useRef(false);
+  const loadMoreTriggerRef = useRef<HTMLDivElement | null>(null);
   const schoolAvatar = useStorageImageUrl(currentSchool?.avatarUrl ?? null);
 
-  useEffect(() => {
-    async function fetchUsers() {
-      // Use schoolId (UUID) directly, not slug
+  const fetchUsersBatch = useCallback(
+    async (offset: number, append: boolean) => {
       const schoolId = currentSchool?.id;
+      if (!schoolId || isCancelledRef.current) return;
 
-      if (!schoolId) {
-        setLoading(false);
-        return;
+      if (append) {
+        setIsLoadingMore(true);
+      } else {
+        setIsInitialLoading(true);
       }
 
       try {
-        setLoading(true);
         const result = await meApi.get.listAllUsers({
-          schoolId: schoolId,
-          limit: 100, // Max allowed by API
+          schoolId,
+          limit: USERS_BATCH_SIZE,
+          offset,
         });
 
-        if (!result.error && result.data) {
-          // Note: API returns { users: [...], totalCount: number }
-          setUsers(result.data.users);
-        } else if (result.error) {
-          console.error("Failed to fetch users:", result.error);
+        if (isCancelledRef.current || result.error || !result.data) {
+          if (result.error) {
+            console.error("Failed to fetch users:", result.error);
+          }
+          return;
         }
+
+        const { users: batchUsers, totalCount } = result.data;
+        let usersToMerge = batchUsers;
+
+        // Ensure school admins are visible from first paint, regardless of
+        // alphabetical pagination order in the general users list.
+        if (!append) {
+          const adminResult = await meApi.get.listAllUsers({
+            schoolId,
+            role: "SCHOOL_ADMIN",
+            limit: USERS_BATCH_SIZE,
+            offset: 0,
+          });
+          if (!adminResult.error && adminResult.data) {
+            usersToMerge = [...adminResult.data.users, ...batchUsers];
+          }
+        }
+
+        const updatedOffset = offset + batchUsers.length;
+
+        setTotalUsers(totalCount);
+        setNextOffset(updatedOffset);
+        setHasMoreUsers(batchUsers.length > 0 && updatedOffset < totalCount);
+        setUsers((previousUsers) => {
+          if (!append) {
+            const usersById = new Map(
+              usersToMerge.map((user) => [user.id, user])
+            );
+            return Array.from(usersById.values());
+          }
+          const usersById = new Map(previousUsers.map((user) => [user.id, user]));
+          usersToMerge.forEach((user) => {
+            usersById.set(user.id, user);
+          });
+          return Array.from(usersById.values());
+        });
       } catch (error) {
         console.error("Failed to fetch users:", error);
       } finally {
-        setLoading(false);
+        if (!isCancelledRef.current) {
+          if (append) {
+            setIsLoadingMore(false);
+          } else {
+            setIsInitialLoading(false);
+          }
+        }
       }
+    },
+    [currentSchool?.id]
+  );
+
+  const fetchNextBatch = useCallback(() => {
+    if (isInitialLoading || isLoadingMore || !hasMoreUsers) return;
+    void fetchUsersBatch(nextOffset, true);
+  }, [fetchUsersBatch, hasMoreUsers, isInitialLoading, isLoadingMore, nextOffset]);
+
+  useEffect(() => {
+    isCancelledRef.current = false;
+    const schoolId = currentSchool?.id;
+
+    if (!schoolId) {
+      setUsers([]);
+      setTotalUsers(null);
+      setNextOffset(0);
+      setHasMoreUsers(false);
+      setIsInitialLoading(false);
+      setIsLoadingMore(false);
+      return () => {
+        isCancelledRef.current = true;
+      };
     }
 
-    fetchUsers();
-  }, [currentSchool?.id]);
+    setUsers([]);
+    setTotalUsers(null);
+    setNextOffset(0);
+    setHasMoreUsers(false);
+    setIsLoadingMore(false);
+
+    void fetchUsersBatch(0, false);
+
+    return () => {
+      isCancelledRef.current = true;
+    };
+  }, [currentSchool?.id, fetchUsersBatch]);
+
+  useEffect(() => {
+    if (isInitialLoading || isLoadingMore || !hasMoreUsers) return;
+    const trigger = loadMoreTriggerRef.current;
+    if (!trigger) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const isVisible = entries.some((entry) => entry.isIntersecting);
+        if (isVisible) {
+          fetchNextBatch();
+        }
+      },
+      { rootMargin: "300px 0px" }
+    );
+
+    observer.observe(trigger);
+    return () => observer.disconnect();
+  }, [fetchNextBatch, hasMoreUsers, isInitialLoading, isLoadingMore]);
 
   // Filter users to only show those with TEACHER, SCHOOL_ADMIN, or SCHOOL_STAFF (exclude SCHOOL_LICENCE only users)
   const usersWithValidRoles = useMemo(() => {
@@ -245,27 +345,20 @@ export default function TeachersPageClient() {
     return roleMap;
   }, [filteredUsers, currentSchool?.id, selectedRole]);
 
-  const userPositionsQueries = useQueries({
-    queries: usersWithValidRoles.map((user) =>
-      getUserPositionsOptions(user.id)
-    ),
-  });
-
   const positionsByUserId = useMemo(() => {
     const schoolId = currentSchool?.id;
     if (!schoolId) return new Map<string, string[]>();
 
     const map = new Map<string, string[]>();
-    usersWithValidRoles.forEach((user, index) => {
-      const data = userPositionsQueries[index]?.data ?? [];
-      const positions = data
+    usersWithValidRoles.forEach((user) => {
+      const positions = (user.schoolPositions ?? [])
         .filter((position) => position.schoolId === schoolId)
         .map((position) => position.position.trim())
         .filter((position) => position.length > 0);
       map.set(user.id, positions);
     });
     return map;
-  }, [currentSchool?.id, userPositionsQueries, usersWithValidRoles]);
+  }, [currentSchool?.id, usersWithValidRoles]);
 
   // Section order: School Admins first, then Teaching (AP Teacher etc), then Staff
   const sectionOrder = (a: string, b: string) => {
@@ -486,13 +579,13 @@ export default function TeachersPageClient() {
             className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            disabled={loading}
+            disabled={isInitialLoading}
           />
         </div>
         <Select
           value={selectedRole}
           onValueChange={setSelectedRole}
-          disabled={loading}
+          disabled={isInitialLoading}
         >
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Filter by role" />
@@ -543,8 +636,15 @@ export default function TeachersPageClient() {
         </Select>
       </div>
 
+      {!isInitialLoading && isLoadingMore && (
+        <p className="text-sm text-muted-foreground">
+          Loading more teachers
+          {totalUsers != null ? ` (${users.length}/${totalUsers})` : ""}...
+        </p>
+      )}
+
       {/* Teachers Grid by Category */}
-      {loading ? (
+      {isInitialLoading ? (
         <div className="grid gap-4 md:grid-cols-2">
           {[...Array(6)].map((_, i) => (
             <TeacherCardSkeleton key={i} />
@@ -585,6 +685,10 @@ export default function TeachersPageClient() {
               </Fragment>
             ))}
         </div>
+      )}
+
+      {hasMoreUsers && (
+        <div ref={loadMoreTriggerRef} className="h-1 w-full" aria-hidden />
       )}
     </div>
   );
