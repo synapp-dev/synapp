@@ -10,8 +10,8 @@ import { checkFeatureAccess, assertFeature } from "@/server/features/features.se
 import { createServerAdminClient } from "@/utils/supabase/admin";
 import { schoolRepo } from "@/server/school/school.repo";
 import { db } from "@/server/db/drizzle";
-import { userProfile, userSessions } from "@/drizzle/schema";
-import { sql, desc, inArray } from "drizzle-orm";
+import { userProfile, userSchoolPositions, userSessions } from "@/drizzle/schema";
+import { sql, desc, inArray, eq, and } from "drizzle-orm";
 
 // Helper to check if a string is a valid UUID
 function isValidUUID(str: string): boolean {
@@ -127,6 +127,45 @@ async function getLastLoginTimestamps(
   return resultMap;
 }
 
+async function getSchoolPositionsByUser(
+  userIds: string[],
+  schoolId?: string
+): Promise<Map<string, Array<{ id: string; schoolId: string; position: string }>>> {
+  const positionsByUser = new Map<
+    string,
+    Array<{ id: string; schoolId: string; position: string }>
+  >();
+
+  if (userIds.length === 0) return positionsByUser;
+
+  const baseCondition = inArray(userSchoolPositions.userId, userIds);
+  const whereCondition = schoolId
+    ? and(baseCondition, eq(userSchoolPositions.schoolId, schoolId))
+    : baseCondition;
+
+  const positions = await db
+    .select({
+      id: userSchoolPositions.id,
+      userId: userSchoolPositions.userId,
+      schoolId: userSchoolPositions.schoolId,
+      position: userSchoolPositions.position,
+    })
+    .from(userSchoolPositions)
+    .where(whereCondition);
+
+  for (const position of positions) {
+    const existing = positionsByUser.get(position.userId) ?? [];
+    existing.push({
+      id: position.id,
+      schoolId: position.schoolId,
+      position: position.position,
+    });
+    positionsByUser.set(position.userId, existing);
+  }
+
+  return positionsByUser;
+}
+
 export const userService = {
   async listAllUsers(ctx: AuthContext, query: unknown) {
     const params: ListUsersParams = listUsersSchema.parse(query);
@@ -156,10 +195,15 @@ export const userService = {
     if (result.users.length > 0) {
       const userIds = result.users.map((user) => user.id);
       const lastLoginMap = await getLastLoginTimestamps(userIds);
+      const schoolPositionsByUser = await getSchoolPositionsByUser(
+        userIds,
+        resolvedSchoolId
+      );
 
       // Add lastLoginAt to each user
       const enrichedUsers = result.users.map((user) => ({
         ...user,
+        schoolPositions: schoolPositionsByUser.get(user.id) ?? [],
         lastLoginAt: lastLoginMap.get(user.id) || null,
       }));
 
@@ -169,7 +213,13 @@ export const userService = {
       };
     }
 
-    return result;
+    return {
+      ...result,
+      users: result.users.map((user) => ({
+        ...user,
+        schoolPositions: [],
+      })),
+    };
   },
 
   async createUserWithMagicLink(

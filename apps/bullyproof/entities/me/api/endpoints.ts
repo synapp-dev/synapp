@@ -50,6 +50,11 @@ export type UserWithRolesAndSchools = {
     roleKey: string | null;
     roleName: string | null;
   }>;
+  schoolPositions?: Array<{
+    id: string;
+    schoolId: string;
+    position: string;
+  }>;
   lastLoginAt: string | null;
 };
 
