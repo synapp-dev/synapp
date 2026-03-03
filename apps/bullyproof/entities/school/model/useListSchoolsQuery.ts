@@ -7,7 +7,10 @@ import { schoolApi } from "../api/endpoints";
 import { schoolKeys } from "./keys";
 import type { vSchoolsReadable } from "@/drizzle/schema";
 
-export type School = typeof vSchoolsReadable.$inferSelect;
+export type SchoolStatus = "onboarding" | "ready" | "active" | "certification";
+export type School = typeof vSchoolsReadable.$inferSelect & {
+  status?: SchoolStatus;
+};
 
 export function useListSchoolsQuery(
   params?: {

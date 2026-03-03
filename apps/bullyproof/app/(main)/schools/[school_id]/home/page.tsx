@@ -5,10 +5,15 @@ import { useParams } from "next/navigation";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useSchoolStore } from "@/stores/school-store";
 import { useFeaturesAccess } from "@/hooks/use-features-access";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import {
   useSchoolStatsQuery,
   useSchoolKeyStaffQuery,
 } from "@/entities/school/model/useListSchoolsQuery";
+import {
+  SchoolStatusBadge,
+  type SchoolStatus,
+} from "@/entities/school/ui/school-status-badge";
 import { useLessons } from "@/entities/lessons/model/store";
 import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
 import { StartNewLessonCard } from "@/entities/lessons/ui/start-new-lesson-card";
@@ -111,10 +116,16 @@ const NAV_GROUP_FEATURES = [
 ];
 
 type SchoolHeaderBannerProps = {
-  school: { name: string; bannerUrl?: string | null; avatarUrl?: string | null };
+  school: {
+    name: string;
+    bannerUrl?: string | null;
+    avatarUrl?: string | null;
+    status?: SchoolStatus;
+  };
   stateText: string;
   sectorText: string;
   levelsText: string;
+  showStatusBadge?: boolean;
   /** Resolved signed URLs - when provided, used directly (no fetching) */
   bannerUrl?: string | null;
   avatarUrl?: string | null;
@@ -436,10 +447,18 @@ function SchoolHeaderBanner({
   stateText,
   sectorText,
   levelsText,
+  showStatusBadge = false,
   bannerUrl,
   avatarUrl,
 }: SchoolHeaderBannerProps) {
   const metadataParts = [stateText, sectorText, levelsText].filter(Boolean);
+  const status = school.status;
+  const showStatus =
+    showStatusBadge &&
+    (status === "onboarding" ||
+      status === "ready" ||
+      status === "active" ||
+      status === "certification");
   const DotSeparator = () => (
     <span className="w-0.5 h-0.5 rounded-full bg-white/90 flex-shrink-0" />
   );
@@ -512,7 +531,7 @@ function SchoolHeaderBanner({
         </div>
         {/* Info: metadata above school name */}
         <div className="flex flex-col gap-0.5 pb-0.5 min-w-0 flex-1">
-          {metadataParts.length > 0 && (
+          {(showStatus || metadataParts.length > 0) && (
             <div
               className="flex items-center gap-1.5 text-sm font-medium text-white/90 opacity-0 animate-slide-down-fade-in"
               style={{
@@ -520,6 +539,8 @@ function SchoolHeaderBanner({
                 animationFillMode: "forwards",
               }}
             >
+              {showStatus && status && <SchoolStatusBadge status={status} />}
+              {showStatus && metadataParts.length > 0 && <DotSeparator />}
               {metadataParts.map((part, index) => (
                 <div key={index} className="flex items-center gap-1.5">
                   {index > 0 && <DotSeparator />}
@@ -548,6 +569,7 @@ function SchoolHomeHeroSection({
   stateText,
   sectorText,
   levelsText,
+  showStatusBadge = false,
 }: SchoolHeaderBannerProps) {
   const banner = useStorageImageUrl(school.bannerUrl ?? null);
   const avatar = useStorageImageUrl(school.avatarUrl ?? null);
@@ -579,6 +601,7 @@ function SchoolHomeHeroSection({
       stateText={stateText}
       sectorText={sectorText}
       levelsText={levelsText}
+      showStatusBadge={showStatusBadge}
       bannerUrl={banner.url}
       avatarUrl={avatar.url}
     />
@@ -595,6 +618,8 @@ export default function HomePage() {
     []
   );
   const featuresAccess = useFeaturesAccess(featureKeys, schoolIdForFeatures);
+  const { hasAccess: canViewSchoolStatus, visible: schoolStatusVisible } =
+    useFeatureAccess("admin:schools-view-school-status");
 
   const visibleNavItems = useMemo(() => {
     return HOME_NAV_ITEMS.filter((item) => {
@@ -675,6 +700,7 @@ export default function HomePage() {
             stateText={stateText}
             sectorText={sectorText}
             levelsText={levelsText}
+            showStatusBadge={canViewSchoolStatus && schoolStatusVisible}
           />
         )}
 

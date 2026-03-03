@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { schoolApi } from "../api/endpoints";
+import type { SchoolCertificationStatusResponse } from "../api/endpoints";
 import { schoolKeys } from "./keys";
 
 // School type matching the admin schools page format
@@ -14,7 +15,7 @@ export type School = {
   schoolLicenceCount: number;
   staffCount?: number;
   activeLicence: boolean;
-  status: "onboarding" | "active";
+  status: "onboarding" | "ready" | "active" | "certification";
   slug: string | null;
   levels?: string[] | null;
   levelBadge?: string | null;
@@ -31,14 +32,21 @@ function transformSchoolData(school: any): School {
   const activeLicence =
     school.activeLicence ?? school.active_licence ?? false;
 
-  // Status: onboarding if any count < 1, active if all counts >= 1
-  const status: "onboarding" | "active" =
-    teacherCount < 1 ||
-    classCount < 1 ||
-    schoolAdminCount < 1 ||
-    schoolLicenceCount < 1
-      ? "onboarding"
-      : "active";
+  const isReady =
+    teacherCount >= 1 &&
+    classCount >= 1 &&
+    schoolAdminCount >= 1 &&
+    schoolLicenceCount >= 1;
+  const serverStatus = school.status;
+  const status: "onboarding" | "ready" | "active" | "certification" =
+    serverStatus === "onboarding" ||
+    serverStatus === "ready" ||
+    serverStatus === "active" ||
+    serverStatus === "certification"
+      ? serverStatus
+      : isReady
+        ? "ready"
+        : "onboarding";
 
   return {
     id: school.id || "",
@@ -136,5 +144,48 @@ export function useInvalidateSchools() {
     invalidateAllSchools: () => {
       queryClient.invalidateQueries({ queryKey: schoolKeys.all() });
     },
+  };
+}
+
+export function useSchoolCertificationStatus(
+  schoolId: string | null | undefined,
+  options?: { enabled?: boolean }
+) {
+  const enabled = (options?.enabled ?? true) && !!schoolId;
+
+  const query = useQuery<SchoolCertificationStatusResponse>({
+    queryKey: [...schoolKeys.all(), "certification-status", schoolId ?? null],
+    queryFn: async () => {
+      if (!schoolId) {
+        return {
+          course: { id: "", code: "", name: "" },
+          rows: [],
+        };
+      }
+
+      const result = await schoolApi.get.certificationStatus(schoolId);
+      if (result.error) {
+        throw new Error(
+          result.error.message || "Failed to fetch school certification status"
+        );
+      }
+
+      return (
+        result.data ?? {
+          course: { id: "", code: "", name: "" },
+          rows: [],
+        }
+      );
+    },
+    enabled,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnMount: true,
+  });
+
+  return {
+    ...query,
+    course: query.data?.course ?? null,
+    rows: query.data?.rows ?? [],
   };
 }

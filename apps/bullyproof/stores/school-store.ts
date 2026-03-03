@@ -5,6 +5,7 @@ interface School {
   id: string;
   name: string;
   slug: string;
+  status?: "onboarding" | "ready" | "active" | "certification";
   bannerUrl?: string | null;
   avatarUrl?: string | null;
   sector?: string | null;

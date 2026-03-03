@@ -484,6 +484,9 @@ export function SchoolSwitcher() {
     }
   }
 
+  const shouldTruncateSelectedSchoolName =
+    (selectedSchool?.name?.length ?? 0) > 18;
+
   return (
     <SidebarMenu>
       <SidebarMenuItem
@@ -524,45 +527,46 @@ export function SchoolSwitcher() {
                 tooltip={selectedSchool?.name || "Select school"}
                 className={cn(
                   "w-full flex items-center gap-2 group/school-switcher py-6",
-                  displayState === "expanded" ? "justify-between" : "justify-center"
+                  displayState === "expanded"
+                    ? "justify-start overflow-hidden"
+                    : "justify-center"
                 )}
               >
                 {displayState === "expanded" ? (
-                  <>
-                    <div
-                      className={cn(
-                        "flex items-center gap-2 min-w-0 max-w-[80%]",
-                        selectedSchool?.name ? "" : "mx-2"
-                      )}
-                    >
+                  <div className="w-full min-w-0 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2">
+                    <div className="flex-shrink-0">
                       {selectedSchool?.name ? (
-                        <div className="flex-shrink-0">
-                          <SchoolAvatarOrBadge school={selectedSchool} size="md" />
-                        </div>
+                        <SchoolAvatarOrBadge school={selectedSchool} size="md" />
                       ) : (
-                        <School className="size-4 text-muted-foreground flex-shrink-0" />
+                        <School className="size-4 text-muted-foreground" />
                       )}
-
-                      <div className="flex flex-col text-left -space-y-0.5 min-w-0 flex-1">
-                        <h3
-                          className={cn(
-                            "font-medium truncate",
-                            selectedSchool?.name
-                              ? "text-foreground"
-                              : "text-muted-foreground"
-                          )}
-                        >
-                          {selectedSchool?.name || "Select a school!"}
-                        </h3>
-                        <SchoolMetadata school={selectedSchool} capitalize />
-                      </div>
                     </div>
-                    {selectedSchool?.name ? (
-                      <ArrowLeftRight className="flex-shrink-0 group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300 mr-1" />
-                    ) : (
-                      <MousePointer2 className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300 flex-shrink-0 mr-1" />
-                    )}
-                  </>
+
+                    <div
+                      className="flex flex-col text-left -space-y-0.5 min-w-0 overflow-hidden"
+                    >
+                      <h3
+                        className={cn(
+                          "font-medium block",
+                          shouldTruncateSelectedSchoolName && "truncate",
+                          selectedSchool?.name
+                            ? "text-foreground"
+                            : "text-muted-foreground"
+                        )}
+                      >
+                        {selectedSchool?.name || "Select a school!"}
+                      </h3>
+                      <SchoolMetadata school={selectedSchool} capitalize />
+                    </div>
+
+                    <div className="flex-shrink-0 min-w-fit mr-2">
+                      {selectedSchool?.name ? (
+                        <ArrowLeftRight className="size-4 text-muted-foreground group-hover/school-switcher:text-foreground group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300" />
+                      ) : (
+                        <MousePointer2 className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
+                      )}
+                    </div>
+                  </div>
                 ) : (
                   <SchoolAvatarOrBadge school={selectedSchool} size="sm" />
                 )}

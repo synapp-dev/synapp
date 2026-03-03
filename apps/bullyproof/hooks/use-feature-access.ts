@@ -29,9 +29,11 @@ export function useFeatureAccess(
     if (!effectiveUser || !featureKey) {
       return { hasAccess: false, visible: false };
     }
-    // Platform-level features (/admin*, system:*) never use school context
+    // Platform-level features (/admin*, system:*, admin:*) never use school context
     const effectiveSchoolId =
-      featureKey.startsWith("/admin") || featureKey.startsWith("system:")
+      featureKey.startsWith("/admin") ||
+      featureKey.startsWith("system:") ||
+      featureKey.startsWith("admin:")
         ? undefined
         : schoolId;
     return checkFeatureAccessAndVisibleCached(

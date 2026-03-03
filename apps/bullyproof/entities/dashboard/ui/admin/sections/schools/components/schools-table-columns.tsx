@@ -2,6 +2,10 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ArrowUpDown } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
+import {
+  SchoolStatusBadge,
+  type SchoolStatus,
+} from "@/entities/school/ui/school-status-badge";
 export type School = {
   id: string;
   name: string;
@@ -13,7 +17,7 @@ export type School = {
   schoolLicenceCount: number;
   staffCount?: number; // Number of users with SCHOOL_STAFF role
   activeLicence: boolean;
-  status: "onboarding" | "active";
+  status: "onboarding" | "ready" | "active" | "certification";
   slug: string | null;
   levels?: string[] | null; // Array of level names (e.g., ["Primary", "Secondary"])
   levelBadge?: string | null; // From school_year_assignments: "Primary" | "Secondary" | "P–12" | "P–10" | "Custom"
@@ -80,19 +84,10 @@ export const columns: ColumnDef<School>[] = [
       );
     },
     cell: ({ row }) => {
-      const status = row.getValue("status") as "onboarding" | "active";
+      const status = row.getValue("status") as SchoolStatus;
       return (
         <div className="text-right flex items-center justify-end pl-1">
-          <Badge
-            variant="default"
-            className={
-              status === "onboarding"
-                ? "bg-orange-100 text-orange-800 hover:bg-orange-100"
-                : "bg-green-100 text-green-800 hover:bg-green-100"
-            }
-          >
-            {status === "onboarding" ? "Onboarding" : "Active"}
-          </Badge>
+          <SchoolStatusBadge status={status} />
         </div>
       );
     },

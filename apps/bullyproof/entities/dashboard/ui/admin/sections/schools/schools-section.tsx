@@ -293,7 +293,12 @@ function SchoolsSectionContent() {
 
   // All possible sectors and statuses
   const allSectors = ["government", "catholic", "independent"] as const;
-  const allStatuses = ["active", "onboarding"] as const;
+  const allStatuses = [
+    "active",
+    "certification",
+    "ready",
+    "onboarding",
+  ] as const;
 
   // Count schools for each filter option in current filtered results
   const getStateCount = (state: string) => {
@@ -868,7 +873,7 @@ function SchoolsSectionContent() {
                 <SelectItem value="all">All Status</SelectItem>
                 {allStatuses.map((status) => {
                   const isAvailable = currentAvailableStatuses.has(
-                    status as "active" | "onboarding"
+                    status as "active" | "certification" | "ready" | "onboarding"
                   );
                   const isSelected = statusFilter === status;
                   const statusName =

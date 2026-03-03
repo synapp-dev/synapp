@@ -25,6 +25,7 @@ export function SchoolStoreProvider({ slug }: SchoolStoreProviderProps) {
         id: school.id ?? "",
         name: school.name ?? "",
         slug: school.slug ?? slug ?? "",
+        status: school.status,
         bannerUrl: school.bannerUrl ?? null,
         avatarUrl: school.avatarUrl ?? null,
         sector: school.sector ?? null,
