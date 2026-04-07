@@ -1,0 +1,260 @@
+"use client";
+
+import { Fragment, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Building2 } from "lucide-react";
+import { Separator } from "@workspace/ui/components/separator";
+import { SidebarTrigger } from "@workspace/ui/components/sidebar";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@workspace/ui/components/breadcrumb";
+import { ThemeToggle } from "@/components/atoms/theme-toggle";
+import { CommandMenu } from "@/components/molecules/command-menu";
+import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
+
+const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
+  "auth",
+  "dashboard",
+  "support",
+  "settings",
+  "logout",
+  "api",
+  "_next",
+]);
+
+function formatSegment(segment: string): string {
+  return segment
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+type BreadcrumbEntry = {
+  label: string;
+  href: string;
+};
+
+type ScopedVenueInfo = {
+  venueName: string | null;
+  organisationLogoUrl: string | null;
+};
+
+function getScopedContext(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length < 2) return null;
+
+  const [first, second] = segments;
+  if (!first || !second || RESERVED_TOP_LEVEL_SEGMENTS.has(first)) return null;
+
+  return { organisationSlug: first, venueSlug: second };
+}
+
+function buildBreadcrumbs(
+  pathname: string,
+  venueName: string | null
+): BreadcrumbEntry[] {
+  const segments = pathname.split("/").filter(Boolean);
+  if (segments.length === 0) return [];
+
+  const scoped = getScopedContext(pathname);
+  const crumbs: BreadcrumbEntry[] = [];
+
+  if (scoped) {
+    const scopePrefix = `/${scoped.organisationSlug}/${scoped.venueSlug}`;
+    crumbs.push({
+      label: venueName ?? formatSegment(scoped.venueSlug),
+      href: scopePrefix,
+    });
+
+    const sectionSegments = segments.slice(2);
+    sectionSegments.forEach((segment, index) => {
+      const sectionPath = sectionSegments.slice(0, index + 1).join("/");
+      crumbs.push({
+        label: formatSegment(segment),
+        href: `${scopePrefix}/${sectionPath}`,
+      });
+    });
+  } else {
+    segments.forEach((segment, index) => {
+      crumbs.push({
+        label: formatSegment(segment),
+        href: "/" + segments.slice(0, index + 1).join("/"),
+      });
+    });
+  }
+
+  return crumbs;
+}
+
+function useScopedVenueInfo(
+  organisationSlug: string | undefined,
+  venueSlug: string | undefined
+): ScopedVenueInfo {
+  const { data: organisations = [] } = useAccessibleVenueGroupsQuery();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  return useMemo(() => {
+    if (!mounted || !organisationSlug || !venueSlug) {
+      return {
+        venueName: null,
+        organisationLogoUrl: null,
+      };
+    }
+
+    for (const org of organisations) {
+      if (org.slug !== organisationSlug) continue;
+      const venue = org.venues.find((v) => v.slug === venueSlug);
+      if (venue) {
+        return {
+          venueName: venue.name,
+          organisationLogoUrl: org.logoUrl,
+        };
+      }
+    }
+
+    return {
+      venueName: null,
+      organisationLogoUrl: null,
+    };
+  }, [mounted, organisations, organisationSlug, venueSlug]);
+}
+
+function OrganisationLogo({ logoUrl }: { logoUrl: string | null }) {
+  const [hasImageError, setHasImageError] = useState(false);
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [logoUrl]);
+
+  if (logoUrl && !hasImageError) {
+    return (
+      <Image
+        src={logoUrl}
+        alt="Organisation logo"
+        width={25}
+        height={25}
+        className="h-4 w-4 rounded-sm object-cover"
+        unoptimized
+        onError={() => setHasImageError(true)}
+      />
+    );
+  }
+
+  return (
+    <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-muted text-muted-foreground">
+      <Building2 className="h-2.5 w-2.5" />
+    </span>
+  );
+}
+
+export function AppHeader() {
+  const pathname = usePathname();
+  const scoped = useMemo(() => getScopedContext(pathname), [pathname]);
+  const scopedVenueInfo = useScopedVenueInfo(
+    scoped?.organisationSlug,
+    scoped?.venueSlug
+  );
+
+  const crumbs = useMemo(
+    () => buildBreadcrumbs(pathname, scopedVenueInfo.venueName),
+    [pathname, scopedVenueInfo.venueName]
+  );
+
+  return (
+    <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14">
+      <div className="flex items-center gap-2 px-4">
+        <SidebarTrigger className="-ml-1" />
+        <Separator
+          orientation="vertical"
+          className="mr-2 data-[orientation=vertical]:h-4"
+        />
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              {crumbs.length > 0 ? (
+                <BreadcrumbLink asChild>
+                  <Link href="/dashboard">
+                    <Image
+                      src="/images/supersolt-logo-black.svg"
+                      alt="Supersolt"
+                      width={151}
+                      height={144}
+                      className="h-5 w-auto dark:hidden"
+                    />
+                    <Image
+                      src="/images/supersolt-logo-white.svg"
+                      alt="Supersolt"
+                      width={151}
+                      height={144}
+                      className="hidden h-5 w-auto dark:block"
+                    />
+                  </Link>
+                </BreadcrumbLink>
+              ) : (
+                <BreadcrumbPage>
+                  <Image
+                    src="/images/supersolt-logo-black.svg"
+                    alt="Supersolt"
+                    width={151}
+                    height={144}
+                    className="h-5 w-auto dark:hidden"
+                  />
+                  <Image
+                    src="/images/supersolt-logo-white.svg"
+                    alt="Supersolt"
+                    width={151}
+                    height={144}
+                    className="hidden h-5 w-auto dark:block"
+                  />
+                </BreadcrumbPage>
+              )}
+            </BreadcrumbItem>
+            {crumbs.map((crumb, index) => {
+              const isLast = index === crumbs.length - 1;
+              const isScopedVenueCrumb = Boolean(scoped) && index === 0;
+              const crumbLabel = isScopedVenueCrumb ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <OrganisationLogo
+                    logoUrl={scopedVenueInfo.organisationLogoUrl}
+                  />
+                  <span>{crumb.label}</span>
+                </span>
+              ) : (
+                crumb.label
+              );
+
+              return (
+                <Fragment key={crumb.href}>
+                  <BreadcrumbSeparator />
+                  <BreadcrumbItem>
+                    {isLast ? (
+                      <BreadcrumbPage>{crumbLabel}</BreadcrumbPage>
+                    ) : (
+                      <BreadcrumbLink asChild>
+                        <Link href={crumb.href}>{crumbLabel}</Link>
+                      </BreadcrumbLink>
+                    )}
+                  </BreadcrumbItem>
+                </Fragment>
+              );
+            })}
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
+      <div className="flex items-center gap-2 px-4">
+        <CommandMenu />
+        <div className="mx-2 h-0.5 w-0.5 rounded-full bg-muted-foreground" />
+        <ThemeToggle />
+      </div>
+    </header>
+  );
+}
