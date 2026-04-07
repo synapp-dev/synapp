@@ -34,3 +34,10 @@ npm-debug.log*
 # Misc
 .DS_Store
 *.pem
+
+# Supabase cross-region migration (secrets + SQL dumps)
+scripts/supabase/migration.env
+scripts/supabase/artifacts/
+
+# Supersolt: local reference / legacy app copy — do not commit
+apps/supersolt/reference/
