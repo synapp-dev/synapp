@@ -76,7 +76,7 @@ export function CommandMenu() {
             <CommandItem
               onSelect={() => {
                 router.push(
-                  `/${DEFAULT_ORGANISATION_SLUG}/${DEFAULT_VENUE_SLUG}/settings`
+                  `/${DEFAULT_ORGANISATION_SLUG}/${DEFAULT_VENUE_SLUG}/settings/integrations`
                 );
                 setOpen(false);
               }}

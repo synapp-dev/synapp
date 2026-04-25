@@ -9,6 +9,8 @@ export type MeUser = {
   avatarUrl: string | null;
   role: string | null;
   features: string[];
+  needsSetup: boolean;
+  setupCompletedAt: string | null;
 };
 
 type MeState = {

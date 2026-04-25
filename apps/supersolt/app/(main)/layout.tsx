@@ -15,13 +15,13 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider className="h-svh max-h-svh overflow-hidden">
+    <SidebarProvider className="min-h-svh w-full">
       <MeLoader />
       <AppSidebar />
-      <div className="mx-auto flex min-h-0 min-w-0 flex-1 max-w-7xl flex-col overflow-hidden">
+      <div className="mx-auto flex min-w-0 flex-1 max-w-7xl flex-col">
         <AppHeader />
-        <SidebarInset className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-6 py-3">{children}</div>
+        <SidebarInset className="flex min-w-0 flex-1 flex-col">
+          <div className="min-w-0 px-6 py-3">{children}</div>
         </SidebarInset>
       </div>
     </SidebarProvider>

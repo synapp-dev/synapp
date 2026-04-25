@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { SupersoltLogo } from "@/components/atoms/supersolt-logo";
 import { usePathname } from "next/navigation";
 import { Building2 } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
@@ -27,6 +28,7 @@ const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   "logout",
   "api",
   "_next",
+  "images",
 ]);
 
 function formatSegment(segment: string): string {
@@ -58,7 +60,7 @@ function getScopedContext(pathname: string) {
 
 function buildBreadcrumbs(
   pathname: string,
-  venueName: string | null
+  venueName: string | null,
 ): BreadcrumbEntry[] {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 0) return [];
@@ -95,7 +97,7 @@ function buildBreadcrumbs(
 
 function useScopedVenueInfo(
   organisationSlug: string | undefined,
-  venueSlug: string | undefined
+  venueSlug: string | undefined,
 ): ScopedVenueInfo {
   const { data: organisations = [] } = useAccessibleVenueGroupsQuery();
   const [mounted, setMounted] = useState(false);
@@ -161,12 +163,12 @@ export function AppHeader() {
   const scoped = useMemo(() => getScopedContext(pathname), [pathname]);
   const scopedVenueInfo = useScopedVenueInfo(
     scoped?.organisationSlug,
-    scoped?.venueSlug
+    scoped?.venueSlug,
   );
 
   const crumbs = useMemo(
     () => buildBreadcrumbs(pathname, scopedVenueInfo.venueName),
-    [pathname, scopedVenueInfo.venueName]
+    [pathname, scopedVenueInfo.venueName],
   );
 
   return (
@@ -183,38 +185,12 @@ export function AppHeader() {
               {crumbs.length > 0 ? (
                 <BreadcrumbLink asChild>
                   <Link href="/dashboard">
-                    <Image
-                      src="/images/supersolt-logo-black.svg"
-                      alt="Supersolt"
-                      width={151}
-                      height={144}
-                      className="h-5 w-auto dark:hidden"
-                    />
-                    <Image
-                      src="/images/supersolt-logo-white.svg"
-                      alt="Supersolt"
-                      width={151}
-                      height={144}
-                      className="hidden h-5 w-auto dark:block"
-                    />
+                    <SupersoltLogo variant="mark" className="h-5 w-auto mt-1" />
                   </Link>
                 </BreadcrumbLink>
               ) : (
                 <BreadcrumbPage>
-                  <Image
-                    src="/images/supersolt-logo-black.svg"
-                    alt="Supersolt"
-                    width={151}
-                    height={144}
-                    className="h-5 w-auto dark:hidden"
-                  />
-                  <Image
-                    src="/images/supersolt-logo-white.svg"
-                    alt="Supersolt"
-                    width={151}
-                    height={144}
-                    className="hidden h-5 w-auto dark:block"
-                  />
+                  <SupersoltLogo variant="mark" className="h-5 w-auto mt-1" />
                 </BreadcrumbPage>
               )}
             </BreadcrumbItem>

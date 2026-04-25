@@ -13,6 +13,10 @@ export const config = {
     "/support/:path*",
     "/settings/:path*",
     "/logout/:path*",
+    "/setup",
+    "/setup/:path*",
+    "/agent",
+    "/agent/:path*",
     "/:organisation/:venue/:path*",
   ],
 };

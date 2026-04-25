@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -27,7 +26,13 @@ import {
   TrendingUp,
   Truck,
   Users,
-  UtensilsCrossed,
+  Rocket,
+  LayoutGrid,
+  Settings,
+  Shield,
+  Building2,
+  MapPin,
+  Plug,
   type LucideIcon,
 } from "lucide-react";
 import { NavMain, type NavMainItem, type NavMainSubItem } from "@/components/organisms/nav-main";
@@ -36,12 +41,17 @@ import { NavUser } from "@/components/molecules/nav-user";
 import { useMeStore } from "@/entities/me/model/store";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 import {
+  getScopedSettingsAccess,
+  type ScopedSettingsAccess,
+} from "@/entities/access/scoped-settings-access";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
+import { SupersoltLogo } from "@/components/atoms/supersolt-logo";
 
 type AccessControlledItem = {
   title: string;
@@ -66,8 +76,10 @@ const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   "support",
   "settings",
   "logout",
+  "setup",
   "api",
   "_next",
+  "images",
 ]);
 
 function buildScopedPath(
@@ -93,7 +105,8 @@ function getScopedContext(pathname: string) {
     first === "dashboard" ||
     first === "support" ||
     first === "settings" ||
-    first === "logout"
+    first === "logout" ||
+    first === "setup"
   ) {
     return null;
   }
@@ -145,13 +158,13 @@ function makePlatformNavItems(
       ],
     },
     {
-      title: "Menu",
-      url: buildScopedPath(organisationSlug, venueSlug, "menu"),
-      icon: UtensilsCrossed,
+      title: "Catalog",
+      url: buildScopedPath(organisationSlug, venueSlug, "catalog"),
+      icon: LayoutGrid,
       items: [
-        { title: "Recipes", url: buildScopedPath(organisationSlug, venueSlug, "menu/recipes"), icon: CookingPot },
-        { title: "Menu Items", url: buildScopedPath(organisationSlug, venueSlug, "menu/menu-items"), icon: ClipboardList },
-        { title: "Ingredients", url: buildScopedPath(organisationSlug, venueSlug, "menu/ingredients"), icon: Carrot },
+        { title: "Items", url: buildScopedPath(organisationSlug, venueSlug, "catalog/items"), icon: CookingPot },
+        { title: "Menu", url: buildScopedPath(organisationSlug, venueSlug, "catalog/menu"), icon: ClipboardList },
+        { title: "Ingredients", url: buildScopedPath(organisationSlug, venueSlug, "catalog/ingredients"), icon: Carrot },
       ],
     },
     {
@@ -189,10 +202,72 @@ function makePlatformNavItems(
         { title: "Daybook", url: buildScopedPath(organisationSlug, venueSlug, "operations/daybook"), icon: NotebookPen },
       ],
     },
+    {
+      title: "Settings",
+      url: buildScopedPath(organisationSlug, venueSlug, "settings"),
+      icon: Settings,
+      items: [
+        {
+          title: "Permissions",
+          url: buildScopedPath(organisationSlug, venueSlug, "settings/permissions"),
+          icon: Shield,
+        },
+        {
+          title: "Organisation",
+          url: buildScopedPath(organisationSlug, venueSlug, "settings/organisation"),
+          icon: Building2,
+        },
+        {
+          title: "Venue",
+          url: buildScopedPath(organisationSlug, venueSlug, "settings/venue"),
+          icon: MapPin,
+        },
+        {
+          title: "Integrations",
+          url: buildScopedPath(organisationSlug, venueSlug, "settings/integrations"),
+          icon: Plug,
+        },
+      ],
+    },
   ];
 }
 
-const topPlatformNavItems: NavMainItem[] = [
+function applySettingsNavAccess(
+  items: AccessControlledItem[],
+  access: ScopedSettingsAccess,
+): AccessControlledItem[] {
+  return items
+    .map((item) => {
+      if (item.title !== "Settings" || !item.items) {
+        return item;
+      }
+      if (!access.canSeeSettingsNav) {
+        return null;
+      }
+      const children = item.items.filter((child) => {
+        if (child.url.endsWith("/settings/permissions")) {
+          return access.canSeePermissions;
+        }
+        if (child.url.endsWith("/settings/organisation")) {
+          return access.canSeeOrganisation;
+        }
+        if (child.url.endsWith("/settings/venue")) {
+          return access.canSeeVenue;
+        }
+        if (child.url.endsWith("/settings/integrations")) {
+          return access.canSeePermissions;
+        }
+        return true;
+      });
+      if (children.length === 0) {
+        return null;
+      }
+      return { ...item, items: children };
+    })
+    .filter((item): item is AccessControlledItem => item !== null);
+}
+
+const defaultTopPlatformNavItems: NavMainItem[] = [
   {
     title: "Agent",
     url: "/agent",
@@ -209,6 +284,15 @@ const topPlatformNavItems: NavMainItem[] = [
     title: "Support",
     url: "/support",
     icon: LifeBuoy,
+  },
+];
+
+const setupOnlyPlatformNavItems: NavMainItem[] = [
+  {
+    title: "Setup",
+    url: "/setup",
+    icon: Rocket,
+    exact: true,
   },
 ];
 
@@ -260,6 +344,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
   const currentUser = useMeStore((state) => state.currentUser);
   const features = currentUser?.features ?? [];
+  const needsSetupNav =
+    pathname.startsWith("/setup") || Boolean(currentUser?.needsSetup);
+  const topPlatformNavItems = needsSetupNav
+    ? setupOnlyPlatformNavItems
+    : defaultTopPlatformNavItems;
   const activeScopedContext = useMemo(() => getScopedContext(pathname), [pathname]);
   const [selectedScopedContext, setSelectedScopedContext] = useState<{
     organisationSlug: string;
@@ -304,11 +393,17 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       return [];
     }
 
-    return makePlatformNavItems(
+    const base = makePlatformNavItems(
       resolvedScope.organisationSlug,
-      resolvedScope.venueSlug
+      resolvedScope.venueSlug,
     );
-  }, [resolvedScope]);
+    const settingsAccess = getScopedSettingsAccess(
+      accessOrganisations,
+      resolvedScope.organisationSlug,
+      resolvedScope.venueSlug,
+    );
+    return applySettingsNavAccess(base, settingsAccess);
+  }, [resolvedScope, accessOrganisations]);
   const visiblePlatformItems = getVisiblePlatformItems(
     platformNavItems,
     navRoleForScopedItems,
@@ -320,64 +415,38 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <div className="px-2">
           <div className="flex min-h-10 items-center justify-center px-2 py-4 group-data-[collapsible=icon]:hidden">
-            <Image
-              src="/images/supersolt-logowordmark-black.svg"
-              alt="Supersolt"
-              width={360}
-              height={144}
-              className="h-16 w-auto dark:hidden"
-              priority
-            />
-            <Image
-              src="/images/supersolt-logowordmark-white.svg"
-              alt="Supersolt"
-              width={360}
-              height={144}
-              className="hidden h-16 w-auto dark:block"
-              priority
-            />
+            <SupersoltLogo variant="wordmark" className="h-16 w-auto" priority />
           </div>
           <div className="hidden min-h-10 items-center justify-center group-data-[collapsible=icon]:flex">
-            <Image
-              src="/images/supersolt-logo-black.svg"
-              alt="Supersolt icon"
-              width={151}
-              height={144}
-              className="h-7 w-auto dark:hidden"
-              priority
-            />
-            <Image
-              src="/images/supersolt-logo-white.svg"
-              alt="Supersolt icon"
-              width={151}
-              height={144}
-              className="hidden h-7 w-auto dark:block"
-              priority
-            />
+            <SupersoltLogo variant="mark" className="h-7 w-auto" priority />
           </div>
         </div>
       </SidebarHeader>
       
       <SidebarContent>
         <NavMain title="Platform" items={topPlatformNavItems} />
-        <Separator className="my-0.5" />
-        <VenueSwitcher
-          currentOrganisationSlug={activeScopedContext?.organisationSlug ?? null}
-          currentVenueSlug={activeScopedContext?.venueSlug ?? null}
-          onVenueChange={(venue: Venue) => {
-            setSelectedScopedContext({
-              organisationSlug: venue.organisationSlug,
-              venueSlug: venue.slug,
-            });
-            const nextPath = buildVenueNavigationPath(
-              pathname,
-              venue.organisationSlug,
-              venue.slug
-            );
-            router.push(nextPath);
-          }}
-        />
-        {resolvedScope ? (
+        {!needsSetupNav ? (
+          <>
+            <Separator className="my-0.5" />
+            <VenueSwitcher
+              currentOrganisationSlug={activeScopedContext?.organisationSlug ?? null}
+              currentVenueSlug={activeScopedContext?.venueSlug ?? null}
+              onVenueChange={(venue: Venue) => {
+                setSelectedScopedContext({
+                  organisationSlug: venue.organisationSlug,
+                  venueSlug: venue.slug,
+                });
+                const nextPath = buildVenueNavigationPath(
+                  pathname,
+                  venue.organisationSlug,
+                  venue.slug
+                );
+                router.push(nextPath);
+              }}
+            />
+          </>
+        ) : null}
+        {resolvedScope && !needsSetupNav ? (
           <NavMain
             className="-mt-2"
             items={visiblePlatformItems}

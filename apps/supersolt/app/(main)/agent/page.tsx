@@ -58,7 +58,7 @@ function DemoRosterCard() {
 function DemoWagyuRecipeCard() {
   return (
     <Link
-      href="http://localhost:3005/guzman-y-gomez/footscray-vic/menu/recipes?id=wagyu-burger&tab=details"
+      href="http://localhost:3005/guzman-y-gomez/footscray-vic/catalog/items?id=wagyu-burger&tab=details"
       className="block max-w-2xl transition-transform duration-200 hover:scale-[1.01]"
     >
       <Card className="border-border/80 hover:border-primary/50">

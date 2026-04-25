@@ -8,6 +8,7 @@ type UserProfileRow = {
   last_name: string | null;
   full_name: string | null;
   avatar_url: string | null;
+  setup_completed_at: string | null;
 };
 
 export async function GET() {
@@ -30,9 +31,23 @@ export async function GET() {
     );
   }
 
+  if (!user.email_confirmed_at) {
+    return NextResponse.json(
+      {
+        data: null,
+        error: {
+          message: "Confirm your email before continuing.",
+          status: 403,
+          code: "email_not_confirmed",
+        },
+      },
+      { status: 403 }
+    );
+  }
+
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
-    .select("email, first_name, last_name, full_name, avatar_url")
+    .select("email, first_name, last_name, full_name, avatar_url, setup_completed_at")
     .eq("id", user.id)
     .eq("is_active", true)
     .is("archived_at", null)
@@ -60,6 +75,9 @@ export async function GET() {
     profileFullName ||
     null;
 
+  const setupCompletedAt = typedProfile?.setup_completed_at ?? null;
+  const needsSetup = !setupCompletedAt;
+
   const me: MeUser = {
     id: user.id,
     email: typedProfile?.email ?? user.email ?? null,
@@ -81,6 +99,8 @@ export async function GET() {
     role:
       typeof user.app_metadata?.role === "string" ? user.app_metadata.role : null,
     features: [],
+    needsSetup,
+    setupCompletedAt,
   };
 
   return NextResponse.json({ data: me, error: null });
