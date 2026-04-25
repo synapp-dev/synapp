@@ -8,6 +8,7 @@
       "outputs": [".next/**", "!.next/cache/**"],
       "env": [
         "STEAM_API_KEY",
+        "NEXT_PUBLIC_SUPABASE_*",
         "POSTGRES_*",
         "SUPABASE_*",
         "DATABASE_URL",
