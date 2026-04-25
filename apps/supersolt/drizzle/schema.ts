@@ -267,6 +267,7 @@ export const organisations = pgTable("organisations", {
 	logoUrl: text("logo_url"),
 	timezone: text().default('Australia/Melbourne').notNull(),
 	currency: text().default('AUD').notNull(),
+	isGstRegistered: boolean("is_gst_registered").default(false).notNull(),
 	isActive: boolean("is_active").default(true).notNull(),
 	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -352,6 +353,7 @@ export const userProfiles = pgTable("user_profiles", {
 	timezone: text().default('Australia/Melbourne'),
 	isActive: boolean("is_active").default(true).notNull(),
 	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
+	setupCompletedAt: timestamp("setup_completed_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [

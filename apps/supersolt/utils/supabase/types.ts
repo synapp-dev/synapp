@@ -44,6 +44,7 @@ export type Database = {
           email: string | null;
           id: string;
           is_active: boolean;
+          is_gst_registered: boolean;
           legal_name: string | null;
           logo_url: string | null;
           name: string;
@@ -61,6 +62,7 @@ export type Database = {
           email?: string | null;
           id?: string;
           is_active?: boolean;
+          is_gst_registered?: boolean;
           legal_name?: string | null;
           logo_url?: string | null;
           name: string;
@@ -147,8 +149,80 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["venues"]["Insert"]>;
         Relationships: [];
       };
+      venue_square_connections: {
+        Row: {
+          created_at: string;
+          environment: string;
+          id: string;
+          organisation_id: string;
+          square_access_token: string;
+          square_location_id: string | null;
+          square_merchant_id: string;
+          square_refresh_token: string;
+          token_expires_at: string | null;
+          updated_at: string;
+          venue_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          environment: string;
+          id?: string;
+          organisation_id: string;
+          square_access_token: string;
+          square_location_id?: string | null;
+          square_merchant_id: string;
+          square_refresh_token: string;
+          token_expires_at?: string | null;
+          updated_at?: string;
+          venue_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["venue_square_connections"]["Insert"]>;
+        Relationships: [];
+      };
+      venue_square_order_lines: {
+        Row: {
+          created_at: string;
+          currency: string;
+          gross_amount_cents: number;
+          id: string;
+          line_name: string | null;
+          match_source: string;
+          menu_item_id: string | null;
+          observed_at: string;
+          organisation_id: string;
+          quantity: number;
+          square_catalog_object_id: string | null;
+          square_line_uid: string;
+          square_order_id: string | null;
+          square_payment_id: string;
+          updated_at: string;
+          venue_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          currency?: string;
+          gross_amount_cents?: number;
+          id?: string;
+          line_name?: string | null;
+          match_source?: string;
+          menu_item_id?: string | null;
+          observed_at: string;
+          organisation_id: string;
+          quantity: number;
+          square_catalog_object_id?: string | null;
+          square_line_uid: string;
+          square_order_id?: string | null;
+          square_payment_id: string;
+          updated_at?: string;
+          venue_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["venue_square_order_lines"]["Insert"]>;
+        Relationships: [];
+      };
       venue_staff_weekly_availability: {
         Row: {
+          available_end_time: string | null;
+          available_start_time: string | null;
           created_at: string;
           day_of_week: number;
           id: string;
@@ -159,6 +233,8 @@ export type Database = {
           venue_id: string;
         };
         Insert: {
+          available_end_time?: string | null;
+          available_start_time?: string | null;
           created_at?: string;
           day_of_week: number;
           id?: string;
@@ -173,6 +249,8 @@ export type Database = {
       };
       venue_staff_week_instance_availability: {
         Row: {
+          available_end_time: string | null;
+          available_start_time: string | null;
           created_at: string;
           day_of_week: number;
           id: string;
@@ -184,6 +262,8 @@ export type Database = {
           week_start_monday: string;
         };
         Insert: {
+          available_end_time?: string | null;
+          available_start_time?: string | null;
           created_at?: string;
           day_of_week: number;
           id?: string;
@@ -293,6 +373,7 @@ export type Database = {
           is_active: boolean;
           last_name: string | null;
           phone: string | null;
+          setup_completed_at: string | null;
           timezone: string | null;
           updated_at: string;
         };
@@ -307,6 +388,7 @@ export type Database = {
           is_active?: boolean;
           last_name?: string | null;
           phone?: string | null;
+          setup_completed_at?: string | null;
           timezone?: string | null;
           updated_at?: string;
         };
@@ -503,6 +585,28 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["menu_item_recipes"]["Insert"]>;
+        Relationships: [];
+      };
+      menu_item_square_catalog_links: {
+        Row: {
+          created_at: string;
+          id: string;
+          menu_item_id: string;
+          organisation_id: string;
+          square_catalog_object_id: string;
+          updated_at: string;
+          venue_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          menu_item_id: string;
+          organisation_id: string;
+          square_catalog_object_id: string;
+          updated_at?: string;
+          venue_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["menu_item_square_catalog_links"]["Insert"]>;
         Relationships: [];
       };
       menu_items: {
