@@ -1,0 +1,19 @@
+/**
+ * Youth Justice brand — overrides shared @workspace/ui tokens for this app only.
+ * Default (solid) buttons use bg-primary / text-primary-foreground from the UI package.
+ */
+.app-youthjustice {
+  --primary: #0d4a93;
+  --primary-foreground: #ffffff;
+  /* Case switcher avatar & other `bg-sidebar-primary` accents (shared UI defaults to near-black) */
+  --sidebar-primary: #0d4a93;
+  --sidebar-primary-foreground: #ffffff;
+}
+
+/* next-themes sets `class="dark"` on `html`; keep brand primary in both modes */
+html.dark .app-youthjustice {
+  --primary: #0d4a93;
+  --primary-foreground: #ffffff;
+  --sidebar-primary: #0d4a93;
+  --sidebar-primary-foreground: #ffffff;
+}
