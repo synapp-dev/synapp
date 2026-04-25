@@ -17,7 +17,8 @@
         "SMTP_USER",
         "SMTP_PASS",
         "SMTP_FROM",
-        "TICKET_NOTIFY_EMAIL"
+        "TICKET_NOTIFY_EMAIL",
+        "SQUARE_*"
       ]
     },
     "lint": {
