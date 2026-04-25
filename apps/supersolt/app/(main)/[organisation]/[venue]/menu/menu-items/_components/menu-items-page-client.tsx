@@ -342,7 +342,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
     };
 
     if (!payload.name) {
-      toast.error("Menu item name is required");
+      toast.error("Name is required");
       return;
     }
     if (!payload.sectionName) {
@@ -350,7 +350,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
       return;
     }
     if (payload.components.length === 0) {
-      toast.error("Add at least one recipe component");
+      toast.error("Add at least one catalog item component");
       return;
     }
 
@@ -360,7 +360,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
         venueSlug: venue,
         payload,
       });
-      toast.success("Menu item created");
+      toast.success("Added to menu");
     } else if (sheetMode === "edit" && selectedMenuItemId) {
       await updateMenuItem.mutateAsync({
         organisationSlug: organisation,
@@ -368,7 +368,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
         menuItemId: selectedMenuItemId,
         payload,
       });
-      toast.success("Menu item updated");
+      toast.success("Menu updated");
     }
 
     setSheetMode(null);
@@ -379,7 +379,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
     if (!selectedMenuItemId || sheetMode !== "edit") {
       return;
     }
-    if (!confirm("Delete this menu item? This action cannot be undone.")) {
+    if (!confirm("Delete this from the menu? This action cannot be undone.")) {
       return;
     }
 
@@ -388,7 +388,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
       venueSlug: venue,
       menuItemId: selectedMenuItemId,
     });
-    toast.success("Menu item deleted");
+    toast.success("Removed from menu");
     setSheetMode(null);
     setSelectedMenuItemId(null);
   }
@@ -406,7 +406,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <BookOpenText className="h-5 w-5 text-muted-foreground" />
-            Menu Items
+            Menu
           </h1>
         </div>
         <Separator />
@@ -415,7 +415,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search name, recipe, PLU, tag..."
+              placeholder="Search name, catalog item, PLU, tag..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-9 w-[480px] max-w-full pl-8"
@@ -493,7 +493,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
                     <TableRow className="bg-muted/50">
                       <TableHead className="w-12" />
                       <TableHead>Name</TableHead>
-                      <TableHead>Recipe</TableHead>
+                      <TableHead>Items</TableHead>
                       <TableHead>Tags</TableHead>
                       <TableHead>Mode</TableHead>
                       <TableHead>Price</TableHead>
@@ -529,13 +529,13 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
                     {menuItemsQuery.isLoading ? (
                       <TableRow>
                         <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                          Loading menu items...
+                          Loading menu…
                         </TableCell>
                       </TableRow>
                     ) : pagedItems.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={10} className="py-10 text-center text-sm text-muted-foreground">
-                          No menu items found.
+                          Nothing on the menu yet.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -777,10 +777,10 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
           )}
         >
           <SheetTitle className="sr-only">
-            {sheetMode === "create" ? "Create menu item" : "Edit menu item"}
+            {sheetMode === "create" ? "Add to menu" : "Edit menu line"}
           </SheetTitle>
           <SheetDescription className="sr-only">
-            Create or edit menu item details and recipe components.
+            Create or edit what appears on the menu and linked catalog items.
           </SheetDescription>
 
           <div className="flex h-full min-h-0 flex-col">
@@ -788,10 +788,10 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1">
                   <h2 className="text-lg font-semibold">
-                    {sheetMode === "create" ? "New Menu Item" : form.name || "Menu Item Editor"}
+                    {sheetMode === "create" ? "New menu line" : form.name || "Menu editor"}
                   </h2>
                   <p className="text-xs text-muted-foreground">
-                    Manage menu item details and linked recipe components.
+                    Manage what appears on the menu and linked catalog items.
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -859,7 +859,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="MANUAL">Manual</SelectItem>
-                        <SelectItem value="AUTO_FROM_RECIPE">Auto from recipe</SelectItem>
+                        <SelectItem value="AUTO_FROM_RECIPE">Auto from catalog item</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -956,7 +956,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
               <div className="mt-4 space-y-4 rounded-lg border p-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    Recipe Components
+                    Catalog item components
                   </h3>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={addComponentRow}>
                     <Plus className="h-4 w-4" />
@@ -967,7 +967,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Recipe</TableHead>
+                      <TableHead>Items</TableHead>
                       <TableHead className="w-28">Quantity</TableHead>
                       <TableHead className="w-36 text-right">Line Cost</TableHead>
                       <TableHead className="w-14" />
@@ -977,7 +977,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
                     {form.components.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
-                          No recipe components yet. Add at least one.
+                          No catalog item components yet. Add at least one.
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -998,10 +998,10 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
                                 }
                               >
                                 <SelectTrigger>
-                                  <SelectValue placeholder="Select recipe" />
+                                  <SelectValue placeholder="Select catalog item" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="__none__">Select recipe</SelectItem>
+                                  <SelectItem value="__none__">Select catalog item</SelectItem>
                                   {recipes.map((recipe) => (
                                     <SelectItem key={recipe.id} value={recipe.id}>
                                       {recipe.name}

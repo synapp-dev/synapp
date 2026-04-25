@@ -73,14 +73,14 @@ export class RecipesServiceError extends Error {
 
 function assertRecipeCategory(value: string): RecipeCategory {
   if (!RECIPE_CATEGORIES.includes(value as RecipeCategory)) {
-    throw new RecipesServiceError(400, "Invalid recipe category");
+    throw new RecipesServiceError(400, "Invalid item category");
   }
   return value as RecipeCategory;
 }
 
 function assertRecipeStatus(value: string): RecipeStatus {
   if (!RECIPE_STATUSES.includes(value as RecipeStatus)) {
-    throw new RecipesServiceError(400, "Invalid recipe status");
+    throw new RecipesServiceError(400, "Invalid item status");
   }
   return value as RecipeStatus;
 }
@@ -151,7 +151,7 @@ async function assertVenueAccess(
 function normalizeUpsertInput(input: UpsertRecipeInput) {
   const name = input.name.trim();
   if (name.length === 0) {
-    throw new RecipesServiceError(400, "Recipe name is required");
+    throw new RecipesServiceError(400, "Item name is required");
   }
 
   return {
@@ -347,7 +347,7 @@ export const recipesService = {
     });
 
     if (!detail) {
-      throw new RecipesServiceError(500, "Created recipe not found");
+      throw new RecipesServiceError(500, "Created item not found");
     }
 
     return detail;

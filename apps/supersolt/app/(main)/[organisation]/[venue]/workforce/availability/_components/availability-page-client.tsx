@@ -6,8 +6,26 @@ import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Card, CardContent } from "@workspace/ui/components/card";
+import { Input } from "@workspace/ui/components/input";
+import { Label } from "@workspace/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select";
 import { Separator } from "@workspace/ui/components/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@workspace/ui/components/sheet";
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group";
 import { cn } from "@workspace/ui/lib/utils";
 import {
@@ -25,8 +43,9 @@ type AvailabilityPageClientProps = {
 
 type AvailabilitySlot = {
   available: boolean;
-  startTime?: string;
-  endTime?: string;
+  /** HH:mm when set; both unset = all day. */
+  startTime: string | null;
+  endTime: string | null;
 };
 
 type StaffAvailabilityRow = {
@@ -36,6 +55,55 @@ type StaffAvailabilityRow = {
 
 function countAvailableDays(days: (AvailabilitySlot | null)[]): number {
   return days.filter((s) => s?.available === true).length;
+}
+
+type AvailabilityApiRow = {
+  userProfileId: string;
+  dayOfWeek: number;
+  isAvailable: boolean;
+  availableStartTime?: string | null;
+  availableEndTime?: string | null;
+};
+
+type AvailCellDto = {
+  isAvailable: boolean;
+  availableStartTime: string | null;
+  availableEndTime: string | null;
+};
+
+function slotFromDto(d: AvailCellDto): AvailabilitySlot {
+  return {
+    available: d.isAvailable,
+    startTime: d.availableStartTime ?? null,
+    endTime: d.availableEndTime ?? null,
+  };
+}
+
+function formatTimeAu(hhmm: string | null | undefined): string {
+  if (!hhmm) return "";
+  const parts = hhmm.split(":");
+  const h = Number(parts[0] ?? 0);
+  const m = Number(parts[1] ?? 0);
+  const ap = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${h12}${ap}` : `${h12}:${String(m).padStart(2, "0")}${ap}`;
+}
+
+function slotCellSummary(slot: AvailabilitySlot | null): { title: string; lines: [string] | [string, string] } {
+  if (slot === null) {
+    return { title: "Inherit default", lines: ["—"] };
+  }
+  if (!slot.available) {
+    return { title: "Unavailable", lines: ["Unavailable"] };
+  }
+  const hasWindow = slot.startTime && slot.endTime;
+  if (!hasWindow) {
+    return { title: "Available (all day)", lines: ["Available", "All day"] };
+  }
+  return {
+    title: `Available ${formatTimeAu(slot.startTime)}–${formatTimeAu(slot.endTime)}`,
+    lines: ["Available", `${formatTimeAu(slot.startTime)}–${formatTimeAu(slot.endTime)}`],
+  };
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -55,19 +123,23 @@ function isoMondayToWeekRangeLabel(iso: string): string {
 
 function staffAvailabilityRows(
   staff: VenueStaffMember[],
-  availability: { userProfileId: string; dayOfWeek: number; isAvailable: boolean }[]
+  availability: AvailabilityApiRow[]
 ): StaffAvailabilityRow[] {
-  const slotMap = new Map<string, Map<number, boolean>>();
+  const slotMap = new Map<string, Map<number, AvailCellDto>>();
   for (const row of availability) {
     if (!slotMap.has(row.userProfileId)) slotMap.set(row.userProfileId, new Map());
-    slotMap.get(row.userProfileId)!.set(row.dayOfWeek, row.isAvailable);
+    slotMap.get(row.userProfileId)!.set(row.dayOfWeek, {
+      isAvailable: row.isAvailable,
+      availableStartTime: row.availableStartTime ?? null,
+      availableEndTime: row.availableEndTime ?? null,
+    });
   }
   return staff.map((s) => ({
     member: s,
     days: Array.from({ length: 7 }, (_, d) => {
       const m = slotMap.get(s.id);
       if (!m || !m.has(d)) return null;
-      return { available: m.get(d)! };
+      return slotFromDto(m.get(d)!);
     }),
   }));
 }
@@ -75,18 +147,26 @@ function staffAvailabilityRows(
 /** Week-specific rows override recurring template for display (same rules as roster). */
 function mergedStaffAvailabilityRows(
   staff: VenueStaffMember[],
-  recurring: { userProfileId: string; dayOfWeek: number; isAvailable: boolean }[],
-  weekInstance: { userProfileId: string; dayOfWeek: number; isAvailable: boolean }[]
+  recurring: AvailabilityApiRow[],
+  weekInstance: AvailabilityApiRow[]
 ): StaffAvailabilityRow[] {
-  const recMap = new Map<string, Map<number, boolean>>();
-  const wMap = new Map<string, Map<number, boolean>>();
+  const recMap = new Map<string, Map<number, AvailCellDto>>();
+  const wMap = new Map<string, Map<number, AvailCellDto>>();
   for (const row of recurring) {
     if (!recMap.has(row.userProfileId)) recMap.set(row.userProfileId, new Map());
-    recMap.get(row.userProfileId)!.set(row.dayOfWeek, row.isAvailable);
+    recMap.get(row.userProfileId)!.set(row.dayOfWeek, {
+      isAvailable: row.isAvailable,
+      availableStartTime: row.availableStartTime ?? null,
+      availableEndTime: row.availableEndTime ?? null,
+    });
   }
   for (const row of weekInstance) {
     if (!wMap.has(row.userProfileId)) wMap.set(row.userProfileId, new Map());
-    wMap.get(row.userProfileId)!.set(row.dayOfWeek, row.isAvailable);
+    wMap.get(row.userProfileId)!.set(row.dayOfWeek, {
+      isAvailable: row.isAvailable,
+      availableStartTime: row.availableStartTime ?? null,
+      availableEndTime: row.availableEndTime ?? null,
+    });
   }
   return staff.map((s) => ({
     member: s,
@@ -95,7 +175,7 @@ function mergedStaffAvailabilityRows(
       const t = recMap.get(s.id)?.get(d);
       const eff = w !== undefined ? w : t;
       if (eff === undefined) return null;
-      return { available: eff };
+      return slotFromDto(eff);
     }),
   }));
 }
@@ -139,8 +219,14 @@ function weekDatesFromMondayIso(iso: string): Date[] {
 
 type AvailabilityApiPayload = {
   staff: VenueStaffMember[];
-  recurringAvailability: { userProfileId: string; dayOfWeek: number; isAvailable: boolean }[];
-  weekInstanceAvailability: { userProfileId: string; dayOfWeek: number; isAvailable: boolean }[];
+  recurringAvailability: AvailabilityApiRow[];
+  weekInstanceAvailability: AvailabilityApiRow[];
+};
+
+type CellEditorState = {
+  member: VenueStaffMember;
+  dayIdx: number;
+  slot: AvailabilitySlot | null;
 };
 
 function AvailabilityRosterGrid({
@@ -164,158 +250,311 @@ function AvailabilityRosterGrid({
 }) {
   const weekDates = view === "week" ? weekDatesFromMondayIso(weekStartMondayIso) : null;
 
+  const [editor, setEditor] = useState<CellEditorState | null>(null);
+  const [status, setStatus] = useState<"inherit" | "unavailable" | "available">("inherit");
+  const [useSpecificHours, setUseSpecificHours] = useState(false);
+  const [startStr, setStartStr] = useState("09:00");
+  const [endStr, setEndStr] = useState("17:00");
+  const [saving, setSaving] = useState(false);
+
+  function openCell(member: VenueStaffMember, dayIdx: number, slot: AvailabilitySlot | null) {
+    setEditor({ member, dayIdx, slot });
+    if (slot === null) {
+      setStatus("inherit");
+      setUseSpecificHours(false);
+      setStartStr("09:00");
+      setEndStr("17:00");
+    } else if (!slot.available) {
+      setStatus("unavailable");
+      setUseSpecificHours(false);
+      setStartStr("09:00");
+      setEndStr("17:00");
+    } else {
+      setStatus("available");
+      const hasWindow = !!(slot.startTime && slot.endTime);
+      setUseSpecificHours(hasWindow);
+      setStartStr((slot.startTime ?? "09:00").slice(0, 5));
+      setEndStr((slot.endTime ?? "17:00").slice(0, 5));
+    }
+  }
+
+  async function saveEditor() {
+    if (!editor) return;
+    setSaving(true);
+    try {
+      const body: Record<string, unknown> = {
+        userProfileId: editor.member.id,
+        dayOfWeek: editor.dayIdx,
+        ...patchBodyExtra,
+      };
+      if (status === "inherit") {
+        body.isAvailable = null;
+      } else if (status === "unavailable") {
+        body.isAvailable = false;
+      } else {
+        body.isAvailable = true;
+        if (useSpecificHours) {
+          body.availableStartTime = startStr;
+          body.availableEndTime = endStr;
+        }
+      }
+
+      const res = await fetch(apiBase, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const json = (await res.json()) as { error: { message: string } | null };
+      if (!res.ok || json.error) {
+        toast.error(json.error?.message ?? "Could not update");
+        return;
+      }
+      setEditor(null);
+      onPatched();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const dayLabelForEditor =
+    editor !== null ? DAYS[editor.dayIdx] : "";
+
   return (
-    <div className="min-w-[900px]">
-      <div className="sticky top-0 z-10 grid grid-cols-[200px_repeat(7,1fr)] border-b bg-muted/80 backdrop-blur">
-        <div className="flex items-center border-r px-3 py-2">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Staff</span>
-        </div>
-        {DAYS.map((d, i) => {
-          if (weekDates) {
-            const date = weekDates[i]!;
-            const isToday = date.toDateString() === new Date().toDateString();
-            return (
-              <div
-                key={d}
-                className={cn(
-                  "flex items-center justify-between gap-1 border-r px-2.5 py-2 last:border-r-0",
-                  isToday && "bg-blue-50/80 dark:bg-blue-950/30"
-                )}
-              >
-                <span
+    <>
+      <div className="min-w-[900px]">
+        <div className="sticky top-0 z-10 grid grid-cols-[200px_repeat(7,1fr)] border-b bg-muted/80 backdrop-blur">
+          <div className="flex items-center border-r px-3 py-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Staff</span>
+          </div>
+          {DAYS.map((d, i) => {
+            if (weekDates) {
+              const date = weekDates[i]!;
+              const isToday = date.toDateString() === new Date().toDateString();
+              return (
+                <div
+                  key={d}
                   className={cn(
-                    "shrink-0 text-base font-semibold tabular-nums leading-none",
-                    isToday ? "text-blue-600" : "text-foreground"
+                    "flex items-center justify-between gap-1 border-r px-2.5 py-2 last:border-r-0",
+                    isToday && "bg-blue-50/80 dark:bg-blue-950/30"
                   )}
                 >
-                  {date.getDate()}
-                </span>
-                <div className="min-w-0 flex flex-col items-end text-right leading-tight">
                   <span
                     className={cn(
-                      "text-[10px] font-medium",
-                      isToday ? "text-blue-600" : "text-muted-foreground"
+                      "shrink-0 text-base font-semibold tabular-nums leading-none",
+                      isToday ? "text-blue-600" : "text-foreground"
                     )}
                   >
-                    {d}
+                    {date.getDate()}
                   </span>
-                </div>
-              </div>
-            );
-          }
-          return (
-            <div
-              key={d}
-              className="flex items-center justify-center border-r px-2.5 py-2 last:border-r-0"
-            >
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {d}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-
-      {loading ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
-      ) : rows.length === 0 ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">{emptyMessage}</div>
-      ) : (
-        rows.map((row) => {
-          const { member } = row;
-          const badgeLabel =
-            member.positionSlug && member.positionDisplayName
-              ? positionShortLabel(member.positionSlug, member.positionDisplayName)
-              : "—";
-          const availDays = countAvailableDays(row.days);
-          return (
-            <div
-              key={member.id}
-              className="grid grid-cols-[200px_repeat(7,1fr)] border-b last:border-b-0 hover:bg-muted/20"
-            >
-              <div className="flex items-center gap-2.5 border-r px-3 py-2">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                  {getInitials(member.name)}
-                </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{member.name}</p>
-                  <div className="flex items-center gap-1.5">
-                    <Badge
-                      variant="outline"
+                  <div className="min-w-0 flex flex-col items-end text-right leading-tight">
+                    <span
                       className={cn(
-                        "px-1.5 py-0 text-[10px]",
-                        member.positionSlug
-                          ? positionBadgeClass(member.positionSlug)
-                          : "border-dashed text-muted-foreground"
+                        "text-[10px] font-medium",
+                        isToday ? "text-blue-600" : "text-muted-foreground"
                       )}
                     >
-                      {badgeLabel}
-                    </Badge>
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                      {availDays}d
+                      {d}
                     </span>
                   </div>
                 </div>
+              );
+            }
+            return (
+              <div
+                key={d}
+                className="flex items-center justify-center border-r px-2.5 py-2 last:border-r-0"
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {d}
+                </span>
               </div>
-              {row.days.map((slot, dayIdx) => {
-                const isToday =
-                  weekDates !== null &&
-                  weekDates[dayIdx]!.toDateString() === new Date().toDateString();
-                return (
-                  <div
-                    key={DAYS[dayIdx]}
-                    className={cn(
-                      "relative flex min-h-[56px] items-center justify-center border-r p-1 last:border-r-0",
-                      isToday && "bg-blue-50/40 dark:bg-blue-950/20"
-                    )}
-                  >
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const next: boolean | null =
-                          slot === null ? true : slot.available ? false : null;
-                        const res = await fetch(apiBase, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            userProfileId: member.id,
-                            dayOfWeek: dayIdx,
-                            isAvailable: next,
-                            ...patchBodyExtra,
-                          }),
-                        });
-                        const json = (await res.json()) as { error: { message: string } | null };
-                        if (!res.ok || json.error) {
-                          toast.error(json.error?.message ?? "Could not update");
-                          return;
-                        }
-                        onPatched();
-                      }}
+            );
+          })}
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">{emptyMessage}</div>
+        ) : (
+          rows.map((row) => {
+            const { member } = row;
+            const badgeLabel =
+              member.positionSlug && member.positionDisplayName
+                ? positionShortLabel(member.positionSlug, member.positionDisplayName)
+                : "—";
+            const availDays = countAvailableDays(row.days);
+            return (
+              <div
+                key={member.id}
+                className="grid grid-cols-[200px_repeat(7,1fr)] border-b last:border-b-0 hover:bg-muted/20"
+              >
+                <div className="flex items-center gap-2.5 border-r px-3 py-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
+                    {getInitials(member.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{member.name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "px-1.5 py-0 text-[10px]",
+                          member.positionSlug
+                            ? positionBadgeClass(member.positionSlug)
+                            : "border-dashed text-muted-foreground"
+                        )}
+                      >
+                        {badgeLabel}
+                      </Badge>
+                      <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                        {availDays}d
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {row.days.map((slot, dayIdx) => {
+                  const summary = slotCellSummary(slot);
+                  const isToday =
+                    weekDates !== null &&
+                    weekDates[dayIdx]!.toDateString() === new Date().toDateString();
+                  return (
+                    <div
+                      key={DAYS[dayIdx]}
                       className={cn(
-                        "flex w-[min(100%,7.5rem)] flex-col items-center justify-center rounded-md border px-2 py-1.5 text-center text-xs font-medium transition-colors",
-                        slot === null
-                          ? "border-dashed border-gray-200 text-gray-400 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
-                          : slot.available
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        "relative flex min-h-[56px] items-center justify-center border-r p-1 last:border-r-0",
+                        isToday && "bg-blue-50/40 dark:bg-blue-950/20"
                       )}
                     >
-                      {slot === null ? (
-                        <span className="opacity-50">—</span>
-                      ) : slot.available ? (
-                        "Available"
-                      ) : (
-                        "Unavailable"
-                      )}
-                    </button>
-                  </div>
-                );
-              })}
+                      <button
+                        type="button"
+                        title={summary.title}
+                        onClick={() => openCell(member, dayIdx, slot)}
+                        className={cn(
+                          "flex w-[min(100%,7.5rem)] flex-col items-center justify-center gap-0.5 rounded-md border px-2 py-1.5 text-center text-xs font-medium transition-colors",
+                          slot === null
+                            ? "border-dashed border-gray-200 text-gray-400 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800"
+                            : slot.available
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                              : "border-gray-200 bg-gray-100 text-gray-500 hover:bg-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
+                        )}
+                      >
+                        {summary.lines.length === 1 ? (
+                          <span className={slot === null ? "opacity-50" : undefined}>{summary.lines[0]}</span>
+                        ) : (
+                          <>
+                            <span className="text-[11px] font-semibold leading-tight">{summary.lines[0]}</span>
+                            <span className="text-[10px] font-normal leading-tight opacity-80">
+                              {summary.lines[1]}
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <Sheet
+        open={editor !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditor(null);
+        }}
+      >
+        <SheetContent
+          side="bottom"
+          className={cn(
+            "!inset-x-auto !left-1/2 !right-auto bottom-0 !translate-x-[-50%]",
+            "w-[min(100%-1.5rem,28rem)] sm:w-full sm:max-w-md",
+            "max-h-[min(85vh,560px)] overflow-y-auto rounded-t-xl border-x border-t shadow-xl"
+          )}
+        >
+          <SheetHeader className="text-center sm:text-left">
+            <SheetTitle>Availability</SheetTitle>
+            <SheetDescription>
+              {editor ? (
+                <>
+                  {editor.member.name} · {dayLabelForEditor}
+                </>
+              ) : null}
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col gap-4 px-4 pb-4">
+            <div className="space-y-2">
+              <Label htmlFor="avail-status">Status</Label>
+              <Select
+                value={status}
+                onValueChange={(v) => {
+                  if (v === "inherit" || v === "unavailable" || v === "available") {
+                    setStatus(v);
+                  }
+                }}
+              >
+                <SelectTrigger id="avail-status" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inherit">Inherit (no override)</SelectItem>
+                  <SelectItem value="unavailable">Unavailable</SelectItem>
+                  <SelectItem value="available">Available</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          );
-        })
-      )}
-    </div>
+
+            {status === "available" ? (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="avail-specific-hours"
+                    checked={useSpecificHours}
+                    onCheckedChange={(v) => setUseSpecificHours(v === true)}
+                  />
+                  <Label htmlFor="avail-specific-hours" className="cursor-pointer font-normal">
+                    Specific hours (otherwise all day)
+                  </Label>
+                </div>
+                {useSpecificHours ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="avail-start">From</Label>
+                      <Input
+                        id="avail-start"
+                        type="time"
+                        value={startStr}
+                        onChange={(e) => setStartStr(e.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="avail-end">To</Label>
+                      <Input
+                        id="avail-end"
+                        type="time"
+                        value={endStr}
+                        onChange={(e) => setEndStr(e.target.value)}
+                        className="bg-background"
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+          <SheetFooter className="gap-2 border-t px-4 py-3 sm:flex-row">
+            <Button type="button" variant="outline" onClick={() => setEditor(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={() => void saveEditor()} disabled={saving}>
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }
 

@@ -64,6 +64,9 @@ type PatchBody = {
   isAvailable?: boolean | null;
   /** When set, edits that roster week only (ISO Monday). Omit to edit recurring default. */
   weekStartMonday?: string | null;
+  /** When `isAvailable` is true: both null/omitted = all day; both HH:mm = window. */
+  availableStartTime?: string | null;
+  availableEndTime?: string | null;
 };
 
 export async function PATCH(request: Request, context: { params: Promise<RouteParams> }) {
@@ -118,6 +121,43 @@ export async function PATCH(request: Request, context: { params: Promise<RoutePa
 
   const nextAvailable: boolean | null = rawAvailable;
 
+  let availableStartTime: string | null | undefined;
+  let availableEndTime: string | null | undefined;
+  if (nextAvailable === true) {
+    const hasWindowKeys =
+      Object.prototype.hasOwnProperty.call(body, "availableStartTime") ||
+      Object.prototype.hasOwnProperty.call(body, "availableEndTime");
+    if (!hasWindowKeys) {
+      availableStartTime = null;
+      availableEndTime = null;
+    } else {
+      const s = body.availableStartTime;
+      const e = body.availableEndTime;
+      const sEmpty = s === null || s === undefined || (typeof s === "string" && s.trim() === "");
+      const eEmpty = e === null || e === undefined || (typeof e === "string" && e.trim() === "");
+      if (sEmpty !== eEmpty) {
+        return NextResponse.json(
+          {
+            data: null,
+            error: {
+              message:
+                "When setting hours, send both availableStartTime and availableEndTime as HH:mm, or both null for all day",
+              status: 400,
+            },
+          },
+          { status: 400 }
+        );
+      }
+      if (!sEmpty && typeof s === "string" && typeof e === "string") {
+        availableStartTime = s.trim();
+        availableEndTime = e.trim();
+      } else {
+        availableStartTime = null;
+        availableEndTime = null;
+      }
+    }
+  }
+
   try {
     await availabilityService.setAvailabilityCell(supabase, {
       userId,
@@ -127,6 +167,8 @@ export async function PATCH(request: Request, context: { params: Promise<RoutePa
       dayOfWeek,
       isAvailable: nextAvailable,
       weekStartMonday,
+      availableStartTime,
+      availableEndTime,
     });
     return NextResponse.json({ data: { ok: true }, error: null });
   } catch (error) {

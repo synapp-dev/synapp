@@ -43,7 +43,7 @@ export function useMenuItemMutations(scope: ScopedInput) {
         throw new Error(error.message);
       }
       if (!data) {
-        throw new Error("Failed to create menu item");
+        throw new Error("Failed to create menu line");
       }
       return data;
     },
@@ -57,7 +57,7 @@ export function useMenuItemMutations(scope: ScopedInput) {
         throw new Error(error.message);
       }
       if (!data) {
-        throw new Error("Failed to update menu item");
+        throw new Error("Failed to update menu line");
       }
       return data;
     },

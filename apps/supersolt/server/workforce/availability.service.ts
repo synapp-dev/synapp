@@ -12,11 +12,15 @@ import {
 type Supabase = SupabaseClient<Database>;
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_HHMM_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 export type VenueWeeklyAvailabilityRowDto = {
   userProfileId: string;
   dayOfWeek: number;
   isAvailable: boolean;
+  /** When `is_available` is true: both null = all day. */
+  availableStartTime: string | null;
+  availableEndTime: string | null;
 };
 
 export type VenueWeekInstanceAvailabilityRowDto = {
@@ -24,7 +28,31 @@ export type VenueWeekInstanceAvailabilityRowDto = {
   dayOfWeek: number;
   isAvailable: boolean;
   weekStartMonday: string;
+  availableStartTime: string | null;
+  availableEndTime: string | null;
 };
+
+function timeToMinutes(hhmmOrHhmmss: string): number {
+  const parts = hhmmOrHhmmss.split(":").map((x) => Number(x.trim()));
+  const h = parts[0] ?? 0;
+  const m = parts[1] ?? 0;
+  return h * 60 + m;
+}
+
+/** Accepts HH:mm from API; returns HH:mm:ss for Postgres `time`. */
+function normalizeAvailabilityTimeForDb(input: string): string {
+  const t = input.trim();
+  if (!TIME_HHMM_RE.test(t)) {
+    throw new PeopleServiceError(400, "Time must be HH:mm (24h)");
+  }
+  return `${t}:00`;
+}
+
+function mapDbTimeToDto(value: string | null): string | null {
+  if (value === null || value === undefined) return null;
+  const s = String(value);
+  return s.length >= 5 ? s.slice(0, 5) : s;
+}
 
 function assertIsoDate(label: string, value: string): void {
   if (!ISO_DATE_RE.test(value)) {
@@ -114,7 +142,7 @@ export const availabilityService = {
     if (staffIds.length > 0) {
       const { data: rows, error } = await supabase
         .from("venue_staff_weekly_availability")
-        .select("user_profile_id, day_of_week, is_available")
+        .select("user_profile_id, day_of_week, is_available, available_start_time, available_end_time")
         .eq("venue_id", context.venueId)
         .in("user_profile_id", staffIds);
 
@@ -127,6 +155,8 @@ export const availabilityService = {
           userProfileId: r.user_profile_id,
           dayOfWeek: r.day_of_week,
           isAvailable: r.is_available,
+          availableStartTime: mapDbTimeToDto(r.available_start_time),
+          availableEndTime: mapDbTimeToDto(r.available_end_time),
         }));
       }
     }
@@ -137,7 +167,9 @@ export const availabilityService = {
       assertIsoDate("weekStartMonday", weekStart);
       const { data: rows, error } = await supabase
         .from("venue_staff_week_instance_availability")
-        .select("user_profile_id, day_of_week, is_available, week_start_monday")
+        .select(
+          "user_profile_id, day_of_week, is_available, week_start_monday, available_start_time, available_end_time"
+        )
         .eq("venue_id", context.venueId)
         .eq("week_start_monday", weekStart)
         .in("user_profile_id", staffIds);
@@ -152,6 +184,8 @@ export const availabilityService = {
           dayOfWeek: r.day_of_week,
           isAvailable: r.is_available,
           weekStartMonday: r.week_start_monday,
+          availableStartTime: mapDbTimeToDto(r.available_start_time),
+          availableEndTime: mapDbTimeToDto(r.available_end_time),
         }));
       }
     }
@@ -170,6 +204,9 @@ export const availabilityService = {
       isAvailable: boolean | null;
       /** When set, edits that calendar week only; otherwise edits recurring template. */
       weekStartMonday?: string | null;
+      /** When `isAvailable` is true: both null = all day. Ignored when not available. */
+      availableStartTime?: string | null;
+      availableEndTime?: string | null;
     }
   ): Promise<void> {
     if (!Number.isInteger(args.dayOfWeek) || args.dayOfWeek < 0 || args.dayOfWeek > 6) {
@@ -193,6 +230,28 @@ export const availabilityService = {
     });
 
     const weekStart = args.weekStartMonday?.trim();
+
+    let startDb: string | null = null;
+    let endDb: string | null = null;
+    if (args.isAvailable === true) {
+      const s = args.availableStartTime;
+      const e = args.availableEndTime;
+      const hasS = s != null && String(s).trim() !== "";
+      const hasE = e != null && String(e).trim() !== "";
+      if (hasS !== hasE) {
+        throw new PeopleServiceError(
+          400,
+          "When setting hours, both availableStartTime and availableEndTime are required (or omit both for all day)"
+        );
+      }
+      if (hasS && hasE) {
+        startDb = normalizeAvailabilityTimeForDb(String(s));
+        endDb = normalizeAvailabilityTimeForDb(String(e));
+        if (timeToMinutes(startDb) >= timeToMinutes(endDb)) {
+          throw new PeopleServiceError(400, "availableEndTime must be after availableStartTime");
+        }
+      }
+    }
 
     if (weekStart) {
       assertIsoDate("weekStartMonday", weekStart);
@@ -223,6 +282,8 @@ export const availabilityService = {
           week_start_monday: weekStart,
           day_of_week: args.dayOfWeek,
           is_available: args.isAvailable,
+          available_start_time: args.isAvailable ? startDb : null,
+          available_end_time: args.isAvailable ? endDb : null,
         },
         { onConflict: "venue_id,user_profile_id,week_start_monday,day_of_week" }
       );
@@ -260,6 +321,8 @@ export const availabilityService = {
         user_profile_id: args.userProfileId,
         day_of_week: args.dayOfWeek,
         is_available: args.isAvailable,
+        available_start_time: args.isAvailable ? startDb : null,
+        available_end_time: args.isAvailable ? endDb : null,
       },
       { onConflict: "venue_id,user_profile_id,day_of_week" }
     );
@@ -303,7 +366,9 @@ export const availabilityService = {
 
     const { data: source, error: readErr } = await supabase
       .from("venue_staff_week_instance_availability")
-      .select("user_profile_id, day_of_week, is_available")
+      .select(
+        "user_profile_id, day_of_week, is_available, available_start_time, available_end_time"
+      )
       .eq("venue_id", context.venueId)
       .eq("week_start_monday", args.fromWeekStartMonday);
 
@@ -321,6 +386,8 @@ export const availabilityService = {
       week_start_monday: args.toWeekStartMonday,
       day_of_week: r.day_of_week,
       is_available: r.is_available,
+      available_start_time: r.available_start_time,
+      available_end_time: r.available_end_time,
     }));
 
     if (rows.length === 0) {

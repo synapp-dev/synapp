@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -10,6 +10,7 @@ import {
   Download,
   ExternalLink,
   FileSpreadsheet,
+  Receipt,
   RefreshCw,
   Search,
   X,
@@ -37,6 +38,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
+import { Separator } from "@workspace/ui/components/separator";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@workspace/ui/components/sheet";
 import {
   Table,
   TableBody,
@@ -47,12 +56,16 @@ import {
 } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
 import { useSalesInsightsQuery } from "@/entities/sales-insights/model/useSalesInsightsQuery";
+import { useSquareInvoicesQuery } from "@/entities/sales-insights/model/useSquareInvoicesQuery";
 import type {
   DatePreset,
   SalesDateRange,
+  SalesMixRow,
   SalesOrderRow,
+  SalesOrderSource,
   SortDir,
   SortField,
+  SquareInvoiceRow,
 } from "@/entities/sales-insights/model/types";
 
 type SalesInsightsPageClientProps = {
@@ -137,6 +150,25 @@ function formatCurrency(cents: number): string {
   })}`;
 }
 
+function formatSquareMoney(
+  m: { amount?: number; currency?: string } | undefined
+): string {
+  if (!m || typeof m.amount !== "number") return "—";
+  const cur = m.currency?.toUpperCase();
+  if (cur && cur.length === 3) {
+    try {
+      return (m.amount / 100).toLocaleString("en-AU", {
+        style: "currency",
+        currency: cur,
+        minimumFractionDigits: 2,
+      });
+    } catch {
+      /* invalid currency code */
+    }
+  }
+  return formatCurrency(m.amount);
+}
+
 function formatDayTime(value: string): string {
   const date = new Date(value);
   return new Intl.DateTimeFormat("en-AU", {
@@ -199,6 +231,7 @@ function channelLabel(channel: string): string {
     takeaway: "Takeaway",
     delivery: "Delivery",
     online: "Online",
+    pos: "POS",
   };
   return map[channel] ?? `${channel.charAt(0).toUpperCase()}${channel.slice(1)}`;
 }
@@ -232,6 +265,65 @@ function statusLabel(order: SalesOrderRow): "Void" | "Refund" | "Sale" {
   return "Sale";
 }
 
+function sourceLabel(source: SalesOrderSource | undefined): string {
+  if (source === "square") return "Square";
+  if (source === "demo") return "Demo";
+  return "Manual";
+}
+
+function squareInvoiceStatusLabel(status: string): string {
+  if (!status) {
+    return "Unknown";
+  }
+  return status
+    .split("_")
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatInvoiceDueAmount(row: SquareInvoiceRow): string {
+  if (row.next_payment_amount_cents == null) {
+    return "—";
+  }
+  const cur = row.next_payment_currency?.toUpperCase();
+  if (cur && cur.length === 3) {
+    try {
+      return (row.next_payment_amount_cents / 100).toLocaleString("en-AU", {
+        style: "currency",
+        currency: cur,
+        minimumFractionDigits: 2,
+      });
+    } catch {
+      /* invalid currency */
+    }
+  }
+  return formatCurrency(row.next_payment_amount_cents);
+}
+
+function formatDetailDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-AU", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function DetailField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{label}</p>
+      <div className="text-sm break-words">{children}</div>
+    </div>
+  );
+}
+
 type SortIconProps = {
   sortField: SortField;
   sortDir: SortDir;
@@ -249,6 +341,48 @@ function SortIcon({ sortField, sortDir, field }: SortIconProps) {
   );
 }
 
+function mixLineDetailKey(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function SalesMixItemCell({ row }: { row: SalesMixRow }) {
+  const variation = row.squareVariationName?.trim() ?? "";
+  const catalog = row.squareCatalogObjectId?.trim() ?? "";
+  const receiptDiffers =
+    !row.mapped &&
+    row.squareLineName &&
+    mixLineDetailKey(row.squareLineName) !== mixLineDetailKey(row.label);
+
+  const hasSecondary = Boolean(variation || catalog || receiptDiffers || (!row.mapped && !catalog));
+
+  return (
+    <TableCell className="max-w-[min(300px,42vw)] align-top">
+      <div className="text-sm leading-snug font-medium break-words">{row.label}</div>
+      {hasSecondary ? (
+        <div className="text-muted-foreground mt-1.5 space-y-1 text-[11px] leading-snug">
+          {variation ? (
+            <p>
+              <span className="font-medium text-foreground/70">Variation</span>{" "}
+              <span className="break-words">{variation}</span>
+            </p>
+          ) : null}
+          {catalog ? (
+            <p className="font-mono text-[10px] tracking-tight break-all">{catalog}</p>
+          ) : !row.mapped ? (
+            <p className="text-[10px] italic">No Square catalog id</p>
+          ) : null}
+          {receiptDiffers ? (
+            <p className="break-words">
+              <span className="font-medium text-foreground/70">Receipt line</span>{" "}
+              {row.squareLineName}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+    </TableCell>
+  );
+}
+
 export function SalesInsightsPageClient({
   organisation,
   venue,
@@ -262,6 +396,7 @@ export function SalesInsightsPageClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortField, setSortField] = useState<SortField>("order_datetime");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [detailOrder, setDetailOrder] = useState<SalesOrderRow | null>(null);
 
   const dateRange = useMemo((): SalesDateRange => {
     if (datePreset === "custom") {
@@ -274,15 +409,54 @@ export function SalesInsightsPageClient({
     return getPresetDateRange(datePreset);
   }, [customFrom, customTo, datePreset]);
 
-  const {
-    data: orders = [],
-    isPending,
-    refetch,
-  } = useSalesInsightsQuery({
+  const { data: payload, isPending, refetch } = useSalesInsightsQuery({
     organisationSlug: organisation,
     venueSlug: venue,
     dateRange,
   });
+
+  const {
+    data: invoicesPayload,
+    isPending: invoicesPending,
+    refetch: refetchInvoices,
+  } = useSquareInvoicesQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    dateRange,
+  });
+
+  const orders = payload?.orders ?? [];
+  const meta = payload?.meta;
+  const salesMix: SalesMixRow[] = payload?.salesMix ?? [];
+  const invoices = invoicesPayload?.invoices ?? [];
+  const invoiceMeta = invoicesPayload?.meta;
+
+  useEffect(() => {
+    if (meta?.squareError) {
+      toast.error("Could not load Square payments", {
+        description: meta.squareError,
+        duration: 12_000,
+      });
+    }
+  }, [meta?.squareError]);
+
+  useEffect(() => {
+    if (meta?.squareOrdersError) {
+      toast.error("Could not load Square order lines", {
+        description: meta.squareOrdersError,
+        duration: 14_000,
+      });
+    }
+  }, [meta?.squareOrdersError]);
+
+  useEffect(() => {
+    if (invoiceMeta?.squareInvoicesError) {
+      toast.error("Could not load Square invoices", {
+        description: invoiceMeta.squareInvoicesError,
+        duration: 14_000,
+      });
+    }
+  }, [invoiceMeta?.squareInvoicesError]);
 
   const channels = useMemo(() => {
     return [...new Set(orders.map((order) => order.channel))].sort();
@@ -399,7 +573,8 @@ export function SalesInsightsPageClient({
       return;
     }
 
-    const header = "Date/Time,Order #,Channel,Gross,Tax,Discount,Net,Payment,Source,Status";
+    const header =
+      "Date/Time,Order #,Channel,Gross,Tax,Discount,Net,Payment,Source,Status";
     const rows = filteredOrders.map((order) => {
       return [
         formatCsvDateTime(order.order_datetime),
@@ -410,7 +585,7 @@ export function SalesInsightsPageClient({
         (order.discount_amount / 100).toFixed(2),
         (order.net_amount / 100).toFixed(2),
         paymentLabel(order.payment_method),
-        "manual",
+        sourceLabel(order.source).toLowerCase(),
         statusLabel(order),
       ].join(",");
     });
@@ -429,13 +604,47 @@ export function SalesInsightsPageClient({
     toast.success(`Exported ${filteredOrders.length} transactions`);
   }
 
-  const integrationHref = `/${organisation}/${venue}/settings`;
+  const integrationHref = `/${organisation}/${venue}/settings/integrations`;
+
+  const squareConnectHref = useMemo(() => {
+    const nextPath = `/${organisation}/${venue}/insights/sales`;
+    return `/api/square/oauth/authorize?organisation=${encodeURIComponent(organisation)}&venue=${encodeURIComponent(venue)}&next=${encodeURIComponent(nextPath)}`;
+  }, [organisation, venue]);
+
+  const squareIntegrationNeedsAttention = useMemo(() => {
+    if (isPending || !meta) {
+      return false;
+    }
+    if (meta.dataSource === "demo") {
+      return true;
+    }
+    if (meta.dataSource === "square" && (meta.squareError || meta.squareOrdersError)) {
+      return true;
+    }
+    return false;
+  }, [isPending, meta]);
+
+  const squareConnectPrimaryLabel =
+    meta?.dataSource === "square" && (meta.squareError || meta.squareOrdersError)
+      ? "Reconnect Square"
+      : "Connect Square";
 
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Sales Insights</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Sales Insights</h1>
+            {meta?.dataSource === "square" ? (
+              <Badge variant="secondary" className="text-xs font-normal">
+                Square payments
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
+                Demo data
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-muted-foreground">
             Organisation: <span className="font-medium">{organisation}</span> | Venue:{" "}
             <span className="font-medium">{venue}</span>
@@ -519,6 +728,39 @@ export function SalesInsightsPageClient({
           </Button>
         </div>
       </div>
+
+      {squareIntegrationNeedsAttention ? (
+        <Card className="border-primary/25 bg-muted/50">
+          <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-2">
+              <p className="text-sm font-medium">
+                {meta?.dataSource === "demo"
+                  ? "Square is not connected for this venue"
+                  : "Square could not load sales data"}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {meta?.dataSource === "demo"
+                  ? "You are seeing demo transactions. Organisation admins can connect Square POS to load real sales for this venue."
+                  : "Your venue may be missing a valid Square link, location, or API access. Reconnect Square from this page or review venue settings."}
+              </p>
+              {meta?.dataSource === "square" && (meta.squareError || meta.squareOrdersError) ? (
+                <ul className="text-destructive list-inside list-disc text-xs">
+                  {meta.squareError ? <li>{meta.squareError}</li> : null}
+                  {meta.squareOrdersError ? <li>{meta.squareOrdersError}</li> : null}
+                </ul>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button asChild>
+                <a href={squareConnectHref}>{squareConnectPrimaryLabel}</a>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href={integrationHref}>Square settings</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-3">
         <Card>
@@ -628,7 +870,10 @@ export function SalesInsightsPageClient({
               variant="ghost"
               size="sm"
               className="h-8 gap-1 text-xs"
-              onClick={() => void refetch()}
+              onClick={() => {
+                void refetch();
+                void refetchInvoices();
+              }}
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Refresh
@@ -640,25 +885,84 @@ export function SalesInsightsPageClient({
         </CardContent>
 
         <CardContent className="border-b py-5">
-          <div className="mb-3 flex items-center gap-2">
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold">Sales Mix</h3>
-          </div>
-          <div className="rounded-lg border border-dashed p-6 text-center">
-            <BarChart3 className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm font-medium">Connect your POS to see sales mix</p>
-            <p className="mt-1 mb-3 text-xs text-muted-foreground">
-              Item-level data (menu items sold, quantity, and item revenue) requires a POS
-              integration.
+          <div className="mb-3 space-y-1">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold">Sales Mix</h3>
+            </div>
+            <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
+              The same label can appear on multiple rows when Square has different catalog items or
+              variations (for example two bottle sizes). Details under each name show how rows differ;
+              map catalog links in venue settings to combine them under one menu line.
             </p>
-            <Link
-              href={integrationHref}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-              Open settings
-            </Link>
           </div>
+          {salesMix.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs font-medium">Item</TableHead>
+                  <TableHead className="text-right text-xs font-medium">Qty</TableHead>
+                  <TableHead className="text-right text-xs font-medium">Revenue</TableHead>
+                  <TableHead className="text-xs font-medium">Map</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {salesMix.map((row) => (
+                  <TableRow key={row.mixKey}>
+                    <SalesMixItemCell row={row} />
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {row.quantity.toLocaleString("en-AU", { maximumFractionDigits: 2 })}
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {formatCurrency(row.revenueCents)}
+                    </TableCell>
+                    <TableCell>
+                      {row.mapped ? (
+                        <Badge
+                          variant="secondary"
+                          className="rounded-sm bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+                        >
+                          Mapped
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground rounded-sm text-xs">
+                          Unmapped
+                        </Badge>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-center">
+              <BarChart3 className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+              {meta?.dataSource === "square" ? (
+                <>
+                  <p className="text-sm font-medium">No line-level sales in this range</p>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">
+                    Payments need a Square <code className="text-xs">order_id</code> so we can load
+                    line items. Map catalog ids to your menu in settings for labelled mix.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium">Demo mix appears when line items exist</p>
+                  <p className="mt-1 mb-3 text-xs text-muted-foreground">
+                    Connect Square to load real order lines; use venue settings to map Square catalog
+                    ids to your menu.
+                  </p>
+                </>
+              )}
+              <Link
+                href={integrationHref}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open settings
+              </Link>
+            </div>
+          )}
         </CardContent>
 
         <CardContent className="px-0 py-0">
@@ -673,7 +977,9 @@ export function SalesInsightsPageClient({
               <p className="text-sm font-medium">No transactions found</p>
               <p className="text-xs text-muted-foreground">
                 {orders.length === 0
-                  ? "No sales data for this period."
+                  ? meta?.dataSource === "square"
+                    ? "No Square payments in this date range (or check the toast if the API failed)."
+                    : "No sales data for this period."
                   : "Try adjusting your filters."}
               </p>
             </div>
@@ -756,10 +1062,20 @@ export function SalesInsightsPageClient({
                   return (
                     <TableRow
                       key={order.id}
+                      role="button"
+                      tabIndex={0}
                       className={cn(
+                        "cursor-pointer hover:bg-muted/60",
                         isVoid ? "line-through opacity-50" : "",
                         isRefund ? "bg-red-50/40 dark:bg-red-950/20" : ""
                       )}
+                      onClick={() => setDetailOrder(order)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          setDetailOrder(order);
+                        }
+                      }}
                     >
                       <TableCell className="text-sm tabular-nums">
                         {formatDayTime(order.order_datetime)}
@@ -790,7 +1106,7 @@ export function SalesInsightsPageClient({
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className="rounded-sm px-1.5 py-0.5">
-                          Manual
+                          {sourceLabel(order.source)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -825,6 +1141,325 @@ export function SalesInsightsPageClient({
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader className="border-b pb-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Receipt className="h-5 w-5 text-muted-foreground" />
+                Square invoices
+              </CardTitle>
+              <CardDescription>
+                Published Square invoices (excludes drafts) with created date in the range above.
+                Requires Square OAuth scope INVOICES_READ; reconnect Square after scopes change.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="px-0 py-0">
+          {invoicesPending ? (
+            <div className="flex h-40 items-center justify-center text-muted-foreground">
+              <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
+              Loading invoices...
+            </div>
+          ) : invoiceMeta?.dataSource === "demo" ? (
+            <div className="flex flex-col items-center gap-3 px-6 py-8 text-center text-sm text-muted-foreground">
+              <p>
+                Connect Square for this venue to load invoices that have been published to customers
+                in this period.
+              </p>
+              <Button asChild size="sm">
+                <a href={squareConnectHref}>Connect Square</a>
+              </Button>
+            </div>
+          ) : invoiceMeta?.squareInvoicesError ? (
+            <div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
+              <p className="text-sm text-destructive">{invoiceMeta.squareInvoicesError}</p>
+              {invoiceMeta.dataSource === "square" ? (
+                <Button asChild size="sm">
+                  <a href={squareConnectHref}>Reconnect Square</a>
+                </Button>
+              ) : null}
+            </div>
+          ) : invoices.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
+              <Receipt className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium">No published Square invoices in this range</p>
+              <p className="text-xs text-muted-foreground">
+                Invoices must be published (not draft) and created within the selected dates.
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="text-xs font-medium">Created</TableHead>
+                  <TableHead className="text-xs font-medium">Invoice #</TableHead>
+                  <TableHead className="text-xs font-medium">Title</TableHead>
+                  <TableHead className="text-xs font-medium">Status</TableHead>
+                  <TableHead className="text-right text-xs font-medium">Amount due</TableHead>
+                  <TableHead className="text-xs font-medium">Customer</TableHead>
+                  <TableHead className="text-xs font-medium">Pay</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {invoices.map((inv) => (
+                  <TableRow key={inv.id}>
+                    <TableCell className="text-sm tabular-nums">
+                      {formatDayTime(inv.created_at)}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {inv.invoice_number ?? inv.id.slice(0, 8)}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] text-sm break-words">
+                      {inv.title ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs font-normal">
+                        {squareInvoiceStatusLabel(inv.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right text-sm tabular-nums">
+                      {formatInvoiceDueAmount(inv)}
+                    </TableCell>
+                    <TableCell className="max-w-[160px] text-sm break-words">
+                      {inv.customer_label ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      {inv.public_url ? (
+                        <a
+                          href={inv.public_url}
+                          className="text-primary inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2"
+                          rel="noopener noreferrer"
+                          target="_blank"
+                        >
+                          Open
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Sheet
+        open={detailOrder !== null}
+        onOpenChange={(open) => {
+          if (!open) setDetailOrder(null);
+        }}
+      >
+        <SheetContent
+          side="right"
+          className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-lg"
+        >
+          {detailOrder ? (
+            <>
+              <SheetHeader className="space-y-1 border-b pb-4 text-left">
+                <SheetTitle>Transaction</SheetTitle>
+                <SheetDescription>
+                  {sourceLabel(detailOrder.source)} · {statusLabel(detailOrder)}
+                </SheetDescription>
+              </SheetHeader>
+
+              <div className="flex flex-col gap-6 py-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailField label="Date & time">
+                    {formatDetailDateTime(detailOrder.order_datetime)}
+                  </DetailField>
+                  <DetailField label="Source">{sourceLabel(detailOrder.source)}</DetailField>
+                  <DetailField label="Order / reference #">
+                    {detailOrder.order_number ?? "—"}
+                  </DetailField>
+                  <DetailField label="Internal id">
+                    <span className="font-mono text-xs">{detailOrder.id}</span>
+                  </DetailField>
+                  <DetailField label="Channel">{channelLabel(detailOrder.channel)}</DetailField>
+                  <DetailField label="Payment method">
+                    {paymentLabel(detailOrder.payment_method)}
+                  </DetailField>
+                </div>
+
+                <Separator />
+
+                <div>
+                  <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
+                    Amounts (app view)
+                  </p>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <DetailField label="Gross">{formatCurrency(detailOrder.gross_amount)}</DetailField>
+                    <DetailField label="Tax">{formatCurrency(detailOrder.tax_amount)}</DetailField>
+                    <DetailField label="Discount">
+                      {formatCurrency(detailOrder.discount_amount)}
+                    </DetailField>
+                    <DetailField label="Net">{formatCurrency(detailOrder.net_amount)}</DetailField>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DetailField label="Void">{detailOrder.is_void ? "Yes" : "No"}</DetailField>
+                  <DetailField label="Refund">{detailOrder.is_refund ? "Yes" : "No"}</DetailField>
+                  {detailOrder.refund_reason ? (
+                    <DetailField label="Refund reason">{detailOrder.refund_reason}</DetailField>
+                  ) : null}
+                </div>
+
+                {detailOrder.square ? (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
+                        Square payment
+                      </p>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <DetailField label="Payment id">
+                          <span className="font-mono text-xs">
+                            {detailOrder.square.squarePaymentId}
+                          </span>
+                        </DetailField>
+                        <DetailField label="API status">
+                          {detailOrder.square.status ?? "—"}
+                        </DetailField>
+                        <DetailField label="Source type">
+                          {detailOrder.square.sourceType ?? "—"}
+                        </DetailField>
+                        <DetailField label="Location id">
+                          {detailOrder.square.locationId ? (
+                            <span className="font-mono text-xs">
+                              {detailOrder.square.locationId}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </DetailField>
+                        <DetailField label="Order id (Square)">
+                          {detailOrder.square.orderId ? (
+                            <span className="font-mono text-xs">{detailOrder.square.orderId}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </DetailField>
+                        <DetailField label="Customer id">
+                          {detailOrder.square.customerId ? (
+                            <span className="font-mono text-xs">
+                              {detailOrder.square.customerId}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </DetailField>
+                        <DetailField label="Reference id">
+                          {detailOrder.square.referenceId ?? "—"}
+                        </DetailField>
+                        <DetailField label="Receipt #">
+                          {detailOrder.square.receiptNumber ?? "—"}
+                        </DetailField>
+                        <DetailField label="Created (API)">
+                          {detailOrder.square.createdAt
+                            ? formatDetailDateTime(detailOrder.square.createdAt)
+                            : "—"}
+                        </DetailField>
+                        <DetailField label="Updated (API)">
+                          {detailOrder.square.updatedAt
+                            ? formatDetailDateTime(detailOrder.square.updatedAt)
+                            : "—"}
+                        </DetailField>
+                        <DetailField label="Amount money">
+                          {formatSquareMoney(detailOrder.square.amountMoney)}
+                        </DetailField>
+                        <DetailField label="Total money">
+                          {formatSquareMoney(detailOrder.square.totalMoney)}
+                        </DetailField>
+                        <DetailField label="Refunded money">
+                          {formatSquareMoney(detailOrder.square.refundedMoney)}
+                        </DetailField>
+                        {detailOrder.square.note ? (
+                          <DetailField label="Note">{detailOrder.square.note}</DetailField>
+                        ) : null}
+                        {detailOrder.square.receiptUrl ? (
+                          <div className="sm:col-span-2">
+                            <DetailField label="Receipt">
+                              <a
+                                href={detailOrder.square.receiptUrl}
+                                className="text-primary inline-flex items-center gap-1 font-medium underline underline-offset-2"
+                                rel="noopener noreferrer"
+                                target="_blank"
+                              >
+                                Open in Square
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </DetailField>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+                {detailOrder.saleLineItems?.length ? (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
+                        {detailOrder.source === "demo" ? "Demo line items" : "Order line items"}
+                      </p>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-xs">Item</TableHead>
+                            <TableHead className="text-right text-xs">Qty</TableHead>
+                            <TableHead className="text-right text-xs">Line $</TableHead>
+                            {detailOrder.source === "square" ? (
+                              <TableHead className="text-xs">Map</TableHead>
+                            ) : null}
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {detailOrder.saleLineItems.map((li) => (
+                            <TableRow key={li.lineUid}>
+                              <TableCell className="max-w-[200px] text-sm break-words">
+                                {li.menuItemName ?? li.lineName}
+                                {li.squareVariationName ? (
+                                  <span className="text-muted-foreground mt-0.5 block text-[10px]">
+                                    Variation: {li.squareVariationName}
+                                  </span>
+                                ) : null}
+                                {detailOrder.source === "square" && li.squareCatalogObjectId ? (
+                                  <span className="text-muted-foreground mt-0.5 block font-mono text-[10px]">
+                                    {li.squareCatalogObjectId}
+                                  </span>
+                                ) : null}
+                              </TableCell>
+                              <TableCell className="text-right text-sm tabular-nums">
+                                {li.quantity.toLocaleString("en-AU", {
+                                  maximumFractionDigits: 2,
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right text-sm tabular-nums">
+                                {formatCurrency(li.grossAmountCents)}
+                              </TableCell>
+                              {detailOrder.source === "square" ? (
+                                <TableCell className="text-xs capitalize text-muted-foreground">
+                                  {li.matchSource.replaceAll("_", " ")}
+                                </TableCell>
+                              ) : null}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }

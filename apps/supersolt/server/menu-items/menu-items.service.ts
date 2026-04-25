@@ -82,7 +82,7 @@ function assertGstMode(value: string): GstMode {
 
 function assertStatus(value: string): MenuItemStatus {
   if (!STATUSES.includes(value as MenuItemStatus)) {
-    throw new MenuItemsServiceError(400, "Invalid menu item status");
+    throw new MenuItemsServiceError(400, "Invalid menu line status");
   }
   return value as MenuItemStatus;
 }
@@ -155,7 +155,7 @@ function normalizeInput(input: UpsertMenuItemInput): {
 } {
   const name = input.name.trim();
   if (name.length === 0) {
-    throw new MenuItemsServiceError(400, "Menu item name is required");
+    throw new MenuItemsServiceError(400, "Menu name is required");
   }
 
   const sectionName = input.sectionName.trim();
@@ -443,7 +443,7 @@ export const menuItemsService = {
     });
 
     if (!detail) {
-      throw new MenuItemsServiceError(500, "Created menu item not found");
+      throw new MenuItemsServiceError(500, "Created menu line not found");
     }
     return detail;
   },

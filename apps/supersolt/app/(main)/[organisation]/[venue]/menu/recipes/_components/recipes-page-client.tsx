@@ -286,7 +286,7 @@ export function RecipesPageClient({ organisation, venue }: RecipesPageClientProp
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <CookingPot className="h-5 w-5 text-muted-foreground" />
-            Recipes
+            Items
           </h1>
         </div>
         <Separator />
@@ -295,7 +295,7 @@ export function RecipesPageClient({ organisation, venue }: RecipesPageClientProp
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search recipes..."
+              placeholder="Search items..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               className="h-9 w-[480px] max-w-full pl-8"
@@ -381,7 +381,7 @@ export function RecipesPageClient({ organisation, venue }: RecipesPageClientProp
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/50">
                           <Plus className="h-3.5 w-3.5 text-primary" />
                         </div>
-                        <span className="font-medium">Add New Recipe</span>
+                        <span className="font-medium">Add new item</span>
                       </div>
                     </TableCell>
                     <TableCell />
@@ -395,13 +395,13 @@ export function RecipesPageClient({ organisation, venue }: RecipesPageClientProp
                   {recipesQuery.isLoading ? (
                     <TableRow>
                       <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                        Loading recipes...
+                        Loading items...
                       </TableCell>
                     </TableRow>
                   ) : (recipes ?? []).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                        No recipes found. Adjust filters or add a new recipe.
+                        No items found. Adjust filters or add a new item.
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -580,12 +580,12 @@ export function RecipesPageClient({ organisation, venue }: RecipesPageClientProp
           )}
         >
           <SheetTitle className="sr-only">
-            {selectedRecipeSummary ? `Edit recipe: ${selectedRecipeSummary.name}` : "Create recipe"}
+            {selectedRecipeSummary ? `Edit item: ${selectedRecipeSummary.name}` : "Create item"}
           </SheetTitle>
           <SheetDescription className="sr-only">
             {selectedRecipeSummary
-              ? "Edit recipe details, ingredients, method, allergens, and costing."
-              : "Create a new recipe with details, ingredients, method, allergens, and costing."}
+              ? "Edit item details, ingredients, method, allergens, and costing."
+              : "Create a new catalog item with details, ingredients, method, allergens, and costing."}
           </SheetDescription>
           <RecipeEditorDrawerContent
             organisation={organisation}

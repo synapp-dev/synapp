@@ -216,7 +216,7 @@ export function PAndLInsightsPageClient({ organisation, venue }: PAndLInsightsPa
             </p>
           </div>
           <Button asChild size="sm" variant="outline" className="shrink-0">
-            <Link href={`/${organisation}/${venue}/settings`}>
+            <Link href={`/${organisation}/${venue}/settings/integrations`}>
               <ExternalLink className="mr-1 h-3.5 w-3.5" />
               Connect Xero
             </Link>

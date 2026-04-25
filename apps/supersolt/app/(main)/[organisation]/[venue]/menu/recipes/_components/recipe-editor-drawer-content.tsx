@@ -317,12 +317,12 @@ export function RecipeEditorDrawerContent({
 
   async function saveRecipe(nextStatus: RecipeEditorRecipe["status"]) {
     if (!form.name.trim()) {
-      toast.error("Recipe name is required");
+      toast.error("Item name is required");
       return;
     }
 
     if (nextStatus === "published" && !canPublish) {
-      toast.error("Add recipe name, ingredients, and at least one method step before publishing");
+      toast.error("Add item name, ingredients, and at least one method step before publishing");
       return;
     }
 
@@ -351,13 +351,13 @@ export function RecipeEditorDrawerContent({
       });
       toast.success(
         nextStatus === "published"
-          ? "Recipe published"
-          : "Recipe saved as draft"
+          ? "Item published"
+          : "Item saved as draft"
       );
       onClose();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to save recipe"
+        error instanceof Error ? error.message : "Failed to save item"
       );
     }
   }
@@ -372,11 +372,11 @@ export function RecipeEditorDrawerContent({
     }
     try {
       await onDelete(recipe.id);
-      toast.success("Recipe deleted");
+      toast.success("Item deleted");
       onClose();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to delete recipe"
+        error instanceof Error ? error.message : "Failed to delete item"
       );
     }
   }
@@ -387,9 +387,9 @@ export function RecipeEditorDrawerContent({
       <div className="border-b p-4 md:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <h2 className="text-lg font-semibold">{isNewRecipe ? "New Recipe" : form.name || "Recipe Editor"}</h2>
+            <h2 className="text-lg font-semibold">{isNewRecipe ? "New item" : form.name || "Item editor"}</h2>
             <p className="text-xs text-muted-foreground">
-              {isNewRecipe ? "Create recipe details and costing" : "Edit recipe details and costing"} in-place.
+              {isNewRecipe ? "Create item details and costing" : "Edit item details and costing"} in-place.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -441,7 +441,7 @@ export function RecipeEditorDrawerContent({
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             <TabsContent value="details" className="mt-3">
               <div className="space-y-4 rounded-lg border p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Recipe Details</h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Item details</h3>
                 <div className="grid gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="recipe-name">Name</Label>
@@ -771,7 +771,7 @@ export function RecipeEditorDrawerContent({
               {canPublish ? "Ready to publish" : "Needs required fields"}
             </div>
             <p>
-              {canPublish ? "All required fields are present." : "Add recipe name, ingredients, and at least one method step."}
+              {canPublish ? "All required fields are present." : "Add item name, ingredients, and at least one method step."}
             </p>
           </div>
         </div>

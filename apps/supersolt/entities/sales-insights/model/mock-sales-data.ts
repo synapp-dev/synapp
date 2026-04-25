@@ -1,4 +1,12 @@
-import type { SalesOrderRow } from "@/entities/sales-insights/model/types";
+import type { SalesLineItemRow, SalesOrderRow } from "@/entities/sales-insights/model/types";
+
+const demoLineCatalog = [
+  { name: "Flat white", cents: 550 },
+  { name: "Avo toast", cents: 1850 },
+  { name: "Orange juice", cents: 650 },
+  { name: "Burger combo", cents: 2200 },
+  { name: "Side fries", cents: 600 },
+] as const;
 
 type MockSalesOrdersInput = {
   organisationSlug: string;
@@ -71,6 +79,41 @@ export function buildMockSalesOrders({
         netAmount = 0;
       }
 
+      const saleLineItems: SalesLineItemRow[] | undefined =
+        isVoid || isRefund
+          ? undefined
+          : (() => {
+              const n = 1 + ((dayOffset + slot) % 3);
+              const lines: SalesLineItemRow[] = [];
+              let sumCents = 0;
+              for (let k = 0; k < n; k += 1) {
+                const spec = demoLineCatalog[(dayOffset + slot + k) % demoLineCatalog.length];
+                if (!spec) continue;
+                const qty = 1 + (k % 2);
+                const gross = spec.cents * qty;
+                sumCents += gross;
+                lines.push({
+                  lineUid: `demo-${orderSeed}-${k}`,
+                  quantity: qty,
+                  lineName: spec.name,
+                  grossAmountCents: gross,
+                  currency: "AUD",
+                  squareCatalogObjectId: null,
+                  squareVariationName: null,
+                  menuItemId: null,
+                  menuItemName: spec.name,
+                  matchSource: "name_exact",
+                });
+              }
+              if (sumCents > 0 && lines.length > 0) {
+                const scale = grossAmount / sumCents;
+                for (const li of lines) {
+                  li.grossAmountCents = Math.round(li.grossAmountCents * scale);
+                }
+              }
+              return lines;
+            })();
+
       rows.push({
         id: makeOrderId(organisationSlug, venueSlug, orderSeed),
         order_number: String(4200 + orderSeed),
@@ -84,6 +127,8 @@ export function buildMockSalesOrders({
         is_refund: isRefund,
         refund_reason: isRefund ? pickFromArray(refundReasons, dayOffset + slot) : null,
         payment_method: pickFromArray(paymentMethods, dayOffset * 2 + slot),
+        source: "demo",
+        saleLineItems,
       });
 
       orderSeed += 1;

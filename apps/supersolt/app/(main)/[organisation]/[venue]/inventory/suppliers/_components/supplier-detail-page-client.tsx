@@ -126,7 +126,7 @@ export function SupplierDetailPageClient({
   });
 
   const listPath = buildScopedPath(organisation, venue, "inventory/suppliers");
-  const ingredientsPath = buildScopedPath(organisation, venue, "menu/ingredients");
+  const ingredientsPath = buildScopedPath(organisation, venue, "catalog/ingredients");
 
   const supplierQuery = useSupplierQuery({
     organisationSlug: organisation,

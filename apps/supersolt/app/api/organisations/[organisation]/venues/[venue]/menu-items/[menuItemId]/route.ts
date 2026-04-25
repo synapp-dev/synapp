@@ -49,7 +49,7 @@ export async function GET(
     });
     if (!data) {
       return NextResponse.json(
-        { data: null, error: { message: "Menu item not found", status: 404 } },
+        { data: null, error: { message: "Menu line not found", status: 404 } },
         { status: 404 }
       );
     }
@@ -95,7 +95,7 @@ export async function PATCH(
     });
     if (!data) {
       return NextResponse.json(
-        { data: null, error: { message: "Menu item not found", status: 404 } },
+        { data: null, error: { message: "Menu line not found", status: 404 } },
         { status: 404 }
       );
     }
@@ -139,7 +139,7 @@ export async function DELETE(
     });
     if (!deleted) {
       return NextResponse.json(
-        { data: null, error: { message: "Menu item not found", status: 404 } },
+        { data: null, error: { message: "Menu line not found", status: 404 } },
         { status: 404 }
       );
     }

@@ -23,7 +23,7 @@ export function useMenuItemQuery(
     enabled: Boolean(input.menuItemId),
     queryFn: async () => {
       if (!input.menuItemId) {
-        throw new Error("Missing menu item id");
+        throw new Error("Missing menu line id");
       }
 
       const { data, error } = await menuItemsApi.get.detail({
@@ -36,7 +36,7 @@ export function useMenuItemQuery(
         throw new Error(error.message);
       }
       if (!data) {
-        throw new Error("Menu item not found");
+        throw new Error("Menu line not found");
       }
 
       return data;
