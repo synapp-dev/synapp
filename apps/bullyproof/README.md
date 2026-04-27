@@ -2,6 +2,8 @@
 
 This is a clean, unopinionated Next.js application template with modern tooling and patterns.
 
+For a **per-module and per-file catalog** of this app (routes, API handlers, server layer, entities, shared components, and scripts), see the maintained reference under [`docs/code-reference/README.md`](docs/code-reference/README.md). Regenerate those pages after large refactors with `pnpm docs:code-reference:generate` from this package; verify coverage with `pnpm docs:code-reference:check`.
+
 ## Features
 
 - **Next.js 14** with App Router
