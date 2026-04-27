@@ -84,9 +84,22 @@ export const formatDate = (dateString: string | null) => {
   });
 };
 
-// Platform role keys
-export const PLATFORM_ROLE_KEYS = [
+// Platform role keys (standard platform roles; matches rolesRepo.isPlatformRole)
+export const PLATFORM_ROLE_KEYS: string[] = [
   "PLATFORM_ADMIN",
   "GOVERNMENT_VIEWER",
   "PLATFORM_STAFF",
 ];
+
+/**
+ * Target can receive a standard platform role via assignRole (no schoolId):
+ * no school roles and no platform roles at all (including INTRADARK_DEV).
+ */
+export function canTargetReceiveFirstPlatformRole(
+  user: UserWithRolesAndSchools | null
+): boolean {
+  if (!user) return false;
+  if ((user.schoolRoles?.length ?? 0) > 0) return false;
+  if ((user.platformRoles?.length ?? 0) > 0) return false;
+  return true;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,10 @@ import { cn } from "@workspace/ui/lib/utils";
 import { AlertCircle, Check, ChevronsUpDown, Loader2, ShieldCheck, Users as UsersIcon } from "lucide-react";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import type { roles } from "@/server/db/schema";
-import { extractSchoolMetadata } from "./utils";
+import { INTRADARK_DEV_PLATFORM_ROLE_KEY } from "@/lib/intradark-dev-protection";
+import { extractSchoolMetadata, PLATFORM_ROLE_KEYS } from "./utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
+import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group";
 
 type Role = typeof roles.$inferSelect;
 
@@ -68,6 +71,12 @@ export interface SchoolRoleAssignmentDialogProps {
   error?: string | null;
   excludeSchoolIds?: Set<string>;
   loadingSchools?: boolean;
+  /** Add mode only: show School vs Platform tabs (Intradark dev + eligible target). */
+  assignmentVariant?: "school-only" | "school-or-platform";
+  /** When platform tab saves, parent assigns with no schoolId. */
+  onSubmitPlatform?: (roleId: string) => void | Promise<void>;
+  /** Include INTRADARK_DEV in platform picker (only assignable by dev on server). */
+  includeIntradarkDevInPlatformPicker?: boolean;
 }
 
 const ROLE_ORDER = ["SCHOOL_STAFF", "TEACHER", "SCHOOL_ADMIN"] as const;
@@ -123,11 +132,48 @@ export function SchoolRoleAssignmentDialog({
   error,
   excludeSchoolIds,
   loadingSchools = false,
+  assignmentVariant = "school-only",
+  onSubmitPlatform,
+  includeIntradarkDevInPlatformPicker = false,
 }: SchoolRoleAssignmentDialogProps) {
   const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
   const [staffRemovalConfirmOpen, setStaffRemovalConfirmOpen] = useState(false);
+  const [assignTab, setAssignTab] = useState<"school" | "platform">("school");
+  const [selectedPlatformRoleId, setSelectedPlatformRoleId] = useState("");
 
   const isEditMode = mode === "edit";
+  const showPlatformTab =
+    !isEditMode &&
+    assignmentVariant === "school-or-platform" &&
+    typeof onSubmitPlatform === "function";
+
+  useEffect(() => {
+    if (open) {
+      setAssignTab("school");
+      setSelectedPlatformRoleId("");
+    }
+  }, [open]);
+
+  const platformPickerRoles = roles
+    .filter((r) => {
+      const k = r.key || "";
+      if (PLATFORM_ROLE_KEYS.includes(k)) return true;
+      if (
+        includeIntradarkDevInPlatformPicker &&
+        k === INTRADARK_DEV_PLATFORM_ROLE_KEY
+      )
+        return true;
+      return false;
+    })
+    .sort((a, b) => {
+      const order = [
+        ...PLATFORM_ROLE_KEYS,
+        ...(includeIntradarkDevInPlatformPicker ? [INTRADARK_DEV_PLATFORM_ROLE_KEY] : []),
+      ];
+      const ia = order.indexOf(a.key || "");
+      const ib = order.indexOf(b.key || "");
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
   const schoolId = isEditMode ? (initialSchoolId ?? selectedSchoolId) : selectedSchoolId;
   const effectiveSchools = isEditMode
     ? schools
@@ -145,7 +191,12 @@ export function SchoolRoleAssignmentDialog({
     onOpenChange(next);
   };
 
-  const handleSaveClick = async () => {
+  const handleFooterPrimary = async () => {
+    if (!isEditMode && showPlatformTab && assignTab === "platform") {
+      if (!selectedPlatformRoleId || !onSubmitPlatform) return;
+      await onSubmitPlatform(selectedPlatformRoleId);
+      return;
+    }
     if (isEditMode && staffRole && !staffSelected) {
       setStaffRemovalConfirmOpen(true);
       return;
@@ -168,18 +219,16 @@ export function SchoolRoleAssignmentDialog({
 
   const canSubmitAdd =
     !!selectedSchoolId && selectedRoleIds.size > 0 && !isSaving;
-  const submitLabelAdd = isSaving ? "Assigning..." : "Assign Roles";
-  const submitLabelEdit = isSaving ? "Saving..." : "Save Changes";
+  const canSubmitPlatformAdd = !!selectedPlatformRoleId && !isSaving;
 
-  return (
+  const primaryDisabled = isEditMode
+    ? isSaving
+    : showPlatformTab && assignTab === "platform"
+      ? !canSubmitPlatformAdd
+      : !canSubmitAdd;
+
+  const schoolForm = (
     <>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
             {/* School: dropdown (add) or locked display (edit) */}
             <div className="space-y-2">
               <Label htmlFor="school-select">School *</Label>
@@ -379,6 +428,69 @@ export function SchoolRoleAssignmentDialog({
                 </div>
               </div>
             )}
+    </>
+  );
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {showPlatformTab ? (
+              <Tabs
+                value={assignTab}
+                onValueChange={(v) => setAssignTab(v as "school" | "platform")}
+              >
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="school">School roles</TabsTrigger>
+                  <TabsTrigger value="platform">Platform role</TabsTrigger>
+                </TabsList>
+                <TabsContent value="school" className="space-y-4 pt-4">
+                  {schoolForm}
+                </TabsContent>
+                <TabsContent value="platform" className="space-y-4 pt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Assign a global platform role. This user cannot have school
+                    roles while they hold a platform role.
+                  </p>
+                  {platformPickerRoles.length === 0 ? (
+                    <p className="text-sm text-destructive">
+                      No platform roles found in directory.
+                    </p>
+                  ) : (
+                    <RadioGroup
+                      value={selectedPlatformRoleId}
+                      onValueChange={setSelectedPlatformRoleId}
+                      className="gap-2"
+                    >
+                      {platformPickerRoles.map((role) => (
+                        <div
+                          key={role.id}
+                          className="flex items-center gap-3 rounded-lg border border-input bg-background p-3"
+                        >
+                          <RadioGroupItem
+                            value={role.id}
+                            id={`platform-role-${role.id}`}
+                          />
+                          <Label
+                            htmlFor={`platform-role-${role.id}`}
+                            className="flex-1 cursor-pointer font-normal leading-snug"
+                          >
+                            {role.name || role.key}
+                          </Label>
+                        </div>
+                      ))}
+                    </RadioGroup>
+                  )}
+                </TabsContent>
+              </Tabs>
+            ) : (
+              schoolForm
+            )}
 
             {error && (
               <Alert variant="destructive">
@@ -392,10 +504,7 @@ export function SchoolRoleAssignmentDialog({
             <Button variant="outline" onClick={onCancel}>
               Cancel
             </Button>
-            <Button
-              onClick={handleSaveClick}
-              disabled={isEditMode ? isSaving : !canSubmitAdd}
-            >
+            <Button onClick={handleFooterPrimary} disabled={primaryDisabled}>
               {isSaving ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -403,6 +512,8 @@ export function SchoolRoleAssignmentDialog({
                 </>
               ) : isEditMode ? (
                 "Save Changes"
+              ) : showPlatformTab && assignTab === "platform" ? (
+                "Assign platform role"
               ) : (
                 "Assign Roles"
               )}

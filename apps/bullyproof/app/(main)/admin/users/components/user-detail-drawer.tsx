@@ -108,6 +108,7 @@ import {
 import { UserDetailHeader } from "./user-detail-drawer/user-detail-header";
 import { UserDetailSidebar } from "./user-detail-drawer/user-detail-sidebar";
 import { SchoolRoleAssignmentDialog } from "./user-detail-drawer/school-role-assignment-dialog";
+import { PlatformRoleSwapDialog } from "./user-detail-drawer/platform-role-swap-dialog";
 import { UserDetailsCard } from "./user-detail-drawer/user-details-card";
 import { UserHistoryTab } from "./user-detail-drawer/user-history-tab";
 import { UserPositionsTab } from "./user-detail-drawer/user-positions-tab";
@@ -118,6 +119,7 @@ import {
   getDisplayName,
   isSchoolLicenceAccount,
   PLATFORM_ROLE_KEYS,
+  canTargetReceiveFirstPlatformRole,
 } from "./user-detail-drawer/utils";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
@@ -171,6 +173,7 @@ function UserDetailDrawerContent({
     new Set()
   );
   const [isSavingRoles, setIsSavingRoles] = useState(false);
+  const [isPlatformSwapOpen, setIsPlatformSwapOpen] = useState(false);
 
   // Memoize staff role ID to avoid unnecessary re-renders
   const staffRoleId = useMemo(() => {
@@ -241,6 +244,19 @@ function UserDetailDrawerContent({
             user.platformRoles
           ),
     [realViewer?.platformRoles, user]
+  );
+
+  const viewerIsIntradarkDev = useMemo(
+    () => profileHasIntradarkDevPlatformRole(realViewer?.platformRoles),
+    [realViewer?.platformRoles]
+  );
+
+  const allowSchoolOrPlatformAddTab = useMemo(
+    () =>
+      Boolean(
+        viewerIsIntradarkDev && user && canTargetReceiveFirstPlatformRole(user)
+      ),
+    [viewerIsIntradarkDev, user]
   );
 
   // Context-aware params: schools page uses "tab" for school section, so we use userTab/userHistoryTab
@@ -750,6 +766,34 @@ function UserDetailDrawerContent({
     }
   };
 
+  const handleAssignPlatformFromDialog = async (roleId: string) => {
+    if (!user || !canMutateTargetUser) return;
+
+    setIsSavingRoles(true);
+    setToggleRoleError(null);
+    try {
+      const result = await rolesApi.post.assignRole({
+        userId: user.id,
+        roleId,
+      });
+      if (result.error) {
+        setToggleRoleError(result.error.message || "Failed to assign role");
+        return;
+      }
+      setIsAddRoleDialogOpen(false);
+      setAddRoleSchoolId("");
+      setAddRoleSelectedRoles(new Set());
+      onUserUpdate?.();
+    } catch (err: unknown) {
+      console.error("Failed to assign platform role:", err);
+      setToggleRoleError(
+        err instanceof Error ? err.message : "Failed to assign role"
+      );
+    } finally {
+      setIsSavingRoles(false);
+    }
+  };
+
   const handleOpenEditSchoolRoles = (
     schoolId: string,
     schoolName: string,
@@ -999,12 +1043,21 @@ function UserDetailDrawerContent({
                       return (
                         <div className="space-y-2">
                           <Card className="border">
-                            <CardContent className="px-4 py-2 flex items-center justify-between gap-4">
-                              {/* Platform Title on Left */}
-                              <div className="flex flex-col -space-y-0.5 shrink-0">
-                                <h3 className="text-lg font-semibold">
-                                  Platform
-                                </h3>
+                            <CardContent className="px-4 py-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                <h3 className="text-lg font-semibold">Platform</h3>
+                                {viewerIsIntradarkDev && canMutateTargetUser && (
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsPlatformSwapOpen(true)}
+                                    className="h-8"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                    Change role
+                                  </Button>
+                                )}
                               </div>
 
                               {/* All Platform Role Badges on Right */}
@@ -1042,7 +1095,7 @@ function UserDetailDrawerContent({
                                   }
 
                                   if (isAssigned) {
-                                    // Assigned role badge
+                                    // Assigned role badge: Intradark dev uses "Change role" to swap; others click to remove
                                     return (
                                       <Badge
                                         key={`${roleKey}-platform-assigned`}
@@ -1050,13 +1103,22 @@ function UserDetailDrawerContent({
                                         className={cn(
                                           "group flex items-center gap-1 border px-2 py-1 transition-colors",
                                           canMutateTargetUser &&
+                                            !viewerIsIntradarkDev &&
                                             "cursor-pointer hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/30",
+                                          canMutateTargetUser &&
+                                            viewerIsIntradarkDev &&
+                                            "cursor-default",
                                           !canMutateTargetUser &&
                                             "cursor-not-allowed opacity-60",
                                           getBadgeClasses(roleKey)
                                         )}
                                         onClick={() => {
-                                          if (!role || !canMutateTargetUser) return;
+                                          if (
+                                            !role ||
+                                            !canMutateTargetUser ||
+                                            viewerIsIntradarkDev
+                                          )
+                                            return;
                                           setRoleToToggle({
                                             roleId: role.id,
                                             roleKey,
@@ -1067,8 +1129,15 @@ function UserDetailDrawerContent({
                                           setIsToggleRoleDialogOpen(true);
                                         }}
                                       >
-                                        <RoleIcon className="h-4 w-4 group-hover:hidden" />
-                                        <X className="h-4 w-4 hidden group-hover:block !text-destructive" />
+                                        <RoleIcon
+                                          className={cn(
+                                            "h-4 w-4",
+                                            !viewerIsIntradarkDev && "group-hover:hidden"
+                                          )}
+                                        />
+                                        {!viewerIsIntradarkDev && (
+                                          <X className="h-4 w-4 hidden group-hover:block !text-destructive" />
+                                        )}
                                         {roleName}
                                       </Badge>
                                     );
@@ -1509,7 +1578,11 @@ function UserDetailDrawerContent({
           }
         }}
         title="Add Role"
-        description={`Select a school and assign roles to ${getDisplayName(user)}.`}
+        description={
+          allowSchoolOrPlatformAddTab
+            ? `Add school roles or assign a platform role to ${getDisplayName(user)}.`
+            : `Select a school and assign roles to ${getDisplayName(user)}.`
+        }
         schools={schools}
         selectedSchoolId={addRoleSchoolId}
         onSchoolIdChange={(id) => {
@@ -1534,7 +1607,25 @@ function UserDetailDrawerContent({
             : undefined
         }
         loadingSchools={loadingSchools}
+        assignmentVariant={
+          allowSchoolOrPlatformAddTab ? "school-or-platform" : "school-only"
+        }
+        onSubmitPlatform={handleAssignPlatformFromDialog}
+        includeIntradarkDevInPlatformPicker={viewerIsIntradarkDev}
       />
+
+      {user && userPlatformRoleKey && (
+        <PlatformRoleSwapDialog
+          open={isPlatformSwapOpen}
+          onOpenChange={setIsPlatformSwapOpen}
+          userId={user.id}
+          userDisplayName={getDisplayName(user)}
+          currentRoleKey={userPlatformRoleKey}
+          roles={roles}
+          includeIntradarkDevOption={viewerIsIntradarkDev}
+          onSuccess={() => onUserUpdate?.()}
+        />
+      )}
 
       {/* Toggle Role Confirmation Dialog */}
       <AlertDialog
