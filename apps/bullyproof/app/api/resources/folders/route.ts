@@ -1,16 +1,23 @@
 import { NextResponse } from "next/server";
 import { resourcesService } from "@/server/resources/resources.service";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import {
+  getResourcesAuthFromRequest,
+  resourcesAuthErrorStatus,
+} from "@/server/lib/resources-request-auth";
 
 export async function POST(request: Request) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
 
     const body = await request.json();
-    const folder = await resourcesService.createFolder({ userId }, body);
+    const folder = await resourcesService.createFolder(
+      { userId: auth.userId, actorUserId: auth.actorUserId },
+      body
+    );
     return NextResponse.json(folder, { status: 201 });
   } catch (e: any) {
     console.error("[resources/folders] POST error:", e);

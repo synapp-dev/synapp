@@ -26,8 +26,10 @@ const RESOURCE_MANAGER_PLATFORM_KEYS = [
   "PLATFORM_MODERATOR",
 ] as const;
 
-type AuthContext = {
-  userId: string | null;
+/** Effective user for permissions; actorUserId for audit columns (real JWT user). */
+export type ResourcesAuthContext = {
+  userId: string;
+  actorUserId: string;
 };
 
 type FolderRow = Awaited<ReturnType<typeof resourcesRepo.getFolderById>>;
@@ -98,40 +100,33 @@ function buildFolderPath(folderId: string, folders: NonNullable<FolderRow>[]): s
   return slugs.reverse().join("/");
 }
 
-async function canManageResources(ctx: AuthContext): Promise<boolean> {
-  if (!ctx.userId) return false;
-  const scopedRoles = await getUserScopedRoles(ctx.userId);
+async function canManageResourcesForUser(userId: string): Promise<boolean> {
+  const scopedRoles = await getUserScopedRoles(userId);
   return RESOURCE_MANAGER_PLATFORM_KEYS.some((key) =>
     scopedRoles.platform.includes(key)
   );
 }
 
-async function assertCanManageResources(ctx: AuthContext): Promise<void> {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
+async function canManageResources(ctx: ResourcesAuthContext): Promise<boolean> {
+  return canManageResourcesForUser(ctx.userId);
+}
+
+async function assertCanManageResources(ctx: ResourcesAuthContext): Promise<void> {
   if (!(await canManageResources(ctx))) {
     throw new Error("Forbidden");
   }
 }
 
-async function assertCanViewResources(ctx: AuthContext): Promise<void> {
-  if (!ctx.userId) {
-    throw new Error("Unauthorized");
-  }
-}
-
 async function assertCanReadSchoolResources(
-  ctx: AuthContext,
+  ctx: ResourcesAuthContext,
   schoolId: string
 ): Promise<void> {
-  await assertCanViewResources(ctx);
   const canManage = await canManageResources(ctx);
   if (canManage) {
     return;
   }
   const hasAccess = await checkFeatureAccess(
-    ctx.userId as string,
+    ctx.userId,
     "/school/resources",
     schoolId
   );
@@ -190,12 +185,16 @@ function folderDeletePayload(
 }
 
 export const resourcesService = {
-  async listTree(ctx: AuthContext, query: unknown) {
+  async listTree(ctx: ResourcesAuthContext, query: unknown) {
     const { schoolId } = listResourceTreeSchema.parse(query);
     if (schoolId) {
       await assertCanReadSchoolResources(ctx, schoolId);
     } else {
-      await assertCanManageResources(ctx);
+      const effectiveManage = await canManageResources(ctx);
+      const actorManage = await canManageResourcesForUser(ctx.actorUserId);
+      if (!effectiveManage && !actorManage) {
+        throw new Error("Forbidden");
+      }
     }
 
     const [folders, files, canManage] = await Promise.all([
@@ -255,7 +254,7 @@ export const resourcesService = {
     return { canManage, roots };
   },
 
-  async createFolder(ctx: AuthContext, payload: unknown) {
+  async createFolder(ctx: ResourcesAuthContext, payload: unknown) {
     await assertCanManageResources(ctx);
     const parsed: CreateResourceFolderParams =
       createResourceFolderSchema.parse(payload);
@@ -278,13 +277,13 @@ export const resourcesService = {
       parentId: parsed.parentId ?? null,
       scopeType,
       schoolId,
-      createdBy: ctx.userId,
+      createdBy: ctx.actorUserId,
     });
 
     return created;
   },
 
-  async renameFolder(ctx: AuthContext, folderId: string, payload: unknown) {
+  async renameFolder(ctx: ResourcesAuthContext, folderId: string, payload: unknown) {
     await assertCanManageResources(ctx);
     const { name } = renameResourceFolderSchema.parse(payload);
 
@@ -302,7 +301,7 @@ export const resourcesService = {
     return updated;
   },
 
-  async deleteFolder(ctx: AuthContext, folderId: string) {
+  async deleteFolder(ctx: ResourcesAuthContext, folderId: string) {
     await assertCanManageResources(ctx);
 
     const folder = await resourcesRepo.getFolderById(folderId);
@@ -347,7 +346,7 @@ export const resourcesService = {
     };
   },
 
-  async uploadFile(ctx: AuthContext, formData: FormData) {
+  async uploadFile(ctx: ResourcesAuthContext, formData: FormData) {
     await assertCanManageResources(ctx);
     const folderId = formData.get("folderId");
     const file = formData.get("file");
@@ -386,7 +385,7 @@ export const resourcesService = {
       sizeBytes: file.size,
       scopeType,
       schoolId,
-      uploadedBy: ctx.userId,
+      uploadedBy: ctx.actorUserId,
     });
 
     const prefix =
@@ -423,7 +422,7 @@ export const resourcesService = {
     }
   },
 
-  async renameFile(ctx: AuthContext, fileId: string, payload: unknown) {
+  async renameFile(ctx: ResourcesAuthContext, fileId: string, payload: unknown) {
     await assertCanManageResources(ctx);
     const { displayName } = renameResourceFileSchema.parse(payload);
 
@@ -440,7 +439,7 @@ export const resourcesService = {
     return updated;
   },
 
-  async deleteFile(ctx: AuthContext, fileId: string) {
+  async deleteFile(ctx: ResourcesAuthContext, fileId: string) {
     await assertCanManageResources(ctx);
     const file = await resourcesRepo.getFileById(fileId);
     if (!file) {
@@ -462,7 +461,7 @@ export const resourcesService = {
     return { success: true };
   },
 
-  async listTopicFiles(ctx: AuthContext, query: unknown) {
+  async listTopicFiles(ctx: ResourcesAuthContext, query: unknown) {
     const { topicId, schoolId }: ListTopicResourceFilesParams =
       listTopicResourceFilesSchema.parse(query);
     await assertCanReadSchoolResources(ctx, schoolId);
@@ -482,7 +481,7 @@ export const resourcesService = {
     }));
   },
 
-  async listFileTopics(ctx: AuthContext, fileId: string) {
+  async listFileTopics(ctx: ResourcesAuthContext, fileId: string) {
     await assertCanManageResources(ctx);
     const file = await resourcesRepo.getFileById(fileId);
     if (!file) {
@@ -491,7 +490,7 @@ export const resourcesService = {
     return resourcesRepo.listTopicsForFile(fileId);
   },
 
-  async assignFileTopic(ctx: AuthContext, fileId: string, payload: unknown) {
+  async assignFileTopic(ctx: ResourcesAuthContext, fileId: string, payload: unknown) {
     await assertCanManageResources(ctx);
     const { topicId }: AssignResourceFileTopicParams =
       assignResourceFileTopicSchema.parse(payload);
@@ -510,13 +509,13 @@ export const resourcesService = {
     await resourcesRepo.addFileTopic({
       fileId,
       topicId,
-      createdBy: ctx.userId,
+      createdBy: ctx.actorUserId,
     });
 
     return { success: true };
   },
 
-  async removeFileTopic(ctx: AuthContext, fileId: string, topicId: string) {
+  async removeFileTopic(ctx: ResourcesAuthContext, fileId: string, topicId: string) {
     await assertCanManageResources(ctx);
     const [file, topic] = await Promise.all([
       resourcesRepo.getFileById(fileId),
@@ -533,8 +532,7 @@ export const resourcesService = {
     return { success: true };
   },
 
-  async getDownloadUrl(ctx: AuthContext, fileId: string) {
-    await assertCanViewResources(ctx);
+  async getDownloadUrl(ctx: ResourcesAuthContext, fileId: string) {
     const file = await resourcesRepo.getFileById(fileId);
     if (!file) {
       throw new Error("File not found");

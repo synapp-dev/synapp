@@ -1,24 +1,21 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import { generateMetadataFromSegments } from "@/utils/metadata";
 import { ResourceBrowserClient } from "../resource-browser-client";
 
-export default function LegacyInfoPacksRoute({
+export const metadata = generateMetadataFromSegments([
+  "schools",
+  "resources",
+  "info-packs",
+]);
+
+export default async function LegacyInfoPacksRoute({
   params,
 }: {
   params: Promise<{ school_id: string }>;
 }) {
-  const [schoolSlug, setSchoolSlug] = useState<string>("");
-
-  useEffect(() => {
-    params.then(({ school_id }) => setSchoolSlug(school_id));
-  }, [params]);
-
-  if (!schoolSlug) return null;
-
+  const { school_id } = await params;
   return (
     <ResourceBrowserClient
-      schoolSlug={schoolSlug}
+      schoolSlug={school_id}
       initialFolderSegments={["info-packs"]}
     />
   );

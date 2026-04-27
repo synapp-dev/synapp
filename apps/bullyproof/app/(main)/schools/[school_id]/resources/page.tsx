@@ -7,7 +7,7 @@ import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { SchoolPageCompactHeader } from "@/components/molecules/school-page-compact-header";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 import { useSchoolStore } from "@/stores/school-store";
-import { FolderOpen, Video, Lock } from "lucide-react";
+import { FolderOpen, Video, Lock, Shield } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
 import { getAuthHeaders } from "@/lib/api/fetcher.client";
 
 type ResourceTreeNode = {
@@ -118,6 +119,20 @@ export default function ResourcesPage({
               : undefined
           }
         >
+          {treeQuery.data?.canManage ? (
+            <div className="flex justify-end">
+              <Button asChild variant="outline" size="sm">
+                <Link
+                  href="/admin/resources"
+                  className="inline-flex items-center gap-2"
+                >
+                  <Shield className="h-4 w-4" aria-hidden />
+                  Manage resources
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {treeQuery.isLoading ? (
               <Card className="h-full">

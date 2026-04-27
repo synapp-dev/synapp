@@ -1,20 +1,28 @@
 import { NextResponse } from "next/server";
 import { resourcesService } from "@/server/resources/resources.service";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import {
+  getResourcesAuthFromRequest,
+  resourcesAuthErrorStatus,
+} from "@/server/lib/resources-request-auth";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
 
     const { id } = await params;
     const body = await request.json();
-    const folder = await resourcesService.renameFolder({ userId }, id, body);
+    const folder = await resourcesService.renameFolder(
+      { userId: auth.userId, actorUserId: auth.actorUserId },
+      id,
+      body
+    );
     return NextResponse.json(folder, { status: 200 });
   } catch (e: any) {
     console.error("[resources/folders/:id] PATCH error:", e);
@@ -40,13 +48,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
 
     const { id } = await params;
-    const result = await resourcesService.deleteFolder({ userId }, id);
+    const result = await resourcesService.deleteFolder(
+      { userId: auth.userId, actorUserId: auth.actorUserId },
+      id
+    );
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
     console.error("[resources/folders/:id] DELETE error:", e);

@@ -1,29 +1,28 @@
-"use client";
-
-import { useEffect, useState } from "react";
+import type { Metadata } from "next";
+import { generateResourcesFolderTabTitle } from "@/utils/metadata";
 import { ResourceBrowserClient } from "../resource-browser-client";
 
-export default function SchoolResourcesFolderPage({
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ school_id: string; folder: string[] }>;
+}): Promise<Metadata> {
+  const { folder } = await params;
+  return {
+    title: generateResourcesFolderTabTitle(folder ?? []),
+  };
+}
+
+export default async function SchoolResourcesFolderPage({
   params,
 }: {
   params: Promise<{ school_id: string; folder: string[] }>;
 }) {
-  const [schoolSlug, setSchoolSlug] = useState<string>("");
-  const [folderSegments, setFolderSegments] = useState<string[]>([]);
-
-  useEffect(() => {
-    params.then(({ school_id, folder }) => {
-      setSchoolSlug(school_id);
-      setFolderSegments(folder ?? []);
-    });
-  }, [params]);
-
-  if (!schoolSlug) return null;
-
+  const { school_id, folder } = await params;
   return (
     <ResourceBrowserClient
-      schoolSlug={schoolSlug}
-      initialFolderSegments={folderSegments}
+      schoolSlug={school_id}
+      initialFolderSegments={folder ?? []}
     />
   );
 }

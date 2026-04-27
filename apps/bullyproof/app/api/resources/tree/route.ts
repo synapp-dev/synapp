@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 import { resourcesService } from "@/server/resources/resources.service";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import {
+  getResourcesAuthFromRequest,
+  resourcesAuthErrorStatus,
+} from "@/server/lib/resources-request-auth";
 
 export async function GET(request: Request) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
 
     const { searchParams } = new URL(request.url);
     const schoolId = searchParams.get("schoolId");
     const tree = await resourcesService.listTree(
-      { userId },
+      { userId: auth.userId, actorUserId: auth.actorUserId },
       schoolId ? { schoolId } : {}
     );
     return NextResponse.json(tree, { status: 200 });

@@ -1,18 +1,25 @@
 import { NextResponse } from "next/server";
 import { resourcesService } from "@/server/resources/resources.service";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
+import {
+  getResourcesAuthFromRequest,
+  resourcesAuthErrorStatus,
+} from "@/server/lib/resources-request-auth";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
     const { id } = await params;
-    const topics = await resourcesService.listFileTopics({ userId }, id);
+    const topics = await resourcesService.listFileTopics(
+      { userId: auth.userId, actorUserId: auth.actorUserId },
+      id
+    );
     return NextResponse.json(topics, { status: 200 });
   } catch (e: any) {
     console.error("[resources/files/:id/topics] GET error:", e);
@@ -36,13 +43,18 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
     const { id } = await params;
     const body = await request.json();
-    const result = await resourcesService.assignFileTopic({ userId }, id, body);
+    const result = await resourcesService.assignFileTopic(
+      { userId: auth.userId, actorUserId: auth.actorUserId },
+      id,
+      body
+    );
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
     console.error("[resources/files/:id/topics] POST error:", e);
@@ -68,9 +80,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await getUserIdFromRequest(request);
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const auth = await getResourcesAuthFromRequest(request);
+    if (auth.kind !== "ok") {
+      const { status, message } = resourcesAuthErrorStatus(auth);
+      return NextResponse.json({ error: message }, { status });
     }
     const { id } = await params;
     const topicId = new URL(request.url).searchParams.get("topicId");
@@ -78,7 +91,11 @@ export async function DELETE(
       return NextResponse.json({ error: "topicId is required" }, { status: 400 });
     }
 
-    const result = await resourcesService.removeFileTopic({ userId }, id, topicId);
+    const result = await resourcesService.removeFileTopic(
+      { userId: auth.userId, actorUserId: auth.actorUserId },
+      id,
+      topicId
+    );
     return NextResponse.json(result, { status: 200 });
   } catch (e: any) {
     console.error("[resources/files/:id/topics] DELETE error:", e);
