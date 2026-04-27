@@ -37,9 +37,11 @@ type FeaturePermission = {
 
 interface UserFeaturesTabProps {
   user: UserWithRolesAndSchools;
+  /** When false, switches are disabled (e.g. non–INTRADARK_DEV admin viewing a dev account). */
+  canEdit?: boolean;
 }
 
-export function UserFeaturesTab({ user }: UserFeaturesTabProps) {
+export function UserFeaturesTab({ user, canEdit = true }: UserFeaturesTabProps) {
   const queryClient = useQueryClient();
 
   // Fetch all features
@@ -169,6 +171,17 @@ export function UserFeaturesTab({ user }: UserFeaturesTabProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {!canEdit && (
+          <Alert className="mb-6 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-900 dark:text-amber-100">
+              Read-only
+            </AlertTitle>
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              Only Intradark developers can change feature access for this account.
+            </AlertDescription>
+          </Alert>
+        )}
         <Alert className="mb-6">
           <Info className="h-4 w-4" />
           <AlertTitle>Permission Hierarchy</AlertTitle>
@@ -257,7 +270,7 @@ export function UserFeaturesTab({ user }: UserFeaturesTabProps) {
                           onCheckedChange={(checked) =>
                             handleToggleVisible(feature.id, checked)
                           }
-                          disabled={setPermissionMutation.isPending}
+                          disabled={!canEdit || setPermissionMutation.isPending}
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -273,7 +286,7 @@ export function UserFeaturesTab({ user }: UserFeaturesTabProps) {
                           onCheckedChange={(checked) =>
                             handleToggleAccess(feature.id, checked)
                           }
-                          disabled={setPermissionMutation.isPending}
+                          disabled={!canEdit || setPermissionMutation.isPending}
                         />
                       </div>
                     </div>

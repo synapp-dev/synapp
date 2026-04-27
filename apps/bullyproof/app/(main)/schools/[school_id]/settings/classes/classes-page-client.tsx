@@ -50,7 +50,7 @@ export function ClassesPageClient({ schoolSlug }: ClassesPageClientProps) {
     return (
       <>
         <FeatureGuard feature="/settings" schoolId={schoolId ?? undefined} />
-        <div className="h-[calc(100dvh-4rem-1.5rem)] flex flex-col min-h-0 gap-4">
+        <div className="flex h-[calc(100dvh-4rem-1.5rem)] min-h-0 flex-col gap-4 overflow-hidden pb-6">
           <Skeleton className="h-10 w-64 flex-shrink-0" />
           <Skeleton className="h-12 w-full flex-shrink-0" />
           <Skeleton className="flex-1 min-h-0 w-full" />
@@ -62,11 +62,12 @@ export function ClassesPageClient({ schoolSlug }: ClassesPageClientProps) {
   return (
     <>
       <FeatureGuard feature="/settings" schoolId={school.id}>
-        <div className="h-[calc(100dvh-4rem-1.5rem)] flex flex-col min-h-0">
+        <div className="flex h-[calc(100dvh-4rem-1.5rem)] min-h-0 flex-col overflow-hidden pb-6">
           <SettingsClassesCard
             schoolId={school.id}
             schoolSlug={slug}
             schoolName={school.name ?? "School"}
+            schoolAvatarUrl={school.avatarUrl ?? null}
             schoolState={school.state ?? null}
             schoolSector={schoolSector}
             schoolLevels={schoolLevels}

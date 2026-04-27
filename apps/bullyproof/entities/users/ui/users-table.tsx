@@ -65,6 +65,8 @@ interface UsersTableProps {
   totalCount?: number;
   onPageChange?: (pageIndex: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  /** When it returns true, the row cannot be bulk-selected (e.g. Intradark dev rows for non-dev admins). */
+  isRowSelectionLocked?: (user: User) => boolean;
 }
 
 export function UsersTable({
@@ -81,6 +83,7 @@ export function UsersTable({
   totalCount = 0,
   onPageChange,
   onPageSizeChange,
+  isRowSelectionLocked,
 }: UsersTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -118,6 +121,7 @@ export function UsersTable({
             onCheckedChange={(value) => row.toggleSelected(!!value)}
             aria-label="Select row"
             onClick={(e) => e.stopPropagation()}
+            disabled={!row.getCanSelect()}
           />
         </div>
       ),
@@ -280,7 +284,7 @@ export function UsersTable({
       }
       return col;
     });
-  }, [roles, schoolId, showSelection]);
+  }, [roles, schoolId, showSelection, isRowSelectionLocked]);
 
   const table = useReactTable({
     data: users,
@@ -310,6 +314,9 @@ export function UsersTable({
         pageSize,
       },
     },
+    enableRowSelection: isRowSelectionLocked
+      ? (row) => !isRowSelectionLocked(row.original)
+      : true,
   });
 
   // Calculate pagination info

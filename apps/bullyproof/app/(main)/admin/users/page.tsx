@@ -61,10 +61,13 @@ import {
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { meApi } from "@/entities/me/api/endpoints";
+import { useMeStore } from "@/entities/me/model/store";
+import { canManageIntradarkDevScopedUser } from "@/lib/intradark-dev-protection";
 
 function AdminUsersPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const realViewer = useMeStore((s) => s.currentUser);
   // Initialize search query from URL, but don't re-initialize on every URL change
   const [searchQuery, setSearchQuery] = useState(() => 
     searchParams?.get("search") || ""
@@ -755,6 +758,12 @@ function AdminUsersPageContent() {
             totalCount={totalCount}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
+            isRowSelectionLocked={(u) =>
+              !canManageIntradarkDevScopedUser(
+                realViewer?.platformRoles,
+                u.platformRoles
+              )
+            }
           />
         )}
       </div>

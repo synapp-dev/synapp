@@ -14,7 +14,6 @@ import {
   VisibilityState,
 } from "@tanstack/react-table";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -27,7 +26,34 @@ import { cn } from "@workspace/ui/lib/utils";
 import type { classes } from "@/server/db/schema";
 
 type Class = typeof classes.$inferSelect;
-type ClassWithYearCodes = Class & { yearCodes?: string[] };
+type ClassWithYearCodes = Class & {
+  yearCodes?: string[] | null;
+  yearNames?: string[] | null;
+};
+
+function ordinalSuffix(day: number): string {
+  const d = day % 100;
+  if (d >= 11 && d <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
+function formatClassCreatedDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  const day = d.getDate();
+  const month = d.toLocaleDateString("en-AU", { month: "long" });
+  const year = d.getFullYear();
+  return `${day}${ordinalSuffix(day)} ${month} ${year}`;
+}
 
 interface ClassesTableProps {
   classes: ClassWithYearCodes[];
@@ -36,9 +62,45 @@ interface ClassesTableProps {
   onClassClick?: (classItem: ClassWithYearCodes) => void;
   onRowSelectionChange?: (selection: Record<string, boolean>) => void;
   showSelection?: boolean;
+  /** When true, table grows with flex parent and only the body area scrolls (header stays fixed). */
+  fillHeight?: boolean;
+}
+
+/** Width + horizontal padding for select / status / name columns */
+function columnLayoutClass(columnId: string): string | undefined {
+  switch (columnId) {
+    case "select":
+      return "w-11 min-w-11 max-w-11 px-2.5";
+    case "active":
+      /* pl-3 keeps space after checkbox; tighter pr pulls class name closer */
+      return "min-w-[2rem] max-w-[3rem] pl-3 pr-1.5";
+    case "name":
+      return "pl-0";
+    default:
+      return undefined;
+  }
 }
 
 const columns: ColumnDef<ClassWithYearCodes>[] = [
+  {
+    accessorKey: "active",
+    header: "Status",
+    cell: ({ row }) => {
+      const active = row.getValue("active") as boolean;
+      return (
+        <Badge
+          variant={active ? "default" : "secondary"}
+          className={cn(
+            "border-0 font-normal",
+            active &&
+              "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]"
+          )}
+        >
+          {active ? "Active" : "Inactive"}
+        </Badge>
+      );
+    },
+  },
   {
     accessorKey: "name",
     header: "Class Name",
@@ -47,26 +109,28 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
     },
   },
   {
-    accessorKey: "code",
-    header: "Code",
-    cell: ({ row }) => {
-      const code = row.getValue("code") as string | null;
-      return (
-        <span className="text-sm text-muted-foreground">{code || "—"}</span>
-      );
+    id: "yearLevels",
+    header: "Year Levels",
+    accessorFn: (row) => {
+      const names = row.yearNames?.filter(Boolean) ?? [];
+      if (names.length > 0) return names.join(" ");
+      return (row.yearCodes ?? []).join(" ");
     },
-  },
-  {
-    accessorKey: "yearCodes",
-    header: "Year Level Codes",
     cell: ({ row }) => {
-      const yearCodes = row.getValue("yearCodes") as string[] | undefined;
-      if (yearCodes && yearCodes.length > 0) {
+      const original = row.original;
+      const names = original.yearNames?.filter(Boolean) ?? [];
+      const labels =
+        names.length > 0 ? names : (original.yearCodes ?? []).filter(Boolean);
+      if (labels.length > 0) {
         return (
           <div className="flex flex-wrap gap-1">
-            {yearCodes.map((yearCode, index) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {yearCode}
+            {labels.map((label, index) => (
+              <Badge
+                key={`${label}-${index}`}
+                variant="secondary"
+                className="border-0 bg-muted text-xs font-normal text-primary"
+              >
+                {label}
               </Badge>
             ))}
           </div>
@@ -90,15 +154,16 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
     },
   },
   {
-    accessorKey: "active",
-    header: "Status",
+    accessorKey: "studentCap",
+    header: "Class Size",
     cell: ({ row }) => {
-      const active = row.getValue("active") as boolean;
-      return (
-        <Badge variant={active ? "default" : "secondary"}>
-          {active ? "Active" : "Inactive"}
-        </Badge>
-      );
+      const cap = row.getValue("studentCap") as number | null | undefined;
+      if (cap != null && cap !== undefined && !Number.isNaN(Number(cap))) {
+        return (
+          <span className="text-sm text-muted-foreground tabular-nums">{Number(cap)}</span>
+        );
+      }
+      return <span className="text-sm text-muted-foreground">—</span>;
     },
   },
   {
@@ -109,7 +174,7 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
       if (createdAt) {
         return (
           <span className="text-sm text-muted-foreground">
-            {new Date(createdAt).toLocaleDateString()}
+            {formatClassCreatedDate(createdAt)}
           </span>
         );
       }
@@ -125,6 +190,7 @@ export function ClassesTable({
   onClassClick,
   onRowSelectionChange,
   showSelection = false,
+  fillHeight = false,
 }: ClassesTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] =
@@ -137,7 +203,7 @@ export function ClassesTable({
     const selectionColumn: ColumnDef<ClassWithYearCodes> = {
       id: "select",
       header: ({ table }) => (
-        <div className="pl-2">
+        <div className="flex h-full min-h-8 items-center justify-center leading-none">
           <Checkbox
             checked={
               table.getIsAllPageRowsSelected()
@@ -154,7 +220,7 @@ export function ClassesTable({
         </div>
       ),
       cell: ({ row }) => (
-        <div className="pl-2">
+        <div className="flex h-full min-h-8 items-center justify-center leading-none">
           <Checkbox
             checked={row.getIsSelected()}
             onCheckedChange={(value) => row.toggleSelected(!!value)}
@@ -216,15 +282,33 @@ export function ClassesTable({
   }
 
   return (
-    <div className="rounded-md border overflow-hidden flex flex-col max-h-[600px]">
-      <div className="overflow-auto">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
+    <div
+      className={cn(
+        "flex min-h-0 flex-col overflow-hidden rounded-md border",
+        fillHeight ? "min-h-0 flex-1" : "max-h-[600px]"
+      )}
+    >
+      <div
+        className={cn(
+          fillHeight
+            ? "min-h-0 flex-1 overflow-x-auto overflow-y-auto"
+            : "overflow-auto"
+        )}
+      >
+        <table className="w-full caption-bottom text-sm">
+          <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
+                  const layout = columnLayoutClass(header.column.id);
                   return (
-                    <TableHead key={header.id} className="bg-background">
+                    <TableHead
+                      key={header.id}
+                      className={cn(
+                        "sticky top-0 z-10 border-b bg-background shadow-sm",
+                        layout
+                      )}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -249,7 +333,10 @@ export function ClassesTable({
                   onClick={() => onClassClick?.(row.original)}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell
+                      key={cell.id}
+                      className={columnLayoutClass(cell.column.id)}
+                    >
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -269,7 +356,7 @@ export function ClassesTable({
               </TableRow>
             )}
           </TableBody>
-        </Table>
+        </table>
       </div>
     </div>
   );

@@ -12,17 +12,22 @@ export interface RoleBadgeItem {
   isPlatform?: boolean;
 }
 
+/** Display order: school admin, then teacher/AP, then staff, then licence, then platform/other. */
 const ROLE_PRIORITY: Record<string, number> = {
-  SCHOOL_STAFF: 1,
-  SCHOOL_ADMIN: 2,
-  TEACHER: 3,
+  SCHOOL_ADMIN: 1,
+  TEACHER: 2,
+  SCHOOL_STAFF: 3,
   SCHOOL_LICENCE: 4,
   PLATFORM_ADMIN: 5,
 };
 
 function getRolePriority(roleKey: string): number {
-  if (roleKey === "TEACHER" || roleKey?.includes("TEACHER")) return 3;
-  return ROLE_PRIORITY[roleKey] ?? 6;
+  const k = roleKey || "";
+  if (k === "SCHOOL_ADMIN") return 1;
+  if (k === "TEACHER" || k.includes("TEACHER")) return 2;
+  if (k === "SCHOOL_STAFF") return 3;
+  if (k === "SCHOOL_LICENCE") return 4;
+  return ROLE_PRIORITY[k] ?? 6;
 }
 
 function getBadgeClasses(roleKey: string, isPlatform: boolean): string {
@@ -100,7 +105,8 @@ export function RoleBadges({
   const sortedRoles = [...roles].sort((a, b) => {
     const aPriority = getRolePriority(a.roleKey);
     const bPriority = getRolePriority(b.roleKey);
-    return aPriority - bPriority;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return (a.roleName || a.roleKey).localeCompare(b.roleName || b.roleKey);
   });
 
   const iconClass = size === "sm" ? "h-4 w-4" : "h-5 w-5";

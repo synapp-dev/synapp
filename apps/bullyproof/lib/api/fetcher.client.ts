@@ -4,10 +4,18 @@
 import type { RequestInit } from "next/dist/server/web/spec-extension/request";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { useMeStore } from "@/entities/me/model/store";
+import { VIEW_AS_USER_ID_HEADER } from "@/lib/view-as-http";
 
 type ApiOk<T> = { data: T; error: null };
 type ApiErr = { data: null; error: { message: string; status?: number } };
 export type ApiResult<T> = ApiOk<T> | ApiErr;
+
+function applyViewAsHeader(headers: Headers) {
+  const viewAsId = useMeStore.getState().viewAsUser?.id;
+  if (viewAsId) {
+    headers.set(VIEW_AS_USER_ID_HEADER, viewAsId);
+  }
+}
 
 async function withAuth(init?: RequestInit): Promise<RequestInit> {
   const headers = new Headers(init?.headers);
@@ -18,6 +26,7 @@ async function withAuth(init?: RequestInit): Promise<RequestInit> {
   } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  applyViewAsHeader(headers);
 
   return { ...init, headers };
 }
@@ -31,6 +40,7 @@ export async function getAuthHeaders(): Promise<Headers> {
   } = await supabase.auth.getSession();
   const token = session?.access_token;
   if (token) headers.set("Authorization", `Bearer ${token}`);
+  applyViewAsHeader(headers);
   return headers;
 }
 

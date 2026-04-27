@@ -49,7 +49,14 @@ export function AdminPageClient() {
       <div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {itemsWithAccess.map((item, index) => (
-            <StaggeredAnimation key={item.title} index={index} fadeDirection="up">
+            <StaggeredAnimation
+              key={item.title}
+              index={index}
+              baseDelay={0.05}
+              incrementDelay={0.05}
+              fadeDirection="up"
+              className="h-full"
+            >
               <AdminCard
                 title={item.title}
                 url={item.url}

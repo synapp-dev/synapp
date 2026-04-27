@@ -65,7 +65,11 @@ export async function GET(
     return NextResponse.json(permissions, { status: 200 });
   } catch (e: any) {
     console.error(e);
-    const status = e.message?.includes("Unauthorized") ? 403 : 500;
+    const msg = e.message ?? "";
+    const status =
+      msg.includes("Unauthorized") || msg.includes("Only Intradark developers")
+        ? 403
+        : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status }
@@ -119,7 +123,11 @@ export async function POST(
     return NextResponse.json(permission, { status: 200 });
   } catch (e: any) {
     console.error(e);
-    const status = e.message?.includes("Unauthorized") ? 403 : 500;
+    const msg = e.message ?? "";
+    const status =
+      msg.includes("Unauthorized") || msg.includes("Only Intradark developers")
+        ? 403
+        : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status }
@@ -177,7 +185,11 @@ export async function DELETE(
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {
     console.error(e);
-    const status = e.message?.includes("Unauthorized") ? 403 : 500;
+    const msg = e.message ?? "";
+    const status =
+      msg.includes("Unauthorized") || msg.includes("Only Intradark developers")
+        ? 403
+        : 500;
     return NextResponse.json(
       { error: e.message ?? "Internal error" },
       { status }

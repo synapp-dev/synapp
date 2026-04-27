@@ -9,9 +9,9 @@ import { useSchoolStore } from "@/stores/school-store";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
-import { ACTION_FEATURES } from "@/lib/feature-keys";
+import { ACTION_FEATURES, PAGE_FEATURES } from "@/lib/feature-keys";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { GraduationCap, School, ShieldCheck, Users } from "lucide-react";
+import { GraduationCap, School, ShieldCheck, Star, Users } from "lucide-react";
 import {
   Card,
   CardHeader,
@@ -44,6 +44,10 @@ export function SettingsPageClient({ schoolSlug }: SettingsPageClientProps) {
   const schoolId = school?.id ?? currentSchool?.id ?? null;
   const certificationAccess = useFeatureAccess(
     ACTION_FEATURES.VIEW_SCHOOL_CERTIFICATION,
+    schoolId ?? undefined
+  );
+  const cultureRatingAccess = useFeatureAccess(
+    PAGE_FEATURES.SCHOOL_CULTURE_RATING,
     schoolId ?? undefined
   );
 
@@ -138,6 +142,22 @@ export function SettingsPageClient({ schoolSlug }: SettingsPageClientProps) {
                     </CardTitle>
                     <CardDescription className="text-sm text-muted-foreground">
                       View teacher AMAYDA certification progress
+                    </CardDescription>
+                  </CardHeader>
+                </Card>
+              </Link>
+            )}
+
+            {cultureRatingAccess.visible && (
+              <Link href={`${basePath}/culture-rating`}>
+                <Card className="transition-all h-full hover:shadow-md hover:border-primary/50 cursor-pointer">
+                  <CardHeader>
+                    <CardTitle className="flex flex-row items-center gap-2">
+                      <Star className="h-5 w-5" />
+                      Culture rating
+                    </CardTitle>
+                    <CardDescription className="text-sm text-muted-foreground">
+                      Enter comparative period data for culture rating reports
                     </CardDescription>
                   </CardHeader>
                 </Card>

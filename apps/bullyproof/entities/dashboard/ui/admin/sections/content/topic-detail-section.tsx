@@ -607,10 +607,11 @@ export function TopicDetailSection({
   };
 
   // No-op: signed URLs are managed by the API/DB cache
-  const setSlideUrl = (_slideId: string, _url: string) => {};
-  // No-op invalidation stubs – TQ invalidation handles freshness
-  const invalidateSlide = (_slideId: string) => {};
-  const invalidateCertificationSlide = (_slideId: string) => {};
+  const setSlideUrl = useCallback((_slideId: string, _url: string) => {}, []);
+  // No-op invalidation stubs – TQ invalidation handles freshness (must be stable:
+  // fetchTopicData depends on invalidateCertificationSlide; unstable refs cause an infinite refetch loop)
+  const invalidateSlide = useCallback((_slideId: string) => {}, []);
+  const invalidateCertificationSlide = useCallback((_slideId: string) => {}, []);
 
   // Resolve topic by slug: primary = createSlug(title), fallback = T1/T2 legacy format
   const isLegacyTopicSlug = topicSlug ? /^T\d+$/.test(topicSlug) : false;
@@ -677,7 +678,15 @@ export function TopicDetailSection({
             const allSlides: ExtendedSlideData[] = slidesResult.data
               .sort(compareSlidesByPosition)
               .map((slide) => {
-                const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
+                const s = slide as typeof slide & {
+                  signedUrl?: string | null;
+                  signedImageUrl?: string | null;
+                  signedVideoUrl?: string | null;
+                };
+                // GET /certification/topics/:id/slides uses topicSlidesService → signedImageUrl / signedVideoUrl.
+                // SlideRenderer only paints storage-backed images from signed URLs (not raw imageUrl).
+                const imageSigned =
+                  s.signedUrl ?? s.signedImageUrl ?? null;
                 return {
                   id: slide.id,
                   kind: slide.kind as SlideData["kind"],
@@ -689,6 +698,9 @@ export function TopicDetailSection({
                   videoEndS: slide.videoEndS ?? null,
                   quizData: (slide as any).quizData as QuizData | null,
                   effectiveNotes: (slide as any).officialNotes ?? null,
+                  signedUrl: imageSigned,
+                  signedImageUrl: s.signedImageUrl ?? null,
+                  signedVideoUrl: s.signedVideoUrl ?? null,
                 };
               });
             
@@ -768,7 +780,7 @@ export function TopicDetailSection({
         }
       }
     },
-    [isCertification, topicId, invalidateCertificationSlide]
+    [isCertification, topicId, excludeQuizSlides, invalidateCertificationSlide]
   );
 
   // Handle certification flow
@@ -2441,6 +2453,8 @@ export function TopicDetailSection({
                     ? null
                     : (slide.imageUrl ?? null);
 
+                const imageSigned =
+                  slide.signedUrl ?? slide.signedImageUrl ?? null;
                 return {
                   id: slide.id,
                   kind: slide.kind as
@@ -2461,7 +2475,9 @@ export function TopicDetailSection({
                   quizData: isCertification
                     ? (slide.quizData as QuizData | null)
                     : null,
-                  signedUrl: slide.signedUrl ?? null,
+                  signedUrl: imageSigned,
+                  signedImageUrl: slide.signedImageUrl ?? null,
+                  signedVideoUrl: slide.signedVideoUrl ?? null,
                 };
               }) ?? [];
           setLocalSlides(updatedSlides);

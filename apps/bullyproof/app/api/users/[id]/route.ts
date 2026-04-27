@@ -29,6 +29,7 @@ import { userProfile } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { handleDatabaseError } from "@/utils/db-error-handler";
+import { assertActorCanManageIntradarkDevTarget } from "@/server/auth/intradark-dev-account-guard";
 
 type UpdateLogChange = {
   field: string;
@@ -133,6 +134,15 @@ export async function PATCH(
       targetUserId,
       body: { ...body, email: body.email ? "***" : undefined },
     });
+
+    try {
+      await assertActorCanManageIntradarkDevTarget(userId, targetUserId);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message ?? "Forbidden" },
+        { status: 403 }
+      );
+    }
 
     // Validate request body
     const data = updateUserSchema.parse(body);

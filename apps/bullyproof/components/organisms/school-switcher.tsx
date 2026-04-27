@@ -47,7 +47,7 @@ import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useSchoolStore } from "@/stores/school-store";
 import { useMeStore } from "@/entities/me/model/store";
 import { cn } from "@workspace/ui/lib/utils";
-import { StorageImage } from "@/components/atoms/storage-image";
+import { SchoolAvatarOrBadge } from "@/components/atoms/school-avatar-or-badge";
 
 // Union type for both school types
 type School = MeSchool | SchoolServiceSchool;
@@ -98,50 +98,6 @@ function extractSchoolMetadata(school: School | null) {
   }
 
   return { stateText, sectorText, levelsText };
-}
-
-// Component for school icon with teal background (fallback when no avatar)
-function SchoolIconBadge({ size = "md" }: { size?: "sm" | "md" }) {
-  const iconSize = size === "sm" ? "w-3.5 h-3.5" : "w-4 h-4";
-  const containerSize = size === "sm" ? "w-6 h-6" : "w-8 h-8";
-  return (
-    <div
-      className={`${containerSize} rounded flex items-center aspect-square justify-center`}
-      style={{ backgroundColor: "#008993" }}
-    >
-      <School className={`${iconSize} text-background`} />
-    </div>
-  );
-}
-
-// Component for active school: avatar if URL exists, otherwise placeholder badge
-function SchoolAvatarOrBadge({
-  school,
-  size = "md",
-}: {
-  school: School | null;
-  size?: "sm" | "md";
-}) {
-  const avatarUrl = school ? (school as any).avatarUrl ?? null : null;
-
-  if (avatarUrl) {
-    const widthPx = size === "sm" ? 22 : 29;
-    const widthClass = size === "sm" ? "w-5" : "w-7";
-    return (
-      <div className={`${widthClass} flex-shrink-0 ml-1`}>
-        <StorageImage
-          src={avatarUrl}
-          alt={school?.name || "School"}
-          width={widthPx}
-          height={widthPx}
-          className="w-full h-auto rounded object-contain"
-          style={{ width: widthPx, height: "auto" }}
-        />
-      </div>
-    );
-  }
-
-  return <SchoolIconBadge size={size} />;
 }
 
 // Component for displaying school metadata (state, sector, levels)
@@ -538,12 +494,17 @@ export function SchoolSwitcher() {
                       {selectedSchool?.name ? (
                         <SchoolAvatarOrBadge school={selectedSchool} size="md" />
                       ) : (
-                        <School className="size-4 text-muted-foreground" />
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center">
+                          <School className="size-5 text-muted-foreground animate-opacity-breathe-subtle motion-reduce:animate-none" />
+                        </div>
                       )}
                     </div>
 
                     <div
-                      className="flex flex-col text-left -space-y-0.5 min-w-0 overflow-hidden"
+                      className={cn(
+                        "flex flex-col text-left -space-y-0.5 min-w-0 overflow-hidden",
+                        !selectedSchool?.name && "-ml-1"
+                      )}
                     >
                       <h3
                         className={cn(
@@ -551,7 +512,7 @@ export function SchoolSwitcher() {
                           shouldTruncateSelectedSchoolName && "truncate",
                           selectedSchool?.name
                             ? "text-foreground"
-                            : "text-muted-foreground"
+                            : "text-muted-foreground animate-opacity-breathe-subtle motion-reduce:animate-none"
                         )}
                       >
                         {selectedSchool?.name || "Select a school!"}
@@ -563,7 +524,7 @@ export function SchoolSwitcher() {
                       {selectedSchool?.name ? (
                         <ArrowLeftRight className="size-4 text-muted-foreground group-hover/school-switcher:text-foreground group-hover/school-switcher:rotate-180 group-hover/school-switcher:animate-pulse transition-transform duration-300" />
                       ) : (
-                        <MousePointer2 className="size-6 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
+                        <MousePointer2 className="size-4 animate-bounce text-muted-foreground group-hover/school-switcher:text-primary group-hover/school-switcher:rotate-90 transition-transform duration-300" />
                       )}
                     </div>
                   </div>

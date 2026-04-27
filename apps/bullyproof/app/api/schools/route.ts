@@ -62,7 +62,7 @@ export async function GET(request: Request) {
       return NextResponse.json(result, { status: 200 });
     }
 
-    // Otherwise, return list of schools (existing behavior)
+    // Otherwise, return list of schools
     const query = Object.fromEntries(searchParams.entries());
     const rows = await schoolService.listSchools({ userId }, query);
     return NextResponse.json(rows, { status: 200 });

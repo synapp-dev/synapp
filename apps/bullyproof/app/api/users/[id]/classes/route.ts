@@ -21,6 +21,7 @@ import { db } from "@/server/db/drizzle";
 import { teacherClasses, classes, schools } from "@/server/db/schema";
 import { eq, asc, and, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { assertActorCanManageIntradarkDevTarget } from "@/server/auth/intradark-dev-account-guard";
 
 const postBodySchema = z.object({
   classId: z.string().uuid(),
@@ -134,6 +135,15 @@ export async function POST(
     const { id: targetUserId } = await params;
     const body = await request.json();
     const data = postBodySchema.parse(body);
+
+    try {
+      await assertActorCanManageIntradarkDevTarget(userId, targetUserId);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message ?? "Forbidden" },
+        { status: 403 }
+      );
+    }
 
     // Get the class to verify it exists and get its schoolId
     const [classRow] = await db

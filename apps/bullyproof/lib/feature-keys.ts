@@ -41,6 +41,7 @@ export const PAGE_FEATURES = {
   CLASSES: "/school/classes",
   PERFORMANCE: "/school/performance",
   REPORTS: "/school/reports",
+  SCHOOL_CULTURE_RATING: "/school/culture-rating",
 
   // Admin pages
   ADMIN: "/admin",
@@ -51,6 +52,8 @@ export const PAGE_FEATURES = {
   ADMIN_RESOURCES: "/admin/resources",
   ADMIN_CLASSES: "/admin/classes",
   ADMIN_LESSONS: "/admin/lessons",
+  ADMIN_RATINGS: "/admin/ratings",
+  ADMIN_REPORTS: "/admin/reports",
   ADMIN_CULTURE_RATINGS: "/admin/culture-ratings",
   ADMIN_AUDIT_LOGS: "/admin/audit-logs",
   ADMIN_SUPPORT_TOOLS: "/admin/support-tools",

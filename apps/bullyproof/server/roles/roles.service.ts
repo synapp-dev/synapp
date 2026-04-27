@@ -16,6 +16,10 @@ import {
 } from "./roles.validators";
 import { rolesRepo } from "./roles.repo";
 import { getUserScopedRoles } from "../auth/rbac";
+import {
+  assertActorCanAssignIntradarkDevRole,
+  assertActorCanManageIntradarkDevTarget,
+} from "../auth/intradark-dev-account-guard";
 import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
 
@@ -155,20 +159,30 @@ export const rolesService = {
   async assignRole(ctx: AuthContext, params: unknown, tx?: typeof db) {
     const data: AssignRoleParams = assignRoleSchema.parse(params);
 
+    const [roleRow] = await rolesRepo.getById(data.roleId);
+    if (!roleRow?.key) {
+      throw new Error("Role not found");
+    }
+
     try {
       await assertCanManageRoles(ctx);
     } catch {
       if (data.schoolId) {
-        const [roleRow] = await rolesRepo.getById(data.roleId);
-        if (roleRow?.key) {
-          await assertCanManageRolesForSchool(ctx, data.schoolId, roleRow.key);
-        } else {
-          throw new Error("Role not found");
-        }
+        await assertCanManageRolesForSchool(
+          ctx,
+          data.schoolId,
+          roleRow.key
+        );
       } else {
         throw new Error("Unauthorized");
       }
     }
+
+    if (!ctx.userId) {
+      throw new Error("Unauthorized");
+    }
+    await assertActorCanAssignIntradarkDevRole(ctx.userId, roleRow.key);
+    await assertActorCanManageIntradarkDevTarget(ctx.userId, data.userId);
 
     const assignment = await rolesRepo.assignRole(data, tx);
     return assignment[0];
@@ -177,20 +191,29 @@ export const rolesService = {
   async removeRole(ctx: AuthContext, params: unknown, tx?: typeof db) {
     const data: RemoveRoleParams = removeRoleSchema.parse(params);
 
+    const [roleRow] = await rolesRepo.getById(data.roleId);
+    if (!roleRow?.key) {
+      throw new Error("Role not found");
+    }
+
     try {
       await assertCanManageRoles(ctx);
     } catch {
       if (data.schoolId) {
-        const [roleRow] = await rolesRepo.getById(data.roleId);
-        if (roleRow?.key) {
-          await assertCanManageRolesForSchool(ctx, data.schoolId, roleRow.key);
-        } else {
-          throw new Error("Role not found");
-        }
+        await assertCanManageRolesForSchool(
+          ctx,
+          data.schoolId,
+          roleRow.key
+        );
       } else {
         throw new Error("Unauthorized");
       }
     }
+
+    if (!ctx.userId) {
+      throw new Error("Unauthorized");
+    }
+    await assertActorCanManageIntradarkDevTarget(ctx.userId, data.userId);
 
     await rolesRepo.removeRole(data.userId, data.roleId, data.schoolId, tx);
     return { success: true };
@@ -263,6 +286,26 @@ export const rolesService = {
         continue;
       }
 
+      if (!ctx.userId) {
+        results.push({
+          email,
+          success: false,
+          message: "Unauthorized",
+        });
+        continue;
+      }
+
+      try {
+        await assertActorCanManageIntradarkDevTarget(ctx.userId, userId);
+      } catch (e: any) {
+        results.push({
+          email,
+          success: false,
+          message: e.message ?? "Forbidden",
+        });
+        continue;
+      }
+
       // Process each role for this user
       let userSuccess = true;
       const roleMessages: string[] = [];
@@ -283,6 +326,12 @@ export const rolesService = {
               roleMessages.push("Role already assigned");
               continue;
             }
+
+            const [roleRowForIntradev] = await rolesRepo.getById(roleId);
+            await assertActorCanAssignIntradarkDevRole(
+              ctx.userId,
+              roleRowForIntradev?.key
+            );
 
             // Assign role
             await rolesRepo.assignRole(

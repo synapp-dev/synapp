@@ -613,7 +613,7 @@ export function LessonWizardRecommendation({
         if (!topicsArray.some(t => t.topicId === topic.id)) {
           topicsArray.push({
             topicId: topic.id,
-            topicTitle: topic.title || "Unknown Topic",
+            topicTitle: topic.title || "Unknown lesson",
             stageOrder: topic.stageOrder ?? null,
           });
         }
@@ -711,7 +711,7 @@ export function LessonWizardRecommendation({
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Unable to load recommendations</AlertTitle>
           <AlertDescription>
-            Please try selecting your classes again or proceed to choose a topic manually.
+            Please try selecting your classes again or proceed to choose a lesson manually.
           </AlertDescription>
         </Alert>
         <div className="flex gap-2 justify-end">
@@ -719,7 +719,7 @@ export function LessonWizardRecommendation({
             Back
           </Button>
           <Button onClick={onChooseDifferentLesson}>
-            Choose Topic
+            Choose Lesson
           </Button>
         </div>
       </div>
@@ -1115,7 +1115,7 @@ export function LessonWizardRecommendation({
           ) : (
             <Alert className="bg-blue-50 border-blue-300 text-blue-900">
               <Info className="h-4 w-4 text-blue-600" />
-              <AlertTitle className="text-blue-900">Recommended Topic</AlertTitle>
+              <AlertTitle className="text-blue-900">Recommended Lesson</AlertTitle>
               <AlertDescription className="text-blue-800 mt-2">
                 <p className="font-medium">{recommendedTopic.title}</p>
               </AlertDescription>
@@ -1173,7 +1173,7 @@ export function LessonWizardRecommendation({
             <AlertDescription className="text-muted-foreground leading-none">
               <span>If you&apos;re happy with this recommendation, you can click <span className="font-bold">Next</span>.</span>
               <br />
-              <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another topic</span>.</span>
+              <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another lesson</span>.</span>
             </AlertDescription>
           </Alert>
 
@@ -1539,7 +1539,7 @@ export function LessonWizardRecommendation({
                   <Info className="h-4 w-4 text-muted-foreground" />
                   <AlertDescription className="text-muted-foreground leading-normal">
                     <span>If you&apos;re happy with this recommendation, you can click <span className="font-bold">Next</span>.</span>
-                    <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another topic</span>.</span>
+                    <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another lesson</span>.</span>
                   </AlertDescription>
                 </Alert>
               </div>
@@ -1551,7 +1551,7 @@ export function LessonWizardRecommendation({
         <Alert className="bg-yellow-50 border-yellow-300 text-yellow-800">
           <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertTitle className="text-yellow-900">
-            Classes are on different topics
+            Classes are on different lessons
           </AlertTitle>
           <AlertDescription className="text-yellow-800 mt-2">
             <div className="space-y-1">
@@ -1591,7 +1591,7 @@ export function LessonWizardRecommendation({
                         <div>
                           <p className="font-medium">{lesson.title}</p>
                           <p className="text-sm">
-                            Topic: <span className="font-medium">{lesson.topicTitle}</span>
+                            Lesson: <span className="font-medium">{lesson.topicTitle}</span>
                           </p>
                           <p className="text-sm">
                             Classes: <span className="font-medium">{lesson.className}</span>
@@ -1669,7 +1669,7 @@ export function LessonWizardRecommendation({
                         <div>
                           <p className="font-medium">{lesson.title}</p>
                           <p className="text-sm">
-                            Topic: <span className="font-medium">{lesson.topicTitle}</span>
+                            Lesson: <span className="font-medium">{lesson.topicTitle}</span>
                           </p>
                           <p className="text-sm">
                             Classes: <span className="font-medium">{lesson.className}</span>
@@ -1740,7 +1740,7 @@ export function LessonWizardRecommendation({
                         <div>
                           <p className="font-medium">{lesson.title}</p>
                           <p className="text-sm">
-                            Topic: <span className="font-medium">{lesson.topicTitle}</span>
+                            Lesson: <span className="font-medium">{lesson.topicTitle}</span>
                           </p>
                           <p className="text-sm">
                             Classes: <span className="font-medium">{lesson.className}</span>

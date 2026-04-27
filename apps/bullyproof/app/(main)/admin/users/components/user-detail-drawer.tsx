@@ -121,6 +121,11 @@ import {
 } from "./user-detail-drawer/utils";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
+import { useMeStore } from "@/entities/me/model/store";
+import {
+  canManageIntradarkDevScopedUser,
+  profileHasIntradarkDevPlatformRole,
+} from "@/lib/intradark-dev-protection";
 import type {
   UserDetailDrawerProps,
   TabType,
@@ -225,6 +230,18 @@ function UserDetailDrawerContent({
 
   // Check if current user has access to manage features
   const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
+
+  const realViewer = useMeStore((s) => s.currentUser);
+  const canMutateTargetUser = useMemo(
+    () =>
+      !user
+        ? true
+        : canManageIntradarkDevScopedUser(
+            realViewer?.platformRoles,
+            user.platformRoles
+          ),
+    [realViewer?.platformRoles, user]
+  );
 
   // Context-aware params: schools page uses "tab" for school section, so we use userTab/userHistoryTab
   const isSchoolsContext = pathname?.includes("/admin/schools") ?? false;
@@ -451,7 +468,7 @@ function UserDetailDrawerContent({
   };
 
   const handleToggleRole = async () => {
-    if (!user || !roleToToggle) {
+    if (!user || !roleToToggle || !canMutateTargetUser) {
       setIsTogglingRole(false);
       return;
     }
@@ -610,7 +627,7 @@ function UserDetailDrawerContent({
   };
 
   const handleRemoveRole = async () => {
-    if (!user || !roleToRemove) return;
+    if (!user || !roleToRemove || !canMutateTargetUser) return;
 
     try {
       setIsRemovingRole(true);
@@ -640,7 +657,12 @@ function UserDetailDrawerContent({
   };
 
   const handleSaveRolesFromDialog = async () => {
-    if (!user || !addRoleSchoolId || addRoleSelectedRoles.size === 0) {
+    if (
+      !user ||
+      !addRoleSchoolId ||
+      addRoleSelectedRoles.size === 0 ||
+      !canMutateTargetUser
+    ) {
       return;
     }
 
@@ -751,7 +773,7 @@ function UserDetailDrawerContent({
   };
 
   const applyEditSchoolRolesChanges = async () => {
-    if (!user || !editSchoolRolesSchoolId) return;
+    if (!user || !editSchoolRolesSchoolId || !canMutateTargetUser) return;
 
     const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
     const adminRole = roles.find((r) => r.key === "SCHOOL_ADMIN");
@@ -874,19 +896,43 @@ function UserDetailDrawerContent({
         {/* Sidebar and Content Area */}
         <div className="flex flex-1 overflow-hidden min-h-0 gap-0">
           {/* Left Sidebar */}
-          <UserDetailSidebar activeTab={activeTab} onTabChange={updateTab} canManageFeatures={canManageFeatures} onDeleteClick={onDeleteUserClick} />
+          <UserDetailSidebar
+            activeTab={activeTab}
+            onTabChange={updateTab}
+            canManageFeatures={canManageFeatures}
+            onDeleteClick={
+              canMutateTargetUser ? onDeleteUserClick : undefined
+            }
+          />
 
           {/* Right Content Area */}
           <main className="flex flex-1 flex-col overflow-hidden min-h-0 pt-2 pr-6 pl-4">
             {/* Content */}
             <div className="flex-1 overflow-y-auto">
               {activeTab === "details" && (
-                <UserDetailsCard user={user} onUserUpdate={onUserUpdate} />
+                <UserDetailsCard
+                  user={user}
+                  onUserUpdate={onUserUpdate}
+                  canEdit={canMutateTargetUser}
+                />
               )}
 
               {activeTab === "roles" && (
                 /* Roles */
                 <div className="space-y-4">
+                  {profileHasIntradarkDevPlatformRole(user.platformRoles) &&
+                    !canMutateTargetUser && (
+                      <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 w-full">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                        <AlertTitle className="text-amber-800 dark:text-amber-200">
+                          Intradark developer account
+                        </AlertTitle>
+                        <AlertDescription className="text-amber-700 dark:text-amber-300">
+                          This account can only be edited by users with the
+                          Intradark developer role.
+                        </AlertDescription>
+                      </Alert>
+                    )}
                   {/* Warning alerts */}
                   {(userHasPlatformRole ||
                     (userHasSchoolRole && !userHasPlatformRole)) && (
@@ -930,6 +976,7 @@ function UserDetailDrawerContent({
                         }}
                         variant="outline"
                         className="w-full md:w-auto"
+                        disabled={!canMutateTargetUser}
                       >
                         <UserPlus className="h-4 w-4" />
                         Add New Role
@@ -1001,11 +1048,15 @@ function UserDetailDrawerContent({
                                         key={`${roleKey}-platform-assigned`}
                                         variant="default"
                                         className={cn(
-                                          "group flex items-center gap-1 border px-2 py-1 cursor-pointer transition-colors hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/30",
+                                          "group flex items-center gap-1 border px-2 py-1 transition-colors",
+                                          canMutateTargetUser &&
+                                            "cursor-pointer hover:!bg-destructive/10 hover:!text-destructive hover:!border-destructive/30",
+                                          !canMutateTargetUser &&
+                                            "cursor-not-allowed opacity-60",
                                           getBadgeClasses(roleKey)
                                         )}
                                         onClick={() => {
-                                          if (!role) return;
+                                          if (!role || !canMutateTargetUser) return;
                                           setRoleToToggle({
                                             roleId: role.id,
                                             roleKey,
@@ -1034,8 +1085,15 @@ function UserDetailDrawerContent({
                                       <Badge
                                         key={`${roleKey}-platform-unassigned`}
                                         variant="outline"
-                                        className="group flex items-center gap-1 border-dashed border px-2 py-1 cursor-pointer transition-all bg-transparent text-muted-foreground border-muted-foreground hover:animate-pulse"
+                                        className={cn(
+                                          "group flex items-center gap-1 border-dashed border px-2 py-1 transition-all bg-transparent text-muted-foreground border-muted-foreground",
+                                          canMutateTargetUser &&
+                                            "cursor-pointer hover:animate-pulse",
+                                          !canMutateTargetUser &&
+                                            "cursor-not-allowed opacity-60"
+                                        )}
                                         onMouseEnter={(e) => {
+                                          if (!canMutateTargetUser) return;
                                           e.currentTarget.style.backgroundColor =
                                             "rgba(217, 119, 6, 0.1)";
                                           e.currentTarget.style.color =
@@ -1050,6 +1108,7 @@ function UserDetailDrawerContent({
                                           }
                                         }}
                                         onMouseLeave={(e) => {
+                                          if (!canMutateTargetUser) return;
                                           e.currentTarget.style.backgroundColor =
                                             "transparent";
                                           e.currentTarget.style.color = "";
@@ -1064,6 +1123,7 @@ function UserDetailDrawerContent({
                                           }
                                         }}
                                         onClick={() => {
+                                          if (!canMutateTargetUser) return;
                                           setRoleToToggle({
                                             roleId: role.id,
                                             roleKey,
@@ -1287,7 +1347,10 @@ function UserDetailDrawerContent({
                                                       schoolName,
                                                       schoolRoles
                                                     )}
-                                                  disabled={userHasPlatformRole}
+                                                  disabled={
+                                                    userHasPlatformRole ||
+                                                    !canMutateTargetUser
+                                                  }
                                                 >
                                                   <Pencil className="h-4 w-4" />
                                                   Edit
@@ -1317,11 +1380,19 @@ function UserDetailDrawerContent({
               )}
 
               {activeTab === "positions" && (
-                <UserPositionsTab user={user} schools={schools} />
+                <UserPositionsTab
+                  user={user}
+                  schools={schools}
+                  canEdit={canMutateTargetUser}
+                />
               )}
 
               {activeTab === "classes" && (
-                <UserClassesTab user={user} schools={schools} />
+                <UserClassesTab
+                  user={user}
+                  schools={schools}
+                  canEdit={canMutateTargetUser}
+                />
               )}
 
               {activeTab === "history" && (
@@ -1335,7 +1406,10 @@ function UserDetailDrawerContent({
 
               {activeTab === "features" && (
                 <FeatureGuard feature="/admin/features">
-                  <UserFeaturesTab user={user} />
+                  <UserFeaturesTab
+                    user={user}
+                    canEdit={canMutateTargetUser}
+                  />
                 </FeatureGuard>
               )}
             </div>

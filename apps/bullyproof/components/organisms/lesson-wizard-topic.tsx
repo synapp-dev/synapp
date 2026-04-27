@@ -516,7 +516,7 @@ export function LessonWizardTopic({
                             )}
                           </CardTitle>
                           <span className="text-xs text-muted-foreground whitespace-nowrap">
-                            {stage.topicCount} {stage.topicCount === 1 ? "topic" : "topics"}
+                            {stage.topicCount} {stage.topicCount === 1 ? "lesson" : "lessons"}
                           </span>
                         </div>
                         {stage.years && stage.years.length > 0 && (
@@ -564,7 +564,7 @@ export function LessonWizardTopic({
             <h3 className="text-lg font-semibold">{selectedStage.name}</h3>
             <Badge variant="outline" className="text-xs">
               {selectedStageTopics.length}{" "}
-              {selectedStageTopics.length === 1 ? "topic" : "topics"}
+              {selectedStageTopics.length === 1 ? "lesson" : "lessons"}
             </Badge>
           </div>
         )}
@@ -572,7 +572,7 @@ export function LessonWizardTopic({
 
       {/* Search input */}
       <Input
-        placeholder="Search topics..."
+        placeholder="Search lessons..."
         value={searchQuery}
         onChange={(e) => setSearchQuery(e.target.value)}
         className="w-full flex-shrink-0"
@@ -636,7 +636,7 @@ export function LessonWizardTopic({
               <Alert className="bg-yellow-50 border-yellow-300 text-yellow-800">
                 <AlertTriangle className="h-4 w-4 text-yellow-600" />
                 <AlertTitle className="text-yellow-900">
-                  Classes are on different topics
+                  Classes are on different lessons
                 </AlertTitle>
                 <AlertDescription className="text-yellow-800 mt-2">
                   <div className="space-y-1">
@@ -665,7 +665,7 @@ export function LessonWizardTopic({
                     className="text-xs bg-amber-50 text-amber-700 border-amber-300"
                   >
                     {recommendedTopics.filter((t) => t.stageId === selectedStageId).length}{" "}
-                    {recommendedTopics.filter((t) => t.stageId === selectedStageId).length === 1 ? "topic" : "topics"}
+                    {recommendedTopics.filter((t) => t.stageId === selectedStageId).length === 1 ? "lesson" : "lessons"}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -681,8 +681,8 @@ export function LessonWizardTopic({
               <div className="text-center py-8">
                 <p className="text-sm text-muted-foreground">
                   {searchQuery
-                    ? `No topics found matching "${searchQuery}"`
-                    : "No topics available"}
+                    ? `No lessons found matching "${searchQuery}"`
+                    : "No lessons available"}
                 </p>
               </div>
             ) : (

@@ -3,14 +3,25 @@ import { CardHeader } from "@workspace/ui/components/card";
 import { CardContent } from "@workspace/ui/components/card";
 import Image from "next/image";
 import { useEffectiveUser } from "@/hooks/use-effective-user";
+import {
+  RoleBadges,
+  type RoleBadgeItem,
+} from "@/components/atoms/role-badges";
 
 interface HeroCardProps {
   currentTime: Date;
   userTitle: string;
+  /** When set and non-empty, replaces the plain `userTitle` line with role badges (e.g. admin dashboard). */
+  roleBadgeItems?: RoleBadgeItem[];
   defaultName?: string;
 }
 
-export function HeroCard({ currentTime, userTitle, defaultName = "User" }: HeroCardProps) {
+export function HeroCard({
+  currentTime,
+  userTitle,
+  roleBadgeItems,
+  defaultName = "User",
+}: HeroCardProps) {
   const currentUser = useEffectiveUser();
 
   // Get user name
@@ -68,7 +79,13 @@ export function HeroCard({ currentTime, userTitle, defaultName = "User" }: HeroC
               </>
             )}
           </h1>
-          <h2 className="text-muted-foreground">{userTitle}</h2>
+          {roleBadgeItems && roleBadgeItems.length > 0 ? (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <RoleBadges roles={roleBadgeItems} variant="joined" size="md" />
+            </div>
+          ) : (
+            <h2 className="text-muted-foreground">{userTitle}</h2>
+          )}
         </div>
 
         {/* Profile Image - positioned to ignore card padding and bleed above */}

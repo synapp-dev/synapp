@@ -106,6 +106,15 @@ export const adminItemsConfig: AdminItem[] = [
     enabled: true,
   },
   {
+    title: "Ratings",
+    url: "/admin/ratings",
+    icon: BarChart3,
+    iconName: "BarChart3",
+    description: "View teacher lesson ratings by curriculum stage",
+    featureKey: "/admin/ratings",
+    enabled: true,
+  },
+  {
     title: "Culture Ratings",
     url: "/admin/culture-ratings",
     icon: BarChart3,
@@ -163,6 +172,7 @@ export const adminSegmentToFeatureKey: Record<string, string> = {
   features: "/admin/features",
   classes: "/admin/classes",
   lessons: "/admin/lessons",
+  ratings: "/admin/ratings",
   reports: "/admin/reports",
   "culture-ratings": "/admin/culture-ratings",
   "audit-logs": "/admin/audit-logs",
@@ -209,7 +219,11 @@ export function getAdminItemsByCategory() {
       categoryMap["Clients"].push(item);
     } else if (item.title === "Lessons") {
       categoryMap["Lessons"].push(item);
-    } else if (item.title === "Reports" || item.title === "Culture Ratings") {
+    } else if (
+      item.title === "Reports" ||
+      item.title === "Ratings" ||
+      item.title === "Culture Ratings"
+    ) {
       categoryMap["Reporting"].push(item);
     } else if (item.title === "Audit Logs") {
       categoryMap["System Settings"].push(item);

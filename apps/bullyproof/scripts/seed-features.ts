@@ -3,7 +3,12 @@ import { features, featurePermissions, roles, schools } from '../drizzle/schema'
 import { eq } from 'drizzle-orm';
 
 /** Features restricted to intradark_dev, platform_admin, and school_admin (at their school). */
-const RESTRICTED_SCHOOL_FEATURES = ['/settings', '/school/performance', '/school/reports'];
+const RESTRICTED_SCHOOL_FEATURES = [
+  '/settings',
+  '/school/performance',
+  '/school/reports',
+  '/school/culture-rating',
+];
 
 async function seedFeatures() {
   console.log('🌱 Seeding features...');
@@ -51,6 +56,7 @@ async function seedFeatures() {
       { key: '/school/classes', name: 'Classes Page', description: 'Access to the classes page', category: 'page', section: 'schools-classes' },
       { key: '/school/performance', name: 'Performance Page', description: 'Access to the performance page', category: 'page', section: 'schools-performance' },
       { key: '/school/reports', name: 'Reports Page', description: 'Access to the reports page', category: 'page', section: 'schools-reports' },
+      { key: '/school/culture-rating', name: 'Culture Rating', description: 'Enter comparative culture rating data and request reports', category: 'page', section: 'schools-reports' },
 
       // Page features – admin
       { key: '/admin', name: 'Admin Panel', description: 'Access to the admin panel', category: 'page', section: 'admin' },
@@ -61,6 +67,8 @@ async function seedFeatures() {
       { key: '/admin/resources', name: 'Admin: Resources', description: 'Access to admin resources library', category: 'page', section: 'admin' },
       { key: '/admin/classes', name: 'Admin: Classes', description: 'Access to admin classes section', category: 'page', section: 'admin' },
       { key: '/admin/lessons', name: 'Admin: Lessons', description: 'Access to admin lessons section', category: 'page', section: 'admin' },
+      { key: '/admin/ratings', name: 'Admin: Ratings', description: 'Access to admin ratings section', category: 'page', section: 'admin' },
+      { key: '/admin/reports', name: 'Admin: Reports', description: 'Access to admin reports dashboards', category: 'page', section: 'admin' },
       { key: '/admin/culture-ratings', name: 'Admin: Culture Ratings', description: 'Access to admin culture ratings section', category: 'page', section: 'admin' },
       { key: '/admin/audit-logs', name: 'Admin: Audit Logs', description: 'Access to admin audit logs section', category: 'page', section: 'admin' },
       { key: '/admin/support-tools', name: 'Admin: Support Tools', description: 'Access to admin support tools section', category: 'page', section: 'admin' },

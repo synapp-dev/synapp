@@ -1,10 +1,10 @@
-import { Metadata } from "next";
+import type { Metadata } from "next";
 
 /**
  * Formats a path segment into a readable title
  * Converts kebab-case to Title Case (e.g., "support-tools" → "Support Tools")
  */
-function formatSegment(segment: string): string {
+export function formatSegment(segment: string): string {
   if (!segment) return "";
 
   // Split by hyphens and underscores, then capitalize each word
@@ -30,6 +30,20 @@ export function generatePageTitle(segments: string[]): string {
   const formattedSegment = formatSegment(lastSegment);
 
   return `${formattedSegment} | Bullyproof`;
+}
+
+/**
+ * Tab title for school resource folder URLs: every path segment, e.g.
+ * `culture-packs/ap-leaders-guides` → "Culture Packs · Ap Leaders Guides | Bullyproof".
+ * Safe to use from client code after navigation (sync with `document.title`).
+ */
+export function generateResourcesFolderTabTitle(folderSlugSegments: string[]): string {
+  const parts = folderSlugSegments
+    .filter(Boolean)
+    .map((s) => formatSegment(s))
+    .filter(Boolean);
+  if (parts.length === 0) return "Resources | Bullyproof";
+  return `${parts.join(" · ")} | Bullyproof`;
 }
 
 /**

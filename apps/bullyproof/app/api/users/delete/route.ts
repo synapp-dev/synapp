@@ -24,6 +24,7 @@ import { db } from "@/server/db/drizzle";
 import { userRoles, teacherClasses, userSchoolPositions } from "@/server/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { assertActorCanManageIntradarkDevTarget } from "@/server/auth/intradark-dev-account-guard";
 
 // Request body schema for bulk deletion
 const bulkDeleteSchema = z.object({
@@ -117,6 +118,16 @@ export async function DELETE(request: Request) {
     for (const targetUserId of data.userIds) {
       try {
         console.log(`[BULK USER DELETE] Deleting user: ${targetUserId}`);
+
+        try {
+          await assertActorCanManageIntradarkDevTarget(userId, targetUserId);
+        } catch (e: any) {
+          results.failed.push({
+            userId: targetUserId,
+            error: e?.message ?? "Forbidden",
+          });
+          continue;
+        }
 
         // Delete from auth.users using Supabase admin API
         // This will cascade to user_profile due to foreign key constraint

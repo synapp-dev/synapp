@@ -147,6 +147,17 @@ export function UserDetailsCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {!canEdit && (
+          <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-900 dark:text-amber-100">
+              Read-only profile
+            </AlertTitle>
+            <AlertDescription className="text-amber-800 dark:text-amber-200">
+              Only Intradark developers can edit this developer account.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label

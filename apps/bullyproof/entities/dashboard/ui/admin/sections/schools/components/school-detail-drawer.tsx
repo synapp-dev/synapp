@@ -181,6 +181,7 @@ import {
   SchoolDetailsForm,
   type SchoolForDetailsForm,
 } from "@/entities/school/ui/school-details-form";
+import { SchoolCultureDrawerPanel } from "@/entities/dashboard/ui/admin/sections/culture/school-culture-drawer-panel";
 
 type TabId =
   | "onboarding"
@@ -209,7 +210,7 @@ const navItems = [
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },
   { id: "activity", name: "Activity", icon: Activity, disabled: true },
-  { id: "culture", name: "Culture", icon: Star, disabled: true },
+  { id: "culture", name: "Culture", icon: Star },
   { id: "license", name: "License", icon: Key },
   { id: "delete", name: "Delete School", icon: Trash2 },
 ];
@@ -277,7 +278,6 @@ function SchoolDetailDrawerContent({
   const prevOpenRef = useRef(open);
   const isInitialMountRef = useRef(true);
   const hasHandledInitialDialogRef = useRef(false);
-  const hasRedirectedForLicenseRef = useRef(false);
 
   // Reset to initialTab when drawer opens or initialTab changes
   useEffect(() => {
@@ -295,67 +295,10 @@ function SchoolDetailDrawerContent({
     if (!open && prevOpenRef.current) {
       isInitialMountRef.current = true;
       hasHandledInitialDialogRef.current = false;
-      hasRedirectedForLicenseRef.current = false;
     }
 
     prevOpenRef.current = open;
   }, [open, initialTab]);
-
-  // Track previous active section to detect transitions
-  const prevActiveSectionRef = useRef<TabId | null>(null);
-  const isInitialMountRefForRedirect = useRef(true);
-
-  // Redirect to license tab if user navigates TO onboarding tab with active license
-  // This should NOT trigger on page refresh when already on onboarding
-  useEffect(() => {
-    // Reset redirect flag when drawer closes
-    if (!open) {
-      hasRedirectedForLicenseRef.current = false;
-      prevActiveSectionRef.current = null;
-      isInitialMountRefForRedirect.current = true;
-      return;
-    }
-
-    // On initial mount, initialize the previous section to current section
-    // This prevents redirect on page refresh when already on onboarding
-    if (isInitialMountRefForRedirect.current) {
-      prevActiveSectionRef.current = activeSection;
-      isInitialMountRefForRedirect.current = false;
-      return;
-    }
-
-    // Only redirect if we're transitioning TO onboarding (not already on it)
-    const isTransitioningToOnboarding =
-      prevActiveSectionRef.current !== "onboarding" &&
-      activeSection === "onboarding";
-
-    if (
-      open &&
-      school &&
-      isTransitioningToOnboarding &&
-      school.activeLicence &&
-      !hasRedirectedForLicenseRef.current
-    ) {
-      hasRedirectedForLicenseRef.current = true;
-      // Redirect to license tab without opening dialog
-      setActiveSection("license");
-      onTabChange?.("license");
-      if (school?.slug) {
-        const params = new URLSearchParams(searchParams?.toString() || "");
-        params.set("school", school.slug);
-        params.set("tab", "license");
-        // Explicitly remove dialog param if it exists
-        params.delete("dialog");
-        router.replace(`/admin/schools?${params.toString()}`, {
-          scroll: false,
-        });
-      }
-    }
-
-    // Update previous section ref
-    prevActiveSectionRef.current = activeSection;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, school?.id, school?.activeLicence, activeSection]);
 
   // Handle tab change
   const handleTabChange = (tab: TabId) => {
@@ -395,6 +338,8 @@ function SchoolDetailDrawerContent({
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("");
+  const [usersPageIndex, setUsersPageIndex] = useState(0);
+  const [usersPageSize, setUsersPageSize] = useState(50);
 
   // Search and filter state for classes
   const [classesSearchQuery, setClassesSearchQuery] = useState("");
@@ -427,9 +372,13 @@ function SchoolDetailDrawerContent({
   // Roles for filtering
   const { roles, isLoading: isLoadingRoles } = useRoles();
 
+  const usersListOffset =
+    usersPageSize === -1 ? 0 : usersPageIndex * usersPageSize;
+
   // Use React Query hook for users with locked schoolId filter
   const {
     users,
+    totalCount: usersTotalCount,
     isLoading: loadingUsers,
     error: usersError,
     refetch: refetchUsers,
@@ -437,10 +386,33 @@ function SchoolDetailDrawerContent({
     search: debouncedSearchQuery || undefined,
     role: roleFilter && roleFilter !== "all" ? roleFilter : undefined,
     schoolId: school?.id, // Lock to this school
+    limit: usersPageSize,
+    offset: usersListOffset,
   });
 
   // Row selection state (if needed for future bulk actions)
   const [rowSelection, setRowSelection] = useState({});
+
+  useEffect(() => {
+    setUsersPageIndex(0);
+    setRowSelection({});
+  }, [roleFilter]);
+
+  useEffect(() => {
+    setUsersPageIndex(0);
+    setRowSelection({});
+  }, [school?.id]);
+
+  const handleSchoolUsersPageChange = (nextIndex: number) => {
+    setUsersPageIndex(nextIndex);
+    setRowSelection({});
+  };
+
+  const handleSchoolUsersPageSizeChange = (nextSize: number) => {
+    setUsersPageSize(nextSize);
+    setUsersPageIndex(0);
+    setRowSelection({});
+  };
 
   // User detail drawer state (for clicking user rows in Users tab)
   const [selectedUser, setSelectedUser] =
@@ -485,15 +457,6 @@ function SchoolDetailDrawerContent({
     null
   );
   const [deleteSchoolConfirmation, setDeleteSchoolConfirmation] = useState("");
-
-  // Legacy states for backward compatibility (will be removed)
-  const [addAdminDialogOpen, setAddAdminDialogOpen] = useState(false);
-  const [addAdminSuccess, setAddAdminSuccess] = useState(false);
-  const [addTeacherDialogOpen, setAddTeacherDialogOpen] = useState(false);
-  const [addTeacherSuccess, setAddTeacherSuccess] = useState(false);
-  const [addTeacherStep, setAddTeacherStep] = useState<
-    "selection" | "manual" | "csv"
-  >("selection");
 
   // Class form states
   const [className, setClassName] = useState("");
@@ -541,10 +504,12 @@ function SchoolDetailDrawerContent({
       ? isValidEmail(schoolLicenceEmail)
       : false;
 
-  // Debounce search query
+  // Debounce search query (reset users pagination when applied search changes)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchQuery(searchQuery);
+      setUsersPageIndex(0);
+      setRowSelection({});
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
@@ -1186,7 +1151,14 @@ function SchoolDetailDrawerContent({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
+            <div
+              className={cn(
+                "flex-1 min-h-0",
+                activeSection === "users"
+                  ? "flex flex-col overflow-hidden"
+                  : "overflow-y-auto"
+              )}
+            >
               {/* Onboarding Section */}
               {activeSection === "onboarding" && (
                 <div className="space-y-6">
@@ -1518,9 +1490,9 @@ function SchoolDetailDrawerContent({
 
               {/* Users Section */}
               {activeSection === "users" && (
-                <div className="space-y-6 pt-1">
+                <div className="flex flex-col flex-1 min-h-0 gap-4 pt-1">
                   {/* Action Buttons and Search/Filters */}
-                  <div className="flex items-center justify-between gap-4 flex-wrap mb-4">
+                  <div className="flex shrink-0 items-center justify-between gap-4 flex-wrap">
                     {/* Add User and Import Data Buttons - Left */}
                     <div className="flex items-center gap-2 h-8">
                       {Object.keys(rowSelection).filter(
@@ -1685,7 +1657,10 @@ function SchoolDetailDrawerContent({
                           variant="outline"
                           onClick={() => {
                             setSearchQuery("");
+                            setDebouncedSearchQuery("");
                             setRoleFilter("");
+                            setUsersPageIndex(0);
+                            setRowSelection({});
                           }}
                           className={cn(
                             "flex items-center gap-1",
@@ -1700,19 +1675,26 @@ function SchoolDetailDrawerContent({
                     )}
                   </div>
 
-                  <div className="w-full space-y-4">
-                    <UsersTable
-                      users={users}
-                      roles={roles}
-                      isLoading={loadingUsers}
-                      error={usersError?.message || null}
-                      schoolId={school?.id}
-                      showSelection={true}
-                      onUserClick={handleUserClick}
-                      onRowSelectionChange={setRowSelection}
-                    />
+                  <div className="flex min-h-0 flex-1 flex-col gap-2">
+                    <div className="flex min-h-0 flex-1 flex-col">
+                      <UsersTable
+                        users={users}
+                        roles={roles}
+                        isLoading={loadingUsers}
+                        error={usersError?.message || null}
+                        schoolId={school?.id}
+                        showSelection={true}
+                        onUserClick={handleUserClick}
+                        onRowSelectionChange={setRowSelection}
+                        pageIndex={usersPageIndex}
+                        pageSize={usersPageSize}
+                        totalCount={usersTotalCount}
+                        onPageChange={handleSchoolUsersPageChange}
+                        onPageSizeChange={handleSchoolUsersPageSizeChange}
+                      />
+                    </div>
                     {Object.keys(rowSelection).length > 0 && (
-                      <div className="flex items-center justify-end space-x-2 py-4">
+                      <div className="flex shrink-0 items-center justify-end space-x-2 py-2">
                         <div className="text-muted-foreground flex-1 text-sm">
                           {Object.keys(rowSelection).length} of {users.length}{" "}
                           row(s) selected.
@@ -2030,28 +2012,7 @@ function SchoolDetailDrawerContent({
               {/* Culture Section */}
               {activeSection === "culture" && (
                 <div className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="sr-only">
-                        Culture Analytics
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-center py-8">
-                        <Star className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                        <h3 className="text-lg font-medium mb-2">
-                          Culture Insights
-                        </h3>
-                        <p className="text-muted-foreground mb-4">
-                          Culture rating analytics and trends coming soon.
-                        </p>
-                        <div className="text-sm text-muted-foreground">
-                          This will include detailed culture metrics, trends,
-                          and recommendations.
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <SchoolCultureDrawerPanel schoolId={school.id} />
                 </div>
               )}
 

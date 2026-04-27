@@ -90,6 +90,9 @@ export async function POST(request: Request) {
     if (errorMessage.includes("cannot have any other roles")) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
+    if (errorMessage.includes("Only Intradark developers")) {
+      return NextResponse.json({ error: errorMessage }, { status: 403 });
+    }
 
     // Handle database errors
     const dbError = handleDatabaseError(e, errorMessage);

@@ -48,7 +48,6 @@ const tabCategories = [
         title: "Performance",
         url: "/performance",
         icon: TrendingUp,
-        disabled: true,
       },
       {
         title: "Settings",

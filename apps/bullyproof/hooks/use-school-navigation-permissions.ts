@@ -17,7 +17,7 @@ export function useSchoolNavigationPermissions() {
       schoolId: string;
     }>;
     return schoolRoles.some(
-      (role) => role.roleKey === "TEACHER" && role.schoolId === activeSchool.id
+      (role) => role.roleKey === "TEACHER" && role.schoolId === activeSchool.id,
     );
   }, [currentUser, activeSchool]);
 
@@ -69,7 +69,7 @@ export function useSchoolNavigationPermissions() {
         items: Array<{ title: string }>;
       },
     >(
-      categories: T[]
+      categories: T[],
     ): T[] => {
       if (!isTeacherForCurrentSchool) {
         return categories;

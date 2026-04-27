@@ -51,7 +51,7 @@ const navItems = [
   { id: "users", name: "Users", icon: Users },
   { id: "classes", name: "Classes", icon: GraduationCap },
   { id: "activity", name: "Activity", icon: Activity, disabled: true },
-  { id: "culture", name: "Culture", icon: Star, disabled: true },
+  { id: "culture", name: "Culture", icon: Star },
   { id: "license", name: "License", icon: Key },
   { id: "features", name: "Feature Access", icon: Settings },
 ];

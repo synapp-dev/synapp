@@ -161,6 +161,9 @@ export async function POST(request: Request) {
     if (errorMessage.includes("cannot have any other roles")) {
       return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
+    if (errorMessage.includes("Only Intradark developers")) {
+      return NextResponse.json({ error: errorMessage }, { status: 403 });
+    }
 
     // Handle database errors
     const dbError = handleDatabaseError(e, errorMessage);
@@ -239,7 +242,11 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (e: any) {
     console.error("[DELETE /api/user-roles] Error:", e);
-    const dbError = handleDatabaseError(e, e.message ?? "Internal error");
+    const errorMessage = e.message ?? "Internal error";
+    if (errorMessage.includes("Only Intradark developers")) {
+      return NextResponse.json({ error: errorMessage }, { status: 403 });
+    }
+    const dbError = handleDatabaseError(e, errorMessage);
     return NextResponse.json(
       { error: dbError.error },
       { status: dbError.status }

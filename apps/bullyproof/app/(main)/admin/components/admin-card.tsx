@@ -117,7 +117,7 @@ export function AdminCard({
   const cardContent = (
     <Card
       className={cn(
-        "transition-all h-full",
+        "transition-all h-full min-h-[168px] w-full",
         isDisabled
           ? "cursor-not-allowed"
           : "hover:shadow-md hover:border-primary/50 cursor-pointer"
@@ -154,7 +154,10 @@ export function AdminCard({
           ) : null}
         </div>
         <CardDescription
-          className={cn(isDisabled && !isHovered && "opacity-50")}
+          className={cn(
+            "min-h-[3.25rem]",
+            isDisabled && !isHovered && "opacity-50"
+          )}
         >
           {isDisabled && isHovered ? (
             <p className="text-sm text-muted-foreground animate-slide-down-fade-in">
@@ -181,9 +184,9 @@ export function AdminCard({
   );
 
   return isDisabled ? (
-    <div key={title}>{cardContent}</div>
+    <div className="h-full w-full">{cardContent}</div>
   ) : (
-    <Link key={title} href={url}>
+    <Link href={url} className="block h-full w-full">
       {cardContent}
     </Link>
   );

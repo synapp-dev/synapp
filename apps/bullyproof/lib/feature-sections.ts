@@ -249,6 +249,8 @@ export const SECTION_SUB_GROUPS: Record<string, FeatureSubSection[]> = {
     { key: "features", label: "Features" },
     { key: "classes", label: "Classes" },
     { key: "lessons", label: "Lessons" },
+    { key: "ratings", label: "Ratings" },
+    { key: "reports", label: "Reports" },
     { key: "culture-ratings", label: "Culture Ratings" },
     { key: "audit-logs", label: "Audit Logs" },
     { key: "support-tools", label: "Support Tools" },

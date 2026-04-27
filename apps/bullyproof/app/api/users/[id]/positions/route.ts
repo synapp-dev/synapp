@@ -30,6 +30,7 @@ import { userSchoolPositions, schools } from "@/server/db/schema";
 import { eq, and, ne, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { handleDatabaseError } from "@/utils/db-error-handler";
+import { assertActorCanManageIntradarkDevTarget } from "@/server/auth/intradark-dev-account-guard";
 
 // Request body schema for creating/updating positions
 const createPositionSchema = z.object({
@@ -137,6 +138,15 @@ export async function POST(
     const targetUserId = id;
     const body = await request.json();
     const data = createPositionSchema.parse(body);
+
+    try {
+      await assertActorCanManageIntradarkDevTarget(userId, targetUserId);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message ?? "Forbidden" },
+        { status: 403 }
+      );
+    }
 
     const canManage = await canManageSchoolUsers(userId, data.schoolId);
     if (!canManage) {
@@ -249,6 +259,15 @@ export async function PUT(
     const targetUserId = id;
     const body = await request.json();
     const data = updatePositionSchema.parse(body);
+
+    try {
+      await assertActorCanManageIntradarkDevTarget(userId, targetUserId);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message ?? "Forbidden" },
+        { status: 403 }
+      );
+    }
 
     // Verify the position belongs to this user
     const [existing] = await db
@@ -370,6 +389,15 @@ export async function DELETE(
     const targetUserId = id;
     const body = await request.json();
     const data = deletePositionSchema.parse(body);
+
+    try {
+      await assertActorCanManageIntradarkDevTarget(userId, targetUserId);
+    } catch (e: any) {
+      return NextResponse.json(
+        { error: e?.message ?? "Forbidden" },
+        { status: 403 }
+      );
+    }
 
     // Verify the position belongs to this user
     const [existing] = await db

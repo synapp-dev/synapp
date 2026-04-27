@@ -23,8 +23,20 @@ type StageWithYears = Stage & {
   }>;
 };
 
+/**
+ * Client-side curriculum API endpoints.
+ *
+ * Groups stage, year, and level endpoints behind a typed interface that
+ * returns the shared `ApiResult` envelope from `apiFetch`.
+ */
 export const curriculumApi = {
   stages: {
+    /**
+     * Lists curriculum stages.
+     *
+     * @param params Optional pagination controls.
+     * @returns Stages with optional year and level details.
+     */
     list(params?: {
       limit?: number;
       offset?: number;
@@ -36,21 +48,45 @@ export const curriculumApi = {
       const query = searchParams.toString();
       return apiFetch<StageWithYears[]>(`/curriculum/stages${query ? `?${query}` : ""}`);
     },
+    /**
+     * Fetches a single stage by ID.
+     *
+     * @param id Stage identifier.
+     * @returns Stage details with optional years.
+     */
     byId(id: string): Promise<ApiResult<Stage & { years?: any[] }>> {
       return apiFetch<Stage & { years?: any[] }>(
         `/curriculum/stages/${encodeURIComponent(id)}`
       );
     },
+    /**
+     * Fetches a single stage by stage code.
+     *
+     * @param code Stage code.
+     * @returns Stage details with optional years.
+     */
     byCode(code: string): Promise<ApiResult<Stage & { years?: any[] }>> {
       return apiFetch<Stage & { years?: any[] }>(
         `/curriculum/stages/by-code/${encodeURIComponent(code)}`
       );
     },
+    /**
+     * Fetches a single stage by URL slug.
+     *
+     * @param slug Stage slug.
+     * @returns Stage details with optional years.
+     */
     bySlug(slug: string): Promise<ApiResult<Stage & { years?: any[] }>> {
       return apiFetch<Stage & { years?: any[] }>(
         `/curriculum/stages/by-slug/${encodeURIComponent(slug)}`
       );
     },
+    /**
+     * Creates a new curriculum stage.
+     *
+     * @param data Stage payload.
+     * @returns Newly created stage.
+     */
     create(data: {
       code: string;
       name: string;
@@ -61,6 +97,13 @@ export const curriculumApi = {
         body: JSON.stringify(data),
       });
     },
+    /**
+     * Updates an existing curriculum stage.
+     *
+     * @param id Stage identifier.
+     * @param data Mutable stage fields.
+     * @returns Updated stage.
+     */
     update(
       id: string,
       data: { name: string; minimumYearLevelIds: string[] }
@@ -70,6 +113,12 @@ export const curriculumApi = {
         body: JSON.stringify(data),
       });
     },
+    /**
+     * Deletes a curriculum stage.
+     *
+     * @param id Stage identifier.
+     * @returns Deletion status payload.
+     */
     delete(id: string): Promise<ApiResult<{ success: boolean }>> {
       return apiFetch<{ success: boolean }>(
         `/curriculum/stages/${encodeURIComponent(id)}`,
@@ -80,6 +129,12 @@ export const curriculumApi = {
     },
   },
   years: {
+    /**
+     * Lists school years.
+     *
+     * @param params Optional filters and pagination controls.
+     * @returns Matching school years.
+     */
     list(params?: {
       levelId?: string;
       levelIds?: string[];
@@ -97,6 +152,12 @@ export const curriculumApi = {
       const query = searchParams.toString();
       return apiFetch<Year[]>(`/curriculum/years${query ? `?${query}` : ""}`);
     },
+    /**
+     * Fetches a single school year by ID.
+     *
+     * @param id Year identifier.
+     * @returns Year details with optional level and stage relations.
+     */
     byId(
       id: string
     ): Promise<ApiResult<Year & { level?: any; stages?: any[] }>> {
@@ -106,6 +167,12 @@ export const curriculumApi = {
     },
   },
   levels: {
+    /**
+     * Lists school levels.
+     *
+     * @param params Optional pagination controls.
+     * @returns Matching school levels.
+     */
     list(params?: {
       limit?: number;
       offset?: number;

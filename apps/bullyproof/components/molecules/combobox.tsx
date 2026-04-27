@@ -16,11 +16,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover";
+import { SchoolAvatarOrBadge } from "@/components/atoms/school-avatar-or-badge";
 import { cn } from "@workspace/ui/lib/utils";
 
 export type ComboboxOption = {
   value: string;
   label: string;
+  /** Optional logo shown in trigger and list (e.g. school avatar). */
+  avatarUrl?: string | null;
 };
 
 type ComboboxProps = {
@@ -40,6 +43,11 @@ type ComboboxProps = {
   /** When both provided, popover open state is controlled. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /**
+   * When true, non-empty options render like the sidebar school switcher
+   * (StorageImage logo + teal school badge fallback). Default: text only.
+   */
+  schoolVisuals?: boolean;
 };
 
 export function Combobox({
@@ -56,6 +64,7 @@ export function Combobox({
   onSearchChange,
   open: openProp,
   onOpenChange: onOpenChangeProp,
+  schoolVisuals = false,
 }: ComboboxProps) {
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlledOpen = openProp !== undefined && onOpenChangeProp !== undefined;
@@ -65,6 +74,8 @@ export function Combobox({
   const selectedOption = options.find((opt) => opt.value === value);
   const displayLabel =
     displayLabelProp ?? selectedOption?.label ?? placeholder;
+  const triggerSchoolRow =
+    value && displayLabelProp === undefined ? selectedOption : undefined;
 
   const isAsyncSearch = searchValue !== undefined && onSearchChange !== undefined;
 
@@ -80,11 +91,22 @@ export function Combobox({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className={cn("justify-between", triggerClassName)}
+          className={cn("justify-between gap-2", triggerClassName)}
           disabled={disabled}
         >
-          <span className="truncate">{displayLabel}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+            {schoolVisuals && triggerSchoolRow ? (
+              <SchoolAvatarOrBadge
+                school={{
+                  name: triggerSchoolRow.label,
+                  avatarUrl: triggerSchoolRow.avatarUrl ?? null,
+                }}
+                size="md"
+              />
+            ) : null}
+            <span className="truncate">{displayLabel}</span>
+          </span>
+          <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -104,19 +126,35 @@ export function Combobox({
             <CommandGroup>
               {options.map((option) => {
                 const isSelected = value === option.value;
+                const isAllSchoolsRow = option.value === "";
                 return (
                   <CommandItem
                     key={option.value}
                     value={`${option.value} ${option.label}`}
                     onSelect={() => handleSelect(option.value)}
+                    className={cn(schoolVisuals && "gap-2")}
                   >
+                    {schoolVisuals ? (
+                      isAllSchoolsRow ? (
+                        <span className="flex h-6 w-6 shrink-0" aria-hidden />
+                      ) : (
+                        <SchoolAvatarOrBadge
+                          school={{
+                            name: option.label,
+                            avatarUrl: option.avatarUrl ?? null,
+                          }}
+                          size="sm"
+                        />
+                      )
+                    ) : null}
                     <Check
                       className={cn(
-                        "mr-2 h-4 w-4",
+                        "h-4 w-4 shrink-0",
+                        schoolVisuals ? "" : "mr-2",
                         isSelected ? "opacity-100" : "opacity-0"
                       )}
                     />
-                    {option.label}
+                    <span className="min-w-0 truncate">{option.label}</span>
                   </CommandItem>
                 );
               })}

@@ -10,7 +10,10 @@ import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import { useSchoolStore } from "@/stores/school-store";
 import { usePageTitle } from "@/hooks/use-page-title";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { PAGE_FEATURES } from "@/lib/feature-keys";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { CultureRatingPerformanceSection } from "@/entities/culture-rating/ui/culture-rating-performance-section";
 
 interface PerformancePageClientProps {
   schoolSlug: string;
@@ -24,6 +27,10 @@ export function PerformancePageClient({ schoolSlug }: PerformancePageClientProps
     enabled: !!schoolSlug,
   });
   const schoolId = school?.id ?? currentSchool?.id ?? undefined;
+  const cultureRatingAccess = useFeatureAccess(
+    PAGE_FEATURES.SCHOOL_CULTURE_RATING,
+    schoolId
+  );
   const banner = useStorageImageUrl(currentSchool?.bannerUrl ?? null);
   const avatar = useStorageImageUrl(currentSchool?.avatarUrl ?? null);
   const headerReady =
@@ -58,6 +65,9 @@ export function PerformancePageClient({ schoolSlug }: PerformancePageClientProps
     );
   }
 
+  const showCultureDashboard =
+    cultureRatingAccess.visible && !cultureRatingAccess.isLoading;
+
   return (
     <FeatureGuard feature="/school/performance" schoolId={currentSchool.id}>
       <div className="space-y-6">
@@ -78,26 +88,44 @@ export function PerformancePageClient({ schoolSlug }: PerformancePageClientProps
               : undefined
           }
         >
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <TrendingUp className="h-16 w-16 text-muted-foreground" />
-                <Lock className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <Badge variant="secondary" className="mb-4">
-                Coming Soon
-              </Badge>
-              <h2 className="text-xl font-semibold mb-2">
-                Performance stats will be unlocked after Term 1
-              </h2>
-              <p className="text-muted-foreground">
-                Check back after Term 1 to view your school&apos;s performance
-                metrics and analytics.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+          {showCultureDashboard ? (
+            <CultureRatingPerformanceSection
+              schoolSlug={schoolSlug}
+              schoolId={currentSchool.id}
+            />
+          ) : null}
+
+          {!showCultureDashboard ? (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-12">
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <TrendingUp className="h-16 w-16 text-muted-foreground" />
+                    <Lock className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <Badge variant="secondary" className="mb-4">
+                    Coming Soon
+                  </Badge>
+                  <h2 className="text-xl font-semibold mb-2">
+                    Performance stats will be unlocked after Term 1
+                  </h2>
+                  <p className="text-muted-foreground">
+                    Check back after Term 1 to view your school&apos;s performance
+                    metrics and analytics.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="pt-6">
+                <p className="text-sm text-muted-foreground text-center">
+                  Additional performance metrics beyond culture rating may appear here
+                  in a future release.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </FeatureGuard>

@@ -617,7 +617,7 @@ export function LessonWizard({
           }, 100);
         } catch (err: any) {
           console.error("Failed to fetch topic:", err);
-          setError(err.message || "Failed to load recommended topic. Please try again.");
+          setError(err.message || "Failed to load recommended lesson. Please try again.");
         } finally {
           setLoading(false);
         }
@@ -631,7 +631,7 @@ export function LessonWizard({
     }
 
     if (!recommendationData?.recommendedTopicId) {
-      setError("No recommended topic available");
+      setError("No recommended lesson available");
       return;
     }
 
@@ -689,7 +689,7 @@ export function LessonWizard({
       }, 100);
     } catch (err: any) {
       console.error("Failed to fetch topic:", err);
-      setError(err.message || "Failed to load recommended topic. Please try again.");
+      setError(err.message || "Failed to load recommended lesson. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -769,7 +769,7 @@ export function LessonWizard({
       case 2:
         return "Recommendation";
       case 3:
-        return "Choose Topic";
+        return "Choose Lesson";
       case 4:
         return "Confirm";
       default:
@@ -803,7 +803,7 @@ export function LessonWizard({
       case 1:
         return "Choose which classes will participate in this lesson";
       case 2:
-        return "Review the recommended topic for your selected classes";
+        return "Review the recommended lesson for your selected classes";
       case 3:
         return "Select the lesson content you want to teach";
       case 4:
@@ -830,13 +830,13 @@ export function LessonWizard({
       case 2:
         return {
           title: "Recommendation",
-          description: "Review the recommended topic based on your class selection.",
+          description: "Review the recommended lesson based on your class selection.",
           icon: CheckCircle2,
         };
       case 3:
         return {
-          title: "Choose Topic",
-          description: "Select the lesson content you want to teach. Browse topics by stage and curriculum area.",
+          title: "Choose Lesson",
+          description: "Select the lesson content you want to teach. Browse lessons by stage and curriculum area.",
           icon: BookOpen,
         };
       case 4:
@@ -1100,7 +1100,7 @@ export function LessonWizard({
                     
                     // Create new preparing lesson with all classes
                     if (!state.selectedTopic || !schoolUuid) {
-                      throw new Error("Missing topic or school information");
+                      throw new Error("Missing lesson or school information");
                     }
                     
                     const payload = {
@@ -1250,7 +1250,7 @@ export function LessonWizard({
               // Feedback gate - no action button on right
               <div className="w-[100px]" />
             ) : state.step === 2 ? (
-              // Recommendation step - show Proceed and Choose Another Topic buttons side by side if we can proceed
+              // Recommendation step - show Proceed and Choose Another Lesson buttons side by side if we can proceed
               // Hide buttons if multiple stages detected but no stage selected yet
               (() => {
                 const hasMultipleStages = recommendationData?.warning?.multipleStages && recommendationData.warning.multipleStages.length > 1;
@@ -1266,7 +1266,7 @@ export function LessonWizard({
                       }}
                       disabled={loading}
                     >
-                      Choose another topic
+                      Choose another lesson
                     </Button>
                     <Button
                       onClick={handleProceedWithRecommendation}
@@ -1286,8 +1286,8 @@ export function LessonWizard({
                               const selectedStageOption = recommendationData?.warning?.multipleStages?.find(
                                 (stage) => stage.stageId === selectedStageId
                               );
-                              // If there's a recommended topic, say "Next", otherwise "Continue to Topic Selection"
-                              return selectedStageOption?.firstTopic?.id ? "Next" : "Continue to Topic Selection";
+                              // If there's a recommended lesson, say "Next", otherwise "Continue to Lesson Selection"
+                              return selectedStageOption?.firstTopic?.id ? "Next" : "Continue to Lesson Selection";
                             }
                             return "Next";
                           })()}

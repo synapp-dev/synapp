@@ -2,6 +2,7 @@ import { featuresRepo } from "./features.repo";
 import type { FeaturePermissionLevel } from "./features.repo";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { MAINTENANCE_FEATURE_KEY, MAINTENANCE_BYPASS_ROLE_KEY } from "@/lib/feature-keys";
+import { assertActorCanManageIntradarkDevTarget } from "@/server/auth/intradark-dev-account-guard";
 
 // Auth context for feature management; authorization is from feature_permissions (/admin/features)
 type AuthContext = {
@@ -275,6 +276,10 @@ export const featuresService = {
       throw new Error("Unauthorized");
     }
 
+    if (data.level === "user" && data.targetId) {
+      await assertActorCanManageIntradarkDevTarget(ctx.userId, data.targetId);
+    }
+
     const result = await featuresRepo.setPermission({
       ...data,
       createdBy: ctx.userId,
@@ -316,6 +321,14 @@ export const featuresService = {
     schoolId?: string
   ) {
     await assertCanManageFeatures(ctx);
+
+    if (!ctx.userId) {
+      throw new Error("Unauthorized");
+    }
+    if (level === "user" && targetId) {
+      await assertActorCanManageIntradarkDevTarget(ctx.userId, targetId);
+    }
+
     await featuresRepo.removePermission(featureId, level, targetId, schoolId);
   },
 
