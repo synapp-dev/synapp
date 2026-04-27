@@ -3,6 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
+    "supabase:migrate:check": "bash scripts/supabase/check-prereqs.sh",
+    "supabase:migrate:dump": "bash scripts/supabase/dump-database.sh",
+    "supabase:migrate:restore": "bash scripts/supabase/restore-database.sh",
+    "supabase:migrate:post-db": "bash scripts/supabase/print-post-database-steps.sh",
+    "supabase:migrate:dump-history": "bash scripts/supabase/dump-migration-history.sh",
+    "supabase:migrate:restore-history": "bash scripts/supabase/restore-migration-history.sh",
+    "supabase:migrate:pgsodium": "bash scripts/supabase/copy-pgsodium-root-key.sh",
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
@@ -15,7 +22,7 @@
     "@workspace/eslint-config": "workspace:*",
     "@workspace/typescript-config": "workspace:*",
     "husky": "^9.1.7",
-    "prettier": "^3.5.1",
+    "prettier": "^3.8.3",
     "supabase": "^2.31.4",
     "turbo": "^2.4.2",
     "typescript": "5.7.3"

@@ -11,7 +11,8 @@
     "lint": "next lint",
     "lint:fix": "next lint --fix",
     "typecheck": "tsc --noEmit",
-    "gen-types": "pnpx supabase gen types typescript --project-id sukurbtgprvxgoeagich --schema public > types/supabase.ts",
+    "gen-types": "node ../../scripts/supabase/gen-types.mjs",
+    "verify:supabase-cutover": "node ../../scripts/supabase/verify-cutover.mjs",
     "supabase-start": "npx supabase start",
     "seed:reference": "tsx scripts/seed-reference-data.ts",
     "migrate:schools": "tsx scripts/migrate-schools.ts",
@@ -24,7 +25,10 @@
     "migrate:slide-paths-remote": "tsx scripts/invoke-migrate-edge-function.ts",
     "rollback:slide-paths": "tsx scripts/rollback-slide-storage-paths.ts",
     "backfill:slide-positions": "tsx scripts/backfill-slide-positions.ts",
-    "flowchart:lesson": "mmdc -i misc/lesson-flow-comprehensive.mmd -o misc/lesson-flow-comprehensive.png"
+    "flowchart:lesson": "mmdc -i misc/lesson-flow-comprehensive.mmd -o misc/lesson-flow-comprehensive.png",
+    "docs:code-reference:inventory": "tsx scripts/generate-code-reference-inventory.ts write",
+    "docs:code-reference:generate": "tsx scripts/generate-code-reference-inventory.ts write+markdown",
+    "docs:code-reference:check": "tsx scripts/generate-code-reference-inventory.ts check"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -218,6 +218,8 @@
   --animate-shake-twice: shake 0.3s ease-in-out 2;
   --animate-float-up-loop: float-up-loop 1.2s linear infinite;
   --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
+  --animate-opacity-breathe-subtle: opacity-breathe-subtle 3.5s ease-in-out
+    infinite;
   --animate-float-gentle: float-gentle 3s ease-in-out infinite;
   --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
   --animate-bounce-gentle: bounce-gentle 1.5s ease-in-out infinite;
@@ -587,6 +589,15 @@
     50% {
       background-color: rgb(254 215 170);
       border-color: rgb(234 88 12);
+    }
+  }
+  @keyframes opacity-breathe-subtle {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
     }
   }
   @keyframes float-gentle {
