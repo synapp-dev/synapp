@@ -1,17 +1,70 @@
 import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { LiveActivityFeed } from "./components/live-activity-feed";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { useEffectiveUser } from "@/hooks/use-effective-user";
 import { HeroCard } from "@/entities/dashboard/ui/shared/hero-card";
+import type { RoleBadgeItem } from "@/components/atoms/role-badges";
+import { useRoles } from "@/entities/users/model/store";
+import type { roles } from "@/server/db/schema";
+
+type RoleRow = typeof roles.$inferSelect;
+
+function normalizePlatformRoles(platformRoles: unknown): string[] {
+  if (Array.isArray(platformRoles)) {
+    return platformRoles.filter((r): r is string => typeof r === "string");
+  }
+  if (typeof platformRoles === "string") {
+    const trimmed = platformRoles.replace(/^\{|\}$/g, "").trim();
+    if (!trimmed) return [];
+    return trimmed.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function formatRoleKey(key: string): string {
+  return key
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function parseSchoolRolesJson(
+  schoolRoles: unknown,
+  resolveName: (roleKey: string, apiRoleName?: string | null) => string
+): RoleBadgeItem[] {
+  if (!Array.isArray(schoolRoles)) return [];
+  const out: RoleBadgeItem[] = [];
+  for (const row of schoolRoles) {
+    if (!row || typeof row !== "object" || !("roleKey" in row)) continue;
+    const roleKey = String((row as { roleKey?: string | null }).roleKey || "");
+    if (!roleKey) continue;
+    const apiRoleName = (row as { roleName?: string | null }).roleName;
+    out.push({
+      roleKey,
+      roleName: resolveName(roleKey, apiRoleName),
+      isPlatform: false,
+    });
+  }
+  return out;
+}
 
 export function HeroSection() {
   const [date, setDate] = useState<Date>(new Date());
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
   const currentUser = useEffectiveUser();
+  const { roles } = useRoles();
+
+  const roleNameByKey = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of roles as RoleRow[]) {
+      if (r.key) map.set(r.key, r.name);
+    }
+    return map;
+  }, [roles]);
 
   // Update time every minute
   useEffect(() => {
@@ -22,52 +75,46 @@ export function HeroSection() {
     return () => clearInterval(timer);
   }, []);
 
-  // Get user role/title
-  const getUserRoleDisplay = () => {
-    if (!currentUser) return "Admin";
+  const { roleBadgeItems, userTitle } = useMemo(() => {
+    const empty = { roleBadgeItems: [] as RoleBadgeItem[], userTitle: "Admin" };
+    if (!currentUser) return empty;
 
-    // Helper to format role keys to display names
-    const formatRoleKey = (key: string): string => {
-      return key
-        .split("_")
-        .map(
-          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-        )
-        .join(" ");
+    const resolveName = (roleKey: string, apiRoleName?: string | null) => {
+      if (apiRoleName && apiRoleName.trim()) return apiRoleName.trim();
+      return roleNameByKey.get(roleKey) ?? formatRoleKey(roleKey);
     };
 
-    // Check platform roles first (prioritize PLATFORM_ADMIN)
-    const platformRoles = currentUser.platformRoles;
-    if (
-      platformRoles &&
-      Array.isArray(platformRoles) &&
-      platformRoles.length > 0
-    ) {
-      // Prioritize PLATFORM_ADMIN if present
-      if (platformRoles.includes("PLATFORM_ADMIN")) {
-        return "Platform Admin";
+    const platformKeys = normalizePlatformRoles(currentUser.platformRoles);
+    const platformItems: RoleBadgeItem[] = platformKeys.map((roleKey) => ({
+      roleKey,
+      roleName: resolveName(roleKey, null),
+      isPlatform: true,
+    }));
+
+    const schoolItems = parseSchoolRolesJson(
+      currentUser.schoolRoles,
+      resolveName
+    );
+    const items = [...platformItems, ...schoolItems];
+
+    let title = "Admin";
+    if (platformKeys.length > 0) {
+      title = resolveName(platformKeys[0], null);
+    } else {
+      const schoolRoles = currentUser.schoolRoles;
+      if (schoolRoles && Array.isArray(schoolRoles) && schoolRoles.length > 0) {
+        const firstRole = schoolRoles[0] as {
+          roleName?: string | null;
+          roleKey?: string | null;
+        };
+        if (firstRole.roleKey) {
+          title = resolveName(firstRole.roleKey, firstRole.roleName);
+        }
       }
-      // Return the first platform role formatted nicely
-      return formatRoleKey(platformRoles[0]);
     }
 
-    // Fall back to school roles
-    const schoolRoles = currentUser.schoolRoles;
-    if (schoolRoles && Array.isArray(schoolRoles) && schoolRoles.length > 0) {
-      // Use roleName if available, otherwise format roleKey
-      const firstRole = schoolRoles[0];
-      if (firstRole.roleName) {
-        return firstRole.roleName;
-      }
-      if (firstRole.roleKey) {
-        return formatRoleKey(firstRole.roleKey);
-      }
-    }
-
-    return "Admin";
-  };
-
-  const userTitle = getUserRoleDisplay();
+    return { roleBadgeItems: items, userTitle: title };
+  }, [currentUser, roleNameByKey]);
 
   return (
     <section className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
@@ -76,6 +123,9 @@ export function HeroSection() {
           <HeroCard
             currentTime={currentTime}
             userTitle={userTitle}
+            roleBadgeItems={
+              roleBadgeItems.length > 0 ? roleBadgeItems : undefined
+            }
             defaultName="Admin"
           />
         </StaggeredAnimation>
