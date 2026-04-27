@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, resourceFolders, resourceFiles, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, teacherSlideNotes, topicSlides, classes, topics, curriculumStages, schoolLevels, schoolYears, lessonSlideNotes, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, permissionTemplates, permissionTemplateRules, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, resourceFileTopics } from "./schema";
+import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, resourceFolders, resourceFiles, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, teacherSlideNotes, topicSlides, classes, topics, curriculumStages, schoolLevels, schoolYears, lessonSlideNotes, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, permissionTemplates, permissionTemplateRules, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, resourceFileTopics, schoolCultureBenchmarks, schoolCultureComparativePeriods, schoolCultureReportRequests } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -254,7 +254,43 @@ export const schoolsRelations = relations(schools, ({one, many}) => ({
 	userSchoolPositions: many(userSchoolPositions),
 	schoolLevelAssignments: many(schoolLevelAssignments),
 	schoolYearAssignments: many(schoolYearAssignments),
+	schoolCultureBenchmark: one(schoolCultureBenchmarks, {
+		fields: [schools.id],
+		references: [schoolCultureBenchmarks.schoolId],
+	}),
+	schoolCultureComparativePeriods: many(schoolCultureComparativePeriods),
 }));
+
+export const schoolCultureBenchmarksRelations = relations(schoolCultureBenchmarks, ({one}) => ({
+	school: one(schools, {
+		fields: [schoolCultureBenchmarks.schoolId],
+		references: [schools.id],
+	}),
+}));
+
+export const schoolCultureComparativePeriodsRelations = relations(
+	schoolCultureComparativePeriods,
+	({one}) => ({
+		school: one(schools, {
+			fields: [schoolCultureComparativePeriods.schoolId],
+			references: [schools.id],
+		}),
+		reportRequest: one(schoolCultureReportRequests, {
+			fields: [schoolCultureComparativePeriods.id],
+			references: [schoolCultureReportRequests.comparativePeriodId],
+		}),
+	}),
+);
+
+export const schoolCultureReportRequestsRelations = relations(
+	schoolCultureReportRequests,
+	({one}) => ({
+		comparativePeriod: one(schoolCultureComparativePeriods, {
+			fields: [schoolCultureReportRequests.comparativePeriodId],
+			references: [schoolCultureComparativePeriods.id],
+		}),
+	}),
+);
 
 export const schoolSectorsRelations = relations(schoolSectors, ({many}) => ({
 	schools: many(schools),

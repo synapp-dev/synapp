@@ -575,6 +575,120 @@ export const schools = pgTable("schools", {
 	unique("schools_slug_key").on(table.slug),
 ]);
 
+/** AP Culture Rating template (CultureTemplate sheet) — raw inputs per period. */
+export const schoolCultureBenchmarks = pgTable("school_culture_benchmarks", {
+	schoolId: uuid("school_id").primaryKey().notNull(),
+	periodStart: date("period_start").notNull(),
+	periodEnd: date("period_end").notNull(),
+	metrics: jsonb("metrics").notNull(),
+	sourceNotes: text("source_notes"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+	updatedBy: uuid("updated_by"),
+}, (table) => [
+	foreignKey({
+		columns: [table.schoolId],
+		foreignColumns: [schools.id],
+		name: "school_culture_benchmarks_school_id_fkey",
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.createdBy],
+		foreignColumns: [userProfile.id],
+		name: "school_culture_benchmarks_created_by_fkey",
+	}).onDelete("set null"),
+	foreignKey({
+		columns: [table.updatedBy],
+		foreignColumns: [userProfile.id],
+		name: "school_culture_benchmarks_updated_by_fkey",
+	}).onDelete("set null"),
+	check(
+		"school_culture_benchmarks_period_order",
+		sql`period_end >= period_start`,
+	),
+	pgPolicy("school_culture_benchmarks_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("school_culture_benchmarks_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("school_culture_benchmarks_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("school_culture_benchmarks_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
+export const schoolCultureComparativePeriods = pgTable("school_culture_comparative_periods", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	schoolId: uuid("school_id").notNull(),
+	periodStart: date("period_start").notNull(),
+	periodEnd: date("period_end").notNull(),
+	metrics: jsonb("metrics").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+	updatedBy: uuid("updated_by"),
+}, (table) => [
+	index("idx_school_culture_comparative_school").using("btree", table.schoolId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+		columns: [table.schoolId],
+		foreignColumns: [schools.id],
+		name: "school_culture_comparative_periods_school_id_fkey",
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.createdBy],
+		foreignColumns: [userProfile.id],
+		name: "school_culture_comparative_periods_created_by_fkey",
+	}).onDelete("set null"),
+	foreignKey({
+		columns: [table.updatedBy],
+		foreignColumns: [userProfile.id],
+		name: "school_culture_comparative_periods_updated_by_fkey",
+	}).onDelete("set null"),
+	check(
+		"school_culture_comparative_periods_order",
+		sql`period_end >= period_start`,
+	),
+	pgPolicy("school_culture_comparative_periods_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("school_culture_comparative_periods_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("school_culture_comparative_periods_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("school_culture_comparative_periods_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
+export const schoolCultureReportRequests = pgTable("school_culture_report_requests", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	comparativePeriodId: uuid("comparative_period_id").notNull(),
+	status: text("status").notNull(),
+	requestedAt: timestamp("requested_at", { withTimezone: true, mode: "string" }),
+	requestedBy: uuid("requested_by"),
+	completedAt: timestamp("completed_at", { withTimezone: true, mode: "string" }),
+	deliveredStoragePath: text("delivered_storage_path"),
+	deliveredMimeType: text("delivered_mime_type"),
+	deliveredDisplayName: text("delivered_display_name"),
+	deliveredBy: uuid("delivered_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("ux_school_culture_report_comparative").using("btree", table.comparativePeriodId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+		columns: [table.comparativePeriodId],
+		foreignColumns: [schoolCultureComparativePeriods.id],
+		name: "school_culture_report_requests_comparative_period_id_fkey",
+	}).onDelete("cascade"),
+	foreignKey({
+		columns: [table.requestedBy],
+		foreignColumns: [userProfile.id],
+		name: "school_culture_report_requests_requested_by_fkey",
+	}).onDelete("set null"),
+	foreignKey({
+		columns: [table.deliveredBy],
+		foreignColumns: [userProfile.id],
+		name: "school_culture_report_requests_delivered_by_fkey",
+	}).onDelete("set null"),
+	check(
+		"school_culture_report_requests_status_check",
+		sql`status = ANY (ARRAY['draft'::text, 'requested'::text, 'in_review'::text, 'completed'::text, 'rejected'::text])`,
+	),
+	pgPolicy("school_culture_report_requests_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	pgPolicy("school_culture_report_requests_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("school_culture_report_requests_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("school_culture_report_requests_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+]);
+
 export const resourceFiles = pgTable("resource_files", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	folderId: uuid("folder_id").notNull(),

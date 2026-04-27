@@ -1,4 +1,5 @@
 import { generateMetadataFromSegments } from "@/utils/metadata";
+import { CultureRatingsAdminSection } from "@/entities/dashboard/ui/admin/sections/culture/culture-ratings-admin-section";
 
 export const metadata = generateMetadataFromSegments([
   "admin",
@@ -6,5 +7,5 @@ export const metadata = generateMetadataFromSegments([
 ]);
 
 export default function AdminCultureRatingsPage() {
-  return <div>AdminCultureRatingsPage</div>;
+  return <CultureRatingsAdminSection />;
 }
