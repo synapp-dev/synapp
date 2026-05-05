@@ -1,0 +1,11 @@
+{
+  "name": "@workspace/rbac-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-app RBAC migration contract and conventions (documentation-first; no runtime exports required in MVP).",
+  "type": "module",
+  "scripts": {
+    "lint": "node -e \"process.exit(0)\"",
+    "typecheck": "node -e \"process.exit(0)\""
+  }
+}
