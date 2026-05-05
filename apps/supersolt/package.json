@@ -8,14 +8,16 @@
     "dev": "next dev -p 3005 --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "drizzle:pull": "drizzle-kit pull",
     "fix:schema": "tsx scripts/fix-drizzle-schema.ts",
     "pull-and-fix-schema": "tsx scripts/pull-and-fix-schema.ts",
     "seed:demo-people": "tsx scripts/seed-demo-people.ts",
-    "seed:richmond-april-weeks": "tsx scripts/seed-richmond-april-2026-week-availability.ts"
+    "seed:richmond-april-weeks": "tsx scripts/seed-richmond-april-2026-week-availability.ts",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
@@ -34,15 +36,21 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
+    "@vitejs/plugin-react": "catalog:",
     "dotenv": "^17.2.3",
     "dotenv-cli": "^8.0.0",
+    "eslint": "catalog:",
     "drizzle-kit": "^0.31.5",
+    "jsdom": "catalog:",
     "tsx": "^4.20.6",
-    "typescript": "^5.7.3"
+    "typescript": "^5.7.3",
+    "vitest": "catalog:"
   }
 }
