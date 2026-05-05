@@ -10,7 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
-import { useRightSidebar } from "./right-sidebar-provider.js";
+import { useRightSidebar } from "./right-sidebar-provider";
 
 const SIDEBAR_WIDTH_MOBILE = "18rem";
 
