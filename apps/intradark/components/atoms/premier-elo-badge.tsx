@@ -49,7 +49,7 @@ export function PremierEloBadge({
         className={cn(
           "-skew-x-12 h-full w-1.5 absolute -left-0 z-0",
           size === "xs" && "w-1 -left-1",
-          size === "sm" && "w-1 -left-0.5"
+          size === "sm" && "w-1 -left-0.5",
         )}
         style={{
           backgroundColor: rankColor,
@@ -59,7 +59,7 @@ export function PremierEloBadge({
         className={cn(
           "-skew-x-12 h-full w-1.5 absolute -left-2 z-0",
           size === "xs" && "w-1",
-          size === "sm" && "w-1 -left-2"
+          size === "sm" && "w-1 -left-2",
         )}
         style={{ backgroundColor: rankColor }}
       />
@@ -67,7 +67,7 @@ export function PremierEloBadge({
         className={cn(
           "-skew-x-12 bg-gradient-to-r h-full w-full absolute mr-4 -left-2 z-0",
           size === "xs" && "mr-0 -left-1",
-          size === "sm" && "mr-0"
+          size === "sm" && "mr-0",
         )}
         style={{
           background: `linear-gradient(to right, ${hexToRgba(rankColor, 0.3)}, ${hexToRgba(rankColor, 0.2)}, ${hexToRgba(rankColor, 0.05)})`,
@@ -78,7 +78,7 @@ export function PremierEloBadge({
       <div
         className={cn(
           "relative z-20 mb-0.5 pl-3 pr-1 py-0.5",
-          size === "sm" && "pl-2 pr-0.5 py-0.5"
+          size === "sm" && "pl-2 pr-0.5 py-0.5",
         )}
       >
         <CountUp

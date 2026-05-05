@@ -9,6 +9,7 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
+import { DiscordLinkDialog } from "@/components/molecules/discord-link-dialog";
 import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 import { User, Gamepad2 } from "lucide-react";
 
@@ -56,8 +57,11 @@ export default async function DashboardPage() {
     userProfile.email ??
     "User";
 
+  const needsDiscordLink = userProfile.discord_user_id == null;
+
   return (
     <div className="space-y-6">
+      <DiscordLinkDialog needsDiscordLink={needsDiscordLink} />
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground mt-1">

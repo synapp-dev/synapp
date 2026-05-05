@@ -24,12 +24,17 @@ interface SteamEmailDialogProps {
     avatarfull: string;
     profileurl: string;
   };
+  /** When true, skips API + Supabase; validates email locally then calls `onSandboxComplete`. */
+  sandbox?: boolean;
+  onSandboxComplete?: () => void;
 }
 
 export function SteamEmailDialog({
   open,
   onOpenChange,
   steamData,
+  sandbox = false,
+  onSandboxComplete,
 }: SteamEmailDialogProps) {
   const router = useRouter();
   const [username, setUsername] = useState("");
@@ -47,6 +52,13 @@ export function SteamEmailDialog({
       if (!email || !email.includes("@")) {
         setError("Please enter a valid email address");
         setIsLoading(false);
+        return;
+      }
+
+      if (sandbox) {
+        onSandboxComplete?.();
+        setIsLoading(false);
+        onOpenChange(false);
         return;
       }
 

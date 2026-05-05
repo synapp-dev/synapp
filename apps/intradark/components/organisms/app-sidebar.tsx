@@ -3,22 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import {
-  Play,
-  LayoutDashboard,
-  Trophy,
-  MapPin,
-  Users,
-  Swords,
-  CalendarDays,
-  Newspaper,
-  MessageSquare,
-  Film,
-  BookOpen,
-  Wrench,
-  BarChart3,
-  List,
-} from "lucide-react";
+import { Newspaper, Shield, SquareStack } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
 import { NavUser } from "@/components/molecules/nav-user";
@@ -32,45 +17,64 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 
-const navPlatform = [
-  { title: "Play", url: "#", icon: Play, disabled: true },
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
-    items: [
-      { title: "Matches", url: "/matches", icon: Trophy },
-      { title: "Positions", url: "/positions", icon: MapPin },
-      { title: "Crew", url: "/crew", icon: Users },
-    ],
-  },
-];
-
-const navCompetitive = [
-  { title: "Teams", url: "/teams", icon: Users },
-  { title: "Scrims", url: "/scrims", icon: Swords },
-  { title: "Tournaments", url: "/tournaments", icon: CalendarDays },
-];
-
-const navCommunity = [
-  { title: "News", url: "/news", icon: Newspaper },
-  { title: "Forums", url: "/forums", icon: MessageSquare },
-  { title: "Media", url: "/media", icon: Film },
-];
-
-const navKnowledge = [
-  { title: "Theory", url: "/theory", icon: BookOpen },
-  { title: "Utility", url: "/utility", icon: Wrench },
-];
-
-const navInsight = [
-  { title: "Stats", url: "/stats", icon: BarChart3 },
-  { title: "Watchlist", url: "/watchlist", icon: List },
-];
+import { useUserProfile } from "@/stores/user-profile-store";
+import {
+  ROLE_DEVELOPER,
+  ROLE_NEWS_EDITOR,
+  ROLE_SANDBOX_ACCESS,
+} from "@/entities/admin/lib/rbac-constants";
+import { hasCapability } from "@/entities/admin/lib/role-slugs";
+import {
+  getNavPlatformBase,
+  navCommunity,
+  navCompetitive,
+  navInsight,
+  navKnowledge,
+  type NavMainSidebarItem,
+} from "@/lib/main-nav-routes";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, isMobile } = useSidebar();
   const displayState = isMobile ? "expanded" : state;
+  const { user } = useUserProfile();
+
+  const navPlatform = React.useMemo(() => {
+    const slugs = user?.role_slugs ?? [];
+    const showAdmin =
+      slugs.includes(ROLE_DEVELOPER) ||
+      slugs.some((s) =>
+        [ROLE_SANDBOX_ACCESS, ROLE_NEWS_EDITOR].includes(
+          s as typeof ROLE_SANDBOX_ACCESS | typeof ROLE_NEWS_EDITOR,
+        ),
+      );
+    const showSandbox = slugs.includes(ROLE_SANDBOX_ACCESS);
+    const showNewsAdmin = hasCapability(slugs, ROLE_NEWS_EDITOR);
+    const prefix: NavMainSidebarItem[] = [];
+    if (showAdmin) {
+      const adminItems: NonNullable<NavMainSidebarItem["items"]> = [];
+      if (showSandbox) {
+        adminItems.push({
+          title: "Sandbox",
+          url: "/admin/sandbox",
+          icon: SquareStack,
+        });
+      }
+      if (showNewsAdmin) {
+        adminItems.push({
+          title: "News",
+          url: "/news/admin",
+          icon: Newspaper,
+        });
+      }
+      prefix.push({
+        title: "Admin",
+        url: "/admin",
+        icon: Shield,
+        ...(adminItems.length > 0 ? { items: adminItems } : {}),
+      });
+    }
+    return [...prefix, ...getNavPlatformBase()];
+  }, [user?.role_slugs]);
 
   return (
     <Sidebar collapsible="icon" {...props}>

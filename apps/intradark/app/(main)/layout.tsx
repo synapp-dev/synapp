@@ -1,7 +1,9 @@
 "use client";
 
 import { AppHeader } from "@/components/organisms/app-header";
+import { AppRightSidebar } from "@/components/organisms/app-right-sidebar";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
+import { SandboxRightSidebarProvider } from "@/components/organisms/sandbox-right-sidebar-provider";
 import { UserProfileLoader } from "@/components/molecules/user-profile-loader";
 
 import {
@@ -18,14 +20,17 @@ export default function MainLayout({
   return (
     <SidebarProvider>
       <RightSidebarProvider>
-        <UserProfileLoader />
-        <AppSidebar />
-        <div className="flex flex-col flex-1 max-w-7xl mx-auto">
-          <AppHeader />
-          <SidebarInset>
-            <div className="px-6 py-3">{children}</div>
-          </SidebarInset>
-        </div>
+        <SandboxRightSidebarProvider>
+          <UserProfileLoader />
+          <AppSidebar />
+          <div className="flex flex-col flex-1 max-w-7xl mx-auto">
+            <AppHeader />
+            <SidebarInset>
+              <div className="px-6 py-3">{children}</div>
+            </SidebarInset>
+          </div>
+          <AppRightSidebar />
+        </SandboxRightSidebarProvider>
       </RightSidebarProvider>
     </SidebarProvider>
   );

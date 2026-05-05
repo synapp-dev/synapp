@@ -17,12 +17,25 @@ export type CurrentUserProfiles = {
  * Returns null if not logged in or if user_profile is missing.
  */
 export async function getCurrentUserProfiles(): Promise<CurrentUserProfiles | null> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  if (
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+  ) {
+    return null;
+  }
 
-  if (!user) {
+  const supabase = await createServerClient();
+  let user: User | null = null;
+  try {
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabase.auth.getUser();
+    if (error || !authUser) {
+      return null;
+    }
+    user = authUser;
+  } catch {
     return null;
   }
 

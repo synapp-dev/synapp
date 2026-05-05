@@ -29,6 +29,9 @@ export function UserProfileLoader() {
             username: profile.username ?? null,
             display_name: profile.display_name ?? null,
             avatar_url: profile.avatar_url ?? authUser.user_metadata?.avatar_url,
+            role_slugs: Array.isArray(profile.role_slugs)
+              ? profile.role_slugs
+              : [],
           });
         } else {
           setUser({
@@ -36,6 +39,7 @@ export function UserProfileLoader() {
             email: authUser.email ?? "",
             name: authUser.user_metadata?.name ?? authUser.user_metadata?.full_name,
             avatar_url: authUser.user_metadata?.avatar_url,
+            role_slugs: [],
           });
         }
       } catch (error) {

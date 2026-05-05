@@ -1,6 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  transpilePackages: ["@workspace/ui"],
+  async redirects() {
+    return [
+      { source: "/sandbox", destination: "/admin/sandbox", permanent: false },
+      {
+        source: "/sandbox/:path*",
+        destination: "/admin/sandbox/:path*",
+        permanent: false,
+      },
+    ];
+  },
+  transpilePackages: ["@workspace/ui", "country-flag-icons"],
   images: {
     remotePatterns: [
       {

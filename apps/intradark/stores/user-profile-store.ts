@@ -7,6 +7,8 @@ interface UserProfile {
   username?: string | null;
   display_name?: string | null;
   avatar_url?: string;
+  /** RBAC slugs from `/api/me` (e.g. `sandbox.access`). */
+  role_slugs?: string[];
 }
 
 interface UserProfileState {
