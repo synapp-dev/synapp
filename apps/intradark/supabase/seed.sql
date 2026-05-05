@@ -31,3 +31,46 @@ INSERT INTO public.steam_profiles (
 
 -- user_profiles are created automatically by the trigger on auth.users insert.
 -- No seed data needed; they are populated when users sign up (Steam or email).
+
+-- CS2 utility catalog maps (pools from migration 0007). radar_image_url / badge_image_url are
+-- left empty until assets are uploaded to intradark-media (e.g. maps/<slug>/radar.*,
+-- maps/<slug>/badge.*); re-seed preserves non-empty URLs.
+INSERT INTO public.maps (
+  game,
+  slug,
+  display_name,
+  pool_id,
+  radar_image_url,
+  badge_image_url,
+  is_active,
+  sort_order
+)
+SELECT
+  v.game,
+  v.slug,
+  v.display_name,
+  p.id,
+  '',
+  '',
+  v.is_active,
+  v.sort_order
+FROM (
+  VALUES
+    ('cs2'::varchar(32), 'de_mirage'::varchar(128), 'Mirage'::varchar(255), 'active_duty'::varchar(64), true, 0),
+    ('cs2', 'de_dust2', 'Dust 2', 'active_duty', true, 10),
+    ('cs2', 'de_overpass', 'Overpass', 'active_duty', true, 20),
+    ('cs2', 'de_ancient', 'Ancient', 'active_duty', true, 30),
+    ('cs2', 'de_inferno', 'Inferno', 'active_duty', true, 40),
+    ('cs2', 'de_anubis', 'Anubis', 'active_duty', true, 50),
+    ('cs2', 'de_nuke', 'Nuke', 'active_duty', true, 60),
+    ('cs2', 'de_train', 'Train', 'reserve', true, 0),
+    ('cs2', 'de_vertigo', 'Vertigo', 'reserve', true, 10),
+    ('cs2', 'cs_office', 'Office', 'reserve', true, 20)
+) AS v(game, slug, display_name, pool_slug, is_active, sort_order)
+JOIN public.map_pools p ON p.slug = v.pool_slug
+ON CONFLICT (slug) DO UPDATE SET
+  display_name = EXCLUDED.display_name,
+  pool_id = EXCLUDED.pool_id,
+  sort_order = EXCLUDED.sort_order,
+  is_active = EXCLUDED.is_active,
+  updated_at = now();

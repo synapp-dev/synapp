@@ -8,6 +8,62 @@
       "when": 1769583383486,
       "tag": "0000_needy_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1746384000000,
+      "tag": "0001_roles_user_roles_rbac",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1746387600000,
+      "tag": "0002_user_roles_profile_fk",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1746391200000,
+      "tag": "0003_developer_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1746394800000,
+      "tag": "0004_news_articles",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1746398400000,
+      "tag": "0005_utility_maps_lineups",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1746402000000,
+      "tag": "0006_forums",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1746405600000,
+      "tag": "0007_media_maps_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1746409200000,
+      "tag": "0008_maps_badge_image_url",
+      "breakpoints": true
     }
   ]
 }

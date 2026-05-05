@@ -28,7 +28,7 @@ export type Database = {
           lastlogoff: string | null;
           commentpermission: number;
           realname: string | null;
-          primaryclanid: number | null;
+          primaryclanid: string | null;
           timecreated: string | null;
           gameid: number | null;
           gameserverip: string | null;
@@ -54,7 +54,7 @@ export type Database = {
           lastlogoff?: string | null;
           commentpermission?: number;
           realname?: string | null;
-          primaryclanid?: number | null;
+          primaryclanid?: string | null;
           timecreated?: string | null;
           gameid?: number | null;
           gameserverip?: string | null;
@@ -80,7 +80,7 @@ export type Database = {
           lastlogoff?: string | null;
           commentpermission?: number;
           realname?: string | null;
-          primaryclanid?: number | null;
+          primaryclanid?: string | null;
           timecreated?: string | null;
           gameid?: number | null;
           gameserverip?: string | null;
@@ -98,6 +98,7 @@ export type Database = {
           id: string;
           user_id: string;
           steam_profile_id: number | null;
+          discord_user_id: string | null;
           username: string | null;
           display_name: string | null;
           bio: string | null;
@@ -114,6 +115,7 @@ export type Database = {
           id?: string;
           user_id: string;
           steam_profile_id?: number | null;
+          discord_user_id?: string | null;
           username?: string | null;
           display_name?: string | null;
           bio?: string | null;
@@ -130,6 +132,7 @@ export type Database = {
           id?: string;
           user_id?: string;
           steam_profile_id?: number | null;
+          discord_user_id?: string | null;
           username?: string | null;
           display_name?: string | null;
           bio?: string | null;
@@ -141,6 +144,49 @@ export type Database = {
           last_active?: string;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      roles: {
+        Row: {
+          id: string;
+          slug: string;
+          label: string;
+          description: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          label: string;
+          description?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          label?: string;
+          description?: string | null;
+          created_at?: string;
+        };
+      };
+      user_roles: {
+        Row: {
+          user_profile_id: string;
+          role_id: string;
+          granted_at: string;
+          granted_by: string | null;
+        };
+        Insert: {
+          user_profile_id: string;
+          role_id: string;
+          granted_at?: string;
+          granted_by?: string | null;
+        };
+        Update: {
+          user_profile_id?: string;
+          role_id?: string;
+          granted_at?: string;
+          granted_by?: string | null;
         };
       };
     };
