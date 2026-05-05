@@ -23,7 +23,7 @@ export default async function SafetyPlansPage({ params }: Props) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Safety plans</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Safety Plans</h1>
         <p className="text-muted-foreground text-sm">
           Secure storage for plans linked to {c.displayName} (demo placeholder).
         </p>

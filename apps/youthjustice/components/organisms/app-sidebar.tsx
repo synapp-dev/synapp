@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,6 +29,23 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
 
+const LAST_CASE_SLUG_STORAGE_KEY = "youthjustice.sidebar.lastCaseSlug";
+
+function readLastCaseSlugFromStorage(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(LAST_CASE_SLUG_STORAGE_KEY);
+    if (raw && isKnownCaseSlug(raw)) {
+      return raw;
+    }
+  } catch {
+    // private mode / blocked storage
+  }
+  return null;
+}
+
 function makeCaseNavItems(caseSlug: string): NavMainItem[] {
   const base = `/cases/${caseSlug}`;
   return [
@@ -45,13 +62,13 @@ function makeCaseNavItems(caseSlug: string): NavMainItem[] {
       exact: false,
     },
     {
-      title: "Safety plans",
+      title: "Safety Plans",
       url: `${base}/safety-plans`,
       icon: Shield,
       exact: false,
     },
     {
-      title: "Support contacts",
+      title: "Support Contacts",
       url: `${base}/support-contacts`,
       icon: Users,
       exact: false,
@@ -118,11 +135,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     caseSlug && isKnownCaseSlug(caseSlug) ? caseSlug : null,
   );
 
-  useEffect(() => {
-    if (caseSlug && isKnownCaseSlug(caseSlug) && caseSlug !== selectedCaseSlug) {
-      setSelectedCaseSlug(caseSlug);
+  useLayoutEffect(() => {
+    if (caseSlug && isKnownCaseSlug(caseSlug)) {
+      setSelectedCaseSlug((prev) => (prev === caseSlug ? prev : caseSlug));
+      return;
     }
-  }, [caseSlug, selectedCaseSlug]);
+    setSelectedCaseSlug((prev) => prev ?? readLastCaseSlugFromStorage());
+  }, [caseSlug]);
+
+  useEffect(() => {
+    if (!selectedCaseSlug || !isKnownCaseSlug(selectedCaseSlug)) {
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        LAST_CASE_SLUG_STORAGE_KEY,
+        selectedCaseSlug,
+      );
+    } catch {
+      // ignore
+    }
+  }, [selectedCaseSlug]);
 
   const platformNavItems = useMemo((): NavMainItem[] => {
     const base: NavMainItem[] = [

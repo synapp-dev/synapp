@@ -22,6 +22,15 @@ export type ChatMessage = {
   replyToRole?: "user" | "assistant";
 };
 
+/** Web Crypto `randomUUID` is missing in some dev / non-HTTPS contexts; keep demo IDs stable regardless. */
+function newChatMessageId(): string {
+  const c = globalThis.crypto;
+  if (c && typeof c.randomUUID === "function") {
+    return c.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 const SEED_TIME_BASE_MS = Date.UTC(2026, 3, 25, 7, 0, 0);
 const MINUTE_MS = 60_000;
 
@@ -237,7 +246,7 @@ export function MessagesDemoProvider({ children }: { children: ReactNode }) {
     setThreads((prev) => {
       const list = prev[slug] ?? [];
       const assistantMsg: ChatMessage = {
-        id: crypto.randomUUID(),
+        id: newChatMessageId(),
         role: "assistant",
         text,
         at: Date.now(),
@@ -333,7 +342,7 @@ export function MessagesDemoProvider({ children }: { children: ReactNode }) {
     if (!trimmed) return;
 
     const userMsg: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: newChatMessageId(),
       role: "user",
       text: trimmed,
       at: Date.now(),
@@ -379,7 +388,7 @@ export function MessagesDemoProvider({ children }: { children: ReactNode }) {
       setThreads((prev) => {
         const list = prev[slug] ?? [];
         const assistantMsg: ChatMessage = {
-          id: crypto.randomUUID(),
+          id: newChatMessageId(),
           role: "assistant",
           text: replyFor(list.length + caseForThread.slug.length),
           at: Date.now(),
@@ -413,7 +422,7 @@ export function MessagesDemoProvider({ children }: { children: ReactNode }) {
             return prev;
           }
           const incomingMsg: ChatMessage = {
-            id: crypto.randomUUID(),
+            id: newChatMessageId(),
             role: "assistant",
             text: trimmed,
             at: Date.now(),

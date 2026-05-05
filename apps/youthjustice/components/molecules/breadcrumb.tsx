@@ -33,8 +33,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   home: "Home",
   correspondence: "Correspondence",
   calendar: "Calendar",
-  "safety-plans": "Safety plans",
-  "support-contacts": "Support contacts",
+  "safety-plans": "Safety Plans",
+  "support-contacts": "Support Contacts",
 };
 
 function truncateBreadcrumbLabel(label: string): string {

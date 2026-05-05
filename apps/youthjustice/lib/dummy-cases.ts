@@ -217,9 +217,16 @@ export function buildCaseNavigationPath(pathname: string, newCaseSlug: string): 
   return `/cases/${newCaseSlug}/correspondence`;
 }
 
+/**
+ * Case slug from URL when the user is in a case-scoped or message-thread route.
+ * Callers should still validate with {@link isKnownCaseSlug} before trusting the value.
+ */
 export function getCaseSlugFromPathname(pathname: string): string | null {
   const segments = pathname.split("/").filter(Boolean);
   if (segments[0] === "cases" && segments[1]) {
+    return segments[1];
+  }
+  if (segments[0] === "messages" && segments[1]) {
     return segments[1];
   }
   return null;
