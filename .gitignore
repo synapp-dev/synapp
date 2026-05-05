@@ -30,6 +30,11 @@ dist
 
 # Debug
 npm-debug.log*
+debug-*.log
+
+# Local scratch / one-off exports (do not commit)
+_all_args_strings.txt
+_notion_module_overview_body.md
 
 # Misc
 .DS_Store
