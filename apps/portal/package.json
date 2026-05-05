@@ -7,10 +7,13 @@
     "dev": "next dev -p 3001 --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "lint:fix": "next lint --fix",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "gen-types": "npx supabase gen types typescript --project-id kbtyouwnmhbibfqqljyo --schema public > types/supabase.ts"
+    "gen-types": "node ../../scripts/supabase/gen-types.mjs",
+    "verify:supabase-cutover": "node ../../scripts/supabase/verify-cutover.mjs",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.1.1",
@@ -40,13 +43,19 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@testing-library/dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/node": "catalog:",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
+    "@vitejs/plugin-react": "catalog:",
     "dotenv-cli": "^8.0.0",
+    "eslint": "catalog:",
     "drizzle-kit": "^0.31.4",
-    "typescript": "^5.7.3"
+    "jsdom": "catalog:",
+    "typescript": "^5.7.3",
+    "vitest": "catalog:"
   }
 }
