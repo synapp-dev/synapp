@@ -6,6 +6,8 @@ import globals from "globals"
 import tseslint from "typescript-eslint"
 
 import { config as baseConfig } from "./base.js"
+import { monorepoBoundariesBlock } from "./monorepo-boundaries.js"
+import { workspaceUiPresentationImportsBlock } from "./workspace-ui-presentation.js"
 
 /**
  * A custom ESLint configuration for libraries that use React.
@@ -38,4 +40,6 @@ export const config = [
       "react/prop-types": "off",
     },
   },
+  ...monorepoBoundariesBlock,
+  ...workspaceUiPresentationImportsBlock,
 ]

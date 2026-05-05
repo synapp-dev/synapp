@@ -7,6 +7,7 @@ import globals from "globals"
 import tseslint from "typescript-eslint"
 
 import { config as baseConfig } from "./base.js"
+import { monorepoBoundariesBlock } from "./monorepo-boundaries.js"
 
 /**
  * A custom ESLint configuration for libraries that use Next.js.
@@ -14,6 +15,17 @@ import { config as baseConfig } from "./base.js"
  * @type {import("eslint").Linter.Config}
  * */
 export const nextJsConfig = [
+  {
+    ignores: [
+      "**/.next/**",
+      "**/node_modules/**",
+      "**/out/**",
+      "**/build/**",
+      "**/.turbo/**",
+      "**/coverage/**",
+      "**/next-env.d.ts",
+    ],
+  },
   ...baseConfig,
   js.configs.recommended,
   eslintConfigPrettier,
@@ -48,4 +60,5 @@ export const nextJsConfig = [
       "react/prop-types": "off",
     },
   },
+  ...monorepoBoundariesBlock,
 ]
