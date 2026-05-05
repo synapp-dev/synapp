@@ -22,6 +22,14 @@ export const uploadResourceFileSchema = z.object({
   folderId: z.string().uuid(),
 });
 
+/** JSON body for direct-to-storage uploads (small request; file bytes go to Supabase). */
+export const prepareResourceFileUploadSchema = z.object({
+  folderId: z.string().uuid(),
+  fileName: z.string().trim().min(1).max(512),
+  sizeBytes: z.number().int().positive(),
+  mimeType: z.string().trim().max(128).optional().nullable(),
+});
+
 export const renameResourceFileSchema = z.object({
   displayName: z.string().trim().min(1).max(255),
 });
@@ -44,6 +52,9 @@ export type RenameResourceFolderParams = z.infer<
   typeof renameResourceFolderSchema
 >;
 export type UploadResourceFileParams = z.infer<typeof uploadResourceFileSchema>;
+export type PrepareResourceFileUploadParams = z.infer<
+  typeof prepareResourceFileUploadSchema
+>;
 export type RenameResourceFileParams = z.infer<typeof renameResourceFileSchema>;
 export type ListTopicResourceFilesParams = z.infer<
   typeof listTopicResourceFilesSchema

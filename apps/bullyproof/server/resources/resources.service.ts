@@ -7,6 +7,7 @@ import {
   createResourceFolderSchema,
   listResourceTreeSchema,
   listTopicResourceFilesSchema,
+  prepareResourceFileUploadSchema,
   renameResourceFileSchema,
   renameResourceFolderSchema,
   uploadResourceFileSchema,
@@ -16,6 +17,7 @@ import {
 } from "./resources.validators";
 import { createSlug } from "@/utils/slug";
 import { createServerClient } from "@/utils/supabase/server";
+import { createSupabaseStorageAdminClient } from "@/utils/supabase/storage-admin-client";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 
 const BUCKET = "content";
@@ -75,6 +77,59 @@ function sanitizeFileNameForPath(fileName: string): string {
     : fileName;
   const slug = createSlug(baseName).replace(/[^a-z0-9-_]/gi, "") || "file";
   return `${slug}${extension.toLowerCase()}`;
+}
+
+async function storageObjectExists(
+  objectPath: string
+): Promise<boolean> {
+  const admin = createSupabaseStorageAdminClient();
+  const lastSlash = objectPath.lastIndexOf("/");
+  const parent = lastSlash >= 0 ? objectPath.slice(0, lastSlash) : "";
+  const name = lastSlash >= 0 ? objectPath.slice(lastSlash + 1) : objectPath;
+  const { data, error } = await admin.storage.from(BUCKET).list(parent, {
+    limit: 1000,
+    search: name,
+  });
+  if (error || !data) {
+    return false;
+  }
+  return data.some((o) => o.name === name);
+}
+
+function buildResourceStoragePath(
+  fileId: string,
+  originalFileName: string,
+  folder: NonNullable<FolderRow>,
+  allFoldersInScope: NonNullable<FolderRow>[]
+): string {
+  const scopeType = asScope(folder.scopeType);
+  const schoolId = folder.schoolId ?? null;
+  const folderPath = buildFolderPath(folder.id, allFoldersInScope);
+  const prefix =
+    scopeType === "global" ? "resources/global" : `resources/schools/${schoolId}`;
+  const safeFileName = sanitizeFileNameForPath(originalFileName);
+  return `${prefix}/${folderPath}/${fileId}-${safeFileName}`;
+}
+
+async function resolveStoragePathForPendingFile(
+  file: NonNullable<Awaited<ReturnType<typeof resourcesRepo.getFileById>>>
+): Promise<string | null> {
+  const folder = await resourcesRepo.getFolderById(file.folderId);
+  if (!folder) {
+    return null;
+  }
+  const scopeType = asScope(folder.scopeType);
+  const schoolId = folder.schoolId ?? undefined;
+  const allFoldersInScope = await resourcesRepo.listFoldersByScope(
+    scopeType,
+    schoolId
+  );
+  return buildResourceStoragePath(
+    file.id,
+    file.displayName,
+    folder,
+    allFoldersInScope
+  );
 }
 
 function buildFolderPath(folderId: string, folders: NonNullable<FolderRow>[]): string {
@@ -375,7 +430,6 @@ export const resourcesService = {
       scopeType,
       schoolId ?? undefined
     );
-    const folderPath = buildFolderPath(folder.id, allFoldersInScope);
 
     const [created] = await resourcesRepo.createFile({
       folderId: folder.id,
@@ -388,10 +442,12 @@ export const resourcesService = {
       uploadedBy: ctx.actorUserId,
     });
 
-    const prefix =
-      scopeType === "global" ? "resources/global" : `resources/schools/${schoolId}`;
-    const safeFileName = sanitizeFileNameForPath(file.name);
-    const storagePath = `${prefix}/${folderPath}/${created.id}-${safeFileName}`;
+    const storagePath = buildResourceStoragePath(
+      created.id,
+      file.name,
+      folder,
+      allFoldersInScope
+    );
 
     try {
       const supabase = await createServerClient();
@@ -422,6 +478,102 @@ export const resourcesService = {
     }
   },
 
+  async prepareDirectUpload(ctx: ResourcesAuthContext, payload: unknown) {
+    await assertCanManageResources(ctx);
+    const parsedResult = prepareResourceFileUploadSchema.safeParse(payload);
+    if (!parsedResult.success) {
+      throw new Error("Invalid upload request");
+    }
+    const parsed = parsedResult.data;
+
+    if (parsed.sizeBytes > MAX_UPLOAD_SIZE_BYTES) {
+      throw new Error("File exceeds 100 MB size limit");
+    }
+
+    const folder = await resourcesRepo.getFolderById(parsed.folderId);
+    if (!folder) {
+      throw new Error("Folder not found");
+    }
+
+    const scopeType = asScope(folder.scopeType);
+    const schoolId = folder.schoolId ?? null;
+    const allFoldersInScope = await resourcesRepo.listFoldersByScope(
+      scopeType,
+      schoolId ?? undefined
+    );
+
+    const [created] = await resourcesRepo.createFile({
+      folderId: folder.id,
+      displayName: parsed.fileName,
+      storagePath: "__pending__",
+      mimeType: parsed.mimeType?.trim() || null,
+      sizeBytes: parsed.sizeBytes,
+      scopeType,
+      schoolId,
+      uploadedBy: ctx.actorUserId,
+    });
+
+    const storagePath = buildResourceStoragePath(
+      created.id,
+      parsed.fileName,
+      folder,
+      allFoldersInScope
+    );
+
+    try {
+      const admin = createSupabaseStorageAdminClient();
+      const { data, error } = await admin.storage
+        .from(BUCKET)
+        .createSignedUploadUrl(storagePath, { upsert: true });
+
+      if (error || !data) {
+        throw new Error(error?.message ?? "Could not create upload URL");
+      }
+
+      return {
+        fileId: created.id,
+        signedUrl: data.signedUrl,
+        token: data.token,
+        path: data.path,
+      };
+    } catch (error) {
+      await resourcesRepo.deleteFileById(created.id);
+      throw error;
+    }
+  },
+
+  async finalizeDirectUpload(ctx: ResourcesAuthContext, fileId: string) {
+    await assertCanManageResources(ctx);
+    const file = await resourcesRepo.getFileById(fileId);
+    if (!file) {
+      throw new Error("File not found");
+    }
+    if (file.storagePath !== "__pending__") {
+      return file;
+    }
+
+    const resolvedPath = await resolveStoragePathForPendingFile(file);
+    if (!resolvedPath) {
+      throw new Error("Folder not found");
+    }
+
+    const exists = await storageObjectExists(resolvedPath);
+    if (!exists) {
+      throw new Error(
+        "Upload did not reach storage. Check your connection and try again."
+      );
+    }
+
+    const [updated] = await resourcesRepo.updateFile(file.id, {
+      storagePath: resolvedPath,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      updatedAt: new Date().toISOString(),
+    });
+
+    return updated;
+  },
+
   async renameFile(ctx: ResourcesAuthContext, fileId: string, payload: unknown) {
     await assertCanManageResources(ctx);
     const { displayName } = renameResourceFileSchema.parse(payload);
@@ -448,12 +600,17 @@ export const resourcesService = {
 
     await resourcesRepo.deleteFileById(fileId);
 
-    if (file.storagePath) {
+    const pathToRemove =
+      file.storagePath === "__pending__"
+        ? await resolveStoragePathForPendingFile(file)
+        : file.storagePath;
+
+    if (pathToRemove) {
       const supabase = await createServerClient();
-      const { error } = await supabase.storage.from(BUCKET).remove([file.storagePath]);
+      const { error } = await supabase.storage.from(BUCKET).remove([pathToRemove]);
       if (error) {
         console.warn(
-          `[resources] failed to delete storage file ${file.storagePath}: ${error.message}`
+          `[resources] failed to delete storage file ${pathToRemove}: ${error.message}`
         );
       }
     }

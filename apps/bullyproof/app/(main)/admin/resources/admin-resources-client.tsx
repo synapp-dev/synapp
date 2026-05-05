@@ -40,6 +40,25 @@ import {
 import { Input } from "@workspace/ui/components/input";
 import { getAuthHeaders } from "@/lib/api/fetcher.client";
 
+async function parseResourcesApiJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch {
+    const snippet = text.trim().slice(0, 120);
+    if (res.status === 413) {
+      throw new Error(
+        "This file is larger than the server accepts in one request. Try again after deployment or use a smaller file."
+      );
+    }
+    throw new Error(
+      snippet
+        ? `Unexpected response (${res.status}): ${snippet}`
+        : `Request failed (${res.status})`
+    );
+  }
+}
+
 type ResourceTreeFile = {
   id: string;
   displayName: string;
@@ -452,20 +471,62 @@ export function AdminResourcesClient({
       folderId: string;
       file: File;
     }) => {
-      const headers = await getAuthHeaders();
-      const formData = new FormData();
-      formData.set("folderId", folderId);
-      formData.set("file", file);
-      const res = await fetch("/api/resources/files", {
+      const authHeaders = await getAuthHeaders();
+      const prepareHeaders = new Headers(authHeaders);
+      prepareHeaders.set("content-type", "application/json");
+      const prepareRes = await fetch("/api/resources/files/prepare-upload", {
         method: "POST",
-        headers,
-        body: formData,
+        headers: prepareHeaders,
+        body: JSON.stringify({
+          folderId,
+          fileName: file.name,
+          sizeBytes: file.size,
+          mimeType: file.type || null,
+        }),
       });
-      const body = await res.json();
-      if (!res.ok || body?.error) {
-        throw new Error(body?.error || "Failed to upload file");
+      const prepareBody = await parseResourcesApiJson(prepareRes);
+      if (!prepareRes.ok || prepareBody.error) {
+        throw new Error(
+          (prepareBody.error as string) || "Failed to start upload"
+        );
       }
-      return body;
+      const fileId = prepareBody.fileId as string;
+      const signedUrl = prepareBody.signedUrl as string;
+      const token = prepareBody.token as string;
+
+      const uploadRes = await fetch(signedUrl, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": file.type || "application/octet-stream",
+        },
+        body: file,
+      });
+
+      if (!uploadRes.ok) {
+        const cleanupHeaders = await getAuthHeaders();
+        await fetch(`/api/resources/files/${fileId}`, {
+          method: "DELETE",
+          headers: cleanupHeaders,
+        }).catch(() => undefined);
+        throw new Error(
+          `Upload to storage failed (${uploadRes.status}). Try again.`
+        );
+      }
+
+      const finalizeHeaders = new Headers(await getAuthHeaders());
+      finalizeHeaders.set("content-type", "application/json");
+      const finalizeRes = await fetch(
+        `/api/resources/files/${fileId}/finalize-upload`,
+        { method: "POST", headers: finalizeHeaders }
+      );
+      const finalizeBody = await parseResourcesApiJson(finalizeRes);
+      if (!finalizeRes.ok || finalizeBody.error) {
+        throw new Error(
+          (finalizeBody.error as string) || "Failed to finalize upload"
+        );
+      }
+      return finalizeBody;
     },
     onSuccess: (_, vars) => {
       setError(null);
