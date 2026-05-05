@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUserProfileStore } from "@/stores/user-profile-store";
+import { createBrowserClient } from "@/utils/supabase/client";
+import { useMeStore } from "@/entities/me/model/store";
 import { Button } from "@workspace/ui/components/button";
 import {
   DropdownMenu,
@@ -21,18 +22,16 @@ import { LogOut, Settings, User } from "lucide-react";
 
 export function NavUser() {
   const router = useRouter();
-  const { user, setUser } = useUserProfileStore();
+  const user = useMeStore((state) => state.currentUser);
+  const reset = useMeStore((state) => state.reset);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignOut = async () => {
     setIsLoading(true);
     try {
-      // TODO: Implement your sign out logic here
-      // Example with Supabase:
-      // const supabase = createBrowserClient();
-      // await supabase.auth.signOut();
-
-      setUser(null);
+      const supabase = createBrowserClient();
+      await supabase.auth.signOut();
+      reset();
       router.push("/auth");
     } catch (error) {
       console.error("Error signing out:", error);
@@ -54,11 +53,12 @@ export function NavUser() {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.avatar_url} alt={user.name || user.email} />
+            <AvatarImage
+              src={user.avatarUrl ?? undefined}
+              alt={user.fullName ?? user.email ?? "User avatar"}
+            />
             <AvatarFallback>
-              {user.name
-                ? user.name.charAt(0).toUpperCase()
-                : user.email.charAt(0).toUpperCase()}
+              {(user.fullName ?? user.email ?? "U").charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </Button>
@@ -67,10 +67,10 @@ export function NavUser() {
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">
-              {user.name || "User"}
+              {user.fullName || "User"}
             </p>
             <p className="text-xs leading-none text-muted-foreground">
-              {user.email}
+              {user.email ?? "No email"}
             </p>
           </div>
         </DropdownMenuLabel>

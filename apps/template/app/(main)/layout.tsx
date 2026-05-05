@@ -2,13 +2,12 @@
 
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
-import { UserProfileLoader } from "@/components/molecules/user-profile-loader";
+import { MeLoader } from "@/components/molecules/me-loader";
 
 import {
   SidebarInset,
   SidebarProvider,
 } from "@workspace/ui/components/sidebar";
-import { RightSidebarProvider } from "@workspace/ui/providers/right-sidebar-provider";
 
 export default function MainLayout({
   children,
@@ -17,16 +16,14 @@ export default function MainLayout({
 }) {
   return (
     <SidebarProvider>
-      <RightSidebarProvider>
-        <UserProfileLoader />
-        <AppSidebar />
-        <div className="flex flex-col flex-1 max-w-7xl mx-auto">
-          <AppHeader />
-          <SidebarInset>
-            <div className="px-6 py-3">{children}</div>
-          </SidebarInset>
-        </div>
-      </RightSidebarProvider>
+      <MeLoader />
+      <AppSidebar />
+      <div className="flex flex-1 flex-col">
+        <AppHeader />
+        <SidebarInset>
+          <div className="mx-auto w-full max-w-7xl px-6 py-3">{children}</div>
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }

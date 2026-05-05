@@ -10,28 +10,13 @@
 // 3. Copy the TypeScript types from the "Database types" section
 // 4. Paste them here
 
+/** Placeholder shape until `supabase gen types` output replaces this file. */
 export type Database = {
-  // Add your database schema types here
-  // Example:
-  // public: {
-  //   Tables: {
-  //     users: {
-  //       Row: {
-  //         id: string
-  //         email: string
-  //         created_at: string
-  //       }
-  //       Insert: {
-  //         id?: string
-  //         email: string
-  //         created_at?: string
-  //       }
-  //       Update: {
-  //         id?: string
-  //         email?: string
-  //         created_at?: string
-  //       }
-  //     }
-  //   }
-  // }
+  public: {
+    Tables: Record<string, never>;
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
+  };
 };

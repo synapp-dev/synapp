@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { createBrowserClient } from "@/utils/supabase/client";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -36,6 +37,8 @@ export function AuthForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextPath = searchParams.get("next") ?? "/home";
 
   const signInForm = useForm<SignInForm>({
     resolver: zodResolver(signInSchema),
@@ -50,17 +53,17 @@ export function AuthForm() {
     setError(null);
 
     try {
-      // TODO: Implement your sign in logic here
-      // Example with Supabase:
-      // const supabase = createBrowserClient();
-      // const { error } = await supabase.auth.signInWithPassword({
-      //   email: data.email,
-      //   password: data.password,
-      // });
-      // if (error) throw error;
+      const supabase = createBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      });
+      if (signInError) {
+        throw signInError;
+      }
 
-      console.log("Sign in:", data);
-      router.push("/home");
+      router.push(nextPath);
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -73,22 +76,23 @@ export function AuthForm() {
     setError(null);
 
     try {
-      // TODO: Implement your sign up logic here
-      // Example with Supabase:
-      // const supabase = createBrowserClient();
-      // const { error } = await supabase.auth.signUp({
-      //   email: data.email,
-      //   password: data.password,
-      //   options: {
-      //     data: {
-      //       name: data.name,
-      //     },
-      //   },
-      // });
-      // if (error) throw error;
+      const supabase = createBrowserClient();
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: {
+            name: data.name,
+            full_name: data.name,
+          },
+        },
+      });
+      if (signUpError) {
+        throw signUpError;
+      }
 
-      console.log("Sign up:", data);
-      router.push("/home");
+      setIsSignUp(false);
+      setError("Account created. Please sign in with your credentials.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

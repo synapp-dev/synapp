@@ -1,10 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-// import { Database } from "@/types/supabase";
 import { createServerClient } from "@supabase/ssr";
 
-// TODO: Add your database types once you have them set up
-// You can generate types from Supabase using: npx supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
-type Database = any; // Replace with your actual database types
+type Database = Record<string, never>;
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -13,7 +10,7 @@ export async function updateSession(request: NextRequest) {
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -21,41 +18,44 @@ export async function updateSession(request: NextRequest) {
         },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
+            request.cookies.set(name, value),
           );
           supabaseResponse = NextResponse.next({
             request,
           });
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            supabaseResponse.cookies.set(name, value, options),
           );
         },
       },
-    }
+    },
   );
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-  // IMPORTANT: DO NOT REMOVE auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  // TODO: Uncomment and fix this once you have your database types set up
-  // const {
-  //   data: { user },
-  // } = await supabase.auth.getUser();
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = pathname.startsWith("/auth");
+  const isMainRoute =
+    pathname.startsWith("/home") ||
+    pathname.startsWith("/settings") ||
+    pathname.startsWith("/profile");
 
-  // IMPORTANT: You *must* return the supabaseResponse object as it is.
-  // If you're creating a new response object with NextResponse.next() make sure to:
-  // 1. Pass the request in it, like so:
-  //    const myNewResponse = NextResponse.next({ request })
-  // 2. Copy over the cookies, like so:
-  //    myNewResponse.cookies.setAll(supabaseResponse.cookies.getAll())
-  // 3. Change the myNewResponse object to fit your needs, but avoid changing
-  //    the cookies!
-  // 4. Finally:
-  //    return myNewResponse
-  // If this is not done, you may be causing the browser and server to go out
-  // of sync and terminate the user's session prematurely!
+  if (pathname === "/") {
+    const target = user ? "/home" : "/auth";
+    return NextResponse.redirect(new URL(target, request.url));
+  }
+
+  if (!user && isMainRoute) {
+    const redirectUrl = new URL("/auth", request.url);
+    redirectUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(redirectUrl);
+  }
+
+  if (user && isAuthRoute) {
+    return NextResponse.redirect(new URL("/home", request.url));
+  }
 
   return supabaseResponse;
 }

@@ -1,7 +1,7 @@
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 
 // Generic response type
-export type ApiResponse<T = any> = {
+export type ApiResponse<T = unknown> = {
   success: boolean;
   data: T;
   error?: string;
@@ -12,7 +12,7 @@ export function useApiClient() {
   const authFetch = useAuthFetch();
 
   // Generic method to call any endpoint
-  const call = async <T = any>(
+  const call = async <T = unknown>(
     endpoint: string,
     params?: Record<string, string | number>,
     options?: RequestInit
@@ -45,16 +45,16 @@ export function useApiClient() {
   };
 
   // Convenience methods for common operations
-  const get = async <T = any>(
+  const get = async <T = unknown>(
     endpoint: string,
     params?: Record<string, string | number>
   ): Promise<ApiResponse<T>> => {
     return call<T>(endpoint, params);
   };
 
-  const post = async <T = any>(
+  const post = async <T = unknown>(
     endpoint: string,
-    data: any,
+    data: unknown,
     params?: Record<string, string | number>
   ): Promise<ApiResponse<T>> => {
     return call<T>(endpoint, params, {
@@ -64,9 +64,9 @@ export function useApiClient() {
     });
   };
 
-  const put = async <T = any>(
+  const put = async <T = unknown>(
     endpoint: string,
-    data: any,
+    data: unknown,
     params?: Record<string, string | number>
   ): Promise<ApiResponse<T>> => {
     return call<T>(endpoint, params, {
@@ -76,7 +76,7 @@ export function useApiClient() {
     });
   };
 
-  const del = async <T = any>(
+  const del = async <T = unknown>(
     endpoint: string,
     params?: Record<string, string | number>
   ): Promise<ApiResponse<T>> => {
@@ -95,13 +95,13 @@ export function useExampleApi() {
     getItems: (params?: Record<string, string | number>) =>
       apiClient.get("items", params),
     getItem: (id: string | number) => apiClient.get("items/[id]", { id }),
-    createItem: (data: any) => apiClient.post("items", data),
-    updateItem: (id: string | number, data: any) =>
+    createItem: (data: unknown) => apiClient.post("items", data),
+    updateItem: (id: string | number, data: unknown) =>
       apiClient.put("items/[id]", data, { id }),
     deleteItem: (id: string | number) => apiClient.delete("items/[id]", { id }),
 
     // Generic method for any endpoint
-    call: <T = any>(
+    call: <T = unknown>(
       endpoint: string,
       params?: Record<string, string | number>
     ) => apiClient.get<T>(endpoint, params),

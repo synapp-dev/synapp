@@ -10,7 +10,7 @@ export async function GET() {
     };
 
     return NextResponse.json(exampleData);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch example data" },
       { status: 500 }
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json(processedData, { status: 201 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to create example data" },
       { status: 500 }

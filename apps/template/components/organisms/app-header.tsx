@@ -1,7 +1,6 @@
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
-import { RightSidebarTrigger } from "@workspace/ui/components/right-sidebar-trigger";
 import { CommandMenu } from "@/components/molecules/command-menu";
 
 export function AppHeader() {
@@ -19,7 +18,6 @@ export function AppHeader() {
         <CommandMenu />
         <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
         <ThemeToggle />
-        <RightSidebarTrigger />
       </div>
     </header>
   );
