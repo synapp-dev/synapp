@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import openid from "openid";
 import { extractSteamId } from "@/utils/steam/openid";
 import { fetchSteamProfile, steamProfileToDbFormat } from "@/utils/steam/profile";
+import { ensureMemberTemplateForProfileId } from "@/entities/rbac/lib/ensure-member-template";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createServerClient } from "@/utils/supabase/server";
 
@@ -225,8 +226,16 @@ async function processSteamAuth(
             new URL("/dashboard?error=steam_link_failed", baseUrl)
           );
         }
+        const { data: linkedProfile } = await adminClient
+          .from("user_profiles")
+          .select("id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (linkedProfile?.id) {
+          await ensureMemberTemplateForProfileId(adminClient, linkedProfile.id);
+        }
       } else {
-        const { error: insertError } = await adminClient
+        const { data: insertedProfile, error: insertError } = await adminClient
           .from("user_profiles")
           .insert({
             user_id: user.id,
@@ -234,12 +243,17 @@ async function processSteamAuth(
             email,
             display_name: steamProfile.personaname || null,
             avatar_url: steamProfile.avatarfull || null,
-          });
+          })
+          .select("id")
+          .single();
         if (insertError) {
           console.error("Error linking Steam profile to existing user:", insertError);
           return NextResponse.redirect(
             new URL("/dashboard?error=steam_link_failed", baseUrl)
           );
+        }
+        if (insertedProfile?.id) {
+          await ensureMemberTemplateForProfileId(adminClient, insertedProfile.id);
         }
       }
 

@@ -62,18 +62,37 @@ export function SteamEmailDialog({
         return;
       }
 
-      // Call API to create account
-      const response = await fetch("/api/auth/steam/create-account", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: username.trim() || undefined,
-          email,
-          steamId64: steamData.steamId64,
-        }),
-      });
+      const controller = new AbortController();
+      const requestTimeoutMs = 60_000;
+      const requestTimeout = window.setTimeout(() => controller.abort(), requestTimeoutMs);
+
+      let response: Response;
+      try {
+        response = await fetch("/api/auth/steam/create-account", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            username: username.trim() || undefined,
+            email,
+            steamId64: steamData.steamId64,
+          }),
+          signal: controller.signal,
+        });
+      } catch (fetchErr) {
+        window.clearTimeout(requestTimeout);
+        const aborted =
+          fetchErr instanceof DOMException && fetchErr.name === "AbortError";
+        setError(
+          aborted
+            ? "Request timed out. Check your connection and try again."
+            : "Could not reach the server. Try again in a moment.",
+        );
+        setIsLoading(false);
+        return;
+      }
+      window.clearTimeout(requestTimeout);
 
       const data = await response.json();
 
@@ -93,15 +112,34 @@ export function SteamEmailDialog({
       if (data.hashedToken) {
         const { createBrowserClient } = await import("@/utils/supabase/client");
         const supabase = createBrowserClient();
-        const { error: verifyError } = await supabase.auth.verifyOtp({
-          token_hash: data.hashedToken,
-          type: "email",
-        });
-        if (!verifyError) {
+        const otpTimeoutMs = 30_000;
+        type VerifyResult = Awaited<ReturnType<typeof supabase.auth.verifyOtp>>;
+        const otpResult = await Promise.race<VerifyResult | { timedOut: true }>([
+          supabase.auth.verifyOtp({
+            token_hash: data.hashedToken,
+            type: "email",
+          }),
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ timedOut: true as const }), otpTimeoutMs),
+          ),
+        ]);
+
+        if ("timedOut" in otpResult) {
+          setError(
+            "Sign-in timed out. Use the magic link in your email or try again.",
+          );
+          setIsLoading(false);
+          if (data.magicLink) {
+            window.location.href = data.magicLink as string;
+          }
+          return;
+        }
+
+        if (!otpResult.error) {
           window.location.href = dashboardUrl;
           return;
         }
-        console.error("Error verifying OTP:", verifyError);
+        console.error("Error verifying OTP:", otpResult.error);
         // Fall through to magic link redirect
       }
 

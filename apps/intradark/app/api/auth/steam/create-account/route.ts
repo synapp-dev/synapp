@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+
+import { ensureMemberTemplateForProfileId } from "@/entities/rbac/lib/ensure-member-template";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 /**
@@ -34,26 +36,6 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient();
 
-    // Check if email already exists
-    const { data: existingUsers, error: checkError } = await adminClient.auth.admin.listUsers();
-    
-    if (checkError) {
-      console.error("Error checking existing users:", checkError);
-      return NextResponse.json(
-        { error: "Failed to check existing users" },
-        { status: 500 }
-      );
-    }
-
-    const existingUser = existingUsers.users.find((u) => u.email === email);
-    
-    if (existingUser) {
-      return NextResponse.json(
-        { error: "An account with this email already exists" },
-        { status: 409 }
-      );
-    }
-
     // Get Steam profile data from database
     const { data: steamProfile, error: steamProfileError } = await adminClient
       .from("steam_profiles")
@@ -82,10 +64,22 @@ export async function POST(request: NextRequest) {
     });
 
     if (createError || !userData) {
+      const msg = createError?.message?.toLowerCase() ?? "";
+      if (
+        msg.includes("already been registered") ||
+        msg.includes("already registered") ||
+        msg.includes("user already registered") ||
+        msg.includes("duplicate")
+      ) {
+        return NextResponse.json(
+          { error: "An account with this email already exists" },
+          { status: 409 },
+        );
+      }
       console.error("Error creating user:", createError);
       return NextResponse.json(
         { error: "Failed to create user account" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -108,6 +102,16 @@ export async function POST(request: NextRequest) {
     if (profileError) {
       console.error("Error upserting user profile:", profileError);
       // Continue anyway - the user account was created; trigger may have created the row
+    }
+
+    const { data: profileRow } = await adminClient
+      .from("user_profiles")
+      .select("id")
+      .eq("user_id", userData.user.id)
+      .maybeSingle();
+
+    if (profileRow?.id) {
+      await ensureMemberTemplateForProfileId(adminClient, profileRow.id);
     }
 
     // Generate a session token for the user

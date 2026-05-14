@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { ensureMemberTemplateForProfileId } from "@/entities/rbac/lib/ensure-member-template";
 import { DISCORD_OAUTH_STATE_COOKIE } from "@/lib/discord-oauth-constants";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createServerClient } from "@/utils/supabase/server";
@@ -133,6 +134,15 @@ export async function GET(request: NextRequest) {
     );
     res.cookies.delete(DISCORD_OAUTH_STATE_COOKIE);
     return res;
+  }
+
+  const { data: discordProfile } = await admin
+    .from("user_profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (discordProfile?.id) {
+    await ensureMemberTemplateForProfileId(admin, discordProfile.id);
   }
 
   const res = NextResponse.redirect(
