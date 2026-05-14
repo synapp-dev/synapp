@@ -22,6 +22,7 @@ When a single slug is too coarse (e.g. sandbox **authentication** subtree vs **m
 - **Owns first DDL** for `roles` / `user_roles` + seeds `sandbox.access`, `news.editor`.
 - Apply remote migrations with Cursor MCP **`user-supabase-intradark`** (`apply_migration`) in lockstep with `apps/intradark/drizzle/*.sql`.
 - **News** adds `news_articles` after this catalog exists: [`apps/intradark/docs/features/news/plan.md`](../../apps/intradark/docs/features/news/plan.md).
+- **Navigation RBAC + templates** (optional extension of the same catalog pattern): grouping tables **`role_templates`** + **`role_template_roles`** + **`user_role_templates`** — atomic rows remain in **`roles`**; templates bundle capability IDs for join-at-read expansion. Spec: [`apps/intradark/docs/features/navigation-rbac/plan.md`](../../apps/intradark/docs/features/navigation-rbac/plan.md). Conceptually similar to Bullyproof **`permission_templates`** + **`permission_template_rules`**, but Intradark references **`roles`** directly instead of separate feature rows.
 
 ## Maintenance
 
