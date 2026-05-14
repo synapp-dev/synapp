@@ -164,6 +164,80 @@ export const userRoles = pgTable(
   ],
 );
 
+/** Named bundles of `roles` rows for assign-once membership (navigation RBAC). */
+export const roleTemplates = pgTable(
+  "role_templates",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slug: varchar({ length: 64 }).notNull(),
+    label: varchar({ length: 255 }).notNull(),
+    description: text(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("role_templates_slug_key").on(table.slug)],
+);
+
+/** Which atomic roles belong to a template. */
+export const roleTemplateRoles = pgTable(
+  "role_template_roles",
+  {
+    templateId: uuid("template_id").notNull(),
+    roleId: uuid("role_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.templateId, table.roleId] }),
+    foreignKey({
+      columns: [table.templateId],
+      foreignColumns: [roleTemplates.id],
+      name: "role_template_roles_template_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.roleId],
+      foreignColumns: [roles.id],
+      name: "role_template_roles_role_id_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/** User profile → template assignment (expands to slugs via `role_template_roles`). */
+export const userRoleTemplates = pgTable(
+  "user_role_templates",
+  {
+    userProfileId: uuid("user_profile_id").notNull(),
+    templateId: uuid("template_id").notNull(),
+    grantedAt: timestamp("granted_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    grantedBy: uuid("granted_by"),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userProfileId, table.templateId] }),
+    foreignKey({
+      columns: [table.userProfileId],
+      foreignColumns: [userProfiles.id],
+      name: "user_role_templates_user_profile_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.templateId],
+      foreignColumns: [roleTemplates.id],
+      name: "user_role_templates_template_id_fkey",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.grantedBy],
+      foreignColumns: [userProfiles.id],
+      name: "user_role_templates_granted_by_fkey",
+    }).onDelete("set null"),
+  ],
+);
+
 /** First-party news articles (body JSON from TipTap). */
 export const newsArticles = pgTable(
   "news_articles",
@@ -250,6 +324,7 @@ export const maps = pgTable(
       .references(() => mapPools.id, { onDelete: "restrict" }),
     radarImageUrl: text("radar_image_url").notNull(),
     badgeImageUrl: text("badge_image_url").notNull().default(""),
+    mapScreenshotUrl: text("map_screenshot_url").notNull().default(""),
     isActive: boolean("is_active").default(true).notNull(),
     sortOrder: integer("sort_order").default(0).notNull(),
     createdAt: timestamp("created_at", {
@@ -314,6 +389,42 @@ export const utilityMapSpots = pgTable(
   ],
 );
 
+/**
+ * Named radar zones (callouts) per map — polygon ring in normalized 0–1 radar space.
+ * Higher `priority` wins when a point lies inside overlapping polygons (tie-break).
+ */
+export const mapCallouts = pgTable(
+  "map_callouts",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => maps.id, { onDelete: "cascade" }),
+    slug: varchar({ length: 128 }).notNull(),
+    label: text("label").notNull(),
+    polygonRing: jsonb("polygon_ring")
+      .$type<[number, number][]>()
+      .notNull(),
+    priority: integer("priority").default(0).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("map_callouts_map_id_slug_key").on(table.mapId, table.slug),
+    index("map_callouts_map_id_idx").on(table.mapId),
+  ],
+);
+
 /** Individual grenade lineups (published rows visible to anon per RLS). */
 export const utilityLineups = pgTable(
   "utility_lineups",
@@ -322,20 +433,29 @@ export const utilityLineups = pgTable(
     mapId: uuid("map_id")
       .notNull()
       .references(() => maps.id, { onDelete: "cascade" }),
-    throwSpotId: uuid("throw_spot_id")
-      .notNull()
-      .references(() => utilityMapSpots.id, { onDelete: "restrict" }),
-    landSpotId: uuid("land_spot_id")
-      .notNull()
-      .references(() => utilityMapSpots.id, { onDelete: "restrict" }),
+    throwSpotX: doublePrecision("throw_spot_x").notNull(),
+    throwSpotY: doublePrecision("throw_spot_y").notNull(),
+    landSpotX: doublePrecision("land_spot_x").notNull(),
+    landSpotY: doublePrecision("land_spot_y").notNull(),
+    throwLabel: text("throw_label").notNull(),
+    landLabel: text("land_label").notNull(),
     grenadeType: varchar("grenade_type", { length: 32 }).notNull(),
     side: varchar({ length: 16 }).notNull(),
     movement: varchar("movement", { length: 32 }).notNull(),
     technique: varchar("technique", { length: 48 }).notNull(),
     margin: varchar("margin", { length: 16 }).notNull(),
-    youtubeUrl: text("youtube_url").notNull(),
+    youtubeUrl: text("youtube_url"),
+    /** `intradark-media` object path (no leading slash), e.g. utility/de_mirage/smoke/uuid.mp4 */
+    videoObjectPath: text("video_object_path"),
     videoStartMs: integer("video_start_ms").default(0).notNull(),
     videoEndMs: integer("video_end_ms"),
+    /** Editorial still-frame times (ms) — stand POV, throw POV, land/bloom on site */
+    stillStandMs: integer("still_stand_ms"),
+    stillThrowMs: integer("still_throw_ms"),
+    stillLandMs: integer("still_land_ms"),
+    /** Grenade release / smoke or utility bloom (ms) within clip */
+    grenadeReleaseMs: integer("grenade_release_ms"),
+    grenadeBloomMs: integer("grenade_bloom_ms"),
     lineupImageUrl: text("lineup_image_url"),
     description: text("description").notNull(),
     setposText: text("setpos_text"),
@@ -365,7 +485,11 @@ export const utilityLineups = pgTable(
       table.grenadeType,
       table.side,
     ),
-    index("utility_lineups_land_spot_id_idx").on(table.landSpotId),
+    index("utility_lineups_map_land_xy_idx").on(
+      table.mapId,
+      table.landSpotX,
+      table.landSpotY,
+    ),
     check(
       "utility_lineups_grenade_type_check",
       sql`(${table.grenadeType})::text = ANY ((ARRAY['smoke'::character varying, 'molotov'::character varying, 'flashbang'::character varying, 'he'::character varying])::text[])`,
@@ -388,7 +512,149 @@ export const utilityLineups = pgTable(
     ),
     check(
       "utility_lineups_status_check",
-      sql`(${table.status})::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying])::text[])`,
+      sql`(${table.status})::text = ANY ((ARRAY['draft'::character varying, 'published'::character varying, 'pending'::character varying])::text[])`,
+    ),
+    check(
+      "utility_lineups_video_source_check",
+      sql`(${table.status})::text = 'draft'::text OR NULLIF(btrim(COALESCE(${table.youtubeUrl}, '')), '') IS NOT NULL OR NULLIF(btrim(COALESCE(${table.videoObjectPath}, '')), '') IS NOT NULL`,
+    ),
+    check(
+      "utility_lineups_throw_spot_x_check",
+      sql`(${table.throwSpotX} >= 0::double precision) AND (${table.throwSpotX} <= 1::double precision)`,
+    ),
+    check(
+      "utility_lineups_throw_spot_y_check",
+      sql`(${table.throwSpotY} >= 0::double precision) AND (${table.throwSpotY} <= 1::double precision)`,
+    ),
+    check(
+      "utility_lineups_land_spot_x_check",
+      sql`(${table.landSpotX} >= 0::double precision) AND (${table.landSpotX} <= 1::double precision)`,
+    ),
+    check(
+      "utility_lineups_land_spot_y_check",
+      sql`(${table.landSpotY} >= 0::double precision) AND (${table.landSpotY} <= 1::double precision)`,
+    ),
+  ],
+);
+
+/**
+ * Companion enemy POV videos for a utility lineup (`0015`). Each row references the
+ * source `utility_lineups` row; storage path lives under `utility/enemy-pov/...`.
+ */
+export const utilityLineupEnemyPovVideos = pgTable(
+  "utility_lineup_enemy_pov_videos",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    lineupId: uuid("lineup_id")
+      .notNull()
+      .references(() => utilityLineups.id, { onDelete: "cascade" }),
+    authorProfileId: uuid("author_profile_id").references(
+      () => userProfiles.id,
+      { onDelete: "set null" },
+    ),
+    videoObjectPath: text("video_object_path").notNull(),
+    description: text("description"),
+    videoStartMs: integer("video_start_ms").default(0).notNull(),
+    videoEndMs: integer("video_end_ms"),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("utility_lineup_enemy_pov_videos_lineup_id_idx").on(table.lineupId),
+    index("utility_lineup_enemy_pov_videos_author_idx").on(
+      table.authorProfileId,
+    ),
+    check(
+      "utility_lineup_enemy_pov_videos_video_end_after_start",
+      sql`${table.videoEndMs} IS NULL OR ${table.videoEndMs} > ${table.videoStartMs}`,
+    ),
+  ],
+);
+
+/** Background utility lineup video uploads — one row per queued upload until finalize (`0014`). */
+export const utilityLineupUploadJobs = pgTable(
+  "utility_lineup_upload_jobs",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    authorProfileId: uuid("author_profile_id")
+      .notNull()
+      .references(() => userProfiles.id, { onDelete: "cascade" }),
+    status: varchar("status", { length: 20 }).notNull(),
+    /** `'lineup'` (main video) or `'enemy_pov'` (companion). See `0015`. */
+    kind: text("kind").default("lineup").notNull(),
+    /** Set on enemy POV jobs to the parent `utility_lineups.id` (NULL for main jobs). */
+    parentLineupId: uuid("parent_lineup_id").references(
+      () => utilityLineups.id,
+      { onDelete: "cascade" },
+    ),
+    /** Set after enemy POV job finalize when the companion row is inserted. */
+    enemyPovVideoId: uuid("enemy_pov_video_id").references(
+      () => utilityLineupEnemyPovVideos.id,
+      { onDelete: "set null" },
+    ),
+    payloadJson: jsonb("payload_json").notNull(),
+    videoObjectPath: text("video_object_path").notNull(),
+    expectedByteLength: integer("expected_byte_length").notNull(),
+    errorMessage: text("error_message"),
+    lineupId: uuid("lineup_id").references(() => utilityLineups.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("utility_lineup_upload_jobs_profile_status_idx").on(
+      table.authorProfileId,
+      table.status,
+      table.createdAt,
+    ),
+    index("utility_lineup_upload_jobs_kind_status_idx").on(
+      table.kind,
+      table.status,
+      table.createdAt,
+    ),
+    index("utility_lineup_upload_jobs_parent_lineup_idx").on(
+      table.parentLineupId,
+    ),
+    check(
+      "utility_lineup_upload_jobs_status_check",
+      sql`(${table.status})::text = ANY ((ARRAY[
+        'queued'::character varying,
+        'uploading'::character varying,
+        'finalizing'::character varying,
+        'completed'::character varying,
+        'failed'::character varying,
+        'cancelled'::character varying
+      ])::text[])`,
+    ),
+    check(
+      "utility_lineup_upload_jobs_kind_check",
+      sql`${table.kind} IN ('lineup', 'enemy_pov')`,
+    ),
+    check(
+      "utility_lineup_upload_jobs_kind_parent_check",
+      sql`(${table.kind} = 'enemy_pov' AND ${table.parentLineupId} IS NOT NULL)
+        OR (${table.kind} = 'lineup' AND ${table.parentLineupId} IS NULL)`,
     ),
   ],
 );

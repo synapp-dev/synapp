@@ -64,6 +64,62 @@
       "when": 1746409200000,
       "tag": "0008_maps_badge_image_url",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1746412800000,
+      "tag": "0009_map_callouts",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1746416400000,
+      "tag": "0010_utility_lineups_coordinates",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1746420000000,
+      "tag": "0011_maps_map_screenshot_url",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1746423600000,
+      "tag": "0012_utility_lineups_user_upload",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1746427200000,
+      "tag": "0013_utility_lineups_multi_timestamps",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1746430800000,
+      "tag": "0014_utility_lineup_upload_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1746434400000,
+      "tag": "0015_utility_lineup_enemy_pov_videos",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1746438000000,
+      "tag": "0016_role_templates_navigation_rbac",
+      "breakpoints": true
     }
   ]
 }
