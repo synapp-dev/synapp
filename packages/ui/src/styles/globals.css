@@ -56,7 +56,9 @@
   --brand-faceit: #fd5a00;
   --brand-bullyproof-primary: #038493;
   --brand-bullyproof-secondary: #ea6f4d;
-  
+  --brand-supersolt-primary: #beda8e;
+  --brand-supersolt-primary-foreground: #1a1a1a;
+
   /* Role badge colors */
   --role-teacher: var(--brand-bullyproof-primary);
   --role-teacher-text: #ffffff; /* White text for WCAG AA contrast on #038493 */
@@ -163,6 +165,8 @@
   --brand-faceit: #fd5a00;
   --brand-bullyproof-primary: #038493;
   --brand-bullyproof-secondary: #ea6f4d;
+  --brand-supersolt-primary: #beda8e;
+  --brand-supersolt-primary-foreground: #1a1a1a;
 
   /* Stratum2 Font Weights */
   --font-weight-thin: 100;
@@ -176,6 +180,8 @@
   --animate-ellipsis: ellipsis 1.5s steps(4, end) infinite;
   --animate-border-flash-red: border-flash-red 0.75s ease-in-out 1;
   --animate-border-flash-green: border-flash-green 0.75s ease-in-out 1;
+  --animate-sidebar-agent-chat-sent-pulse: sidebar-agent-chat-sent-pulse 1.35s
+    ease-out forwards;
   --animate-border-pulse-blue: border-pulse-blue 2s ease-in-out infinite;
   --animate-gavel-hit: gavel-hit 0.75s ease-in-out infinite;
   --animate-float-up-fade-out: float-up-fade-out 0.5s ease-out forwards;
@@ -205,6 +211,8 @@
     forwards;
   --animate-slide-down-fade-in-slowest: slide-down-fade-in 1s ease-out forwards;
   --animate-slide-up-fade-in-slowest: slide-up-fade-in 1s ease-out forwards;
+  /* 2× slowest slide-up-fade-in; used e.g. for dashboard hero value */
+  --animate-slide-up-fade-in-superslow: slide-up-fade-in 2s ease-out forwards;
   --animate-slide-left-fade-in-slowest: slide-left-fade-in 1s ease-out forwards;
   --animate-slide-right-fade-in-slowest: slide-right-fade-in 1s ease-out
     forwards;
@@ -218,13 +226,19 @@
   --animate-shake-twice: shake 0.3s ease-in-out 2;
   --animate-float-up-loop: float-up-loop 1.2s linear infinite;
   --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
+  --animate-utility-radar-beacon-ring: utility-radar-beacon-ring 2.1s ease-out
+    infinite;
   --animate-opacity-breathe-subtle: opacity-breathe-subtle 3.5s ease-in-out
     infinite;
   --animate-float-gentle: float-gentle 3s ease-in-out infinite;
   --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
   --animate-bounce-gentle: bounce-gentle 1.5s ease-in-out infinite;
   --animate-rotate-gradient: rotate-gradient 8s linear infinite;
-
+  /* Layer translate pans (pair with oversized `bg-cover` + clip). Use `animate-bg-*` or transition `translate` in JSX. */
+  --animate-bg-left: bg-animate-left 0.7s ease-in-out forwards;
+  --animate-bg-top: bg-animate-top 0.7s ease-in-out forwards;
+  --animate-bg-right: bg-animate-right 0.7s ease-in-out forwards;
+  --animate-bg-bottom: bg-animate-bottom 0.7s ease-in-out forwards;
   @keyframes gradient-animation {
     0%,
     100% {
@@ -591,6 +605,16 @@
       border-color: rgb(234 88 12);
     }
   }
+  @keyframes utility-radar-beacon-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+    100% {
+      transform: scale(5);
+      opacity: 0;
+    }
+  }
   @keyframes opacity-breathe-subtle {
     0%,
     100% {
@@ -655,6 +679,139 @@
       top: -30%;
       left: 120%;
     }
+  }
+
+  /* Horizontal / vertical pans via transform (percent is of the layer itself). */
+  @keyframes bg-animate-left {
+    from {
+      transform: translateX(12%);
+    }
+    to {
+      transform: translateX(-12%);
+    }
+  }
+  @keyframes bg-animate-right {
+    from {
+      transform: translateX(-12%);
+    }
+    to {
+      transform: translateX(12%);
+    }
+  }
+  @keyframes bg-animate-top {
+    from {
+      transform: translateY(12%);
+    }
+    to {
+      transform: translateY(-12%);
+    }
+  }
+  @keyframes bg-animate-bottom {
+    from {
+      transform: translateY(-12%);
+    }
+    to {
+      transform: translateY(12%);
+    }
+  }
+
+  /** Soft inset green — two beats; used when the agent sidebar sends a user message. */
+  @keyframes sidebar-agent-chat-sent-pulse {
+    0%,
+    100% {
+      box-shadow: inset 0 0 0 1px transparent;
+    }
+    12%,
+    26% {
+      box-shadow:
+        inset 0 0 0 1px rgb(34 197 94 / 0.48),
+        inset 0 0 36px rgb(34 197 94 / 0.08);
+    }
+    19%,
+    34% {
+      box-shadow: inset 0 0 0 1px transparent;
+    }
+    48%,
+    66% {
+      box-shadow:
+        inset 0 0 0 1px rgb(34 197 94 / 0.38),
+        inset 0 0 30px rgb(34 197 94 / 0.055);
+    }
+    56%,
+    78% {
+      box-shadow: inset 0 0 0 1px transparent;
+    }
+  }
+
+}
+
+/*
+ * Net revenue hero — soft blobs (radial stack + background-position pan).
+ * One shot: spread → 65% along the path toward full rest (halfway + 15pp), then hold.
+ */
+@keyframes net-revenue-hero-shift-blobs {
+  0% {
+    background-position:
+      88% 58%,
+      8% 72%,
+      62% 12%;
+  }
+  100% {
+    background-position:
+      38.6% 46.3%,
+      62.6% 43.4%,
+      52.9% 61.4%;
+  }
+}
+
+.net-revenue-hero-shifting-blobs {
+  background-size: 320% 320%;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(
+      ellipse 45% 42% at 50% 50%,
+      rgb(255 255 255 / 0.16) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 38% 48% at 50% 50%,
+      rgb(167 243 208 / 0.14) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 44% 40% at 50% 50%,
+      rgb(0 0 0 / 0.2) 0%,
+      transparent 52%
+    );
+  animation: net-revenue-hero-shift-blobs 6.5s ease forwards;
+}
+
+.dark .net-revenue-hero-shifting-blobs {
+  background-image:
+    radial-gradient(
+      ellipse 45% 42% at 50% 50%,
+      rgb(255 255 255 / 0.55) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 38% 48% at 50% 50%,
+      rgb(16 185 129 / 0.12) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 44% 40% at 50% 50%,
+      rgb(15 23 42 / 0.08) 0%,
+      transparent 52%
+    );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .net-revenue-hero-shifting-blobs {
+    animation: none;
+    background-position:
+      38.6% 46.3%,
+      62.6% 43.4%,
+      52.9% 61.4%;
   }
 }
 

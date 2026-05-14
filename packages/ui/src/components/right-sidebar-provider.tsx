@@ -88,8 +88,10 @@ export function RightSidebarProvider({
           data-slot="right-sidebar-wrapper"
           style={
             {
-              "--sidebar-width": SIDEBAR_WIDTH,
-              "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
+              // Dedicated tokens so apps can widen the right rail without
+              // overriding the left `Sidebar` (`--sidebar-width` from `SidebarProvider`).
+              "--right-sidebar-width": SIDEBAR_WIDTH,
+              "--right-sidebar-width-icon": SIDEBAR_WIDTH_ICON,
               ...style,
             } as React.CSSProperties
           }

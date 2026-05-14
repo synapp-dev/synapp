@@ -9,6 +9,7 @@ import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider
 export function RightSidebarTrigger({
   className,
   onClick,
+  children,
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar } = useRightSidebar();
@@ -26,7 +27,7 @@ export function RightSidebarTrigger({
       }}
       {...props}
     >
-      <PanelRightIcon />
+      {children ?? <PanelRightIcon />}
       <span className="sr-only">Toggle Right Sidebar</span>
     </Button>
   );
