@@ -16,6 +16,8 @@ import {
 } from "@workspace/ui/components/input-otp";
 import { Label } from "@workspace/ui/components/label";
 import { cn } from "@workspace/ui/lib/utils";
+import { supabaseAuthErrorMessage } from "@/lib/auth/supabase-auth-error-message";
+import { safeRelativeNextPath } from "@/server/square/safe-next-path";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { useMeStore } from "@/entities/me/model/store";
 
@@ -27,6 +29,8 @@ type AlertState = {
 
 type AuthMode = "signin" | "signup";
 
+type SignInExperience = "password" | "otp" | "forgot";
+
 function AuthFormContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -34,17 +38,22 @@ function AuthFormContent() {
   const resetMeStore = useMeStore((state) => state.reset);
   const supabase = useMemo(() => createBrowserClient(), []);
 
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = useMemo(
+    () => safeRelativeNextPath(searchParams.get("next")) ?? "/dashboard",
+    [searchParams]
+  );
   const emailParam = searchParams.get("email") ?? searchParams.get("username");
   const modeParam = searchParams.get("mode");
 
   const [mode, setMode] = useState<AuthMode>(
     modeParam === "signup" ? "signup" : "signin"
   );
+  const [signInExperience, setSignInExperience] = useState<SignInExperience>("password");
   const [email, setEmail] = useState(emailParam ?? "");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [signInPassword, setSignInPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [awaitingEmailConfirmation, setAwaitingEmailConfirmation] = useState(false);
   const [otp, setOtp] = useState("");
@@ -60,14 +69,20 @@ function AuthFormContent() {
     const desc = searchParams.get("error_description");
     const decoded = desc ? decodeURIComponent(desc) : "";
     const messages: Record<string, string> = {
-      auth_callback_missing_code: "The confirmation link was incomplete. Request a new link from the sign-up screen.",
+      auth_callback_missing_code:
+        "The confirmation link was incomplete. Request a new link from the sign-up screen.",
       auth_callback_exchange_failed:
-        decoded || "We could not complete sign-in from your link. Try again or request a new confirmation email.",
-      confirm_email: "Please confirm your email using the link we sent you before using the app.",
+        "We could not complete sign-in from your link. Try again or request a new confirmation email.",
+      confirm_email:
+        "Please confirm your email using the link we sent you before using the app.",
     };
+    const fallback =
+      err === "auth_callback_exchange_failed" && decoded
+        ? supabaseAuthErrorMessage({ message: decoded })
+        : decoded;
     setAlert({
       title: "Something went wrong",
-      description: messages[err] ?? decoded ?? "Authentication error. Try again.",
+      description: messages[err] ?? fallback ?? "Authentication error. Try again.",
       tone: "error",
     });
   }, [searchParams]);
@@ -79,10 +94,12 @@ function AuthFormContent() {
 
   const setModeAndResetOtp = (next: AuthMode) => {
     setMode(next);
+    setSignInExperience("password");
     setAlert(null);
     setIsOtpStep(false);
     setOtp("");
     setPassword("");
+    setSignInPassword("");
     setConfirmPassword("");
     setAwaitingEmailConfirmation(false);
   };
@@ -93,6 +110,98 @@ function AuthFormContent() {
     }
     const next = nextPath.startsWith("/") ? nextPath : "/dashboard";
     return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+  };
+
+  const recoveryRedirectTo = () => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const next = "/auth/update-password";
+    return `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
+  };
+
+  const handleSignInWithPassword = async () => {
+    setAlert(null);
+    setIsSubmitting(true);
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!normalizedEmail.includes("@")) {
+        setAlert({
+          title: "Invalid email",
+          description: "Enter a valid email address.",
+          tone: "error",
+        });
+        return;
+      }
+      if (signInPassword.length < 6) {
+        setAlert({
+          title: "Password required",
+          description: "Enter your password (at least 6 characters).",
+          tone: "error",
+        });
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: signInPassword,
+      });
+
+      if (error) {
+        setAlert({
+          title: "Sign-in failed",
+          description: supabaseAuthErrorMessage(error),
+          tone: "error",
+        });
+        return;
+      }
+
+      clearClientState();
+      router.push(nextPath);
+      router.refresh();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    setAlert(null);
+    setIsSubmitting(true);
+    try {
+      const normalizedEmail = email.trim().toLowerCase();
+      if (!normalizedEmail.includes("@")) {
+        setAlert({
+          title: "Invalid email",
+          description: "Enter a valid email address.",
+          tone: "error",
+        });
+        return;
+      }
+
+      const redirectTo = recoveryRedirectTo();
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo,
+      });
+
+      if (error) {
+        setAlert({
+          title: "Could not send reset email",
+          description: supabaseAuthErrorMessage(error),
+          tone: "error",
+        });
+        return;
+      }
+
+      setAlert({
+        title: "Check your email",
+        description:
+          "If an account exists for that address, we sent a link to reset your password. Open it on this device to continue.",
+        tone: "info",
+      });
+      setSignInExperience("password");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSignUp = async () => {
@@ -156,7 +265,7 @@ function AuthFormContent() {
       if (error) {
         setAlert({
           title: "Unable to create account",
-          description: error.message,
+          description: supabaseAuthErrorMessage(error),
           tone: "error",
         });
         return;
@@ -200,7 +309,7 @@ function AuthFormContent() {
       if (error) {
         setAlert({
           title: "Could not resend",
-          description: error.message,
+          description: supabaseAuthErrorMessage(error),
           tone: "error",
         });
         return;
@@ -250,7 +359,7 @@ function AuthFormContent() {
       if (error) {
         setAlert({
           title: "Unable to send code",
-          description: error.message,
+          description: supabaseAuthErrorMessage(error),
           tone: "error",
         });
         return;
@@ -294,7 +403,7 @@ function AuthFormContent() {
       if (error) {
         setAlert({
           title: "Verification failed",
-          description: error.message,
+          description: supabaseAuthErrorMessage(error),
           tone: "error",
         });
         return;
@@ -317,6 +426,14 @@ function AuthFormContent() {
       await handleSignUp();
       return;
     }
+    if (signInExperience === "forgot") {
+      await handleForgotPassword();
+      return;
+    }
+    if (signInExperience === "password") {
+      await handleSignInWithPassword();
+      return;
+    }
     if (isOtpStep) {
       await handleVerifyOtp();
       return;
@@ -333,7 +450,92 @@ function AuthFormContent() {
     password.length >= 6 &&
     password === confirmPassword;
 
-  const canSendCode = mode === "signin" && email.trim();
+  const canSendCode = mode === "signin" && signInExperience === "otp" && email.trim();
+
+  const canSubmitPasswordSignIn =
+    mode === "signin" &&
+    signInExperience === "password" &&
+    email.trim().includes("@") &&
+    signInPassword.length >= 6;
+
+  const canSubmitForgot =
+    mode === "signin" && signInExperience === "forgot" && email.trim().includes("@");
+
+  const signInHeadline = () => {
+    if (mode === "signup") {
+      return awaitingEmailConfirmation ? "Confirm your email" : "Create your account";
+    }
+    if (signInExperience === "forgot") {
+      return "Reset your password";
+    }
+    if (signInExperience === "otp") {
+      return isOtpStep ? "Enter verification code" : "Sign in with a code";
+    }
+    return "Welcome back";
+  };
+
+  const signInSubline = () => {
+    if (mode === "signup") {
+      return awaitingEmailConfirmation
+        ? "Confirm your address using the link in your email, then sign in with a one-time code."
+        : "Choose a password, then we will email you a link to confirm your account.";
+    }
+    if (signInExperience === "forgot") {
+      return "We will email you a link to choose a new password.";
+    }
+    if (signInExperience === "otp") {
+      return isOtpStep
+        ? "Enter the 6-digit code we sent to your inbox."
+        : "We will send a one-time code to your email.";
+    }
+    return "Sign in with your email and password, or use a one-time code instead.";
+  };
+
+  const submitDisabled = () => {
+    if (isSubmitting) {
+      return true;
+    }
+    if (mode === "signup" && awaitingEmailConfirmation) {
+      return true;
+    }
+    if (mode === "signup" && !awaitingEmailConfirmation) {
+      return !canSubmitSignUp;
+    }
+    if (signInExperience === "forgot") {
+      return !canSubmitForgot;
+    }
+    if (signInExperience === "password") {
+      return !canSubmitPasswordSignIn;
+    }
+    if (isOtpStep) {
+      return otp.length !== 6;
+    }
+    return !canSendCode;
+  };
+
+  const submitLabel = () => {
+    if (isSubmitting) {
+      return (
+        <span className="flex items-center justify-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Working...
+        </span>
+      );
+    }
+    if (mode === "signup" && !awaitingEmailConfirmation) {
+      return "Create account";
+    }
+    if (signInExperience === "forgot") {
+      return "Send reset link";
+    }
+    if (signInExperience === "password") {
+      return "Sign in";
+    }
+    if (isOtpStep) {
+      return "Verify code";
+    }
+    return "Send code";
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -375,16 +577,8 @@ function AuthFormContent() {
               </div>
 
               <div className="space-y-1 text-center">
-                <h1 className="text-2xl font-semibold">
-                  {mode === "signup" ? "Create your account" : "Welcome back"}
-                </h1>
-                <p className="text-muted-foreground text-sm">
-                  {mode === "signup"
-                    ? awaitingEmailConfirmation
-                      ? "Confirm your address using the link in your email, then sign in with a one-time code."
-                      : "Choose a password, then we will email you a link to confirm your account."
-                    : "Sign in with a one-time code sent to your email."}
-                </p>
+                <h1 className="text-2xl font-semibold">{signInHeadline()}</h1>
+                <p className="text-muted-foreground text-sm">{signInSubline()}</p>
               </div>
 
               {alert ? (
@@ -457,6 +651,35 @@ function AuthFormContent() {
                   </>
                 ) : null}
 
+                {mode === "signin" && signInExperience === "password" ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="signin-password">Password</Label>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground text-xs font-medium underline-offset-4 hover:underline"
+                        onClick={() => {
+                          setAlert(null);
+                          setSignInExperience("forgot");
+                          setSignInPassword("");
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <Input
+                      id="signin-password"
+                      type="password"
+                      autoComplete="current-password"
+                      value={signInPassword}
+                      onChange={(e) => setSignInPassword(e.target.value)}
+                      disabled={isSubmitting}
+                      placeholder="Your password"
+                    />
+                  </div>
+                ) : null}
+
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input
@@ -466,11 +689,15 @@ function AuthFormContent() {
                     placeholder="you@example.com"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    disabled={isSubmitting || isOtpStep || awaitingEmailConfirmation}
+                    disabled={
+                      isSubmitting ||
+                      (mode === "signin" && signInExperience === "otp" && isOtpStep) ||
+                      awaitingEmailConfirmation
+                    }
                   />
                 </div>
 
-                {isOtpStep ? (
+                {mode === "signin" && signInExperience === "otp" && isOtpStep ? (
                   <div className="space-y-2">
                     <Label htmlFor="verification-code">Verification code</Label>
                     <InputOTP
@@ -497,31 +724,8 @@ function AuthFormContent() {
               </div>
 
               <div className="mt-auto space-y-3">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={
-                    isSubmitting ||
-                    (mode === "signup" &&
-                      !awaitingEmailConfirmation &&
-                      !canSubmitSignUp) ||
-                    (mode === "signin" && !isOtpStep && !canSendCode) ||
-                    (mode === "signin" && isOtpStep && otp.length !== 6) ||
-                    (mode === "signup" && awaitingEmailConfirmation)
-                  }
-                >
-                  {isSubmitting ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Working...
-                    </span>
-                  ) : isOtpStep ? (
-                    "Verify code"
-                  ) : mode === "signup" && !awaitingEmailConfirmation ? (
-                    "Create account"
-                  ) : (
-                    "Send code"
-                  )}
+                <Button type="submit" className="w-full" disabled={submitDisabled()}>
+                  {submitLabel()}
                 </Button>
                 {mode === "signup" && awaitingEmailConfirmation ? (
                   <Button
@@ -534,7 +738,7 @@ function AuthFormContent() {
                     Resend confirmation email
                   </Button>
                 ) : null}
-                {isOtpStep ? (
+                {mode === "signin" && signInExperience === "otp" && isOtpStep ? (
                   <Button
                     type="button"
                     variant="outline"
@@ -543,6 +747,53 @@ function AuthFormContent() {
                     disabled={isSubmitting}
                   >
                     Resend code
+                  </Button>
+                ) : null}
+                {mode === "signin" && signInExperience === "forgot" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setSignInExperience("password");
+                      setAlert(null);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Back to sign in
+                  </Button>
+                ) : null}
+                {mode === "signin" && signInExperience === "password" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setAlert(null);
+                      setSignInExperience("otp");
+                      setSignInPassword("");
+                      setIsOtpStep(false);
+                      setOtp("");
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Use a one-time code instead
+                  </Button>
+                ) : null}
+                {mode === "signin" && signInExperience === "otp" && !isOtpStep ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setAlert(null);
+                      setSignInExperience("password");
+                      setIsOtpStep(false);
+                      setOtp("");
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Use password instead
                   </Button>
                 ) : null}
                 <p className="text-center text-sm text-muted-foreground">
@@ -577,10 +828,7 @@ function AuthFormContent() {
           <div className="bg-muted relative hidden flex-col items-center justify-center overflow-hidden md:flex">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-background" />
             <div className="relative z-10 px-10 text-center">
-              <SupersoltLogo
-                variant="wordmark"
-                className="mx-auto mb-6 h-8 w-auto"
-              />
+              <SupersoltLogo variant="wordmark" className="mx-auto mb-6 h-8 w-auto" />
               <p className="text-muted-foreground text-sm">
                 Hospitality operations, inventory, and workforce in one place.
               </p>

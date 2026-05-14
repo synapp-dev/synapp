@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { SupersoltLogo } from "@/components/atoms/supersolt-logo";
 import { usePathname } from "next/navigation";
-import { Building2 } from "lucide-react";
+import { Bot, Building2 } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import {
@@ -18,7 +18,9 @@ import {
 } from "@workspace/ui/components/breadcrumb";
 import { ThemeToggle } from "@/components/atoms/theme-toggle";
 import { CommandMenu } from "@/components/molecules/command-menu";
+import { shouldShowAgentRightShell } from "@/entities/ai-agent-chat/lib/agent-right-shell-pathname";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
+import { RightSidebarTrigger } from "@workspace/ui/components/right-sidebar-trigger";
 
 const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   "auth",
@@ -230,6 +232,11 @@ export function AppHeader() {
         <CommandMenu />
         <div className="mx-2 h-0.5 w-0.5 rounded-full bg-muted-foreground" />
         <ThemeToggle />
+        {shouldShowAgentRightShell(pathname) ? (
+          <RightSidebarTrigger className="-mr-1">
+            <Bot />
+          </RightSidebarTrigger>
+        ) : null}
       </div>
     </header>
   );

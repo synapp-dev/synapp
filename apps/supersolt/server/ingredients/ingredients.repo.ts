@@ -10,10 +10,18 @@ export const ingredientsRepo = {
     supabase: Supabase,
     organisationSlug: string,
     venueSlug: string
-  ): Promise<{ organisationId: string; venueId: string; timezone: string } | null> {
+  ): Promise<{
+    organisationId: string;
+    venueId: string;
+    timezone: string;
+    organisationName: string;
+    venueName: string;
+  } | null> {
     const { data, error } = await supabase
       .from("venues")
-      .select("id, organisation_id, timezone, organisations:organisation_id (slug)")
+      .select(
+        "id, name, organisation_id, timezone, organisations:organisation_id (slug, name)",
+      )
       .eq("slug", venueSlug)
       .eq("is_active", true)
       .is("archived_at", null)
@@ -24,12 +32,27 @@ export const ingredientsRepo = {
       return null;
     }
 
-    const venueRow = data as { id: string; organisation_id: string; timezone: string };
+    const row = data as {
+      id: string;
+      name: string;
+      organisation_id: string;
+      timezone: string;
+      organisations: { slug: string; name: string } | { slug: string; name: string }[];
+    };
+
+    const orgRel = Array.isArray(row.organisations)
+      ? row.organisations[0]
+      : row.organisations;
+    if (!orgRel?.name) {
+      return null;
+    }
 
     return {
-      organisationId: venueRow.organisation_id,
-      venueId: venueRow.id,
-      timezone: venueRow.timezone,
+      organisationId: row.organisation_id,
+      venueId: row.id,
+      timezone: row.timezone,
+      organisationName: orgRel.name,
+      venueName: row.name,
     };
   },
 

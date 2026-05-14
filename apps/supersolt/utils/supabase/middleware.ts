@@ -66,6 +66,9 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname.startsWith("/auth");
+  const isUpdatePasswordRoute =
+    pathname === "/auth/update-password" ||
+    pathname.startsWith("/auth/update-password/");
   const isSetupRoute = pathname === "/setup" || pathname.startsWith("/setup/");
   const isLogoutRoute = pathname === "/logout" || pathname.startsWith("/logout/");
 
@@ -106,7 +109,7 @@ export async function updateSession(request: NextRequest) {
         : user
           ? needsSetup
             ? "/setup"
-            : "/dashboard"
+            : "/agent"
           : "/auth";
     const redirectResponse = NextResponse.redirect(new URL(target, request.url));
     copyCookies(response, redirectResponse);
@@ -143,14 +146,14 @@ export async function updateSession(request: NextRequest) {
 
   if (user && !needsSetup && isSetupRoute) {
     const redirectResponse = NextResponse.redirect(
-      new URL("/dashboard", request.url)
+      new URL("/agent", request.url)
     );
     copyCookies(response, redirectResponse);
     return redirectResponse;
   }
 
-  if (user && emailConfirmed && isAuthRoute) {
-    const target = needsSetup ? "/setup" : "/dashboard";
+  if (user && emailConfirmed && isAuthRoute && !isUpdatePasswordRoute) {
+    const target = needsSetup ? "/setup" : "/agent";
     const redirectResponse = NextResponse.redirect(new URL(target, request.url));
     copyCookies(response, redirectResponse);
     return redirectResponse;

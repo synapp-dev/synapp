@@ -8,7 +8,7 @@ export default async function IndexPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    redirect("/dashboard");
+    redirect("/agent");
   }
 
   redirect("/auth");

@@ -17,6 +17,7 @@ export const config = {
     "/setup/:path*",
     "/agent",
     "/agent/:path*",
+    "/api/agent/:path*",
     "/:organisation/:venue/:path*",
   ],
 };

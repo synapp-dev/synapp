@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -45,6 +45,9 @@ import {
   type Venue,
 } from "@/components/organisms/venue-switcher";
 import { NavUser } from "@/components/molecules/nav-user";
+import {
+  useScopedNavigation,
+} from "@/entities/access/scoped-navigation-context";
 import { useMeStore } from "@/entities/me/model/store";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 import {
@@ -97,33 +100,6 @@ function buildScopedPath(
   return `/${organisationSlug}/${venueSlug}/${sectionPath}`;
 }
 
-function getScopedContext(pathname: string) {
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length < 2) {
-    return null;
-  }
-
-  const [first, second] = segments;
-  if (
-    !first ||
-    !second ||
-    first === "auth" ||
-    first === "agent" ||
-    first === "dashboard" ||
-    first === "support" ||
-    first === "settings" ||
-    first === "logout" ||
-    first === "setup"
-  ) {
-    return null;
-  }
-
-  return {
-    organisationSlug: first,
-    venueSlug: second,
-  };
-}
-
 function buildVenueNavigationPath(
   pathname: string,
   organisationSlug: string,
@@ -143,6 +119,15 @@ function buildVenueNavigationPath(
     }
 
     return `/${organisationSlug}/${venueSlug}/${rest.join("/")}`;
+  }
+
+  // Unscoped app shell routes (e.g. /agent, /dashboard): keep the path when the
+  // venue switcher resolves — do not force a jump into scoped insights.
+  if (
+    first !== undefined &&
+    RESERVED_TOP_LEVEL_SEGMENTS.has(first)
+  ) {
+    return `/${segments.join("/")}`;
   }
 
   return `/${organisationSlug}/${venueSlug}/${DEFAULT_SCOPED_SECTION_PATH}`;
@@ -500,33 +485,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const topPlatformNavItems = needsSetupNav
     ? setupOnlyPlatformNavItems
     : defaultTopPlatformNavItems;
-  const activeScopedContext = useMemo(
-    () => getScopedContext(pathname),
-    [pathname],
-  );
-  const [selectedScopedContext, setSelectedScopedContext] = useState<{
-    organisationSlug: string;
-    venueSlug: string;
-  } | null>(activeScopedContext);
-
-  useEffect(() => {
-    if (!activeScopedContext) {
-      return;
-    }
-
-    setSelectedScopedContext((previous) => {
-      if (
-        previous?.organisationSlug === activeScopedContext.organisationSlug &&
-        previous?.venueSlug === activeScopedContext.venueSlug
-      ) {
-        return previous;
-      }
-
-      return activeScopedContext;
-    });
-  }, [activeScopedContext?.organisationSlug, activeScopedContext?.venueSlug]);
-
-  const resolvedScope = selectedScopedContext ?? activeScopedContext;
+  const {
+    activeScopedContext,
+    resolvedScope,
+    setScopedContext,
+  } = useScopedNavigation();
   const { data: accessOrganisations = [] } = useAccessibleVenueGroupsQuery({
     enabled: Boolean(resolvedScope?.organisationSlug),
   });
@@ -593,7 +556,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               }
               currentVenueSlug={activeScopedContext?.venueSlug ?? null}
               onVenueChange={(venue: Venue) => {
-                setSelectedScopedContext({
+                setScopedContext({
                   organisationSlug: venue.organisationSlug,
                   venueSlug: venue.slug,
                 });
