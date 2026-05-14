@@ -6,8 +6,10 @@ interface StaggeredAnimationProps {
   index: number;
   baseDelay?: number;
   incrementDelay?: number;
+  /** When set, used as the CSS animation delay in seconds (overrides baseDelay / index math). */
+  delaySeconds?: number;
   className?: string;
-  fadeDirection?: "up" | "down" | "left" | "right";
+  fadeDirection?: "up" | "down" | "left" | "right" | "upFromBottom";
 }
 
 export function StaggeredAnimation({
@@ -15,10 +17,14 @@ export function StaggeredAnimation({
   index,
   baseDelay = 0.2,
   incrementDelay = 0.15,
+  delaySeconds,
   className,
   fadeDirection = "down",
 }: StaggeredAnimationProps) {
-  const delay = baseDelay + (index + 1) * incrementDelay;
+  const delay =
+    delaySeconds !== undefined
+      ? delaySeconds
+      : baseDelay + (index + 1) * incrementDelay;
 
   const getFadeAnimation = () => {
     switch (fadeDirection) {
@@ -30,8 +36,8 @@ export function StaggeredAnimation({
         return "animate-slide-left-fade-in";
       case "right":
         return "animate-slide-right-fade-in";
-      default:
-        return "animate-slide-down-fade-in";
+      case "upFromBottom":
+        return "animate-slide-up-from-bottom";
     }
   };
 
@@ -39,7 +45,7 @@ export function StaggeredAnimation({
     <div
       className={cn("opacity-0", getFadeAnimation(), className)}
       style={{
-        animationDelay: `${delay.toFixed(2)}s`,
+        animationDelay: `${delay.toFixed(3)}s`,
         animationFillMode: "forwards",
       }}
     >

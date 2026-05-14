@@ -1,0 +1,73 @@
+import {
+  BarChart3,
+  Boxes,
+  Building2,
+  CalendarDays,
+  Carrot,
+  ClipboardList,
+  Clock3,
+  CookingPot,
+  FileDown,
+  FileText,
+  HardHat,
+  LayoutDashboard,
+  LayoutGrid,
+  MapPin,
+  NotebookPen,
+  PackageCheck,
+  Plane,
+  Plug,
+  Receipt,
+  Settings,
+  Shield,
+  ShoppingCart,
+  Timer,
+  Trash2,
+  TrendingUp,
+  Truck,
+  type LucideIcon,
+  Users,
+} from "lucide-react";
+
+import type { AppNavigationDestinationKey } from "@/entities/ai-agent-chat/lib/app-navigation-catalog";
+
+/** Matches sidebar icons in `app-sidebar.tsx` for the same destinations. */
+export const APP_NAVIGATION_DESTINATION_ICONS = {
+  insights: BarChart3,
+  insights_sales: TrendingUp,
+  insights_labour: HardHat,
+  insights_inventory: Boxes,
+  insights_p_and_l: FileText,
+  catalog: LayoutGrid,
+  catalog_items: CookingPot,
+  catalog_menu: ClipboardList,
+  ingredients: Carrot,
+  inventory: Boxes,
+  inventory_overview: LayoutDashboard,
+  inventory_order_guide: FileText,
+  inventory_purchase_orders: ShoppingCart,
+  inventory_invoices: Receipt,
+  inventory_stock_counts: PackageCheck,
+  inventory_waste: Trash2,
+  inventory_suppliers: Truck,
+  workforce: Users,
+  workforce_people: Users,
+  workforce_roster: CalendarDays,
+  workforce_availability: Clock3,
+  workforce_leave: Plane,
+  workforce_timesheets: Timer,
+  workforce_payroll_export: FileDown,
+  operations: ClipboardList,
+  operations_daybook: NotebookPen,
+  settings: Settings,
+  settings_permissions: Shield,
+  settings_organisation: Building2,
+  settings_venue: MapPin,
+  settings_integrations: Plug,
+} satisfies Record<AppNavigationDestinationKey, LucideIcon>;
+
+export function getAppNavigationDestinationIcon(
+  key: AppNavigationDestinationKey,
+): LucideIcon {
+  return APP_NAVIGATION_DESTINATION_ICONS[key];
+}
