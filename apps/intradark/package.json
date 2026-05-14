@@ -15,6 +15,10 @@
     "verify:supabase-cutover": "node ../../scripts/supabase/verify-cutover.mjs",
     "pull-and-fix-schema": "tsx scripts/pull-and-fix-schema.ts",
     "seed": "tsx scripts/seed-steam-tables.ts",
+    "seed:mirage-lineups": "tsx scripts/seed-mirage-lineups.ts",
+    "seed:dust2-lineups": "dotenv -e .env.local -- tsx scripts/seed-dust2-lineups.ts",
+    "storage:raw-upload-test": "dotenv -e .env.local -- tsx scripts/storage-raw-upload-test.ts",
+    "generate:dust2-lineups-sql": "tsx scripts/generate-dust2-lineups-sql.ts",
     "discord-bot": "dotenv -e .env.local -- tsx discord-bot/index.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
@@ -52,9 +56,11 @@
     "react-fast-marquee": "^1.6.5",
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^3.0.3",
+    "react-zoom-pan-pinch": "^4.0.3",
     "recharts": "2.15.4",
     "sonner": "^2.0.6",
     "three": "^0.180.0",
+    "tus-js-client": "^4.3.1",
     "vaul": "^1.1.2",
     "zod": "^4.4.3",
     "zustand": "^5.0.6"
