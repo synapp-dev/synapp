@@ -1,10 +1,11 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db/drizzle";
 import {
+  mapCallouts,
   maps,
   mapPools,
+  userProfiles,
   utilityLineups,
   utilityMapSpots,
 } from "@/server/db/schema";
@@ -19,11 +20,19 @@ export async function listActiveUtilityMaps() {
       displayName: maps.displayName,
       radarImageUrl: maps.radarImageUrl,
       badgeImageUrl: maps.badgeImageUrl,
+      mapScreenshotUrl: maps.mapScreenshotUrl,
       sortOrder: maps.sortOrder,
+      poolSlug: mapPools.slug,
+      poolDisplayName: mapPools.displayName,
     })
     .from(maps)
+    .innerJoin(mapPools, eq(maps.poolId, mapPools.id))
     .where(eq(maps.isActive, true))
-    .orderBy(asc(maps.sortOrder), asc(maps.displayName));
+    .orderBy(
+      asc(mapPools.sortOrder),
+      asc(maps.sortOrder),
+      asc(maps.displayName),
+    );
 }
 
 export async function getActiveUtilityMapBySlug(slug: string) {
@@ -33,6 +42,20 @@ export async function getActiveUtilityMapBySlug(slug: string) {
     .where(and(eq(maps.slug, slug), eq(maps.isActive, true)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/** Any map row by slug (includes inactive) — developer tooling. */
+export async function getMapBySlugAny(slug: string) {
+  const rows = await db.select().from(maps).where(eq(maps.slug, slug)).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listMapCalloutsForMap(mapId: string) {
+  return db
+    .select()
+    .from(mapCallouts)
+    .where(eq(mapCallouts.mapId, mapId))
+    .orderBy(desc(mapCallouts.priority), asc(mapCallouts.label));
 }
 
 export async function listMapsWithPoolsForAdmin() {
@@ -59,13 +82,19 @@ export async function listUtilityMapSpotsForMap(mapId: string) {
     .orderBy(asc(utilityMapSpots.label));
 }
 
-const throwSpot = alias(utilityMapSpots, "utility_throw_spot");
-const landSpot = alias(utilityMapSpots, "utility_land_spot");
+/** All spots for admin maps UI (group by `mapId` on the client). */
+export async function listAllUtilityMapSpotsForAdmin() {
+  return db
+    .select()
+    .from(utilityMapSpots)
+    .orderBy(asc(utilityMapSpots.mapId), asc(utilityMapSpots.label));
+}
 
 export type UtilityLineupWithSpotLabels = {
   lineup: typeof utilityLineups.$inferSelect;
-  throwLabel: string;
-  landLabel: string;
+  authorDisplayName: string | null;
+  authorUsername: string | null;
+  authorAvatarUrl: string | null;
 };
 
 export async function listPublishedUtilityLineupsForMap(
@@ -90,11 +119,41 @@ export async function listPublishedUtilityLineupsForMap(
   return db
     .select({
       lineup: utilityLineups,
-      throwLabel: throwSpot.label,
-      landLabel: landSpot.label,
+      authorDisplayName: userProfiles.displayName,
+      authorUsername: userProfiles.username,
+      authorAvatarUrl: userProfiles.avatarUrl,
     })
     .from(utilityLineups)
-    .innerJoin(throwSpot, eq(utilityLineups.throwSpotId, throwSpot.id))
-    .innerJoin(landSpot, eq(utilityLineups.landSpotId, landSpot.id))
+    .leftJoin(userProfiles, eq(utilityLineups.authorProfileId, userProfiles.id))
     .where(and(...conditions));
+}
+
+export async function listPendingUtilityLineupsForAdmin() {
+  return db
+    .select({
+      lineup: utilityLineups,
+      mapSlug: maps.slug,
+      mapDisplayName: maps.displayName,
+    })
+    .from(utilityLineups)
+    .innerJoin(maps, eq(utilityLineups.mapId, maps.id))
+    .where(eq(utilityLineups.status, "pending"))
+    .orderBy(desc(utilityLineups.createdAt));
+}
+
+/** Labels for `/utility` map cards (`map_pools.slug` → display copy). */
+export function formatUtilityMapPoolCategory(
+  poolSlug: string,
+  poolDisplayName: string,
+): string {
+  switch (poolSlug) {
+    case "active_duty":
+      return "Active Duty";
+    case "reserve":
+      return "Reserved";
+    case "community":
+      return "Community";
+    default:
+      return poolDisplayName;
+  }
 }

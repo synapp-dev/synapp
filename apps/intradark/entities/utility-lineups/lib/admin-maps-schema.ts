@@ -14,6 +14,7 @@ export const adminMapUpdateSchema = z.object({
   poolId: z.string().uuid(),
   radarImageUrl: z.string().max(8000),
   badgeImageUrl: z.string().max(8000),
+  mapScreenshotUrl: z.string().max(8000),
   isActive: z.boolean(),
   sortOrder: z.number().int().min(-1_000_000).max(1_000_000),
 });

@@ -1,0 +1,1922 @@
+[
+  {
+    "id": "community_e05c9a7d7c0f",
+    "throwTo": {
+      "x": 81,
+      "y": 188,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 237,
+      "y": 610,
+      "levels": [1]
+    },
+    "titleFrom": "Outside B Tunnels",
+    "titleTo": "B Plat",
+    "bounces": [],
+    "slug": "e05c9a7d7c0f-b-plat-from-outside-b-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "MIlae0QQqfs",
+      "start": 0,
+      "end": null,
+      "author": "The Lucky One"
+    }
+  },
+  {
+    "id": "community_c85863193a96",
+    "throwTo": {
+      "x": 690,
+      "y": 230,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 669,
+      "y": 496,
+      "levels": [1]
+    },
+    "titleFrom": "Long",
+    "titleTo": "CT Spawn",
+    "bounces": [],
+    "slug": "c85863193a96-ct-spawn-from-long",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "neAvfJFu2fY",
+      "start": 0,
+      "end": null,
+      "author": "NF Nades CS2"
+    }
+  },
+  {
+    "id": "community_acecc3139a95",
+    "throwTo": {
+      "x": 447,
+      "y": 356,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 479,
+      "y": 976,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn Corner",
+    "titleTo": "Mid Doors",
+    "bounces": [],
+    "slug": "acecc3139a95-mid-doors-from-t-spawn-corner",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "vnKH4ncvA4c",
+      "start": 0,
+      "end": null,
+      "author": "Jonas"
+    }
+  },
+  {
+    "id": "community_e352bae9d252",
+    "throwTo": {
+      "x": 443,
+      "y": 706,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 476,
+      "y": 270,
+      "levels": [1]
+    },
+    "titleFrom": "CT Mid",
+    "titleTo": "Drop",
+    "bounces": [],
+    "slug": "e352bae9d252-drop-from-ct-mid",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "m_nAwpBXKeQ",
+      "start": 0,
+      "end": null,
+      "author": "So?"
+    }
+  },
+  {
+    "id": "community_21d860774a06",
+    "throwTo": {
+      "x": 816,
+      "y": 161,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 619,
+      "y": 415,
+      "levels": [1]
+    },
+    "titleFrom": "A Short",
+    "titleTo": "A Site",
+    "bounces": [],
+    "slug": "21d860774a06-a-site-from-a-short",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "GtseaP77j0o",
+      "start": 0,
+      "end": null,
+      "author": "The Lucky One"
+    }
+  },
+  {
+    "id": "community_c4c03ee4add7",
+    "throwTo": {
+      "x": 690,
+      "y": 230,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 656,
+      "y": 649,
+      "levels": [1]
+    },
+    "titleFrom": "Top Mid",
+    "titleTo": "CT Spawn",
+    "bounces": [],
+    "slug": "c4c03ee4add7-ct-spawn-from-top-mid",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "OPOfqx0F2IY",
+      "start": 0,
+      "end": null,
+      "author": "Zach"
+    }
+  },
+  {
+    "id": "community_db13f0304d0f",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 614,
+      "y": 352,
+      "levels": [1]
+    },
+    "titleFrom": "Catwalk Stairs",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "db13f0304d0f-a-cross-from-catwalk-stairs",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "mHCkh7X2K3k",
+      "start": 0,
+      "end": null,
+      "author": "yurri"
+    }
+  },
+  {
+    "id": "community_74e53c117f66",
+    "throwTo": {
+      "x": 793,
+      "y": 113,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 619,
+      "y": 415,
+      "levels": [1]
+    },
+    "titleFrom": "Catwalk",
+    "titleTo": "A Site",
+    "bounces": [],
+    "slug": "74e53c117f66-a-site-from-catwalk",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "gwYBcX5pM6I",
+      "start": 0,
+      "end": null,
+      "author": "yurri"
+    }
+  },
+  {
+    "id": "community_4503a41e578c",
+    "throwTo": {
+      "x": 81,
+      "y": 188,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 208,
+      "y": 760,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "B Plat",
+    "bounces": [],
+    "slug": "4503a41e578c-b-plat-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "jwsGcZF3RB0",
+      "start": 0,
+      "end": null,
+      "author": "buh"
+    }
+  },
+  {
+    "id": "community_560b8a0b9b6b",
+    "throwTo": {
+      "x": 699,
+      "y": 545,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 862,
+      "y": 191,
+      "levels": [1]
+    },
+    "titleFrom": "A Ramp",
+    "titleTo": "Long Doors",
+    "bounces": [],
+    "slug": "560b8a0b9b6b-long-doors-from-a-ramp",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "loose",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "_F_5WrJBjUA",
+      "start": 0,
+      "end": null,
+      "author": "Milkshark"
+    }
+  },
+  {
+    "id": "community_7f7e07019213",
+    "throwTo": {
+      "x": 232,
+      "y": 121,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 127,
+      "y": 474,
+      "levels": [1]
+    },
+    "titleFrom": "Upper Tunnels",
+    "titleTo": "B Window",
+    "bounces": [],
+    "slug": "7f7e07019213-b-window-from-upper-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "YzSYNoFqGJA",
+      "start": 0,
+      "end": null,
+      "author": "NadesCS2here"
+    }
+  },
+  {
+    "id": "community_4b03abb0922f",
+    "throwTo": {
+      "x": 747,
+      "y": 167,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 636,
+      "y": 375,
+      "levels": [1]
+    },
+    "titleFrom": "Catwalk Stairs",
+    "titleTo": "A Ledge",
+    "bounces": [],
+    "slug": "4b03abb0922f-a-ledge-from-catwalk-stairs",
+    "team": "any",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left",
+    "precision": "loose",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "S199t5AMOVM",
+      "start": 2,
+      "end": 14,
+      "author": "nochinator"
+    }
+  },
+  {
+    "id": "community_0ff58c4e50d1",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 632,
+      "y": 283,
+      "levels": [1]
+    },
+    "titleFrom": "Catwalk",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "0ff58c4e50d1-a-cross-from-catwalk",
+    "team": "any",
+    "type": "smoke",
+    "movement": "walking",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "qxC_nmyzKlw",
+      "start": 2,
+      "end": 15,
+      "author": "nochinator"
+    }
+  },
+  {
+    "id": "community_9205a2463a3b",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 62,
+      "y": 678,
+      "levels": [1]
+    },
+    "titleFrom": "Outside B Tunnels",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "9205a2463a3b-b-doors-from-outside-b-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "XoNBOreLbZU",
+      "start": 0,
+      "end": null,
+      "author": "Erfa90"
+    }
+  },
+  {
+    "id": "community_cadfa5c604ef",
+    "throwTo": {
+      "x": 666,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 662,
+      "y": 285,
+      "levels": [1]
+    },
+    "titleFrom": "Catwalk",
+    "titleTo": "Short",
+    "bounces": [],
+    "slug": "cadfa5c604ef-short-from-catwalk",
+    "team": "any",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "both_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "OmLd_cCIM1k",
+      "start": 0,
+      "end": null,
+      "author": "Mark"
+    }
+  },
+  {
+    "id": "community_eaac6418dfde",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 763,
+      "y": 486,
+      "levels": [1]
+    },
+    "titleFrom": "Blue Crate",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "eaac6418dfde-a-cross-from-blue-crate",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "loose",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "d8Je1FyeMK8",
+      "start": 0,
+      "end": null,
+      "author": "Marius Reinhold"
+    }
+  },
+  {
+    "id": "community_0619b9d8bb9f",
+    "throwTo": {
+      "x": 107,
+      "y": 277,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 309,
+      "y": 937,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "Tunnels Entry",
+    "bounces": [],
+    "slug": "0619b9d8bb9f-tunnels-entry-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "RGqHpVr2fBw",
+      "start": 0,
+      "end": null,
+      "author": "Koda"
+    }
+  },
+  {
+    "id": "community_359ba986c00c",
+    "throwTo": {
+      "x": 443,
+      "y": 706,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 697,
+      "y": 191,
+      "levels": [1]
+    },
+    "titleFrom": "Garbage",
+    "titleTo": "Suicide",
+    "bounces": [],
+    "slug": "359ba986c00c-suicide-from-garbage",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "2EfM0mjmdyU",
+      "start": 1,
+      "end": null,
+      "author": "Ossama Elbannaoui"
+    }
+  },
+  {
+    "id": "community_19e42a5d69cf",
+    "throwTo": {
+      "x": 533,
+      "y": 631,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 697,
+      "y": 191,
+      "levels": [1]
+    },
+    "titleFrom": "Garbage",
+    "titleTo": "Palm",
+    "bounces": [],
+    "slug": "19e42a5d69cf-palm-from-garbage",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "8E-jDKSWZtg",
+      "start": 0,
+      "end": null,
+      "author": "tryfonas"
+    }
+  },
+  {
+    "id": "community_9a75ced66070",
+    "throwTo": {
+      "x": 500,
+      "y": 239,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 445,
+      "y": 951,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn Railing",
+    "titleTo": "CT Spawn Boost",
+    "bounces": [],
+    "slug": "9a75ced66070-ct-spawn-boost-from-t-spawn-railing",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "BcgMdiJCkZA",
+      "start": 0,
+      "end": null,
+      "author": "CSGO Nade"
+    }
+  },
+  {
+    "id": "community_cc1662223b34",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 761,
+      "y": 536,
+      "levels": [1]
+    },
+    "titleFrom": "Long Doors",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "cc1662223b34-b-doors-from-long-doors",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "Faau0GiSiTY",
+      "start": 0,
+      "end": null,
+      "author": "Shando"
+    }
+  },
+  {
+    "id": "community_44b14c09d240",
+    "throwTo": {
+      "x": 500,
+      "y": 239,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 761,
+      "y": 536,
+      "levels": [1]
+    },
+    "titleFrom": "Long Doors",
+    "titleTo": "CT Spawn Boost",
+    "bounces": [],
+    "slug": "44b14c09d240-ct-spawn-boost-from-long-doors",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "8PJv0Xxr1Y8",
+      "start": 0,
+      "end": null,
+      "author": "Shando"
+    }
+  },
+  {
+    "id": "community_5f7b8ccdc4f8",
+    "throwTo": {
+      "x": 232,
+      "y": 121,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 127,
+      "y": 474,
+      "levels": [1]
+    },
+    "titleFrom": "Upper Tunnels",
+    "titleTo": "B Window",
+    "bounces": [],
+    "slug": "5f7b8ccdc4f8-b-window-from-upper-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "aKPa3P4cD-g",
+      "start": 0,
+      "end": null,
+      "author": "DifferentGames(no commentary)"
+    }
+  },
+  {
+    "id": "community_5feadb13da5c",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 127,
+      "y": 474,
+      "levels": [1]
+    },
+    "titleFrom": "Upper Tunnels",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "5feadb13da5c-b-doors-from-upper-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "kDRD8kiL_xw",
+      "start": 0,
+      "end": null,
+      "author": "DifferentGames(no commentary)"
+    }
+  },
+  {
+    "id": "community_b8204d0f7df0",
+    "throwTo": {
+      "x": 699,
+      "y": 545,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 727,
+      "y": 186,
+      "levels": [1]
+    },
+    "titleFrom": "Garbage",
+    "titleTo": "Long Doors",
+    "bounces": [],
+    "slug": "b8204d0f7df0-long-doors-from-garbage",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "x1IiZLkfaq0",
+      "start": 0,
+      "end": null,
+      "author": "Dimi Nades"
+    }
+  },
+  {
+    "id": "community_05670ea66d6d",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 62,
+      "y": 678,
+      "levels": [1]
+    },
+    "titleFrom": "Outside B Tunnels",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "05670ea66d6d-a-cross-from-outside-b-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "FeLi1WuMp38",
+      "start": 0,
+      "end": null,
+      "author": "meneerple"
+    }
+  },
+  {
+    "id": "community_221b00c8bf99",
+    "throwTo": {
+      "x": 81,
+      "y": 188,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 157,
+      "y": 778,
+      "levels": [1]
+    },
+    "titleFrom": "boxes",
+    "titleTo": "B Plat",
+    "bounces": [],
+    "slug": "221b00c8bf99-b-plat-from-boxes",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "OODd_xXEVuc",
+      "start": 3,
+      "end": 32,
+      "author": "ott vain"
+    }
+  },
+  {
+    "id": "community_13a2e6bd0626",
+    "throwTo": {
+      "x": 447,
+      "y": 356,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 930,
+      "y": 401,
+      "levels": [1]
+    },
+    "titleFrom": "A Long",
+    "titleTo": "Mid Doors",
+    "bounces": [],
+    "slug": "13a2e6bd0626-mid-doors-from-a-long",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "BrWPXnXgRKw",
+      "start": 0,
+      "end": null,
+      "author": "zFlxw"
+    }
+  },
+  {
+    "id": "community_30d101fa0345",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 669,
+      "y": 496,
+      "levels": [1]
+    },
+    "titleFrom": "Long",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "30d101fa0345-a-cross-from-long",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "OAcvtKR8FMo",
+      "start": 14,
+      "end": 30,
+      "author": "Beats"
+    }
+  },
+  {
+    "id": "community_fb41aa3f4f0a",
+    "throwTo": {
+      "x": 699,
+      "y": 545,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 727,
+      "y": 186,
+      "levels": [1]
+    },
+    "titleFrom": "Next to boost",
+    "titleTo": "Long Doors",
+    "bounces": [],
+    "slug": "fb41aa3f4f0a-long-doors-from-next-to-boost",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "HQYeYYCAXbI",
+      "start": 0,
+      "end": null,
+      "author": "G0dfig"
+    }
+  },
+  {
+    "id": "community_8d8050f61b1f",
+    "throwTo": {
+      "x": 505,
+      "y": 451,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 923,
+      "y": 33,
+      "levels": [1]
+    },
+    "titleFrom": "Elevator",
+    "titleTo": "catwalk",
+    "bounces": [],
+    "slug": "8d8050f61b1f-catwalk-from-elevator",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "E4GokNGpLj4",
+      "start": 0,
+      "end": null,
+      "author": "Tevel"
+    }
+  },
+  {
+    "id": "community_766abf20d887",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Long Doors",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "766abf20d887-a-cross-from-long-doors",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "3T8EE4qDmJU",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_b9d44b14e812",
+    "throwTo": {
+      "x": 475,
+      "y": 398,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 785,
+      "y": 184,
+      "levels": [1]
+    },
+    "titleFrom": "Elevator",
+    "titleTo": "XBox",
+    "bounces": [],
+    "slug": "b9d44b14e812-xbox-from-elevator",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "iNilcymRG-M",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_021b36dadf86",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 539,
+      "y": 633,
+      "levels": [1]
+    },
+    "titleFrom": "Top Mid",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "021b36dadf86-b-doors-from-top-mid",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "vfW6ONY9ko8",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_8d850b181f44",
+    "throwTo": {
+      "x": 845,
+      "y": 465,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 519,
+      "y": 865,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "Long Corner",
+    "bounces": [],
+    "slug": "8d850b181f44-long-corner-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "cpRzlyT5Lbo",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_b241da1b4c5c",
+    "throwTo": {
+      "x": 404,
+      "y": 401,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 640,
+      "y": 803,
+      "levels": [1]
+    },
+    "titleFrom": "Outside Long",
+    "titleTo": "Lower Tunnels",
+    "bounces": [],
+    "slug": "b241da1b4c5c-lower-tunnels-from-outside-long",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "TM-hehMrvsc",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_21d6b1bbd876",
+    "throwTo": {
+      "x": 447,
+      "y": 356,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 634,
+      "y": 824,
+      "levels": [1]
+    },
+    "titleFrom": "Outside T Spawn",
+    "titleTo": "Mid Doors",
+    "bounces": [],
+    "slug": "21d6b1bbd876-mid-doors-from-outside-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "jkJOzjUwfhQ",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_067060a5e3b0",
+    "throwTo": {
+      "x": 500,
+      "y": 239,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 62,
+      "y": 678,
+      "levels": [1]
+    },
+    "titleFrom": "Outside B Tunnels",
+    "titleTo": "CT Spawn Boost",
+    "bounces": [],
+    "slug": "067060a5e3b0-ct-spawn-boost-from-outside-b-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "walking",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "Ll2OrxMWBwc",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_89f80cf85c5a",
+    "throwTo": {
+      "x": 693,
+      "y": 192,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 619,
+      "y": 415,
+      "levels": [1]
+    },
+    "titleFrom": "Catwalk",
+    "titleTo": "Elbow",
+    "bounces": [],
+    "slug": "89f80cf85c5a-elbow-from-catwalk",
+    "team": "any",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "OOmJgsVYonU",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_d5423ce7dfce",
+    "throwTo": {
+      "x": 693,
+      "y": 192,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Dumpster",
+    "titleTo": "Elbow",
+    "bounces": [],
+    "slug": "d5423ce7dfce-elbow-from-dumpster",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "gjwVo6f0nxc",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_f36f90069416",
+    "throwTo": {
+      "x": 699,
+      "y": 545,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 693,
+      "y": 219,
+      "levels": [1]
+    },
+    "titleFrom": "Garbage",
+    "titleTo": "Long Doors",
+    "bounces": [],
+    "slug": "f36f90069416-long-doors-from-garbage",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "vnBs2TS6yWY",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_a75ee2554c6c",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 208,
+      "y": 760,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "a75ee2554c6c-b-doors-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "nCkZCf_3iIs",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_915119beb2bf",
+    "throwTo": {
+      "x": 232,
+      "y": 121,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 207,
+      "y": 863,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "B Window",
+    "bounces": [],
+    "slug": "915119beb2bf-b-window-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "erUOV05cySo",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_be3aeab6c95c",
+    "throwTo": {
+      "x": 447,
+      "y": 356,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 464,
+      "y": 868,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "Mid Doors",
+    "bounces": [],
+    "slug": "be3aeab6c95c-mid-doors-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "-nM55VYUcRY",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_f7f42f480f9c",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 208,
+      "y": 760,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "f7f42f480f9c-b-doors-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "JrpBmg1eel4",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_db5ca96f9b87",
+    "throwTo": {
+      "x": 839,
+      "y": 137,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 104,
+      "levels": [1]
+    },
+    "titleFrom": "Sandbags",
+    "titleTo": "A Site",
+    "bounces": [],
+    "slug": "db5ca96f9b87-a-site-from-sandbags",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "crouched_stationary",
+    "technique": "left",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "cnVljp50VpE",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_049f951a93f8",
+    "throwTo": {
+      "x": 156,
+      "y": 181,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 148,
+      "y": 508,
+      "levels": [1]
+    },
+    "titleFrom": "Upper Tunnels",
+    "titleTo": "Tunnels Entry",
+    "bounces": [],
+    "slug": "049f951a93f8-tunnels-entry-from-upper-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "loose",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "RGaHQyt5u2k",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_23345c321e06",
+    "throwTo": {
+      "x": 156,
+      "y": 181,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 151,
+      "y": 514,
+      "levels": [1]
+    },
+    "titleFrom": "Upper Tunnels",
+    "titleTo": "Lurk Smoke",
+    "bounces": [],
+    "slug": "23345c321e06-lurk-smoke-from-upper-tunnels",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "loose",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "E-MhYmf8iV0",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_b35ffc4e58e5",
+    "throwTo": {
+      "x": 666,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Dumpster",
+    "titleTo": "Short",
+    "bounces": [],
+    "slug": "b35ffc4e58e5-short-from-dumpster",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "zyuvjCw5uNA",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_4b61bdbb7975",
+    "throwTo": {
+      "x": 690,
+      "y": 230,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Dumpster",
+    "titleTo": "CT",
+    "bounces": [],
+    "slug": "4b61bdbb7975-ct-from-dumpster",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "N6yOXKvxQeg",
+      "start": 0,
+      "end": null,
+      "author": "R4cc02"
+    }
+  },
+  {
+    "id": "community_8ab6aa7a7160",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 194,
+      "y": 740,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "8ab6aa7a7160-b-doors-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "D5q1K9J_4FU",
+      "start": 0,
+      "end": null,
+      "author": "Brock"
+    }
+  },
+  {
+    "id": "community_2fe677094fa9",
+    "throwTo": {
+      "x": 690,
+      "y": 230,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 761,
+      "y": 536,
+      "levels": [1]
+    },
+    "titleFrom": "Long Doors",
+    "titleTo": "CT Spawn",
+    "bounces": [],
+    "slug": "2fe677094fa9-ct-spawn-from-long-doors",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "dJ_O6Sbk--U",
+      "start": 0,
+      "end": null,
+      "author": "痕"
+    }
+  },
+  {
+    "id": "community_d710fed056b6",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 598,
+      "y": 735,
+      "levels": [1]
+    },
+    "titleFrom": "T spawn",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "d710fed056b6-a-cross-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "k-g-GdOaRCA",
+      "start": 0,
+      "end": null,
+      "author": "pulz1kkk"
+    }
+  },
+  {
+    "id": "community_9cba2fc94434",
+    "throwTo": {
+      "x": 642,
+      "y": 262,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Dumpster",
+    "titleTo": "Short A",
+    "bounces": [],
+    "slug": "9cba2fc94434-short-a-from-dumpster",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "both_jump",
+    "precision": "precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "dKG0x0W7yzE",
+      "start": 0,
+      "end": null,
+      "author": "Zweidx"
+    }
+  },
+  {
+    "id": "community_df4efc3ddcbf",
+    "throwTo": {
+      "x": 699,
+      "y": 545,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 647,
+      "y": 195,
+      "levels": [1]
+    },
+    "titleFrom": "CT Spawn",
+    "titleTo": "Long Doors",
+    "bounces": [],
+    "slug": "df4efc3ddcbf-long-doors-from-ct-spawn",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "7q4aqqsl7OA",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_3e3376c21d2a",
+    "throwTo": {
+      "x": 229,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 547,
+      "y": 648,
+      "levels": [1]
+    },
+    "titleFrom": "Top Mid",
+    "titleTo": "B Doors",
+    "bounces": [],
+    "slug": "3e3376c21d2a-b-doors-from-top-mid",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "RrzeUp62dt8",
+      "start": 0,
+      "end": 26,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_84a65e7009ed",
+    "throwTo": {
+      "x": 232,
+      "y": 121,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 539,
+      "y": 642,
+      "levels": [1]
+    },
+    "titleFrom": "Top Mid",
+    "titleTo": "B Window",
+    "bounces": [],
+    "slug": "84a65e7009ed-b-window-from-top-mid",
+    "team": "t",
+    "type": "smoke",
+    "movement": "running",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "RrzeUp62dt8",
+      "start": 30,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_4070bafa13b8",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 586,
+      "y": 676,
+      "levels": [1]
+    },
+    "titleFrom": "Top Mid",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "4070bafa13b8-a-cross-from-top-mid",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "j2GhTMKjEe4",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_61f456bd541a",
+    "throwTo": {
+      "x": 447,
+      "y": 356,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 447,
+      "y": 866,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "Mid Doors",
+    "bounces": [],
+    "slug": "61f456bd541a-mid-doors-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "iYX0Tq9RkQE",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_631e308b89ea",
+    "throwTo": {
+      "x": 845,
+      "y": 465,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 464,
+      "y": 868,
+      "levels": [1]
+    },
+    "titleFrom": "T Spawn",
+    "titleTo": "Long Corner",
+    "bounces": [],
+    "slug": "631e308b89ea-long-corner-from-t-spawn",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "aIMwHx0OiRc",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_957224b3533f",
+    "throwTo": {
+      "x": 666,
+      "y": 228,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 485,
+      "y": 417,
+      "levels": [1]
+    },
+    "titleFrom": "XBox",
+    "titleTo": "Short",
+    "bounces": [],
+    "slug": "957224b3533f-short-from-xbox",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": null,
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "WW1FZhZtPYM",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_7304d4f93376",
+    "throwTo": {
+      "x": 839,
+      "y": 233,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Dumpster",
+    "titleTo": "A Cross",
+    "bounces": [],
+    "slug": "7304d4f93376-a-cross-from-dumpster",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "both_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "pJJKHnAS0to",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_28db1d4744f6",
+    "throwTo": {
+      "x": 642,
+      "y": 262,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 769,
+      "y": 467,
+      "levels": [1]
+    },
+    "titleFrom": "Dumpster",
+    "titleTo": "Short",
+    "bounces": [],
+    "slug": "28db1d4744f6-short-from-dumpster",
+    "team": "t",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "both_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "qmXPbVlhxD8",
+      "start": 0,
+      "end": null,
+      "author": "雪梨Yukirly"
+    }
+  },
+  {
+    "id": "community_2c5c9cc36aa8",
+    "throwTo": {
+      "x": 699,
+      "y": 545,
+      "levels": [1]
+    },
+    "throwFrom": {
+      "x": 785,
+      "y": 184,
+      "levels": [1]
+    },
+    "titleFrom": "Elevator",
+    "titleTo": "Long Doors",
+    "bounces": [],
+    "slug": "2c5c9cc36aa8-long-doors-from-elevator",
+    "team": "ct",
+    "type": "smoke",
+    "movement": "stationary",
+    "technique": "left_jump",
+    "precision": "very_precise",
+    "community": true,
+    "video": {
+      "__typename": "ComponentVideosYouTube",
+      "youtubeId": "dLpx5LudQ-I",
+      "start": 0,
+      "end": 21,
+      "author": "雪梨Yukirly"
+    }
+  }
+]

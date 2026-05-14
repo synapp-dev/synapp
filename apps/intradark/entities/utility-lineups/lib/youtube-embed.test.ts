@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildYouTubeEmbedSrc, parseYouTubeVideoId } from "./youtube-embed";
+import {
+  buildYouTubeEmbedHoverPreviewSrc,
+  buildYouTubeEmbedSrc,
+  parseYouTubeVideoId,
+} from "./youtube-embed";
 
 describe("parseYouTubeVideoId", () => {
   it("parses watch URL", () => {
@@ -29,5 +33,19 @@ describe("buildYouTubeEmbedSrc", () => {
     );
     expect(src).toContain("youtube-nocookie.com/embed/dQw4w9WgXcQ");
     expect(src).toContain("start=5");
+  });
+});
+
+describe("buildYouTubeEmbedHoverPreviewSrc", () => {
+  it("adds autoplay and loop (with playlist id) for muted hover preview", () => {
+    const src = buildYouTubeEmbedHoverPreviewSrc(
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      0,
+      null,
+    );
+    expect(src).toContain("autoplay=1");
+    expect(src).toContain("mute=1");
+    expect(src).toContain("loop=1");
+    expect(src).toContain("playlist=dQw4w9WgXcQ");
   });
 });

@@ -4,6 +4,8 @@ import type { InferSelectModel } from "drizzle-orm";
 import { useMemo, useState, useTransition } from "react";
 
 import { updateAdminMapAction } from "@/entities/utility-lineups/actions/admin-maps-actions";
+import { MapSpotsAdminSection } from "@/entities/utility-lineups/components/map-spots-admin-section";
+import type { UtilityMapSpotRow } from "@/entities/utility-lineups/components/map-spots-admin-section";
 import { isAllowedUploadMime } from "@/lib/media/upload-validation";
 import { mapPools, maps } from "@/server/db/schema";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
@@ -25,13 +27,15 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { Switch } from "@workspace/ui/components/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 
 type MapRow = InferSelectModel<typeof maps>;
 type PoolRow = InferSelectModel<typeof mapPools>;
 
-export type UtilityMapsAdminRow = {
+export type MapsAdminRow = {
   map: MapRow;
   poolSlug: string;
+  poolLabel: string;
 };
 
 function extForMime(mime: string): string {
@@ -54,6 +58,7 @@ function MapEditorCard({
   const [poolId, setPoolId] = useState(initial.poolId);
   const [radarImageUrl, setRadarImageUrl] = useState(initial.radarImageUrl);
   const [badgeImageUrl, setBadgeImageUrl] = useState(initial.badgeImageUrl);
+  const [mapScreenshotUrl, setMapScreenshotUrl] = useState(initial.mapScreenshotUrl);
   const [isActive, setIsActive] = useState(initial.isActive);
   const [sortOrder, setSortOrder] = useState(String(initial.sortOrder));
   const [message, setMessage] = useState<{
@@ -87,6 +92,7 @@ function MapEditorCard({
         poolId,
         radarImageUrl,
         badgeImageUrl,
+        mapScreenshotUrl,
         isActive,
         sortOrder: so,
       });
@@ -107,7 +113,7 @@ function MapEditorCard({
   }
 
   async function uploadMapImage(
-    asset: "radar" | "badge",
+    asset: "radar" | "badge" | "map_screenshot",
     file: File | null,
     setUrl: (url: string) => void,
     successBody: string,
@@ -284,6 +290,33 @@ function MapEditorCard({
           </div>
         </div>
 
+        <div className="grid gap-2">
+          <Label htmlFor={`screenshot-${initial.id}`}>Map screenshot URL</Label>
+          <Input
+            id={`screenshot-${initial.id}`}
+            value={mapScreenshotUrl}
+            onChange={(e) => setMapScreenshotUrl(e.target.value)}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="max-w-xs"
+              onChange={(e) =>
+                void uploadMapImage(
+                  "map_screenshot",
+                  e.target.files?.[0] ?? null,
+                  setMapScreenshotUrl,
+                  "Map screenshot URL was set to the public object URL.",
+                )
+              }
+            />
+            <span className="text-muted-foreground text-xs">
+              Uploads to maps/&lt;slug&gt;/map_screenshot.* and fills the URL above.
+            </span>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-2">
             <Switch
@@ -312,18 +345,40 @@ function MapEditorCard({
   );
 }
 
-export function UtilityMapsAdminClient({
+export function MapsAdminClient({
   rows,
   pools,
+  spotsByMapId,
+  defaultMapSlug,
 }: {
-  rows: UtilityMapsAdminRow[];
+  rows: MapsAdminRow[];
   pools: PoolRow[];
+  spotsByMapId: Record<string, UtilityMapSpotRow[]>;
+  defaultMapSlug?: string;
 }) {
+  const defaultTab =
+    rows.find((r) => r.map.slug === defaultMapSlug)?.map.id ?? rows[0]?.map.id ?? "";
+
+  if (rows.length === 0) {
+    return null;
+  }
+
   return (
-    <div className="space-y-6">
+    <Tabs defaultValue={defaultTab} className="w-full gap-4">
+      <TabsList className="h-auto w-full max-w-full flex-wrap justify-start gap-1">
+        {rows.map(({ map }) => (
+          <TabsTrigger key={map.id} value={map.id} className="max-w-[220px] shrink truncate">
+            {map.displayName}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
       {rows.map(({ map }) => (
-        <MapEditorCard key={map.id} map={map} pools={pools} />
+        <TabsContent key={map.id} value={map.id} className="space-y-6">
+          <MapEditorCard map={map} pools={pools} />
+          <MapSpotsAdminSection mapId={map.id} spots={spotsByMapId[map.id] ?? []} />
+        </TabsContent>
       ))}
-    </div>
+    </Tabs>
   );
 }

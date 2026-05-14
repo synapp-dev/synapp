@@ -52,6 +52,7 @@ export async function updateAdminMapAction(
         poolId: v.poolId,
         radarImageUrl: v.radarImageUrl,
         badgeImageUrl: v.badgeImageUrl,
+        mapScreenshotUrl: v.mapScreenshotUrl,
         isActive: v.isActive,
         sortOrder: v.sortOrder,
         updatedAt: new Date().toISOString(),
@@ -67,6 +68,7 @@ export async function updateAdminMapAction(
       ok: true,
       map_slug: v.slug,
     });
+    revalidatePath("/admin/maps");
     revalidatePath("/admin/utility");
     revalidatePath("/utility");
     revalidatePath(`/utility/${v.slug}`);
