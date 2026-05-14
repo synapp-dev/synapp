@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { connection } from "next/server";
 
 import { ForumNewThreadForm } from "@/entities/forums/components/forum-new-thread-form";
 import {
@@ -12,7 +13,10 @@ import { Button } from "@workspace/ui/components/button";
 
 type PageProps = { params: Promise<{ categorySlug: string }> };
 
+export const dynamic = "force-dynamic";
+
 export default async function ForumNewThreadPage({ params }: PageProps) {
+  await connection();
   const { categorySlug } = await params;
   const userId = await getSessionUserId();
   if (!userId) {

@@ -1,11 +1,15 @@
 import Link from "next/link";
+import { connection } from "next/server";
 
 import { ForumCategoryGrid } from "@/entities/forums/components/forum-category-grid";
 import { listForumCategories } from "@/entities/forums/lib/queries";
 import { MainSectionShell } from "@/components/organisms/main-section-shell";
 import { Button } from "@workspace/ui/components/button";
 
+export const dynamic = "force-dynamic";
+
 export default async function ForumsPage() {
+  await connection();
   const categories = await listForumCategories();
 
   return (

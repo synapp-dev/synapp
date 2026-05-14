@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 
 import { ForumThreadList } from "@/entities/forums/components/forum-thread-list";
 import {
@@ -12,7 +13,10 @@ import { Button } from "@workspace/ui/components/button";
 
 type PageProps = { params: Promise<{ categorySlug: string }> };
 
+export const dynamic = "force-dynamic";
+
 export default async function ForumCategoryPage({ params }: PageProps) {
+  await connection();
   const { categorySlug } = await params;
   const category = await getForumCategoryBySlug(categorySlug);
   if (!category) notFound();

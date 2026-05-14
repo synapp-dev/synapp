@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 
 import { ForumReplySection } from "@/entities/forums/components/forum-reply-section";
 import { ForumThreadDeleteButton } from "@/entities/forums/components/forum-thread-delete-button";
@@ -15,7 +16,10 @@ type PageProps = {
   params: Promise<{ categorySlug: string; threadSlug: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ForumThreadPage({ params }: PageProps) {
+  await connection();
   const { categorySlug, threadSlug } = await params;
   const [userId, { category, thread }] = await Promise.all([
     getSessionUserId(),
