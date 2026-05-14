@@ -5,6 +5,8 @@ import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-use
 import { hasAnyAdminSlug } from "@/entities/admin/lib/role-slugs";
 import { ADMIN_AREA_SLUGS } from "@/entities/admin/lib/rbac-constants";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLayout({
   children,
 }: {

@@ -114,7 +114,7 @@ function getButtonClassName(
     return "border border-orange-500/30 bg-orange-500/5 text-orange-700 font-medium hover:bg-orange-500/10";
   }
   if (itemActiveEffective) {
-    return "bg-sidebar-primary text-sidebar-primary-foreground font-semibold hover:bg-sidebar-primary/90 hover:text-sidebar-primary-foreground";
+    return "bg-primary text-primary-foreground font-semibold hover:bg-primary/90 hover:text-primary-foreground";
   }
   return undefined;
 }
@@ -266,7 +266,7 @@ export function NavMain({
                                 asChild
                                 className={
                                   subActive
-                                    ? "gap-1.5 bg-sidebar-primary/60 text-sidebar-primary-foreground hover:bg-sidebar-primary/60 hover:text-sidebar-primary-foreground"
+                                    ? "gap-1.5 bg-primary/60 text-primary-foreground hover:bg-primary/60 hover:text-primary-foreground"
                                     : "gap-1.5"
                                 }
                               >
@@ -276,7 +276,7 @@ export function NavMain({
                                       <subItem.icon
                                         className={
                                           subActive
-                                            ? "text-sidebar-primary-foreground"
+                                            ? "text-primary-foreground"
                                             : "text-muted-foreground/60"
                                         }
                                       />

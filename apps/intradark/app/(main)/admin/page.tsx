@@ -89,19 +89,22 @@ export default async function AdminHomePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Map className="h-5 w-5" />
-                Utility maps
+                Maps
               </CardTitle>
               <CardDescription>
-                Canonical <code className="text-xs">maps</code> table and storage-backed radar
-                assets.
+                Canonical <code className="text-xs">maps</code> table, radar assets, and map
+                spots for utility lineups.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col gap-2">
+              <Link href="/admin/maps" className="text-primary text-sm font-medium hover:underline">
+                Open maps admin →
+              </Link>
               <Link
-                href="/admin/utility"
+                href="/admin/utility/pending"
                 className="text-primary text-sm font-medium hover:underline"
               >
-                Open utility admin →
+                Pending lineup submissions →
               </Link>
             </CardContent>
           </Card>

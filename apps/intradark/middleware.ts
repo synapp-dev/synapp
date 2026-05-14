@@ -28,7 +28,11 @@ export async function middleware(request: NextRequest) {
         "/dashboard",
       );
     }
-    return redirectPreservingSessionCookies(request, sessionResponse, "/auth");
+    return redirectPreservingSessionCookies(
+      request,
+      sessionResponse,
+      "/news",
+    );
   }
 
   if (pathname === "/auth" && user) {

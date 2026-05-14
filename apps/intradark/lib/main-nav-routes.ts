@@ -52,6 +52,11 @@ export type NavMainSidebarItem = {
   url: string;
   icon?: LucideIcon;
   exact?: boolean;
+  disabled?: boolean;
+  disabledMessage?: string;
+  disableActiveStyle?: boolean;
+  liveStyle?: boolean;
+  badge?: number | string;
   items?: { title: string; url: string; icon?: LucideIcon; exact?: boolean }[];
 };
 
@@ -100,6 +105,21 @@ export function formatSegment(segment: string): string {
     .join(" ");
 }
 
+/** CS / CS2-style map slugs (e.g. `de_mirage`, `cs_office`) → short display name for breadcrumbs. */
+export function formatUtilityMapSlugLabel(slug: string): string {
+  const rest = slug.replace(/^(de|cs|ar|gd)_/i, "");
+  const core = rest.length > 0 ? rest : slug;
+  return core
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map((word) => {
+      if (word.length === 0) return word;
+      const lower = word.toLowerCase();
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(" ");
+}
+
 export type BreadcrumbTrailCrumb = {
   href: string;
   /** Visible text; may be hidden in UI when `iconOnlyDisplay` is true. */
@@ -139,7 +159,13 @@ export function buildBreadcrumbTrail(pathname: string | null): {
   const crumbs: BreadcrumbTrailCrumb[] = segments.map((segment, index) => {
     const href = `/${segments.slice(0, index + 1).join("/")}`;
     const meta = segment ? MAIN_NAV_SEGMENT_META[segment] : undefined;
-    const label = meta?.label ?? formatSegment(segment);
+    const afterUtility =
+      index > 0 && segments[index - 1] === "utility" && segment;
+    const label =
+      meta?.label ??
+      (afterUtility
+        ? formatUtilityMapSlugLabel(segment)
+        : formatSegment(segment));
 
     const isMainNavCrumb = index === mainNavIndex;
     const icon = isMainNavCrumb ? meta?.icon : undefined;

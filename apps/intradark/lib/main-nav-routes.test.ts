@@ -1,11 +1,27 @@
 import { describe, expect, it } from "vitest";
 import { LayoutDashboard, Newspaper, Trophy } from "lucide-react";
-import { buildBreadcrumbTrail, formatSegment } from "./main-nav-routes";
+import {
+  buildBreadcrumbTrail,
+  formatSegment,
+  formatUtilityMapSlugLabel,
+} from "./main-nav-routes";
 
 describe("formatSegment", () => {
   it("title-cases kebab-case", () => {
     expect(formatSegment("match-lab")).toBe("Match Lab");
     expect(formatSegment("foo")).toBe("Foo");
+  });
+});
+
+describe("formatUtilityMapSlugLabel", () => {
+  it("strips de_/cs_ prefixes and title-cases the map name", () => {
+    expect(formatUtilityMapSlugLabel("de_mirage")).toBe("Mirage");
+    expect(formatUtilityMapSlugLabel("cs_office")).toBe("Office");
+  });
+
+  it("handles multi-word map slugs and non-prefixed slugs", () => {
+    expect(formatUtilityMapSlugLabel("de_ancient")).toBe("Ancient");
+    expect(formatUtilityMapSlugLabel("custom_map_name")).toBe("Custom Map Name");
   });
 });
 
@@ -77,5 +93,12 @@ describe("buildBreadcrumbTrail", () => {
       "/match/123/veto",
     ]);
     expect(crumbs[0]?.icon).toBe(Trophy);
+  });
+
+  it("formats utility map slugs after /utility", () => {
+    const { crumbs } = buildBreadcrumbTrail("/utility/de_mirage");
+    expect(crumbs.map((c) => c.label)).toEqual(["Utility", "Mirage"]);
+    const office = buildBreadcrumbTrail("/utility/cs_office");
+    expect(office.crumbs.map((c) => c.label)).toEqual(["Utility", "Office"]);
   });
 });

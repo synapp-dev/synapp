@@ -6,6 +6,7 @@ import { RightSidebar } from "@workspace/ui/components/right-sidebar";
 import { SidebarContent } from "@workspace/ui/components/sidebar";
 
 import { useSandboxRightSidebar } from "@/components/organisms/sandbox-right-sidebar-provider";
+import { Sword } from "lucide-react";
 
 export function AppRightSidebar() {
   const { setSidebarMountElement, sidebarOccupied } = useSandboxRightSidebar();
@@ -20,10 +21,13 @@ export function AppRightSidebar() {
   return (
     <RightSidebar collapsible="icon">
       <SidebarContent className="gap-0">
-        <div ref={mountRef} className="flex min-h-0 flex-1 flex-col">
+        <div
+          ref={mountRef}
+          className="flex min-h-0 flex-1 flex-col items-center justify-start"
+        >
           {!sidebarOccupied ? (
             <p className="px-2 py-3 text-xs text-muted-foreground">
-              Future secondary panel content
+              <Sword className="w-4 h-4" />
             </p>
           ) : null}
         </div>

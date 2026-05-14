@@ -17,10 +17,15 @@ import {
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
 import { CommandMenu } from "@/components/molecules/command-menu";
+import { UtilityLineupUploadQueueIndicator } from "@/entities/utility-lineups/components/utility-lineup-upload-queue-indicator";
+import { appHomeHref } from "@/lib/app-home-href";
 import { buildBreadcrumbTrail } from "@/lib/main-nav-routes";
+import { useUserProfile } from "@/stores/user-profile-store";
 
 export function AppHeader() {
   const pathname = usePathname();
+  const { user } = useUserProfile();
+  const homeHref = appHomeHref(Boolean(user));
   const { crumbs } = useMemo(() => buildBreadcrumbTrail(pathname), [pathname]);
 
   return (
@@ -36,7 +41,7 @@ export function AppHeader() {
             <BreadcrumbItem className="shrink-0">
               {crumbs.length > 0 ? (
                 <BreadcrumbLink asChild>
-                  <Link href="/" className="inline-flex items-end gap-0">
+                  <Link href={homeHref} className="inline-flex items-end gap-0">
                     <span className="sr-only">Home</span>
                     <Image
                       src="/images/logos/intradark-symbol-blue.svg"
@@ -115,6 +120,7 @@ export function AppHeader() {
         </Breadcrumb>
       </div>
       <div className="flex shrink-0 items-center gap-2 px-4">
+        <UtilityLineupUploadQueueIndicator />
         <CommandMenu />
         <div className="mx-2 h-0.5 w-0.5 rounded-full bg-muted-foreground" />
         <ThemeToggle />

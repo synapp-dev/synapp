@@ -24,6 +24,8 @@ import {
   ROLE_SANDBOX_ACCESS,
 } from "@/entities/admin/lib/rbac-constants";
 import { hasCapability } from "@/entities/admin/lib/role-slugs";
+import { applyNavRbacToItems } from "@/entities/rbac/lib/filter-nav-for-rbac";
+import { NAV_ANONYMOUS_SLUGS } from "@/entities/rbac/lib/nav-slugs";
 import {
   getNavPlatformBase,
   navCommunity,
@@ -32,14 +34,16 @@ import {
   navKnowledge,
   type NavMainSidebarItem,
 } from "@/lib/main-nav-routes";
+import { appHomeHref } from "@/lib/app-home-href";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, isMobile } = useSidebar();
   const displayState = isMobile ? "expanded" : state;
   const { user } = useUserProfile();
+  const homeHref = appHomeHref(Boolean(user));
 
   const navPlatform = React.useMemo(() => {
-    const slugs = user?.role_slugs ?? [];
+    const slugs = user?.role_slugs ?? NAV_ANONYMOUS_SLUGS;
     const showAdmin =
       slugs.includes(ROLE_DEVELOPER) ||
       slugs.some((s) =>
@@ -73,13 +77,47 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ...(adminItems.length > 0 ? { items: adminItems } : {}),
       });
     }
-    return [...prefix, ...getNavPlatformBase()];
+    const platformFiltered = applyNavRbacToItems(getNavPlatformBase(), slugs);
+    return [...prefix, ...platformFiltered];
   }, [user?.role_slugs]);
+
+  const navCommunityFiltered = React.useMemo(
+    () =>
+      applyNavRbacToItems(
+        navCommunity,
+        user?.role_slugs ?? NAV_ANONYMOUS_SLUGS,
+      ),
+    [user?.role_slugs],
+  );
+
+  const navCompetitiveFiltered = React.useMemo(
+    () =>
+      applyNavRbacToItems(
+        navCompetitive,
+        user?.role_slugs ?? NAV_ANONYMOUS_SLUGS,
+      ),
+    [user?.role_slugs],
+  );
+
+  const navKnowledgeFiltered = React.useMemo(
+    () =>
+      applyNavRbacToItems(
+        navKnowledge,
+        user?.role_slugs ?? NAV_ANONYMOUS_SLUGS,
+      ),
+    [user?.role_slugs],
+  );
+
+  const navInsightFiltered = React.useMemo(
+    () =>
+      applyNavRbacToItems(navInsight, user?.role_slugs ?? NAV_ANONYMOUS_SLUGS),
+    [user?.role_slugs],
+  );
 
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="mb-2">
-        <Link href="/" className="block">
+        <Link href={homeHref} className="block">
           {displayState === "expanded" ? (
             <div className="flex items-center gap-1 my-4 w-full justify-center">
               <Image
@@ -113,10 +151,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent>
         <ScrollArea className="h-full">
           <NavMain items={navPlatform} title="Platform" />
-          <NavMain items={navCommunity} title="Community" />
-          <NavMain items={navCompetitive} title="Competitive" />
-          <NavMain items={navKnowledge} title="Knowledge" />
-          <NavMain items={navInsight} title="Insight" />
+          <NavMain items={navCommunityFiltered} title="Community" />
+          <NavMain items={navCompetitiveFiltered} title="Competitive" />
+          <NavMain items={navKnowledgeFiltered} title="Knowledge" />
+          <NavMain items={navInsightFiltered} title="Insight" />
         </ScrollArea>
       </SidebarContent>
       <SidebarFooter>
