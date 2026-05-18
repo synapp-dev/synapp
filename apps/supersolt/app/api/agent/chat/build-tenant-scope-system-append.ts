@@ -31,7 +31,7 @@ export function buildTenantScopeSystemAppend(args: {
   }
 
   parts.push(
-    "When the user asks to open an in-app destination (e.g. roster, sales, ingredients, purchase orders), call suggestAppNavigation with organisationSlug, venueSlug, and destinationKeys (snake_case keys such as workforce_roster, insights_sales, ingredients, inventory_purchase_orders). Do not invent slugs—use focus slugs or names from the access context, or call listAccessibleTenants if you need a fresh server list."
+    "When the user asks to open an in-app destination (e.g. dashboard, home, roster, sales, ingredients, purchase orders), call suggestAppNavigation with organisationSlug, venueSlug, and destinationKeys (snake_case keys such as dashboard, workforce_roster, insights_sales, ingredients, inventory_purchase_orders). Use destination key `dashboard` for the workspace dashboard at `/dashboard` (not `insights`). Do not invent slugs—use focus slugs or names from the access context, or call listAccessibleTenants if you need a fresh server list."
   );
 
   return parts.join("\n");

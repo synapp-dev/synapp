@@ -1,13 +1,11 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@workspace/ui/components/tooltip";
+
 import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider";
 import { cn } from "@workspace/ui/lib/utils";
+
+import { AgentBotAvatarVideo } from "@/entities/ai-agent-chat/components/agent-bot-avatar-video";
 
 export function AgentSidebarCollapsedRail({
   className,
@@ -16,47 +14,45 @@ export function AgentSidebarCollapsedRail({
 }) {
   const { resolvedTheme } = useTheme();
   const { setOpen } = useRightSidebar();
-  const assistantVideoTheme = resolvedTheme === "dark" ? "dark" : "light";
-  const src =
-    assistantVideoTheme === "dark"
-      ? "/images/supersolt-bot-dark.webm"
-      : "/images/supersolt-bot-light.webm";
+  const themeKey = resolvedTheme === "dark" ? "dark" : "light";
 
   return (
-    <button
-      type="button"
-      aria-label="Open Superbot sidebar"
-      onClick={() => setOpen(true)}
+    <div
       className={cn(
-        "group flex w-full min-h-0 flex-1 flex-col items-center justify-center border-0 bg-transparent p-0 shadow-none outline-none",
-        "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        className
+        "pointer-events-none relative h-full min-h-0 w-full flex-1 overflow-visible",
+        className,
       )}
     >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex max-w-full shrink-0">
-            <video
-              key={src}
-              aria-hidden
-              autoPlay
-              loop
-              muted
-              playsInline
-              className={cn(
-                "pointer-events-none h-[8.4rem] w-auto max-w-[8.4rem] object-contain",
-                "origin-center scale-100 transform-gpu transition-transform duration-300 ease-out will-change-transform",
-                "group-hover:scale-[1.2]",
-              )}
-            >
-              <source src={src} type="video/webm" />
-            </video>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="left" sideOffset={10}>
-          get help from superbot!
-        </TooltipContent>
-      </Tooltip>
-    </button>
+      <button
+        type="button"
+        aria-label="Talk to Superbot"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "group/bot pointer-events-auto fixed top-16 z-30 inline-flex flex-col items-center border-0 bg-transparent p-0 shadow-none outline-none",
+          "right-[max(1.75rem,env(safe-area-inset-right,0px))] -translate-x-[35%]",
+          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        )}
+      >
+        <AgentBotAvatarVideo
+          key={themeKey}
+          aria-hidden
+          className={cn(
+            "h-24 w-auto max-w-[min(6.5rem,24vw)] origin-center transform-gpu",
+            "animate-slide-down-fade-in-slow transition-transform duration-300 ease-out will-change-transform",
+            "group-hover/bot:scale-[1.12]",
+          )}
+        />
+        <span
+          className={cn(
+            "text-foreground mt-1 max-w-[14rem] px-1 text-center text-base font-semibold leading-snug tracking-tight whitespace-nowrap",
+            "translate-y-14 opacity-0 transition-[opacity,transform] duration-300 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100",
+            "group-hover/bot:translate-y-0 group-hover/bot:opacity-100",
+          )}
+          aria-hidden
+        >
+          Talk to Superbot!
+        </span>
+      </button>
+    </div>
   );
 }

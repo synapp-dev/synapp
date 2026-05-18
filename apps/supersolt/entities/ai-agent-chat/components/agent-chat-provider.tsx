@@ -1,10 +1,16 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import * as React from "react";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { AccessibleOrganisation } from "@/entities/organisations/api/endpoints";
 import { useScopedNavigation } from "@/entities/access/scoped-navigation-context";
@@ -19,11 +25,21 @@ import {
 } from "@/entities/ai-agent-chat/lib/page-welcome";
 import { isAgentOnlyRoute } from "@/entities/ai-agent-chat/lib/agent-right-shell-pathname";
 import { useMeStore } from "@/entities/me/model/store";
+import {
+  buildSuperbotSuggestionAssistantText,
+  formatSuperbotScopePlaceLine,
+  superbotSuggestionToPageHandoff,
+  type SuperbotPageHandoff,
+} from "@/entities/ai-agent-chat/lib/superbot-suggestion-handoff";
+import type { SuperbotSuggestion } from "@/entities/dashboard/model/dummy-superbot-suggestions";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 
 type AgentChatContextValue = {
   messages: ReturnType<typeof useChat>["messages"];
-  sendMessage: ReturnType<typeof useChat>["sendMessage"];
+  sendMessage: (
+    message: Parameters<ReturnType<typeof useChat>["sendMessage"]>[0],
+    options?: Parameters<ReturnType<typeof useChat>["sendMessage"]>[1],
+  ) => ReturnType<ReturnType<typeof useChat>["sendMessage"]>;
   status: ReturnType<typeof useChat>["status"];
   stop: ReturnType<typeof useChat>["stop"];
   error: ReturnType<typeof useChat>["error"];
@@ -40,6 +56,15 @@ type AgentChatContextValue = {
   navLogEntries: NavLogEntry[];
   messageSeenAt: ReadonlyMap<string, number>;
   pageWelcome: PageWelcome | null;
+  /** Pinned copy of a page welcome after the user starts a thread without using welcome buttons. */
+  archivedPageWelcome: PageWelcome | null;
+  /** Context for the in-page Superbot strip after dashboard suggestion navigation. */
+  superbotPageHandoff: SuperbotPageHandoff | null;
+  clearSuperbotPageHandoff: () => void;
+  beginSuperbotSuggestionNavigation: (args: {
+    suggestion: SuperbotSuggestion;
+    scopePlaceLabels: { organisationName: string; venuePart: string } | null;
+  }) => void;
 };
 
 const AgentChatContext = React.createContext<AgentChatContextValue | null>(
@@ -72,11 +97,7 @@ function pickFirstAccessibleVenue(
   return null;
 }
 
-export function AgentChatProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function AgentChatProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
@@ -126,12 +147,23 @@ export function AgentChatProvider({
 
   useEffect(() => {
     chatExtrasRef.current = {
-      accessContext:
-        organisations.length > 0 ? { organisations } : undefined,
+      accessContext: organisations.length > 0 ? { organisations } : undefined,
       focusOrganisationSlug: tenantScope?.organisationSlug,
       focusVenueSlug: tenantScope?.venueSlug,
     };
   }, [organisations, tenantScope]);
+
+  const [pageWelcome, setPageWelcome] = useState<PageWelcome | null>(() => {
+    if (!pathname) return null;
+    if (isAgentOnlyRoute(pathname)) return null;
+    return buildPageWelcome(pathname);
+  });
+  const [archivedPageWelcome, setArchivedPageWelcome] =
+    useState<PageWelcome | null>(null);
+  const pageWelcomeRef = useRef<PageWelcome | null>(null);
+  useEffect(() => {
+    pageWelcomeRef.current = pageWelcome;
+  }, [pageWelcome]);
 
   const transport = useMemo(
     () =>
@@ -139,7 +171,9 @@ export function AgentChatProvider({
         api: "/api/agent/chat",
         prepareSendMessagesRequest: ({ messages, body }) => ({
           body: {
-            ...(typeof body === "object" && body !== null && !Array.isArray(body)
+            ...(typeof body === "object" &&
+            body !== null &&
+            !Array.isArray(body)
               ? body
               : {}),
             messages,
@@ -158,9 +192,71 @@ export function AgentChatProvider({
     [],
   );
 
-  const { messages, sendMessage, status, stop, error, clearError } = useChat({
+  const {
+    messages,
+    sendMessage: baseSendMessage,
+    setMessages,
+    status,
+    stop,
+    error,
+    clearError,
+  } = useChat({
     transport,
   });
+
+  const [superbotPageHandoff, setSuperbotPageHandoff] =
+    useState<SuperbotPageHandoff | null>(null);
+
+  const clearSuperbotPageHandoff = useCallback(() => {
+    setSuperbotPageHandoff(null);
+  }, []);
+
+  const beginSuperbotSuggestionNavigation = useCallback(
+    (args: {
+      suggestion: SuperbotSuggestion;
+      scopePlaceLabels: { organisationName: string; venuePart: string } | null;
+    }) => {
+      const placeLine = formatSuperbotScopePlaceLine(args.scopePlaceLabels);
+      const text = buildSuperbotSuggestionAssistantText(
+        args.suggestion,
+        placeLine,
+      );
+      const id =
+        typeof globalThis.crypto !== "undefined" &&
+        typeof globalThis.crypto.randomUUID === "function"
+          ? globalThis.crypto.randomUUID()
+          : `superbot-handoff-${Date.now().toString(36)}`;
+      const message: UIMessage = {
+        id,
+        role: "assistant",
+        parts: [{ type: "text", text }],
+      };
+      setMessages((prev) => [...prev, message]);
+      setSuperbotPageHandoff(superbotSuggestionToPageHandoff(args.suggestion));
+    },
+    [setMessages],
+  );
+
+  const sendMessage = useCallback(
+    (
+      message: Parameters<typeof baseSendMessage>[0],
+      options?: Parameters<typeof baseSendMessage>[1],
+    ) => {
+      const raw = options?.body;
+      const bodyObj =
+        raw != null && typeof raw === "object" && !Array.isArray(raw)
+          ? (raw as Record<string, unknown>)
+          : {};
+      const exempt = bodyObj.pageWelcomeInteraction === true;
+      const pw = pageWelcomeRef.current;
+      if (pw != null && !exempt) {
+        setArchivedPageWelcome(pw);
+        setPageWelcome(null);
+      }
+      return baseSendMessage(message, options);
+    },
+    [baseSendMessage],
+  );
 
   const [navLogEntries, setNavLogEntries] = useState<NavLogEntry[]>([]);
   const lastLoggedPathnameRef = useRef<string | null>(null);
@@ -182,25 +278,28 @@ export function AgentChatProvider({
     }
     if (lastLoggedPathnameRef.current === pathname) return;
     lastLoggedPathnameRef.current = pathname;
-    setNavLogEntries((prev) => [...prev, createNavLogEntry(pathname, Date.now())]);
+    setNavLogEntries((prev) => [
+      ...prev,
+      createNavLogEntry(pathname, Date.now()),
+    ]);
   }, [pathname, userMessageCount]);
 
-  const [pageWelcome, setPageWelcome] = useState<PageWelcome | null>(() => {
-    if (!pathname) return null;
-    if (isAgentOnlyRoute(pathname)) return null;
-    return buildPageWelcome(pathname);
-  });
   const prevPathnameForWelcomeRef = useRef<string | null>(null);
   const userMsgCountAtPathEntryRef = useRef(0);
   const agentPageWelcomeEligibleRef = useRef(false);
   const leftAgentAwaitingScopeRef = useRef(false);
 
-  const resolvePageWelcome = React.useCallback((path: string): PageWelcome | null => {
-    if (isAgentOnlyRoute(path)) {
-      return agentPageWelcomeEligibleRef.current ? buildPageWelcome(path) : null;
-    }
-    return buildPageWelcome(path);
-  }, []);
+  const resolvePageWelcome = React.useCallback(
+    (path: string): PageWelcome | null => {
+      if (isAgentOnlyRoute(path)) {
+        return agentPageWelcomeEligibleRef.current
+          ? buildPageWelcome(path)
+          : null;
+      }
+      return buildPageWelcome(path);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!scopeReady || !leftAgentAwaitingScopeRef.current) return;
@@ -331,6 +430,10 @@ export function AgentChatProvider({
       navLogEntries,
       messageSeenAt,
       pageWelcome,
+      archivedPageWelcome,
+      superbotPageHandoff,
+      clearSuperbotPageHandoff,
+      beginSuperbotSuggestionNavigation,
     }),
     [
       messages,
@@ -348,6 +451,10 @@ export function AgentChatProvider({
       navLogEntries,
       messageSeenAt,
       pageWelcome,
+      archivedPageWelcome,
+      superbotPageHandoff,
+      clearSuperbotPageHandoff,
+      beginSuperbotSuggestionNavigation,
     ],
   );
 

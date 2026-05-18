@@ -15,6 +15,10 @@ import {
   parseOptionalAgentChatAccessContext,
 } from "@/entities/ai-agent-chat/lib/agent-chat-access-context-schema";
 import {
+  buildDashboardKpiLabourSystemAppend,
+  parseOptionalDashboardKpiLabourContext,
+} from "@/entities/ai-agent-chat/lib/agent-chat-dashboard-kpi-labour-context";
+import {
   buildPageContextSystemAppend,
   parseAgentChatPageContextFromBody,
 } from "@/entities/ai-agent-chat/lib/agent-chat-page-context-schema";
@@ -194,6 +198,10 @@ export async function POST(req: Request) {
 
   const pageContext = parseAgentChatPageContextFromBody(bodyObj);
   const pageContextAppend = buildPageContextSystemAppend(pageContext);
+  const labourKpiAppend = (() => {
+    const parsed = parseOptionalDashboardKpiLabourContext(bodyObj);
+    return parsed ? buildDashboardKpiLabourSystemAppend(parsed) : "";
+  })();
   if (pageContextAppend) {
     console.info(
       JSON.stringify({
@@ -220,11 +228,13 @@ export async function POST(req: Request) {
       "When they ask for the time or a connectivity check, call getServerTime once.",
       "When they want to open a part of the app for a named organisation and venue, " +
         "call suggestAppNavigation with organisationSlug, venueSlug, and destinationKeys. " +
-        `Allowed destinationKeys values (match user language to the closest; up to 8 per call): ${APP_NAVIGATION_DESTINATION_KEYS.join(", ")}.`,
+        `Allowed destinationKeys values (match user language to the closest; up to 8 per call): ${APP_NAVIGATION_DESTINATION_KEYS.join(", ")}. ` +
+        "If they ask for the dashboard, home page, or KPI overview, use destination key `dashboard` (opens `/dashboard`). Use `insights` only for the venue Insights area.",
       "After suggestAppNavigation returns one or more navigation cards, do not repeat destinations in prose, bullet lists, or long summaries—the UI already shows the cards and short on-screen guidance.",
       "Otherwise answer helpfully in plain language; do not invent data about venues or sales.",
       tenantScopeAppend,
       pageContextAppend,
+      labourKpiAppend,
     ]
       .filter((s): s is string => Boolean(s && s.length > 0))
       .join("\n\n"),

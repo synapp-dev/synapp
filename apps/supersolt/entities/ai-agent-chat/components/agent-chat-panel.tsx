@@ -26,6 +26,8 @@ import {
   useState,
 } from "react";
 
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+
 import type { UIMessage } from "ai";
 
 import { Button } from "@workspace/ui/components/button";
@@ -44,6 +46,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { AgentChatAssistantText } from "@/entities/ai-agent-chat/components/agent-chat-assistant-text";
 import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
 import { AgentNavDestinationCards } from "@/entities/ai-agent-chat/components/agent-nav-destination-cards";
 import { AgentTenantScopeDropdowns } from "@/entities/ai-agent-chat/components/agent-tenant-scope-dropdowns";
@@ -104,7 +107,25 @@ export function AgentChatPanel({
     navLogEntries,
     messageSeenAt,
     pageWelcome,
+    archivedPageWelcome,
   } = useAgentChat();
+
+  const reduceMotion = usePrefersReducedMotion();
+  const prevChatStatusRef = useRef<typeof status | null>(null);
+  const liveStreamCompletedAssistantIdsRef = useRef(new Set<string>());
+  useLayoutEffect(() => {
+    prevChatStatusRef.current = status;
+  }, [status]);
+
+  if (
+    prevChatStatusRef.current === "streaming" &&
+    status !== "streaming"
+  ) {
+    const last = messages.at(-1);
+    if (last?.role === "assistant") {
+      liveStreamCompletedAssistantIdsRef.current.add(last.id);
+    }
+  }
 
   const isSidebar = variant === "sidebar";
   const { open, openMobile, isMobile } = useRightSidebar();
@@ -202,9 +223,12 @@ export function AgentChatPanel({
   const hasConversation =
     messages.length > 0 ||
     pageWelcome != null ||
+    archivedPageWelcome != null ||
     (hasUserSentMessage && navLogEntries.length > 0);
 
   const lastMessage = messages.at(-1);
+  const isLiveStreamingAssistant =
+    status === "streaming" && lastMessage?.role === "assistant";
   const showAssistantThinking =
     busy && (messages.length === 0 || lastMessage?.role === "user");
 
@@ -247,10 +271,15 @@ export function AgentChatPanel({
   }, [busy, bumpSidebarSendBorderPulse, input, scopeReady, sendMessage]);
 
   const sendPreset = useCallback(
-    (prompt: string) => {
+    (prompt: string, options?: { pageWelcomeInteraction?: boolean }) => {
       if (busy || !scopeReady) return;
       bumpSidebarSendBorderPulse();
-      void sendMessage({ text: prompt });
+      void sendMessage(
+        { text: prompt },
+        options?.pageWelcomeInteraction
+          ? { body: { pageWelcomeInteraction: true } }
+          : undefined,
+      );
       setInput("");
     },
     [busy, bumpSidebarSendBorderPulse, scopeReady, sendMessage],
@@ -443,16 +472,30 @@ export function AgentChatPanel({
           </div>
           {message.parts.map((part, index) => {
             if (part.type === "text") {
-              if (!isUser && assistantNavCards) {
-                return null;
+              if (isUser) {
+                return (
+                  <div
+                    key={index}
+                    className={cn("whitespace-pre-wrap text-right")}
+                  >
+                    {part.text}
+                  </div>
+                );
               }
               return (
-                <div
+                <AgentChatAssistantText
                   key={index}
-                  className={cn("whitespace-pre-wrap", isUser && "text-right")}
-                >
-                  {part.text}
-                </div>
+                  fullText={part.text}
+                  messageId={message.id}
+                  partIndex={index}
+                  reduceMotion={reduceMotion}
+                  isLiveStreaming={
+                    message.id === lastMessage?.id && isLiveStreamingAssistant
+                  }
+                  wasLiveStreamCompleted={liveStreamCompletedAssistantIdsRef.current.has(
+                    message.id,
+                  )}
+                />
               );
             }
             if (part.type === "tool-getServerTime") {
@@ -623,6 +666,59 @@ export function AgentChatPanel({
     );
   };
 
+  const renderArchivedPageWelcome = (welcome: PageWelcome) => (
+    <div
+      key={`archived-${welcome.id}`}
+      className="flex w-full flex-col gap-2"
+      role="note"
+      aria-label="Saved page welcome"
+    >
+      <div className="flex w-full justify-start">
+        <div
+          className={cn(
+            "flex max-w-[min(100%,36rem)] flex-col gap-2 rounded-xl border border-dashed p-3 text-sm",
+            isSidebar
+              ? "max-w-[min(100%,100%)] border-sidebar-border/50 bg-sidebar-accent/15 text-xs leading-snug"
+              : "border-border/50 bg-muted/10",
+          )}
+        >
+          <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs font-medium tracking-wide uppercase">
+            <span className="inline-flex items-center gap-1">
+              <Bot className="size-3.5" aria-hidden />
+              <span>Superbot</span>
+            </span>
+            <span className="text-muted-foreground/90 font-normal normal-case tracking-normal">
+              Page tip (saved)
+            </span>
+          </div>
+          <h3
+            className={cn(
+              "text-foreground font-semibold leading-snug",
+              isSidebar ? "text-sm" : "text-base",
+            )}
+          >
+            {welcome.headline}
+          </h3>
+          <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+            {welcome.body}
+          </p>
+          {welcome.suggestions.length > 0 ? (
+            <div className="text-muted-foreground border-border/40 mt-0.5 border-t pt-2 text-xs leading-snug">
+              <p className="text-foreground/85 mb-1 font-medium">
+                Ideas you could still try
+              </p>
+              <ul className="list-inside list-disc space-y-0.5">
+                {welcome.suggestions.map((s) => (
+                  <li key={s.label}>{s.label}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderPageWelcomeCard = (welcome: PageWelcome) => {
     const staggerBase = 0.04;
     const staggerStep = 0.09;
@@ -682,7 +778,7 @@ export function AgentChatPanel({
                     ? "max-w-[min(100%,100%)] border-sidebar-border/55 bg-sidebar py-2 text-xs text-foreground hover:bg-sidebar-accent/40"
                     : "border-border/80 text-foreground hover:bg-muted/50",
                 )}
-                onClick={() => sendPreset(s.prompt)}
+                onClick={() => sendPreset(s.prompt, { pageWelcomeInteraction: true })}
               >
                 <CircleHelp
                   className="text-muted-foreground size-4 shrink-0"
@@ -754,7 +850,9 @@ export function AgentChatPanel({
   const initialTimelineHadRowsRef = useRef<boolean | null>(null);
   if (initialTimelineHadRowsRef.current === null) {
     initialTimelineHadRowsRef.current =
-      renderNodes.length > 0 || pageWelcome != null;
+      renderNodes.length > 0 ||
+      pageWelcome != null ||
+      archivedPageWelcome != null;
   }
   const shouldMountStaggerTimeline = initialTimelineHadRowsRef.current;
 
@@ -907,9 +1005,15 @@ export function AgentChatPanel({
                   key={sidebarStaggerEpoch}
                   className={cn(
                     "flex max-w-full flex-col gap-2 px-3 pb-4 pt-1",
-                    pageWelcome != null && "min-h-full",
+                    (pageWelcome != null || archivedPageWelcome != null) &&
+                      "min-h-full",
                   )}
                 >
+                  {archivedPageWelcome ? (
+                    <div className="flex shrink-0 flex-col gap-1 pb-1">
+                      {renderArchivedPageWelcome(archivedPageWelcome)}
+                    </div>
+                  ) : null}
                   <div className="flex shrink-0 flex-col gap-3">
                     {timelineNodes}
                     {assistantThinkingRow}
@@ -938,7 +1042,7 @@ export function AgentChatPanel({
               )}
             </ScrollArea>
           ) : (
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 py-6">
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-6 pt-10">
               {showSidebarAnimatedContent ? (
                 <div
                   key={sidebarStaggerEpoch}
@@ -947,28 +1051,6 @@ export function AgentChatPanel({
                   <StaggeredAnimation
                     index={0}
                     baseDelay={0}
-                    incrementDelay={0}
-                    fadeDirection="up"
-                    className="flex shrink-0 justify-center"
-                  >
-                    <video
-                      key={assistantVideoTheme}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      preload="auto"
-                      width={120}
-                      height={120}
-                      aria-label="Supersolt assistant"
-                      className="h-24 w-24 shrink-0 select-none object-contain"
-                    >
-                      <source src={assistantVideoSrc} type="video/webm" />
-                    </video>
-                  </StaggeredAnimation>
-                  <StaggeredAnimation
-                    index={0}
-                    baseDelay={0.5}
                     incrementDelay={0}
                     fadeDirection="left"
                     className="flex max-w-[14rem] justify-center"
@@ -1113,9 +1195,15 @@ export function AgentChatPanel({
           className={cn(
             "mx-auto flex flex-col gap-2 px-3 pb-4 pt-2 sm:px-4",
             composerMaxWithThread,
-            pageWelcome != null && "min-h-full",
+            (pageWelcome != null || archivedPageWelcome != null) &&
+              "min-h-full",
           )}
         >
+          {archivedPageWelcome ? (
+            <div className="flex w-full shrink-0 flex-col gap-1 pb-1">
+              {renderArchivedPageWelcome(archivedPageWelcome)}
+            </div>
+          ) : null}
           <div className="flex shrink-0 flex-col gap-3">
             {timelineNodes}
             {assistantThinkingRow}
