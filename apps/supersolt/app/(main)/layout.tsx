@@ -25,7 +25,6 @@ export default function MainLayout({
         style={
           {
             "--right-sidebar-width": "21rem",
-            "--right-sidebar-width-icon": "12rem",
           } as React.CSSProperties
         }
       >
