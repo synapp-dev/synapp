@@ -773,6 +773,54 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["recipe_allergens"]["Insert"]>;
         Relationships: [];
       };
+      agent_digest_cache: {
+        Row: {
+          body_md: string;
+          digest_date: string;
+          generated_at: string;
+          id: string;
+          organisation_id: string;
+          user_profile_id: string;
+        };
+        Insert: {
+          body_md: string;
+          digest_date: string;
+          generated_at?: string;
+          id?: string;
+          organisation_id: string;
+          user_profile_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["agent_digest_cache"]["Insert"]>;
+        Relationships: [];
+      };
+      dashboard_user_preferences: {
+        Row: {
+          custom_range_end: string | null;
+          custom_range_start: string | null;
+          id: string;
+          organisation_id: string;
+          selected_venue_ids: string[] | null;
+          time_window: string;
+          updated_at: string;
+          user_profile_id: string;
+          venue_scope_mode: string;
+        };
+        Insert: {
+          custom_range_end?: string | null;
+          custom_range_start?: string | null;
+          id?: string;
+          organisation_id: string;
+          selected_venue_ids?: string[] | null;
+          time_window?: string;
+          updated_at?: string;
+          user_profile_id: string;
+          venue_scope_mode?: string;
+        };
+        Update: Partial<
+          Database["public"]["Tables"]["dashboard_user_preferences"]["Insert"]
+        >;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
