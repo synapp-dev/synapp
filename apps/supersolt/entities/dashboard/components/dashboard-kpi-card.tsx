@@ -29,9 +29,22 @@ function kpiDeltaTextClassName(direction: "up" | "down"): string {
 
 type DashboardKpiCardProps = {
   kpi: DashboardKpiData;
+  /**
+   * Seconds before the count-up starts — use the same value as the wrapping
+   * `StaggeredAnimation` `delaySeconds` so the number animates while the card is visible.
+   */
+  countUpDelaySeconds?: number;
+  /**
+   * When set, the card is keyboard-focusable and activates Superbot with dashboard context.
+   */
+  onRequestAgentInsight?: () => void;
 };
 
-export function DashboardKpiCard({ kpi }: DashboardKpiCardProps) {
+export function DashboardKpiCard({
+  kpi,
+  countUpDelaySeconds = 0,
+  onRequestAgentInsight,
+}: DashboardKpiCardProps) {
   const [deltaBadgeVisible, setDeltaBadgeVisible] = React.useState(false);
 
   React.useEffect(() => {
@@ -44,10 +57,35 @@ export function DashboardKpiCard({ kpi }: DashboardKpiCardProps) {
   ]);
 
   const targetMissed = kpi.targetMissed === true;
+  const agentInsight = Boolean(onRequestAgentInsight);
 
   return (
-    <Card className="flex h-full min-h-0 flex-col gap-0 py-0">
-      <CardContent className="flex min-h-[124px] flex-1 flex-col justify-between gap-3 p-0 px-6 py-4 md:min-h-[132px] md:gap-4 md:py-5">
+    <Card
+      role={agentInsight ? "button" : undefined}
+      tabIndex={agentInsight ? 0 : undefined}
+      aria-label={
+        agentInsight
+          ? `Ask Superbot about ${kpi.title}`
+          : undefined
+      }
+      onClick={agentInsight ? onRequestAgentInsight : undefined}
+      onKeyDown={
+        agentInsight
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onRequestAgentInsight?.();
+              }
+            }
+          : undefined
+      }
+      className={cn(
+        "flex h-full min-h-0 flex-col gap-0 py-0",
+        agentInsight &&
+          "cursor-pointer transition-colors hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+      )}
+    >
+      <CardContent className="flex min-h-48 flex-1 flex-col justify-between gap-3 p-0 px-6 py-4 md:min-h-30 md:gap-4 md:py-5">
         <div className="flex flex-row items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {targetMissed ? (
@@ -56,8 +94,14 @@ export function DashboardKpiCard({ kpi }: DashboardKpiCardProps) {
                 role="img"
                 aria-label="Current value is worse than target"
               >
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" aria-hidden />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" aria-hidden />
+                <span
+                  className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75"
+                  aria-hidden
+                />
+                <span
+                  className="relative inline-flex h-2 w-2 rounded-full bg-amber-500"
+                  aria-hidden
+                />
               </span>
             ) : null}
             <CardDescription className="min-w-0 flex-1 text-xs uppercase tracking-wider text-muted-foreground leading-none">
@@ -84,12 +128,13 @@ export function DashboardKpiCard({ kpi }: DashboardKpiCardProps) {
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-wrap items-start gap-3">
+        <div className="flex min-w-0 flex-wrap items-start gap-2">
           <CardTitle className="min-w-0 shrink text-4xl leading-none tracking-tight">
             <DashboardCountUp
               end={kpi.countUpEnd}
               decimals={kpi.countUpDecimals}
               duration={KPI_COUNT_DURATION_S}
+              delay={countUpDelaySeconds}
               prefix={kpi.countUpPrefix}
               suffix={kpi.countUpSuffix}
               separator=""
@@ -101,7 +146,7 @@ export function DashboardKpiCard({ kpi }: DashboardKpiCardProps) {
               <TooltipTrigger asChild>
                 <span
                   className={cn(
-                    "inline-flex h-fit shrink-0 cursor-help items-center gap-0.5 text-xs font-medium opacity-0 animate-slide-left-fade-in-slow [&>svg]:size-3.5",
+                    "inline-flex h-fit shrink-0 cursor-help items-center gap-0 text-xs font-medium opacity-0 animate-slide-left-fade-in-slow [&>svg]:size-3.5",
                     kpiDeltaTextClassName(kpi.deltaDirection),
                   )}
                 >

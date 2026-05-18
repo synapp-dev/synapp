@@ -31,7 +31,7 @@ import type {
 const chartConfig = {
   revenue: {
     label: "Revenue",
-    color: "#86efac",
+    color: "var(--brand-supersolt-primary)",
   },
   expenses: {
     label: "Expenses",

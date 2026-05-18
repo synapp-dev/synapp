@@ -70,6 +70,13 @@ export type DashboardQuickAction = {
   href: string | null;
 };
 
+export type DashboardMorningDigestData = {
+  /** Short lines shown as the agent morning digest (mock until live agent). */
+  lines: string[];
+  insightHeadline: string | null;
+  insightBody: string | null;
+};
+
 export type DummyDashboardData = {
   hero: DashboardHeroData;
   /** Dummy daily net revenue points for the hero spark chart (UX preview). */
@@ -79,6 +86,7 @@ export type DummyDashboardData = {
   channelMix: DashboardChannelMix[];
   alerts: DashboardAlert[];
   quickActions: DashboardQuickAction[];
+  morningDigest: DashboardMorningDigestData;
 };
 
 export const dummyDashboardData: DummyDashboardData = {
@@ -218,4 +226,12 @@ export const dummyDashboardData: DummyDashboardData = {
       href: null,
     },
   ],
+  morningDigest: {
+    lines: [
+      "Yesterday closed slightly under your Tuesday baseline — nothing alarming.",
+      "Two supplier invoices are waiting for approval; oat milk cost is up 15% vs last invoice.",
+    ],
+    insightHeadline: "Revenue vs baseline",
+    insightBody: "Brunswick was 18% under; Hawthorn carried the day. Tap Sales when you want the full picture.",
+  },
 };

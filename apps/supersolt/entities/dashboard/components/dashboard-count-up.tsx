@@ -18,6 +18,8 @@ type DashboardCountUpProps = {
   end: number;
   decimals?: number;
   duration?: number;
+  /** Seconds before counting starts (e.g. match a parent entrance `animation-delay`). */
+  delay?: number;
   prefix?: string;
   suffix?: string;
   /** Thousands separator; use "" for small values. */
@@ -31,6 +33,7 @@ export function DashboardCountUp({
   end,
   decimals = 0,
   duration = 3,
+  delay = 0,
   prefix,
   suffix,
   separator = ",",
@@ -44,6 +47,7 @@ export function DashboardCountUp({
       end={end}
       decimals={decimals}
       duration={duration}
+      delay={delay}
       prefix={prefix}
       suffix={suffix}
       separator={separator}
