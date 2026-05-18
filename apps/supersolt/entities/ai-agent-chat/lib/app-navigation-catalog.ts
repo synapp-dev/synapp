@@ -1,4 +1,5 @@
 export const APP_NAVIGATION_DESTINATION_KEYS = [
+  "dashboard",
   "insights",
   "insights_sales",
   "insights_labour",
@@ -41,12 +42,24 @@ export type AppNavigationCatalogEntry = {
   description?: string;
   /** Path after `/{organisationSlug}/{venueSlug}` — leading slash, no org/venue placeholders. */
   pathSuffix: string;
+  /**
+   * When set, navigation cards use this root-relative href instead of
+   * `/{organisationSlug}/{venueSlug}{pathSuffix}` (access is still checked against the given org/venue).
+   */
+  globalHref?: string;
 };
 
 export const APP_NAVIGATION_CATALOG: Record<
   AppNavigationDestinationKey,
   AppNavigationCatalogEntry
 > = {
+  dashboard: {
+    key: "dashboard",
+    title: "Dashboard",
+    description: "Workspace home with KPIs and venue overview.",
+    pathSuffix: "",
+    globalHref: "/dashboard",
+  },
   insights: {
     key: "insights",
     title: "Insights",

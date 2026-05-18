@@ -59,6 +59,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+import { SuperbotSuggestionDestinationBanner } from "@/entities/ai-agent-chat/components/superbot-suggestion-destination-banner";
 import { useMenuItemMutations } from "@/entities/menu-items/model/useMenuItemMutations";
 import { useMenuItemQuery } from "@/entities/menu-items/model/useMenuItemQuery";
 import { useMenuItemsQuery } from "@/entities/menu-items/model/useMenuItemsQuery";
@@ -403,6 +404,7 @@ export function MenuItemsPageClient({ organisation, venue }: MenuItemsPageClient
   return (
     <>
       <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
+        <SuperbotSuggestionDestinationBanner pathSuffix="menu/menu-items" />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
             <BookOpenText className="h-5 w-5 text-muted-foreground" />

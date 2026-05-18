@@ -12,6 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
 
+import { SuperbotSuggestionDestinationBanner } from "@/entities/ai-agent-chat/components/superbot-suggestion-destination-banner";
+
 type OrderGuidePageClientProps = {
   organisation: string;
   venue: string;
@@ -164,6 +166,7 @@ export function OrderGuidePageClient({ organisation, venue }: OrderGuidePageClie
 
   return (
     <section className="space-y-5">
+      <SuperbotSuggestionDestinationBanner pathSuffix="inventory/order-guide" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Order Guide</h1>

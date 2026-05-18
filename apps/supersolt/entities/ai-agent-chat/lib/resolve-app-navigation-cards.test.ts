@@ -33,4 +33,24 @@ describe("resolveAppNavigationCards", () => {
     });
     expect(cards).toHaveLength(1);
   });
+
+  it("uses /dashboard for the dashboard destination (not org/venue prefix)", () => {
+    const cards = resolveAppNavigationCards({
+      organisationSlug: "acme",
+      venueSlug: "richmond",
+      organisationName: "Acme Co",
+      venueName: "Richmond",
+      destinationKeys: ["dashboard"],
+    });
+    expect(cards).toEqual([
+      {
+        title: "Dashboard",
+        description: "Workspace home with KPIs and venue overview.",
+        href: "/dashboard",
+        destinationKey: "dashboard",
+        organisationName: "Acme Co",
+        venueName: "Richmond",
+      },
+    ]);
+  });
 });

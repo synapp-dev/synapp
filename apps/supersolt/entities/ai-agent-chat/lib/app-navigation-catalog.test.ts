@@ -24,6 +24,7 @@ describe("app-navigation-catalog", () => {
   });
 
   it("narrows unknown strings via isAppNavigationDestinationKey", () => {
+    expect(isAppNavigationDestinationKey("dashboard")).toBe(true);
     expect(isAppNavigationDestinationKey("ingredients")).toBe(true);
     expect(isAppNavigationDestinationKey("workforce_roster")).toBe(true);
     expect(isAppNavigationDestinationKey("recipes")).toBe(false);

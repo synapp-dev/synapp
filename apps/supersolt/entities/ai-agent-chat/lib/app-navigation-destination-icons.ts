@@ -33,6 +33,7 @@ import type { AppNavigationDestinationKey } from "@/entities/ai-agent-chat/lib/a
 
 /** Matches sidebar icons in `app-sidebar.tsx` for the same destinations. */
 export const APP_NAVIGATION_DESTINATION_ICONS = {
+  dashboard: LayoutDashboard,
   insights: BarChart3,
   insights_sales: TrendingUp,
   insights_labour: HardHat,

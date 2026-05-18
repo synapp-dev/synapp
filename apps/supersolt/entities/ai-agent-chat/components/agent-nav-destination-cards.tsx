@@ -141,6 +141,8 @@ function AgentNavDestinationCardItem({
 
   const secondsLeft = Math.max(0, Math.ceil(remainingMs / 1000));
   const progress = remainingMs / AUTO_REDIRECT_MS;
+  /** Elapsed fraction (0 → 1): bar grows toward redirect instead of draining. */
+  const fillProgress = 1 - progress;
   const cleanedVenue = cleanVenueName(card.venueName, card.organisationName);
 
   const cardInner = (
@@ -217,12 +219,12 @@ function AgentNavDestinationCardItem({
                   role="progressbar"
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={Math.round(progress * 100)}
+                  aria-valuenow={Math.round(fillProgress * 100)}
                   aria-label="Redirect countdown"
                 >
                   <span
                     className="block h-full bg-black/60"
-                    style={{ width: `${progress * 100}%` }}
+                    style={{ width: `${fillProgress * 100}%` }}
                   />
                 </span>
               ) : null}

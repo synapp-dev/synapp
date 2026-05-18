@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  DollarSign,
   FileCheck,
   MoreVertical,
   X,
@@ -31,6 +30,11 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
+
+import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
+import { SuperbotSuggestionDestinationBanner } from "@/entities/ai-agent-chat/components/superbot-suggestion-destination-banner";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
 
 type TimesheetsPageClientProps = {
   organisation: string;
@@ -77,6 +81,28 @@ const SEED_TIMESHEETS: TimesheetEntry[] = [
   { id: "ts13", staffName: "Mia Roberts", date: "2026-03-18", dayLabel: "Wed, 18 Mar", clockIn: "5:00 PM", clockOut: "10:15 PM", breakMins: 0, totalHours: 5.25, scheduled: "17:00–22:00", scheduledHours: 5.0, grossPay: 13650, status: "rejected" },
 ];
 
+/** Matches `SuperbotSuggestion.pathSuffix` for this page. */
+const TIMESHEETS_PATH_SUFFIX = "workforce/timesheets";
+
+/**
+ * Dummy UX: first four pending seed rows — “the ones Superbot meant” when landing
+ * from the dashboard Employee Timesheets suggestion.
+ */
+const AGENT_REFERENCE_TIMESHEET_IDS: readonly string[] = [
+  "ts5",
+  "ts6",
+  "ts7",
+  "ts8",
+];
+
+const START_DELAY_S = 0.08;
+const STAGGER_STEP_S = 0.09;
+const SECTION_FADE_DIRECTIONS = ["left", "down", "up", "right"] as const;
+
+function sectionDelay(slot: number): number {
+  return START_DELAY_S + STAGGER_STEP_S * slot;
+}
+
 function formatCurrency(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -94,15 +120,35 @@ function getWeekLabel(offset: number): string {
 }
 
 export function TimesheetsPageClient({ organisation, venue }: TimesheetsPageClientProps) {
+  const { superbotPageHandoff } = useAgentChat();
+  const reduceMotion = usePrefersReducedMotion();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [weekOffset, setWeekOffset] = useState(0);
 
   const weekLabel = useMemo(() => getWeekLabel(weekOffset), [weekOffset]);
 
+  const isTimesheetAgentHandoff =
+    superbotPageHandoff?.source === "superbot-suggestion" &&
+    superbotPageHandoff.pathSuffix === TIMESHEETS_PATH_SUFFIX;
+
   const filtered = useMemo(() => {
     if (statusFilter === "all") return SEED_TIMESHEETS;
     return SEED_TIMESHEETS.filter((ts) => ts.status === statusFilter);
   }, [statusFilter]);
+
+  const displayRows = useMemo(() => {
+    if (!isTimesheetAgentHandoff) {
+      return filtered;
+    }
+    const refSet = new Set(AGENT_REFERENCE_TIMESHEET_IDS);
+    const referenced: TimesheetEntry[] = [];
+    for (const id of AGENT_REFERENCE_TIMESHEET_IDS) {
+      const row = filtered.find((r) => r.id === id);
+      if (row) referenced.push(row);
+    }
+    const rest = filtered.filter((r) => !refSet.has(r.id));
+    return [...referenced, ...rest];
+  }, [filtered, isTimesheetAgentHandoff]);
 
   const metrics = useMemo(() => {
     const pending = SEED_TIMESHEETS.filter((ts) => ts.status === "pending");
@@ -121,113 +167,145 @@ export function TimesheetsPageClient({ organisation, venue }: TimesheetsPageClie
   return (
     <section className="space-y-4">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Timesheets</h1>
-          <p className="text-sm text-muted-foreground">
-            {organisation} &middot; {venue}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setWeekOffset((w) => w - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 min-w-[180px] text-xs font-medium"
-              onClick={() => setWeekOffset(0)}
-            >
-              {weekLabel}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setWeekOffset((w) => w + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+      <StaggeredAnimation index={0} delaySeconds={sectionDelay(0)} fadeDirection="up">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold tracking-tight">Timesheets</h1>
+            <p className="text-sm text-muted-foreground">
+              {organisation} &middot; {venue}
+            </p>
           </div>
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
-            <SelectTrigger className="h-8 w-[140px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="rejected">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-          {metrics.pendingCount > 0 ? (
-            <Button
-              size="sm"
-              className="gap-1.5"
-              onClick={() => toast.info(`Approve all ${metrics.pendingCount} pending`)}
-            >
-              <FileCheck className="h-3.5 w-3.5" />
-              Approve All ({metrics.pendingCount})
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setWeekOffset((w) => w - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 min-w-[180px] text-xs font-medium"
+                onClick={() => setWeekOffset(0)}
+              >
+                {weekLabel}
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setWeekOffset((w) => w + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+              <SelectTrigger className="h-8 w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            {metrics.pendingCount > 0 ? (
+              <Button
+                size="sm"
+                className="gap-1.5"
+                onClick={() => toast.info(`Approve all ${metrics.pendingCount} pending`)}
+              >
+                <FileCheck className="h-3.5 w-3.5" />
+                Approve All ({metrics.pendingCount})
+              </Button>
+            ) : null}
+          </div>
         </div>
-      </div>
+      </StaggeredAnimation>
 
       {/* Stat cards */}
       <div className="grid gap-3 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Total Hours</CardDescription>
-            <CardTitle className="text-3xl">{metrics.totalHours.toFixed(1)}h</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Total Pay</CardDescription>
-            <CardTitle className="text-3xl">{formatCurrency(metrics.totalPay)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">Entries</CardDescription>
-            <CardTitle className="text-3xl">{metrics.totalCount}</CardTitle>
-          </CardHeader>
-        </Card>
+        <StaggeredAnimation
+          index={0}
+          delaySeconds={sectionDelay(1)}
+          fadeDirection={SECTION_FADE_DIRECTIONS[0]!}
+        >
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs uppercase tracking-wider">Total Hours</CardDescription>
+              <CardTitle className="text-3xl">{metrics.totalHours.toFixed(1)}h</CardTitle>
+            </CardHeader>
+          </Card>
+        </StaggeredAnimation>
+        <StaggeredAnimation
+          index={1}
+          delaySeconds={sectionDelay(2)}
+          fadeDirection={SECTION_FADE_DIRECTIONS[1]!}
+        >
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs uppercase tracking-wider">Total Pay</CardDescription>
+              <CardTitle className="text-3xl">{formatCurrency(metrics.totalPay)}</CardTitle>
+            </CardHeader>
+          </Card>
+        </StaggeredAnimation>
+        <StaggeredAnimation
+          index={2}
+          delaySeconds={sectionDelay(3)}
+          fadeDirection={SECTION_FADE_DIRECTIONS[2]!}
+        >
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription className="text-xs uppercase tracking-wider">Entries</CardDescription>
+              <CardTitle className="text-3xl">{metrics.totalCount}</CardTitle>
+            </CardHeader>
+          </Card>
+        </StaggeredAnimation>
       </div>
 
       {/* Secondary stats */}
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="outline" className="gap-1 text-xs">
-          Pending: {metrics.pendingCount}
-        </Badge>
-        <Badge variant="outline" className="gap-1 text-xs">
-          Approved: {metrics.approvedCount}
-        </Badge>
-      </div>
+      <StaggeredAnimation index={0} delaySeconds={sectionDelay(4)} fadeDirection="left">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline" className="gap-1 text-xs">
+            Pending: {metrics.pendingCount}
+          </Badge>
+          <Badge variant="outline" className="gap-1 text-xs">
+            Approved: {metrics.approvedCount}
+          </Badge>
+        </div>
+      </StaggeredAnimation>
 
       {/* Table */}
-      {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
-            <Clock className="h-10 w-10 text-muted-foreground/50" />
-            <p className="font-semibold">No timesheet entries found</p>
-            <p className="text-sm text-muted-foreground">
-              {SEED_TIMESHEETS.length === 0
-                ? "Time entries will appear when staff clock in."
-                : "Adjust filters to see more entries."}
-            </p>
-          </CardContent>
-        </Card>
+      {displayRows.length === 0 ? (
+        <StaggeredAnimation index={0} delaySeconds={sectionDelay(5)} fadeDirection="up">
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center gap-2 py-12 text-center">
+              <Clock className="h-10 w-10 text-muted-foreground/50" />
+              <p className="font-semibold">No timesheet entries found</p>
+              <p className="text-sm text-muted-foreground">
+                {SEED_TIMESHEETS.length === 0
+                  ? "Time entries will appear when staff clock in."
+                  : "Adjust filters to see more entries."}
+              </p>
+            </CardContent>
+          </Card>
+        </StaggeredAnimation>
       ) : (
-        <Card>
-          <CardContent className="px-0 py-0">
-            <Table>
+        <>
+          <StaggeredAnimation index={0} delaySeconds={sectionDelay(5)} fadeDirection="up">
+            <SuperbotSuggestionDestinationBanner
+              pathSuffix={TIMESHEETS_PATH_SUFFIX}
+              className="shadow-sm"
+            />
+          </StaggeredAnimation>
+          <StaggeredAnimation index={0} delaySeconds={sectionDelay(6)} fadeDirection="up">
+            <Card>
+              <CardContent className="px-0 pb-0 pt-0">
+                <Table>
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-xs font-medium uppercase tracking-wider">Staff</TableHead>
@@ -244,10 +322,22 @@ export function TimesheetsPageClient({ organisation, venue }: TimesheetsPageClie
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((ts) => {
+                {displayRows.map((ts) => {
                   const variance = ts.totalHours - ts.scheduledHours;
+                  const isAgentReferenced =
+                    isTimesheetAgentHandoff &&
+                    AGENT_REFERENCE_TIMESHEET_IDS.includes(ts.id);
                   return (
-                    <TableRow key={ts.id}>
+                    <TableRow
+                      key={ts.id}
+                      data-superbot-referenced={isAgentReferenced ? "true" : undefined}
+                      className={cn(
+                        isAgentReferenced &&
+                          (reduceMotion
+                            ? "bg-[color:color-mix(in_oklab,rgb(34_197_94)_18%,var(--card))]"
+                            : "transition-none [animation:var(--animate-superbot-timesheet-row-pulse)] hover:bg-[color:color-mix(in_oklab,rgb(34_197_94)_26%,var(--card))]"),
+                      )}
+                    >
                       <TableCell className="font-medium">{ts.staffName}</TableCell>
                       <TableCell>{ts.dayLabel}</TableCell>
                       <TableCell>{ts.clockIn}</TableCell>
@@ -315,9 +405,11 @@ export function TimesheetsPageClient({ organisation, venue }: TimesheetsPageClie
                   );
                 })}
               </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+              </Table>
+            </CardContent>
+          </Card>
+          </StaggeredAnimation>
+        </>
       )}
     </section>
   );

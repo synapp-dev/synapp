@@ -15,7 +15,7 @@ export function resolveAppNavigationCards(args: {
 
   return keys.map((key) => {
     const entry = APP_NAVIGATION_CATALOG[key];
-    const href = `${base}${entry.pathSuffix}`;
+    const href = entry.globalHref ?? `${base}${entry.pathSuffix}`;
     return {
       title: entry.title,
       ...(entry.description ? { description: entry.description } : {}),

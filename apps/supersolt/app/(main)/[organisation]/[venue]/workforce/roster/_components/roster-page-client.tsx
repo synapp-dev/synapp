@@ -42,6 +42,7 @@ import {
   positionBadgeClass,
   positionShortLabel,
 } from "@/lib/roster/position-styles";
+import { SuperbotSuggestionDestinationBanner } from "@/entities/ai-agent-chat/components/superbot-suggestion-destination-banner";
 import type { VenueStaffMember } from "@/server/workforce/people.service";
 import { getInitials } from "../../people/_components/people-staff-model";
 
@@ -575,6 +576,10 @@ export function RosterPageClient({ organisation, venue }: RosterPageClientProps)
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+      <SuperbotSuggestionDestinationBanner
+        pathSuffix="workforce/roster"
+        className="shrink-0"
+      />
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
