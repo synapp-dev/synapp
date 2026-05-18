@@ -1,93 +1,204 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Calendar,
-  ClipboardList,
-  type LucideIcon,
-  Sparkles,
-  UtensilsCrossed,
-  Users,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 
-import { useScopedNavigation } from "@/entities/access/scoped-navigation-context";
+import {
+  useScopedNavigation,
+  type ScopedContext,
+} from "@/entities/access/scoped-navigation-context";
+import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
 import {
   dummySuperbotSuggestions,
   type SuperbotSuggestion,
-  type SuperbotSuggestionIconId,
 } from "@/entities/dashboard/model/dummy-superbot-suggestions";
-import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
-import { Button } from "@workspace/ui/components/button";
+import { SuperbotSuggestionNavButton } from "@/entities/dashboard/components/superbot-suggestion-nav-button";
 import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@workspace/ui/components/card";
-import { Separator } from "@workspace/ui/components/separator";
+  AUTO_ADVANCE_MS,
+  easeInOutCubic,
+  PROGRESS_TICK_MS,
+  SLIDE_EXIT_FADE_MS,
+} from "@/entities/dashboard/components/superbot-suggestions-carousel-constants";
+import { SuperbotSuggestionsContextPanel } from "@/entities/dashboard/components/superbot-suggestions-context-panel";
+import { superbotSuggestionHref } from "@/entities/dashboard/components/superbot-suggestions-href";
+import { SuperbotSuggestionsMainPanel } from "@/entities/dashboard/components/superbot-suggestions-main-panel";
+import { useStreamingText } from "@/entities/dashboard/components/superbot-suggestions-use-streaming-text";
+import {
+  cleanVenueNameAgainstOrganisation,
+  formatSlugAsDisplayName,
+} from "@/entities/dashboard/lib/scope-place-display";
+import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
+import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 import { cn } from "@workspace/ui/lib/utils";
-
-const AUTO_ADVANCE_MS = 10_000;
-const TICK_MS = 100;
-const PROGRESS_STEP = TICK_MS / AUTO_ADVANCE_MS;
-
-const ICONS: Record<SuperbotSuggestionIconId, LucideIcon> = {
-  users: Users,
-  calendar: Calendar,
-  "clipboard-list": ClipboardList,
-  utensils: UtensilsCrossed,
-};
-
-function suggestionHref(
-  suggestion: SuperbotSuggestion,
-  scope: { organisationSlug: string; venueSlug: string } | null,
-): string | null {
-  if (!scope) {
-    return null;
-  }
-  const suffix = suggestion.pathSuffix.replace(/^\/+/, "");
-  return `/${scope.organisationSlug}/${scope.venueSlug}/${suffix}`;
-}
 
 export type SuperbotSuggestionsCardProps = {
   suggestions?: readonly SuperbotSuggestion[];
+  /** When the pathname is `/dashboard`, CTAs use this org/venue pair for deep links. */
+  linkScope?: ScopedContext | null;
+  /**
+   * Invoked after the suggestion context is written into Superbot chat and before
+   * client navigation (e.g. expand the agent sidebar so the new message is visible).
+   */
+  onSuggestionHandoff?: () => void;
 };
 
-export function SuperbotSuggestionsCard({
+export type SuperbotSuggestionsCardViewProps = SuperbotSuggestionsCardProps & {
+  navigate: (href: string) => void;
+};
+
+export function SuperbotSuggestionsCardView({
   suggestions = dummySuperbotSuggestions,
-}: SuperbotSuggestionsCardProps) {
+  linkScope = null,
+  onSuggestionHandoff,
+  navigate,
+}: SuperbotSuggestionsCardViewProps) {
+  const { beginSuperbotSuggestionNavigation } = useAgentChat();
   const { resolvedScope } = useScopedNavigation();
+  const scope = resolvedScope ?? linkScope;
   const reduceMotion = usePrefersReducedMotion();
-  const list = React.useMemo(() => [...suggestions], [suggestions]);
+  const { data: organisations = [] } = useAccessibleVenueGroupsQuery();
+
+  const scopePlaceLabels = React.useMemo(() => {
+    if (!scope) {
+      return null;
+    }
+    const org = organisations.find((o) => o.slug === scope.organisationSlug);
+    const venueRow = org?.venues.find((v) => v.slug === scope.venueSlug);
+    const organisationName =
+      org?.name ?? formatSlugAsDisplayName(scope.organisationSlug);
+    const rawVenueName =
+      venueRow?.name ?? formatSlugAsDisplayName(scope.venueSlug);
+    const venuePart = cleanVenueNameAgainstOrganisation(
+      rawVenueName,
+      organisationName,
+    );
+    return { organisationName, venuePart };
+  }, [organisations, scope]);
+
+  const handleScopedSuggestionClick = React.useCallback(
+    (
+      event: React.MouseEvent<HTMLAnchorElement>,
+      suggestion: SuperbotSuggestion,
+      targetHref: string,
+    ) => {
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        event.button !== 0
+      ) {
+        return;
+      }
+      event.preventDefault();
+      beginSuperbotSuggestionNavigation({
+        suggestion,
+        scopePlaceLabels,
+      });
+      onSuggestionHandoff?.();
+      navigate(targetHref);
+    },
+    [
+      beginSuperbotSuggestionNavigation,
+      navigate,
+      onSuggestionHandoff,
+      scopePlaceLabels,
+    ],
+  );
 
   const [activeIndex, setActiveIndex] = React.useState(0);
+  const [slideExiting, setSlideExiting] = React.useState(false);
+  const slideExitingRef = React.useRef(false);
+
   const [hoverPaused, setHoverPaused] = React.useState(false);
-  const [progress01, setProgress01] = React.useState(0);
-  const progressRef = React.useRef(0);
   const hoverPausedRef = React.useRef(false);
+  const progressFillRef = React.useRef<HTMLSpanElement | null>(null);
+  const segmentStartRef = React.useRef(0);
+  const totalPausedMsRef = React.useRef(0);
+  const pauseEnteredAtRef = React.useRef<number | null>(null);
+  const advancePendingRef = React.useRef(false);
+  const autoAdvanceExitTimeoutRef = React.useRef<number | null>(null);
+
+  const n = suggestions.length;
+  const active = n > 0 ? suggestions[activeIndex % n]! : null;
+
+  const clearAutoAdvanceExitTimeout = React.useCallback(() => {
+    if (autoAdvanceExitTimeoutRef.current != null) {
+      window.clearTimeout(autoAdvanceExitTimeoutRef.current);
+      autoAdvanceExitTimeoutRef.current = null;
+    }
+  }, []);
+
+  React.useEffect(() => {
+    return () => {
+      clearAutoAdvanceExitTimeout();
+    };
+  }, [clearAutoAdvanceExitTimeout]);
 
   React.useEffect(() => {
     hoverPausedRef.current = hoverPaused;
   }, [hoverPaused]);
 
-  const n = list.length;
-  const active = n > 0 ? list[activeIndex % n]! : null;
+  const bodyStreamEnabled = Boolean(active);
+  const descriptionStreamLen = useStreamingText(
+    active?.description ?? "",
+    active?.id ?? "",
+    reduceMotion,
+    bodyStreamEnabled,
+  );
+
+  const descriptionStreamComplete =
+    reduceMotion ||
+    !active ||
+    descriptionStreamLen >= active.description.length;
+
+  const revealStage: 1 | 2 | 3 = reduceMotion
+    ? 3
+    : !active
+      ? 1
+      : descriptionStreamComplete
+        ? 3
+        : 2;
 
   const goTo = React.useCallback(
     (index: number) => {
       if (n === 0) {
         return;
       }
+      clearAutoAdvanceExitTimeout();
+      slideExitingRef.current = false;
+      setSlideExiting(false);
+      advancePendingRef.current = false;
       setActiveIndex(((index % n) + n) % n);
     },
-    [n],
+    [n, clearAutoAdvanceExitTimeout],
   );
 
+  React.useLayoutEffect(() => {
+    if (reduceMotion) {
+      return;
+    }
+    segmentStartRef.current = Date.now();
+    totalPausedMsRef.current = 0;
+    pauseEnteredAtRef.current = hoverPausedRef.current ? Date.now() : null;
+    const el = progressFillRef.current;
+    if (el) {
+      el.style.transform = "scaleX(0)";
+    }
+  }, [activeIndex, reduceMotion]);
+
   React.useEffect(() => {
-    progressRef.current = 0;
-    setProgress01(0);
-  }, [activeIndex]);
+    if (reduceMotion) {
+      return;
+    }
+    if (hoverPaused) {
+      pauseEnteredAtRef.current = Date.now();
+    } else if (pauseEnteredAtRef.current != null) {
+      totalPausedMsRef.current += Date.now() - pauseEnteredAtRef.current;
+      pauseEnteredAtRef.current = null;
+    }
+  }, [hoverPaused, reduceMotion]);
 
   React.useEffect(() => {
     if (reduceMotion || n === 0) {
@@ -95,184 +206,186 @@ export function SuperbotSuggestionsCard({
     }
 
     const id = window.setInterval(() => {
-      if (hoverPausedRef.current) {
-        return;
+      const now = Date.now();
+      let elapsed = now - segmentStartRef.current - totalPausedMsRef.current;
+      if (pauseEnteredAtRef.current != null) {
+        elapsed -= now - pauseEnteredAtRef.current;
       }
-      progressRef.current += PROGRESS_STEP;
-      if (progressRef.current >= 1) {
-        progressRef.current = 0;
-        setActiveIndex((i) => (i + 1) % n);
-        setProgress01(0);
-        return;
+      const linearT = Math.min(1, Math.max(0, elapsed / AUTO_ADVANCE_MS));
+      const eased = easeInOutCubic(linearT);
+      progressFillRef.current?.style.setProperty(
+        "transform",
+        `scaleX(${eased})`,
+      );
+
+      if (
+        linearT >= 1 &&
+        !advancePendingRef.current &&
+        !slideExitingRef.current
+      ) {
+        advancePendingRef.current = true;
+        slideExitingRef.current = true;
+        setSlideExiting(true);
+        clearAutoAdvanceExitTimeout();
+        autoAdvanceExitTimeoutRef.current = window.setTimeout(() => {
+          segmentStartRef.current = Date.now();
+          totalPausedMsRef.current = 0;
+          pauseEnteredAtRef.current = hoverPausedRef.current
+            ? Date.now()
+            : null;
+          progressFillRef.current?.style.setProperty(
+            "transform",
+            "scaleX(0)",
+          );
+          setActiveIndex((i) => (i + 1) % n);
+          slideExitingRef.current = false;
+          setSlideExiting(false);
+          advancePendingRef.current = false;
+          autoAdvanceExitTimeoutRef.current = null;
+        }, SLIDE_EXIT_FADE_MS) as unknown as number;
       }
-      setProgress01(progressRef.current);
-    }, TICK_MS);
+    }, PROGRESS_TICK_MS);
 
     return () => window.clearInterval(id);
-  }, [n, reduceMotion]);
+  }, [n, reduceMotion, clearAutoAdvanceExitTimeout]);
 
   if (n === 0 || !active) {
     return null;
   }
 
-  const href = suggestionHref(active, resolvedScope);
-  const motionProgressPercent = progress01 * 100;
-  const ActiveIcon = ICONS[active.iconId];
+  const href = superbotSuggestionHref(active, scope);
+  const footerContentVisible = descriptionStreamComplete || !href;
+
+  const suggestionCardClassName = cn(
+    "relative flex h-64 min-h-0 flex-col gap-0 overflow-hidden rounded-xl border-2 border-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_32%,var(--border))] bg-gradient-to-br from-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_12%,var(--background))] via-background to-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_6%,var(--background))] p-0 py-0 shadow-sm transition-[border-color,box-shadow] md:col-span-3",
+    "dark:border-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_26%,var(--border))] dark:from-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_7%,var(--card))] dark:via-card dark:to-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_3%,var(--card))]",
+    href &&
+      "cursor-pointer hover:border-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_48%,var(--border))] hover:shadow-md dark:hover:border-[color:color-mix(in_oklab,var(--brand-supersolt-primary)_40%,var(--border))]",
+    !href && "cursor-default",
+  );
+
+  const suggestionCardBody = (
+    <>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          key={active.id}
+          aria-hidden
+          className={cn(
+            "superbot-suggestions-shifting-blobs pointer-events-none absolute inset-0 z-0",
+            slideExiting &&
+              !reduceMotion &&
+              "animate-slide-down-fade-out-slow",
+            slideExiting &&
+              reduceMotion &&
+              "opacity-0 transition-opacity duration-150",
+          )}
+        />
+        <div
+          className={cn(
+            "relative z-10 flex min-h-0 flex-1 flex-col gap-4 md:flex-row",
+            slideExiting && "pointer-events-none",
+          )}
+        >
+          <SuperbotSuggestionsMainPanel
+            active={active}
+            reduceMotion={reduceMotion}
+            slideExiting={slideExiting}
+            revealStage={revealStage}
+            descriptionStreamLen={descriptionStreamLen}
+            descriptionStreamComplete={descriptionStreamComplete}
+            navigable={Boolean(href)}
+            footerContentVisible={footerContentVisible}
+            scopePlaceLabels={scopePlaceLabels}
+          />
+          <SuperbotSuggestionsContextPanel
+            suggestionId={active.id}
+            reduceMotion={reduceMotion}
+            slideExiting={slideExiting}
+          />
+        </div>
+      </div>
+    </>
+  );
 
   return (
-    <section
-      role="region"
-      aria-labelledby="superbot-suggestions-heading"
-      className="flex flex-col gap-4 py-6"
-    >
-      <Separator />
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-          <h2
-            id="superbot-suggestions-heading"
-            className="text-sm font-semibold leading-snug tracking-tight"
+    <section role="region" aria-label="Superbot suggestions">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:items-start">
+        <div
+          data-testid="superbot-suggestions-hover-surface"
+          className="flex h-64 min-h-0 w-full flex-col md:col-span-1"
+          onMouseEnter={() => setHoverPaused(true)}
+          onMouseLeave={() => setHoverPaused(false)}
+        >
+          <div
+            className="grid h-full min-h-0 w-full grid-cols-1 grid-rows-6 gap-0"
+            role="group"
+            aria-label="Jump to a suggestion"
           >
-            Superbot suggestions{" "}
-            <span className="font-medium text-muted-foreground">(demo)</span>
-          </h2>
-        </div>
-      </div>
-
-      <div
-        data-testid="superbot-suggestions-hover-surface"
-        className="overflow-hidden"
-        onMouseEnter={() => {
-          setHoverPaused(true);
-        }}
-        onMouseLeave={() => {
-          setHoverPaused(false);
-        }}
-      >
-        <div className="py-2">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-4 md:items-stretch md:gap-4">
-            <div className="min-w-0 w-full md:col-span-1">
-              <div
-                className="grid h-full min-h-0 w-full grid-cols-1 grid-rows-6 gap-1.5"
-                role="group"
-                aria-label="Jump to a suggestion"
-              >
-                {Array.from({ length: 6 }, (_, cellIndex) => {
-                  const s = list[cellIndex];
-                  if (!s) {
-                    return (
-                      <div
-                        key={`superbot-suggestion-slot-${cellIndex}`}
-                        className="min-h-11 rounded-md border border-dotted border-muted-foreground/40 bg-transparent"
-                        aria-hidden
-                      />
-                    );
-                  }
-                  const i = cellIndex;
-                  const Icon = ICONS[s.iconId];
-                  const selected = i === activeIndex;
-                  return (
-                    <Button
-                      key={s.id}
-                      type="button"
-                      variant={selected ? "secondary" : "outline"}
-                      className="h-auto min-h-11 w-full min-w-0 flex-row items-center justify-start gap-2 rounded-md px-2 py-2 text-left font-normal"
-                      aria-label={`Show suggestion: ${s.title}`}
-                      aria-pressed={selected}
-                      onClick={() => {
-                        goTo(i);
-                      }}
-                    >
-                      <Icon
-                        className="h-5 w-5 shrink-0 text-foreground"
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 text-left text-xs font-medium leading-snug tracking-tight text-foreground line-clamp-2">
-                        {s.gridLabel}
-                      </span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="flex min-h-0 min-w-0 md:col-span-3">
-              <Card className="min-h-0 w-full min-w-0 overflow-hidden">
-                <CardHeader className="border-b pb-4">
-                  <div className="flex items-start gap-3">
-                    <ActiveIcon
-                      className="mt-0.5 h-5 w-5 shrink-0 text-primary"
-                      aria-hidden
-                    />
-                    <h3 className="text-lg font-semibold leading-snug tracking-tight">
-                      {active.title}
-                    </h3>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-4">
-                  <p
-                    aria-live="polite"
-                    className="line-clamp-3 text-sm leading-snug text-muted-foreground"
-                  >
-                    {active.description}
-                  </p>
-                </CardContent>
-                <CardFooter className="flex flex-col items-stretch gap-3 border-t bg-muted/20 pt-6">
-                  <div>
-                    {href ? (
-                      <Button asChild size="sm">
-                        <Link href={href}>{active.ctaLabel}</Link>
-                      </Button>
-                    ) : (
-                      <Button type="button" size="sm" disabled>
-                        {active.ctaLabel}
-                      </Button>
-                    )}
-                    {!href ? (
-                      <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
-                        Select an organisation and venue from the sidebar to
-                        open this task.
-                      </p>
-                    ) : null}
-                  </div>
-                  <div>
-                    {reduceMotion ? (
-                      <div
-                        className="flex gap-1"
-                        role="img"
-                        aria-label={`Suggestion ${activeIndex + 1} of ${n}`}
-                      >
-                        {list.map((s, i) => (
-                          <div
-                            key={s.id}
-                            className={cn(
-                              "h-1.5 flex-1 rounded-full",
-                              i === activeIndex ? "bg-primary" : "bg-muted",
-                            )}
-                          />
-                        ))}
-                      </div>
-                    ) : (
-                      <div
-                        className="h-1.5 w-full overflow-hidden rounded-full bg-muted/80"
-                        aria-hidden
-                      >
-                        <div
-                          className={cn(
-                            "h-full rounded-full bg-primary transition-none",
-                            hoverPaused && "opacity-90",
-                          )}
-                          style={{ width: `${motionProgressPercent}%` }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </CardFooter>
-              </Card>
-            </div>
+            {Array.from({ length: 6 }, (_, cellIndex) => {
+              const s = suggestions[cellIndex];
+              if (!s) {
+                return (
+                  <div
+                    key={`superbot-suggestion-slot-${cellIndex}`}
+                    className="min-h-11 rounded-full bg-transparent"
+                    aria-hidden
+                  />
+                );
+              }
+              const selected = cellIndex === activeIndex;
+              return (
+                <SuperbotSuggestionNavButton
+                  key={s.id}
+                  suggestion={s}
+                  selected={selected}
+                  reduceMotion={reduceMotion}
+                  hoverPaused={hoverPaused}
+                  progressFillRef={progressFillRef}
+                  onSelect={() => goTo(cellIndex)}
+                />
+              );
+            })}
           </div>
         </div>
+
+        {href ? (
+          <Link
+            href={href}
+            onClick={(e) =>
+              handleScopedSuggestionClick(e, active, href)
+            }
+            className={cn(
+              suggestionCardClassName,
+              "text-inherit no-underline outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              slideExiting && "pointer-events-none",
+            )}
+            aria-label={`Go to ${active.gridLabel}`}
+          >
+            {suggestionCardBody}
+          </Link>
+        ) : (
+          <div
+            className={cn(
+              suggestionCardClassName,
+              slideExiting && "pointer-events-none",
+            )}
+          >
+            {suggestionCardBody}
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+export function SuperbotSuggestionsCard(props: SuperbotSuggestionsCardProps) {
+  const router = useRouter();
+  return (
+    <SuperbotSuggestionsCardView
+      {...props}
+      navigate={(href) => {
+        router.push(href);
+      }}
+    />
   );
 }

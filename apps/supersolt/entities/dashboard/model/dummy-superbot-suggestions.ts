@@ -14,6 +14,8 @@ export type SuperbotSuggestion = {
   /** Relative to `/{organisationSlug}/{venueSlug}/`. */
   pathSuffix: string;
   iconId: SuperbotSuggestionIconId;
+  /** Shown on the destination page after navigating from this dashboard card. */
+  pageFollowUpQuestion?: string;
 };
 
 export const dummySuperbotSuggestions: SuperbotSuggestion[] = [
@@ -26,6 +28,8 @@ export const dummySuperbotSuggestions: SuperbotSuggestion[] = [
     ctaLabel: "Open timesheets",
     pathSuffix: "workforce/timesheets",
     iconId: "users",
+    pageFollowUpQuestion:
+      "There are still pending submissions in this view—would you like to review them now?",
   },
   {
     id: "roster",
@@ -36,6 +40,8 @@ export const dummySuperbotSuggestions: SuperbotSuggestion[] = [
     ctaLabel: "Open roster",
     pathSuffix: "workforce/roster",
     iconId: "calendar",
+    pageFollowUpQuestion:
+      "Would you like help filling the open lunch slots before you publish?",
   },
   {
     id: "order-guide",
@@ -46,6 +52,8 @@ export const dummySuperbotSuggestions: SuperbotSuggestion[] = [
     ctaLabel: "Open order guide",
     pathSuffix: "inventory/order-guide",
     iconId: "clipboard-list",
+    pageFollowUpQuestion:
+      "Shall we walk through refreshing par levels for the categories called out on the dashboard?",
   },
   {
     id: "menu",
@@ -56,5 +64,7 @@ export const dummySuperbotSuggestions: SuperbotSuggestion[] = [
     ctaLabel: "Review menu items",
     pathSuffix: "menu/menu-items",
     iconId: "utensils",
+    pageFollowUpQuestion:
+      "Want to compare top movers here against what the dashboard highlighted?",
   },
 ];
