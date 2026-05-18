@@ -67,7 +67,9 @@
   --role-school-admin: #0000ff;
   --role-school-admin-text: #ffffff; /* White text for WCAG AA contrast on blue */
   --role-school-staff: var(--foreground);
-  --role-school-staff-text: var(--background); /* Inverted foreground/background */
+  --role-school-staff-text: var(
+    --background
+  ); /* Inverted foreground/background */
   --role-school-licence: #6b7280;
   --role-school-licence-text: #ffffff; /* White text for WCAG AA contrast on gray */
 }
@@ -105,7 +107,7 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.269 0 0);
   --sidebar-ring: oklch(0.439 0 0);
-  
+
   /* Role badge colors (dark mode) */
   --role-teacher: var(--brand-bullyproof-primary);
   --role-teacher-text: #ffffff; /* White text for WCAG AA contrast */
@@ -114,7 +116,9 @@
   --role-school-admin: #0000ff;
   --role-school-admin-text: #ffffff; /* White text for WCAG AA contrast */
   --role-school-staff: var(--foreground);
-  --role-school-staff-text: var(--background); /* Inverted foreground/background */
+  --role-school-staff-text: var(
+    --background
+  ); /* Inverted foreground/background */
   --role-school-licence: #6b7280;
   --role-school-licence-text: #ffffff; /* White text for WCAG AA contrast */
 }
@@ -194,22 +198,26 @@
   --animate-spin-reverse: spin-reverse 1s linear infinite;
   --animate-spin-slow-reverse: spin-slow-reverse 3s linear infinite;
   --animate-caret-blink: caret-blink 1.25s ease-out infinite;
-  --animate-slide-down-fade-in: slide-down-fade-in 0.3s ease-out forwards;
+  --animate-slide-down-fade-in: slide-down-fade-in 0.3s ease-out both;
   --animate-slide-up-fade-in: slide-up-fade-in 0.3s ease-out forwards;
   --animate-slide-left-fade-in: slide-left-fade-in 0.3s ease-out forwards;
   --animate-slide-right-fade-in: slide-right-fade-in 0.3s ease-out forwards;
-  --animate-slide-down-fade-in-slow: slide-down-fade-in 0.5s ease-out forwards;
-  --animate-slide-up-fade-in-slow: slide-up-fade-in 0.5s ease-out forwards;
-  --animate-slide-left-fade-in-slow: slide-left-fade-in 0.5s ease-out forwards;
-  --animate-slide-right-fade-in-slow: slide-right-fade-in 0.5s ease-out forwards;
-  --animate-slide-down-fade-in-slower: slide-down-fade-in 0.75s ease-out
-    forwards;
+  --animate-slide-down-fade-in-slow: slide-down-fade-in 0.5s ease-out both;
+  --animate-slide-up-fade-in-slow: slide-up-fade-in 0.5s ease-out both;
+  --animate-slide-left-fade-in-slow: slide-left-fade-in 0.5s ease-out both;
+  --animate-slide-right-fade-in-slow: slide-right-fade-in 0.5s ease-out both;
+  --animate-slide-down-fade-in-slower: slide-down-fade-in 0.75s ease-out both;
   --animate-slide-up-fade-in-slower: slide-up-fade-in 0.75s ease-out forwards;
   --animate-slide-left-fade-in-slower: slide-left-fade-in 0.75s ease-out
     forwards;
   --animate-slide-right-fade-in-slower: slide-right-fade-in 0.75s ease-out
     forwards;
-  --animate-slide-down-fade-in-slowest: slide-down-fade-in 1s ease-out forwards;
+  --animate-slide-down-fade-in-slowest: slide-down-fade-in 1s ease-out both;
+  --animate-slide-down-fade-out: slide-down-fade-out 0.32s ease-in both;
+  --animate-slide-down-fade-out-slow: slide-down-fade-out 0.42s ease-in both;
+  --animate-slide-left-fade-out-slow: slide-left-fade-out 0.42s ease-in both;
+  --animate-slide-right-fade-out-slow: slide-right-fade-out 0.42s ease-in both;
+  --animate-slide-up-fade-out-slow: slide-up-fade-out 0.42s ease-in both;
   --animate-slide-up-fade-in-slowest: slide-up-fade-in 1s ease-out forwards;
   /* 2× slowest slide-up-fade-in; used e.g. for dashboard hero value */
   --animate-slide-up-fade-in-superslow: slide-up-fade-in 2s ease-out forwards;
@@ -226,6 +234,8 @@
   --animate-shake-twice: shake 0.3s ease-in-out 2;
   --animate-float-up-loop: float-up-loop 1.2s linear infinite;
   --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
+  --animate-superbot-timesheet-row-pulse: superbot-timesheet-row-pulse 2.4s
+    ease-in-out infinite;
   --animate-utility-radar-beacon-ring: utility-radar-beacon-ring 2.1s ease-out
     infinite;
   --animate-opacity-breathe-subtle: opacity-breathe-subtle 3.5s ease-in-out
@@ -268,18 +278,26 @@
     }
   }
   @keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+      transform: translateX(-4px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+      transform: translateX(4px);
+    }
   }
-  10%, 30%, 50%, 70%, 90% {
-    transform: translateX(-4px);
-  }
-  20%, 40%, 60%, 80% {
-    transform: translateX(4px);
-  }
-}
 
-@keyframes border-flash-red {
+  @keyframes border-flash-red {
     0% {
       border-color: hsl(var(--border));
       background-color: hsl(var(--card));
@@ -415,6 +433,16 @@
       transform: translateY(0);
     }
   }
+  @keyframes slide-down-fade-out {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+  }
   @keyframes slide-up-fade-in {
     0% {
       opacity: 0;
@@ -483,6 +511,36 @@
       transform: translateX(0);
     }
   }
+  @keyframes slide-left-fade-out {
+    0% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(-14px);
+    }
+  }
+  @keyframes slide-right-fade-out {
+    0% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateX(14px);
+    }
+  }
+  @keyframes slide-up-fade-out {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+  }
   @keyframes slideInRightFadeUp {
     0% {
       opacity: 0;
@@ -494,7 +552,8 @@
     }
   }
   @keyframes bounce-gentle {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(0);
     }
     50% {
@@ -502,7 +561,8 @@
     }
   }
   @keyframes glow-pulse {
-    0%, 100% {
+    0%,
+    100% {
       filter: drop-shadow(0 0 8px rgba(3, 132, 147, 0.4));
     }
     50% {
@@ -510,7 +570,8 @@
     }
   }
   @keyframes float-gentle {
-    0%, 100% {
+    0%,
+    100% {
       transform: translateY(0);
     }
     50% {
@@ -603,6 +664,16 @@
     50% {
       background-color: rgb(254 215 170);
       border-color: rgb(234 88 12);
+    }
+  }
+  /** Supersolt dummy UX: rows Superbot called out from the dashboard timesheets suggestion. */
+  @keyframes superbot-timesheet-row-pulse {
+    0%,
+    100% {
+      background-color: color-mix(in oklab, rgb(34 197 94) 14%, var(--card));
+    }
+    50% {
+      background-color: color-mix(in oklab, rgb(34 197 94) 28%, var(--card));
     }
   }
   @keyframes utility-radar-beacon-ring {
@@ -742,7 +813,6 @@
       box-shadow: inset 0 0 0 1px transparent;
     }
   }
-
 }
 
 /*
@@ -815,6 +885,61 @@
   }
 }
 
+/*
+ * Superbot suggestions — soft blobs (same pan keyframes as net revenue hero).
+ * Re-mount the element with key={activeSuggestionId} so each slide replays the motion.
+ */
+.superbot-suggestions-shifting-blobs {
+  background-size: 320% 320%;
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(
+      ellipse 45% 42% at 50% 50%,
+      color-mix(in srgb, var(--brand-supersolt-primary) 9%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 38% 48% at 50% 50%,
+      color-mix(in srgb, var(--brand-supersolt-primary) 6%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 44% 40% at 50% 50%,
+      rgb(15 36 23 / 0.035) 0%,
+      transparent 52%
+    );
+  animation: net-revenue-hero-shift-blobs 6.5s ease forwards;
+}
+
+.dark .superbot-suggestions-shifting-blobs {
+  background-image:
+    radial-gradient(
+      ellipse 45% 42% at 50% 50%,
+      rgb(255 255 255 / 0.06) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 38% 48% at 50% 50%,
+      color-mix(in srgb, var(--brand-supersolt-primary) 11%, transparent) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 44% 40% at 50% 50%,
+      rgb(0 0 0 / 0.07) 0%,
+      transparent 52%
+    );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .superbot-suggestions-shifting-blobs {
+    animation: none;
+    background-position:
+      38.6% 46.3%,
+      62.6% 43.4%,
+      52.9% 61.4%;
+  }
+}
+
 .rotating-gradient-bg {
   position: relative;
   overflow: hidden;
@@ -822,7 +947,7 @@
 }
 
 .rotating-gradient-bg::before {
-  content: '';
+  content: "";
   position: absolute;
   width: 200px;
   height: 200px;
@@ -840,7 +965,7 @@
 }
 
 .rotating-gradient-bg::after {
-  content: '';
+  content: "";
   position: absolute;
   width: 200px;
   height: 200px;
@@ -873,26 +998,26 @@
   body {
     @apply bg-background text-foreground;
   }
-  
+
   /* Global scrollbar styling - thin, rounded, matching shadcn ScrollArea */
   *::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
-  
+
   *::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   *::-webkit-scrollbar-thumb {
     background-color: var(--border);
     border-radius: 9999px;
   }
-  
+
   *::-webkit-scrollbar-thumb:hover {
     opacity: 0.8;
   }
-  
+
   /* Firefox scrollbar styling */
   * {
     scrollbar-width: thin;
