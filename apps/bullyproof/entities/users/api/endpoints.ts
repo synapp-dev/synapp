@@ -1,4 +1,5 @@
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
+import type { UserLookupResponse } from "@/entities/users/types/user-lookup";
 
 export type CreateSchoolAdminResponse = {
   userId: string;
@@ -77,6 +78,20 @@ export type UpdateUserResponse = {
 };
 
 export const usersApi = {
+  get: {
+    lookup(params: {
+      email: string;
+      schoolId?: string;
+    }): Promise<ApiResult<UserLookupResponse>> {
+      const searchParams = new URLSearchParams({ email: params.email });
+      if (params.schoolId) {
+        searchParams.set("schoolId", params.schoolId);
+      }
+      return apiFetch<UserLookupResponse>(
+        `/users/lookup?${searchParams.toString()}`
+      );
+    },
+  },
   post: {
     new: {
       schoolAdmin(payload: {
