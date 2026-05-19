@@ -77,6 +77,8 @@ export interface SchoolRoleAssignmentDialogProps {
   onSubmitPlatform?: (roleId: string) => void | Promise<void>;
   /** Include INTRADARK_DEV in platform picker (only assignable by dev on server). */
   includeIntradarkDevInPlatformPicker?: boolean;
+  /** Edit mode: remove all roles at this school (same as unchecking Staff + save). */
+  onRemoveFromSchool?: () => void | Promise<void>;
 }
 
 const ROLE_ORDER = ["SCHOOL_STAFF", "TEACHER", "SCHOOL_ADMIN"] as const;
@@ -135,9 +137,11 @@ export function SchoolRoleAssignmentDialog({
   assignmentVariant = "school-only",
   onSubmitPlatform,
   includeIntradarkDevInPlatformPicker = false,
+  onRemoveFromSchool,
 }: SchoolRoleAssignmentDialogProps) {
   const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
   const [staffRemovalConfirmOpen, setStaffRemovalConfirmOpen] = useState(false);
+  const [confirmRemoveViaFooter, setConfirmRemoveViaFooter] = useState(false);
   const [assignTab, setAssignTab] = useState<"school" | "platform">("school");
   const [selectedPlatformRoleId, setSelectedPlatformRoleId] = useState("");
 
@@ -187,8 +191,14 @@ export function SchoolRoleAssignmentDialog({
     if (!next) {
       setSchoolComboboxOpen(false);
       setStaffRemovalConfirmOpen(false);
+      setConfirmRemoveViaFooter(false);
     }
     onOpenChange(next);
+  };
+
+  const openRemoveFromSchoolConfirm = (viaFooter: boolean) => {
+    setConfirmRemoveViaFooter(viaFooter);
+    setStaffRemovalConfirmOpen(true);
   };
 
   const handleFooterPrimary = async () => {
@@ -198,7 +208,7 @@ export function SchoolRoleAssignmentDialog({
       return;
     }
     if (isEditMode && staffRole && !staffSelected) {
-      setStaffRemovalConfirmOpen(true);
+      openRemoveFromSchoolConfirm(false);
       return;
     }
     await onSubmit();
@@ -206,6 +216,12 @@ export function SchoolRoleAssignmentDialog({
 
   const handleConfirmStaffRemoval = async () => {
     setStaffRemovalConfirmOpen(false);
+    const viaFooter = confirmRemoveViaFooter;
+    setConfirmRemoveViaFooter(false);
+    if (viaFooter && onRemoveFromSchool) {
+      await onRemoveFromSchool();
+      return;
+    }
     await onSubmit();
   };
 
@@ -500,31 +516,58 @@ export function SchoolRoleAssignmentDialog({
               </Alert>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button onClick={handleFooterPrimary} disabled={primaryDisabled}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEditMode ? "Saving..." : "Assigning..."}
-                </>
-              ) : isEditMode ? (
-                "Save Changes"
-              ) : showPlatformTab && assignTab === "platform" ? (
-                "Assign platform role"
-              ) : (
-                "Assign Roles"
-              )}
-            </Button>
+          <DialogFooter
+            className={cn(
+              isEditMode && onRemoveFromSchool && "sm:justify-between"
+            )}
+          >
+            {isEditMode && onRemoveFromSchool ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => openRemoveFromSchoolConfirm(true)}
+                disabled={isSaving}
+              >
+                Remove from school
+              </Button>
+            ) : (
+              <span className="hidden sm:block sm:w-0" aria-hidden />
+            )}
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:gap-2">
+              <Button variant="outline" onClick={onCancel}>
+                Cancel
+              </Button>
+              <Button onClick={handleFooterPrimary} disabled={primaryDisabled}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isEditMode ? "Saving..." : "Assigning..."}
+                  </>
+                ) : isEditMode ? (
+                  "Save Changes"
+                ) : showPlatformTab && assignTab === "platform" ? (
+                  "Assign platform role"
+                ) : (
+                  "Assign Roles"
+                )}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit mode: staff removal confirmation */}
-      <AlertDialog open={staffRemovalConfirmOpen} onOpenChange={setStaffRemovalConfirmOpen}>
-        <AlertDialogContent>
+      <AlertDialog
+        open={staffRemovalConfirmOpen}
+        onOpenChange={(open) => {
+          setStaffRemovalConfirmOpen(open);
+          if (!open) {
+            setConfirmRemoveViaFooter(false);
+          }
+        }}
+      >
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Remove User from School</AlertDialogTitle>
             <AlertDialogDescription>

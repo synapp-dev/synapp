@@ -816,6 +816,45 @@ function UserDetailDrawerContent({
     setEditSchoolRolesDialogOpen(true);
   };
 
+  const removeAllRolesAtSchool = async (schoolId: string) => {
+    if (!user || !canMutateTargetUser) return;
+    const rolesToRemove = user.schoolRoles.filter(
+      (sr) => sr.schoolId === schoolId
+    );
+    for (const schoolRole of rolesToRemove) {
+      const roleToDelete = roles.find((r) => r.key === schoolRole.roleKey);
+      if (roleToDelete) {
+        await rolesApi.delete.removeRole({
+          userId: user.id,
+          roleId: roleToDelete.id,
+          schoolId,
+        });
+      }
+    }
+  };
+
+  const closeEditSchoolRolesDialog = () => {
+    setEditSchoolRolesDialogOpen(false);
+    setEditSchoolRolesSchoolId(null);
+    setEditSchoolRolesSchoolName("");
+    setEditSchoolRolesSelected(new Set());
+  };
+
+  const handleRemoveFromSchoolInEditDialog = async () => {
+    if (!user || !editSchoolRolesSchoolId || !canMutateTargetUser) return;
+
+    try {
+      setIsSavingEditSchoolRoles(true);
+      await removeAllRolesAtSchool(editSchoolRolesSchoolId);
+      closeEditSchoolRolesDialog();
+      await onUserUpdate?.({ removedSchoolId: editSchoolRolesSchoolId });
+    } catch (err: unknown) {
+      console.error("Failed to remove user from school:", err);
+    } finally {
+      setIsSavingEditSchoolRoles(false);
+    }
+  };
+
   const applyEditSchoolRolesChanges = async () => {
     if (!user || !editSchoolRolesSchoolId || !canMutateTargetUser) return;
 
@@ -840,23 +879,13 @@ function UserDetailDrawerContent({
       }
     });
 
+    const removingFromSchool = !editSchoolRolesSelected.has(staffRole.id);
+
     try {
       setIsSavingEditSchoolRoles(true);
 
-      if (!editSchoolRolesSelected.has(staffRole.id)) {
-        const rolesToRemove = user.schoolRoles.filter(
-          (sr) => sr.schoolId === editSchoolRolesSchoolId
-        );
-        for (const schoolRole of rolesToRemove) {
-          const roleToDelete = roles.find((r) => r.key === schoolRole.roleKey);
-          if (roleToDelete) {
-            await rolesApi.delete.removeRole({
-              userId: user.id,
-              roleId: roleToDelete.id,
-              schoolId: editSchoolRolesSchoolId,
-            });
-          }
-        }
+      if (removingFromSchool) {
+        await removeAllRolesAtSchool(editSchoolRolesSchoolId);
       } else {
         for (const role of roleOrder) {
           const roleKey = role.key || "";
@@ -909,12 +938,13 @@ function UserDetailDrawerContent({
         }
       }
 
-      setEditSchoolRolesDialogOpen(false);
-      setEditSchoolRolesSchoolId(null);
-      setEditSchoolRolesSchoolName("");
-      setEditSchoolRolesSelected(new Set());
-      onUserUpdate?.();
-    } catch (err: any) {
+      closeEditSchoolRolesDialog();
+      await onUserUpdate?.(
+        removingFromSchool
+          ? { removedSchoolId: editSchoolRolesSchoolId }
+          : undefined
+      );
+    } catch (err: unknown) {
       console.error("Failed to save school roles:", err);
     } finally {
       setIsSavingEditSchoolRoles(false);
@@ -1556,6 +1586,7 @@ function UserDetailDrawerContent({
         selectedRoleIds={editSchoolRolesSelected}
         onRoleIdsChange={setEditSchoolRolesSelected}
         onSubmit={applyEditSchoolRolesChanges}
+        onRemoveFromSchool={handleRemoveFromSchoolInEditDialog}
         onCancel={() => {
           setEditSchoolRolesDialogOpen(false);
           setEditSchoolRolesSchoolId(null);

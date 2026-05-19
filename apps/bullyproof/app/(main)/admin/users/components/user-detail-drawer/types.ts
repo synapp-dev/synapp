@@ -1,4 +1,5 @@
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
+import type { UserUpdateContext } from "@/entities/users/lib/refresh-selected-user";
 import type { roles } from "@/server/db/schema";
 
 export type Role = typeof roles.$inferSelect;
@@ -7,7 +8,7 @@ export interface UserDetailDrawerProps {
   user: UserWithRolesAndSchools | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onUserUpdate?: () => void;
+  onUserUpdate?: (context?: UserUpdateContext) => void | Promise<void>;
   onDeleteUserClick?: () => void;
 }
 

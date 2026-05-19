@@ -31,6 +31,8 @@ import {
 import { Pencil } from "lucide-react";
 import { RoleBadges } from "@/components/atoms/role-badges";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
+import { rolesApi } from "@/entities/roles/api/endpoints";
+import type { UserUpdateContext } from "@/entities/users/lib/refresh-selected-user";
 import { useRoles } from "@/entities/users/model/store";
 import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
@@ -52,7 +54,7 @@ interface SchoolSettingsUserDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schoolId: string;
-  onUserUpdate?: () => void;
+  onUserUpdate?: (context?: UserUpdateContext) => void | Promise<void>;
 }
 
 export function SchoolSettingsUserDetailDrawer({
@@ -134,6 +136,39 @@ export function SchoolSettingsUserDetailDrawer({
     setEditSchoolRolesDialogOpen(true);
   };
 
+  const removeAllRolesAtSchool = async () => {
+    if (!user) return;
+    const rolesToRemove = user.schoolRoles.filter(
+      (sr) => sr.schoolId === schoolId
+    );
+    for (const schoolRole of rolesToRemove) {
+      const roleToDelete = roles.find((r) => r.key === schoolRole.roleKey);
+      if (roleToDelete) {
+        await rolesApi.delete.removeRole({
+          userId: user.id,
+          roleId: roleToDelete.id,
+          schoolId,
+        });
+      }
+    }
+  };
+
+  const handleRemoveFromSchoolInEditDialog = async () => {
+    if (!user || !staffRole) return;
+
+    try {
+      setIsSavingEditSchoolRoles(true);
+      await removeAllRolesAtSchool();
+      setEditSchoolRolesDialogOpen(false);
+      setEditSchoolRolesSelected(new Set());
+      await onUserUpdate?.({ removedSchoolId: schoolId });
+    } catch (err) {
+      console.error("Failed to remove user from school:", err);
+    } finally {
+      setIsSavingEditSchoolRoles(false);
+    }
+  };
+
   const applyEditSchoolRolesChanges = async () => {
     if (!user || !staffRole || !adminRole || !teacherRole) return;
 
@@ -153,26 +188,13 @@ export function SchoolSettingsUserDetailDrawer({
       }
     });
 
+    const removingFromSchool = !editSchoolRolesSelected.has(staffRole.id);
+
     try {
       setIsSavingEditSchoolRoles(true);
-      const { rolesApi } = await import("@/entities/roles/api/endpoints");
 
-      if (!editSchoolRolesSelected.has(staffRole.id)) {
-        const rolesToRemove = user.schoolRoles.filter(
-          (sr) => sr.schoolId === schoolId
-        );
-        for (const schoolRole of rolesToRemove) {
-          const roleToDelete = roles.find(
-            (r) => r.key === schoolRole.roleKey
-          );
-          if (roleToDelete) {
-            await rolesApi.delete.removeRole({
-              userId: user.id,
-              roleId: roleToDelete.id,
-              schoolId,
-            });
-          }
-        }
+      if (removingFromSchool) {
+        await removeAllRolesAtSchool();
       } else {
         for (const role of roleOrder) {
           const roleKey = role.key || "";
@@ -226,7 +248,9 @@ export function SchoolSettingsUserDetailDrawer({
 
       setEditSchoolRolesDialogOpen(false);
       setEditSchoolRolesSelected(new Set());
-      onUserUpdate?.();
+      await onUserUpdate?.(
+        removingFromSchool ? { removedSchoolId: schoolId } : undefined
+      );
     } catch (err) {
       console.error("Failed to save school roles:", err);
     } finally {
@@ -408,6 +432,7 @@ export function SchoolSettingsUserDetailDrawer({
         selectedRoleIds={editSchoolRolesSelected}
         onRoleIdsChange={setEditSchoolRolesSelected}
         onSubmit={applyEditSchoolRolesChanges}
+        onRemoveFromSchool={handleRemoveFromSchoolInEditDialog}
         onCancel={() => {
           setEditSchoolRolesDialogOpen(false);
           setEditSchoolRolesSelected(new Set());

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
+import React, { useEffect, useState, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { useUsers, useAllUsers, useRoles } from "@/entities/users/model/store";
@@ -43,6 +43,11 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { UserDetailDrawer } from "./components/user-detail-drawer";
+import {
+  buildUserRefreshCatalog,
+  createUserDetailOnUserUpdateHandler,
+  fetchUserWithRolesById,
+} from "@/entities/users/lib/refresh-selected-user";
 import { UsersTable } from "@/entities/users/ui/users-table";
 import { AddUserSheet } from "./components/add-user-sheet";
 import {
@@ -60,7 +65,6 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { apiFetch } from "@/lib/api/fetcher.client";
-import { meApi } from "@/entities/me/api/endpoints";
 import { useMeStore } from "@/entities/me/model/store";
 import { canManageIntradarkDevScopedUser } from "@/lib/intradark-dev-protection";
 
@@ -172,71 +176,6 @@ function AdminUsersPageContent() {
     }
   };
 
-  const handleOpenExistingUser = async (userId: string) => {
-    const result = await meApi.get.userById(userId);
-    if (result.data) {
-      const raw = result.data;
-      // Parse platformRoles (view may return string or array)
-      let platformRoles: string[] = [];
-      if (Array.isArray(raw.platformRoles)) {
-        platformRoles = raw.platformRoles;
-      } else if (typeof raw.platformRoles === "string") {
-        try {
-          platformRoles = JSON.parse(raw.platformRoles);
-        } catch {
-          platformRoles = raw.platformRoles
-            .replace(/[{}"]/g, "")
-            .split(",")
-            .map((r) => r.trim())
-            .filter(Boolean);
-        }
-      }
-      // Parse schoolRoles (view may return JSON string or array)
-      let schoolRoles: Array<{
-        schoolId: string;
-        schoolName: string | null;
-        roleKey: string | null;
-        roleName: string | null;
-      }> = [];
-      if (raw.schoolRoles) {
-        if (typeof raw.schoolRoles === "string") {
-          try {
-            const parsed = JSON.parse(raw.schoolRoles);
-            schoolRoles = Array.isArray(parsed) ? parsed : [];
-          } catch {
-            schoolRoles = [];
-          }
-        } else if (Array.isArray(raw.schoolRoles)) {
-          schoolRoles = raw.schoolRoles.map((sr: Record<string, unknown>) => ({
-            schoolId: String(sr.schoolId ?? ""),
-            schoolName: sr.schoolName != null ? String(sr.schoolName) : null,
-            roleKey: sr.roleKey != null ? String(sr.roleKey) : null,
-            roleName: sr.roleName != null ? String(sr.roleName) : null,
-          }));
-        }
-      }
-      const user: UserWithRolesAndSchools = {
-        id: raw.id,
-        firstName: raw.firstName,
-        lastName: raw.lastName,
-        email: raw.email,
-        avatarUrl: raw.avatarUrl,
-        createdAt: raw.createdAt,
-        updatedAt: raw.updatedAt,
-        metadata: raw.metadata,
-        platformRoles,
-        schoolRoles,
-        lastLoginAt: null,
-      };
-      setSelectedUser(user);
-      setIsDrawerOpen(true);
-      const params = new URLSearchParams(searchParams?.toString() || "");
-      params.set("id", userId);
-      params.delete("dialog");
-      router.push(`/admin/users?${params.toString()}`, { scroll: false });
-    }
-  };
-
   // Extract unique schools from ALL users data (for filter options)
   const allAvailableSchools = Array.from(
     new Map(
@@ -246,6 +185,41 @@ function AdminUsersPageContent() {
         .map((sr) => [sr.schoolId, { id: sr.schoolId, name: sr.schoolName! }])
     ).values()
   ).sort((a, b) => a.name.localeCompare(b.name));
+
+  const userRefreshCatalog = useMemo(
+    () => buildUserRefreshCatalog(allAvailableSchools, roles),
+    [allAvailableSchools, roles]
+  );
+
+  const handleUserDetailUpdate = useMemo(
+    () =>
+      createUserDetailOnUserUpdateHandler({
+        userId: selectedUser?.id,
+        selectedUser,
+        setSelectedUser,
+        refetchLists: async () => {
+          await refetchUsers();
+          await refetchAllUsers();
+        },
+        catalog: userRefreshCatalog,
+      }),
+    [selectedUser, refetchUsers, refetchAllUsers, userRefreshCatalog]
+  );
+
+  const handleOpenExistingUser = async (userId: string) => {
+    const user = await fetchUserWithRolesById(userId, {
+      ...userRefreshCatalog,
+      previousSchoolRoles: selectedUser?.schoolRoles,
+    });
+    if (user) {
+      setSelectedUser(user);
+      setIsDrawerOpen(true);
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      params.set("id", userId);
+      params.delete("dialog");
+      router.push(`/admin/users?${params.toString()}`, { scroll: false });
+    }
+  };
 
   // Extract schools from CURRENT filtered users (for enabling/disabling)
   const currentAvailableSchools = Array.from(
@@ -773,11 +747,7 @@ function AdminUsersPageContent() {
         user={selectedUser}
         open={isDrawerOpen}
         onOpenChange={handleDrawerClose}
-        onUserUpdate={async () => {
-          // Refresh users list
-          await refetchUsers();
-          await refetchAllUsers();
-        }}
+        onUserUpdate={handleUserDetailUpdate}
         onDeleteUserClick={
           selectedUser
             ? () => {

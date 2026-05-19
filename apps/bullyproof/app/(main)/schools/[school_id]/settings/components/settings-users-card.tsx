@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
-import { meApi } from "@/entities/me/api/endpoints";
 import { useUsers, useRoles } from "@/entities/users/model/store";
 import { userKeys } from "@/entities/users/model/keys";
+import {
+  buildUserRefreshCatalog,
+  createUserDetailOnUserUpdateHandler,
+  fetchUserWithRolesById,
+} from "@/entities/users/lib/refresh-selected-user";
 import { UsersTable } from "@/entities/users/ui/users-table";
 import { AddManualUserDialog } from "@/entities/dashboard/ui/admin/sections/schools/components/add-manual-user-dialog";
 import { SchoolSettingsUserDetailDrawer } from "./school-settings-user-detail-drawer";
@@ -58,70 +62,6 @@ interface SettingsUsersCardProps {
   basePath: string;
 }
 
-function rawToUserWithRoles(raw: {
-  id: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  email: string;
-  avatarUrl?: string | null;
-  createdAt?: string;
-  updatedAt?: string;
-  metadata?: unknown;
-  platformRoles?: string[] | string;
-  schoolRoles?: unknown;
-}): UserWithRolesAndSchools {
-  let platformRoles: string[] = [];
-  if (Array.isArray(raw.platformRoles)) {
-    platformRoles = raw.platformRoles;
-  } else if (typeof raw.platformRoles === "string") {
-    try {
-      platformRoles = JSON.parse(raw.platformRoles);
-    } catch {
-      platformRoles = raw.platformRoles
-        .replace(/[{}"]/g, "")
-        .split(",")
-        .map((r) => r.trim())
-        .filter(Boolean);
-    }
-  }
-  let schoolRoles: Array<{
-    schoolId: string;
-    schoolName: string | null;
-    roleKey: string | null;
-    roleName: string | null;
-  }> = [];
-  if (raw.schoolRoles) {
-    if (typeof raw.schoolRoles === "string") {
-      try {
-        const parsed = JSON.parse(raw.schoolRoles);
-        schoolRoles = Array.isArray(parsed) ? parsed : [];
-      } catch {
-        schoolRoles = [];
-      }
-    } else if (Array.isArray(raw.schoolRoles)) {
-      schoolRoles = raw.schoolRoles.map((sr: Record<string, unknown>) => ({
-        schoolId: String(sr.schoolId ?? ""),
-        schoolName: sr.schoolName != null ? String(sr.schoolName) : null,
-        roleKey: sr.roleKey != null ? String(sr.roleKey) : null,
-        roleName: sr.roleName != null ? String(sr.roleName) : null,
-      }));
-    }
-  }
-  return {
-    id: raw.id,
-    firstName: raw.firstName ?? null,
-    lastName: raw.lastName ?? null,
-    email: raw.email,
-    avatarUrl: raw.avatarUrl,
-    createdAt: raw.createdAt,
-    updatedAt: raw.updatedAt,
-    metadata: raw.metadata,
-    platformRoles,
-    schoolRoles,
-    lastLoginAt: null,
-  };
-}
-
 export function SettingsUsersCard({
   schoolId,
   schoolSlug,
@@ -166,6 +106,27 @@ export function SettingsUsersCard({
 
   const { roles, isLoading: isLoadingRoles } = useRoles();
 
+  const userRefreshCatalog = useMemo(
+    () =>
+      buildUserRefreshCatalog(
+        [{ id: schoolId, name: schoolName }],
+        roles
+      ),
+    [schoolId, schoolName, roles]
+  );
+
+  const handleUserDetailUpdate = useMemo(
+    () =>
+      createUserDetailOnUserUpdateHandler({
+        userId: selectedUser?.id,
+        selectedUser,
+        setSelectedUser,
+        refetchLists: refetchUsers,
+        catalog: userRefreshCatalog,
+      }),
+    [selectedUser, refetchUsers, userRefreshCatalog]
+  );
+
   // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -191,16 +152,15 @@ export function SettingsUsersCard({
     // User not in list (e.g. pagination) - fetch by ID
     let cancelled = false;
     (async () => {
-      const result = await meApi.get.userById(userIdFromUrl);
-      if (cancelled || !result.data) return;
-      const user = rawToUserWithRoles(result.data);
+      const user = await fetchUserWithRolesById(userIdFromUrl, userRefreshCatalog);
+      if (cancelled || !user) return;
       setSelectedUser(user);
       setIsDrawerOpen(true);
     })();
     return () => {
       cancelled = true;
     };
-  }, [userIdFromUrl, users]);
+  }, [userIdFromUrl, users, userRefreshCatalog]);
 
   const handleDrawerClose = () => {
     const params = new URLSearchParams(searchParams?.toString() || "");
@@ -408,7 +368,7 @@ export function SettingsUsersCard({
           if (!open) handleDrawerClose();
         }}
         schoolId={schoolId}
-        onUserUpdate={refetchUsers}
+        onUserUpdate={handleUserDetailUpdate}
       />
 
       <AddManualUserDialog
