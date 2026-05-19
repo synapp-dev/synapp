@@ -15,8 +15,8 @@ import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
-import { meApi } from "@/entities/me/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
+import { useUserEmailLookup } from "@/entities/users/hooks/use-user-email-lookup";
 import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
@@ -90,9 +90,12 @@ export function AddUserSheet({
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
-  const [existingUser, setExistingUser] = useState<{ id: string } | null>(null);
-  const [showExistingUserOptions, setShowExistingUserOptions] = useState(false);
-  const [checkingExistingUser, setCheckingExistingUser] = useState(false);
+  const {
+    lookupByEmail,
+    lookupLoading,
+    resetLookup,
+    userExists,
+  } = useUserEmailLookup();
 
   const totalSteps = 4;
 
@@ -123,10 +126,9 @@ export function AddUserSheet({
       setSchoolId("");
       setError(null);
       setSchoolComboboxOpen(false);
-      setExistingUser(null);
-      setShowExistingUserOptions(false);
+      resetLookup();
     }
-  }, [open]);
+  }, [open, resetLookup]);
 
   const loadRoles = async () => {
     try {
@@ -166,8 +168,8 @@ export function AddUserSheet({
         return (
           email.trim() !== "" &&
           /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
-          firstName.trim() !== "" &&
-          lastName.trim() !== ""
+          (userExists ||
+            (firstName.trim() !== "" && lastName.trim() !== ""))
         );
       case 2:
         return userType !== null;
@@ -189,37 +191,20 @@ export function AddUserSheet({
     setError(null);
 
     if (step === 1) {
-      setCheckingExistingUser(true);
       try {
-        const result = await meApi.get.userByEmail(email.trim());
-        if (result.data) {
-          setExistingUser({ id: result.data.id });
-          setShowExistingUserOptions(true);
-          setCheckingExistingUser(false);
-          return;
+        const schoolIdForLookup =
+          userType === "school" && schoolId ? schoolId : undefined;
+        const result = await lookupByEmail(email.trim(), schoolIdForLookup);
+        if (result.exists) {
+          setFirstName(result.firstName?.trim() ?? "");
+          setLastName(result.lastName?.trim() ?? "");
         }
       } catch {
-        // If check fails, proceed anyway (backend will handle)
+        // Backend still handles existing users on submit
       }
-      setCheckingExistingUser(false);
     }
 
-    setShowExistingUserOptions(false);
-    setExistingUser(null);
     setStep((prev) => Math.min(totalSteps, prev + 1));
-  };
-
-  const handleAssignToAnotherSchool = () => {
-    setShowExistingUserOptions(false);
-    setExistingUser(null);
-    setStep(2);
-  };
-
-  const handleEditRoles = () => {
-    if (existingUser && onOpenExistingUser) {
-      onOpenChange(false);
-      onOpenExistingUser(existingUser.id);
-    }
   };
 
   const goBack = () => {
@@ -337,8 +322,8 @@ export function AddUserSheet({
         method: "POST",
         body: JSON.stringify({
           email,
-          firstName,
-          lastName,
+          firstName: userExists ? undefined : firstName,
+          lastName: userExists ? undefined : lastName,
           roleScope,
           schoolId: userType === "school" ? schoolId : undefined,
           roleName: selectedRole.key,
@@ -389,36 +374,17 @@ export function AddUserSheet({
                 Enter the user's basic information.
               </DialogDescription>
             </DialogHeader>
-            {showExistingUserOptions ? (
-              <div className="space-y-4">
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>User already exists</AlertTitle>
-                  <AlertDescription>
-                    A user with this email already exists. You can assign them to
-                    another school or edit their roles at their current school.
-                  </AlertDescription>
-                </Alert>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleAssignToAnotherSchool}
-                    className="flex-1"
-                  >
-                    Assign to another school
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleEditRoles}
-                    disabled={!onOpenExistingUser}
-                  >
-                    Edit roles
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <>
+            {userExists && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Existing user</AlertTitle>
+                <AlertDescription>
+                  Profile details are prefilled. Continue to assign a role or
+                  school.
+                </AlertDescription>
+              </Alert>
+            )}
+            <>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
@@ -434,7 +400,7 @@ export function AddUserSheet({
                       }
                     }}
                     autoFocus
-                    disabled={loading || checkingExistingUser}
+                    disabled={loading || lookupLoading}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -451,7 +417,8 @@ export function AddUserSheet({
                           goNext();
                         }
                       }}
-                      disabled={loading || checkingExistingUser}
+                      disabled={loading || lookupLoading || userExists}
+                      className={userExists ? "bg-muted" : ""}
                     />
                   </div>
                   <div className="space-y-2">
@@ -467,12 +434,12 @@ export function AddUserSheet({
                           goNext();
                         }
                       }}
-                      disabled={loading || checkingExistingUser}
+                      disabled={loading || lookupLoading || userExists}
+                      className={userExists ? "bg-muted" : ""}
                     />
                   </div>
                 </div>
               </>
-            )}
           </div>
         );
 
@@ -1063,31 +1030,26 @@ export function AddUserSheet({
         {/* Footer */}
         <DialogFooter className="shrink-0 border-t -mx-6 px-6 pt-4">
           <div className="flex w-full items-center justify-end gap-2">
-            {(step > 1 || showExistingUserOptions) && (
+            {step > 1 && (
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  if (showExistingUserOptions) {
-                    setShowExistingUserOptions(false);
-                    setExistingUser(null);
-                  } else {
-                    goBack();
-                  }
+                  goBack()
                 }}
                 disabled={loading}
               >
                 Back
               </Button>
             )}
-            {!showExistingUserOptions && step < totalSteps ? (
+            {step < totalSteps ? (
               <Button
                 type="button"
                 onClick={goNext}
-                disabled={!canProceedToNext() || loading || checkingExistingUser}
+                disabled={!canProceedToNext() || loading || lookupLoading}
                 className="bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
               >
-                {checkingExistingUser ? (
+                {lookupLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     Checking...
@@ -1099,7 +1061,7 @@ export function AddUserSheet({
                   </>
                 )}
               </Button>
-            ) : !showExistingUserOptions ? (
+            ) : (
               <Button
                 type="button"
                 onClick={handleCreateUser}
@@ -1118,7 +1080,7 @@ export function AddUserSheet({
                   </>
                 )}
               </Button>
-            ) : null}
+            )}
           </div>
         </DialogFooter>
       </DialogContent>

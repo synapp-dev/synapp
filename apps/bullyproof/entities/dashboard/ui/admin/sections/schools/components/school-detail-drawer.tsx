@@ -164,6 +164,11 @@ import { SchoolDetailHeader } from "./school-detail-header";
 import { SchoolDetailSidebar } from "./school-detail-sidebar";
 import { ImportUsersDialog } from "./import-users-dialog";
 import { UserDetailDrawer } from "@/app/(main)/admin/users/components/user-detail-drawer";
+import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
+import {
+  buildUserRefreshCatalog,
+  createUserDetailOnUserUpdateHandler,
+} from "@/entities/users/lib/refresh-selected-user";
 import { ImportClassesDialog } from "./import-classes-dialog";
 import { BulkRoleDialog } from "./bulk-role-dialog";
 import { SchoolFeaturesTab } from "./school-features-tab";
@@ -371,6 +376,7 @@ function SchoolDetailDrawerContent({
 
   // Roles for filtering
   const { roles, isLoading: isLoadingRoles } = useRoles();
+  const { data: allSchools = [] } = useListSchoolsQuery({ limit: 100 });
 
   const usersListOffset =
     usersPageSize === -1 ? 0 : usersPageIndex * usersPageSize;
@@ -418,6 +424,27 @@ function SchoolDetailDrawerContent({
   const [selectedUser, setSelectedUser] =
     useState<UserWithRolesAndSchools | null>(null);
   const [isUserDrawerOpen, setIsUserDrawerOpen] = useState(false);
+
+  const userRefreshCatalog = useMemo(
+    () =>
+      buildUserRefreshCatalog(
+        allSchools.map((s) => ({ id: s.id, name: s.name })),
+        roles
+      ),
+    [allSchools, roles]
+  );
+
+  const handleUserDetailUpdate = useMemo(
+    () =>
+      createUserDetailOnUserUpdateHandler({
+        userId: selectedUser?.id,
+        selectedUser,
+        setSelectedUser,
+        refetchLists: refetchUsers,
+        catalog: userRefreshCatalog,
+      }),
+    [selectedUser, refetchUsers, userRefreshCatalog]
+  );
 
   // Dialog states
   const [addLicenceDialogOpen, setAddLicenceDialogOpen] = useState(false);
@@ -4013,9 +4040,7 @@ function SchoolDetailDrawerContent({
         user={selectedUser}
         open={isUserDrawerOpen}
         onOpenChange={handleUserDrawerClose}
-        onUserUpdate={async () => {
-          await refetchUsers();
-        }}
+        onUserUpdate={handleUserDetailUpdate}
       />
     </Sheet>
   );

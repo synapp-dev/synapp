@@ -28,10 +28,12 @@ import {
   Users as UsersIcon,
   ShieldCheck,
   AlertCircle,
+  UserPlus,
 } from "lucide-react";
 import { useRoles } from "@/entities/users/model/store";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
+import { useUserEmailLookup } from "@/entities/users/hooks/use-user-email-lookup";
 import { cn } from "@workspace/ui/lib/utils";
 import type { School as SchoolType } from "./schools-table-columns";
 import { Separator } from "@workspace/ui/components/separator";
@@ -43,11 +45,19 @@ interface AddManualUserDialogProps {
   onSuccess?: () => void;
 }
 
-// Email validation helper
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 };
+
+function applySchoolRolePrefill(
+  schoolRoleKeys: string[] | undefined,
+  setApTeacher: (v: boolean) => void,
+  setSchoolAdmin: (v: boolean) => void
+) {
+  setApTeacher(schoolRoleKeys?.includes("TEACHER") ?? false);
+  setSchoolAdmin(schoolRoleKeys?.includes("SCHOOL_ADMIN") ?? false);
+}
 
 export function AddManualUserDialog({
   open,
@@ -59,8 +69,14 @@ export function AddManualUserDialog({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { roles } = useRoles();
+  const {
+    lookupByEmail,
+    lookupLoading,
+    resetLookup,
+    userExists,
+  } = useUserEmailLookup();
 
-  const [step, setStep] = useState<"form" | "preview">("form");
+  const [step, setStep] = useState<"email" | "details" | "preview">("email");
   const [addUserSuccess, setAddUserSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -71,23 +87,25 @@ export function AddManualUserDialog({
   const [schoolAdmin, setSchoolAdmin] = useState(false);
 
   const hasValidEmail = email ? isValidEmail(email) : false;
-  const canProceed =
-    hasValidEmail && (firstName.trim() || lastName.trim() || email.trim());
+  const canProceedDetails =
+    hasValidEmail && (userExists || firstName.trim() || lastName.trim());
 
-  // Reset state when dialog closes
-  const handleClose = (open: boolean) => {
-    if (!open) {
-      setStep("form");
-      setAddUserSuccess(false);
-      setSubmitting(false);
-      setError(null);
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setApTeacher(false);
-      setSchoolAdmin(false);
+  const resetFormState = () => {
+    setStep("email");
+    setAddUserSuccess(false);
+    setSubmitting(false);
+    setError(null);
+    setEmail("");
+    setFirstName("");
+    setLastName("");
+    setApTeacher(false);
+    setSchoolAdmin(false);
+    resetLookup();
+  };
 
-      // Remove dialog query parameter from URL
+  const handleClose = (nextOpen: boolean) => {
+    if (!nextOpen) {
+      resetFormState();
       const params = new URLSearchParams(searchParams?.toString() || "");
       params.delete("dialog");
       const newUrl = params.toString()
@@ -95,36 +113,69 @@ export function AddManualUserDialog({
         : pathname;
       router.replace(newUrl, { scroll: false });
     }
-    onOpenChange(open);
+    onOpenChange(nextOpen);
   };
 
-  // Get role badge classes
+  const handleEmailNext = async () => {
+    if (!school || !hasValidEmail) return;
+    setError(null);
+    try {
+      const result = await lookupByEmail(email.trim(), school.id);
+      if (result.exists) {
+        setFirstName(result.firstName?.trim() ?? "");
+        setLastName(result.lastName?.trim() ?? "");
+        applySchoolRolePrefill(result.schoolRoleKeys, setApTeacher, setSchoolAdmin);
+      } else {
+        setFirstName("");
+        setLastName("");
+        setApTeacher(false);
+        setSchoolAdmin(false);
+      }
+      setStep("details");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to look up email. Please try again."
+      );
+    }
+  };
+
+  const handleBackToEmail = () => {
+    setError(null);
+    setFirstName("");
+    setLastName("");
+    setApTeacher(false);
+    setSchoolAdmin(false);
+    resetLookup();
+    setStep("email");
+  };
+
   const getBadgeClasses = (roleKey: string) => {
     if (roleKey === "TEACHER") {
       return "bg-[var(--role-teacher)] text-[var(--role-teacher-text)] border-[var(--role-teacher)]/50";
-    } else if (roleKey === "SCHOOL_ADMIN") {
+    }
+    if (roleKey === "SCHOOL_ADMIN") {
       return "bg-[var(--role-school-admin)] text-[var(--role-school-admin-text)] border-[var(--role-school-admin)]/50";
-    } else if (roleKey === "SCHOOL_STAFF") {
+    }
+    if (roleKey === "SCHOOL_STAFF") {
       return "bg-[var(--role-school-staff)] text-[var(--role-school-staff-text)] border-[var(--role-school-staff)]/50";
     }
     return "";
   };
 
-  // Get selected roles for preview
   const selectedRoles = [
     { key: "SCHOOL_STAFF", name: "Staff" },
     ...(apTeacher ? [{ key: "TEACHER", name: "AP Teacher" }] : []),
     ...(schoolAdmin ? [{ key: "SCHOOL_ADMIN", name: "School Admin" }] : []),
   ];
 
-  // Handle manual user creation - creates user with SCHOOL_STAFF role and optionally TEACHER and SCHOOL_ADMIN
   const handleManualCreate = async () => {
     if (!school || !hasValidEmail || addUserSuccess) return;
 
     setSubmitting(true);
     setError(null);
     try {
-      // Get roles
       const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
       const teacherRole = roles.find((r) => r.key === "TEACHER");
       const adminRole = roles.find((r) => r.key === "SCHOOL_ADMIN");
@@ -135,7 +186,6 @@ export function AddManualUserDialog({
         return;
       }
 
-      // Create user with SCHOOL_STAFF role using /users/new endpoint
       const createResult = await apiFetch<{
         userId: string;
         email: string;
@@ -147,44 +197,20 @@ export function AddManualUserDialog({
           roleScope: "school",
           schoolId: school.id,
           roleName: "SCHOOL_STAFF",
-          firstName: firstName.trim() || undefined,
-          lastName: lastName.trim() || undefined,
+          firstName: userExists ? undefined : firstName.trim() || undefined,
+          lastName: userExists ? undefined : lastName.trim() || undefined,
         }),
       });
 
       if (!createResult.data || createResult.error) {
-        // Check for common error messages and status codes indicating duplicate user
-        const errorMessage =
+        setError(
           createResult.error?.message ||
-          "Failed to create user. Please try again.";
-        const errorStatus = createResult.error?.status;
-        const errorString = errorMessage.toLowerCase();
-
-        // Check if this is a duplicate user error
-        const isDuplicateUser =
-          errorStatus === 409 || // Conflict status code
-          errorStatus === 422 || // Unprocessable Entity (often used for validation/duplicate)
-          errorString.includes("already exists") ||
-          errorString.includes("already registered") ||
-          errorString.includes("user already registered") ||
-          errorString.includes("duplicate") ||
-          errorString.includes("unique constraint") ||
-          errorString.includes("email already") ||
-          errorString.includes("already been registered") ||
-          errorString.includes("user with this email");
-
-        if (isDuplicateUser) {
-          setError(
-            `A user with the email ${email.trim()} already exists. Please use a different email address.`
-          );
-        } else {
-          setError(errorMessage);
-        }
+            "Failed to add user. Please try again."
+        );
         setSubmitting(false);
         return;
       }
 
-      // Assign additional roles if checked
       const roleAssignments = [];
       const roleErrors: string[] = [];
 
@@ -198,16 +224,12 @@ export function AddManualUserDialog({
             })
             .then((result) => {
               if (result.error) {
-                const errorMsg = result.error?.message || "";
-                const errorStr = errorMsg.toLowerCase();
+                const errorStr = (result.error?.message || "").toLowerCase();
                 if (
-                  errorStr.includes("already") ||
-                  errorStr.includes("duplicate") ||
-                  errorStr.includes("exists")
+                  !errorStr.includes("already") &&
+                  !errorStr.includes("duplicate") &&
+                  !errorStr.includes("exists")
                 ) {
-                  // User already has this role, not a critical error
-                  console.log("User already has AP Teacher role");
-                } else {
                   roleErrors.push("Failed to assign AP Teacher role");
                 }
               }
@@ -226,16 +248,12 @@ export function AddManualUserDialog({
             })
             .then((result) => {
               if (result.error) {
-                const errorMsg = result.error?.message || "";
-                const errorStr = errorMsg.toLowerCase();
+                const errorStr = (result.error?.message || "").toLowerCase();
                 if (
-                  errorStr.includes("already") ||
-                  errorStr.includes("duplicate") ||
-                  errorStr.includes("exists")
+                  !errorStr.includes("already") &&
+                  !errorStr.includes("duplicate") &&
+                  !errorStr.includes("exists")
                 ) {
-                  // User already has this role, not a critical error
-                  console.log("User already has School Admin role");
-                } else {
                   roleErrors.push("Failed to assign School Admin role");
                 }
               }
@@ -244,14 +262,11 @@ export function AddManualUserDialog({
         );
       }
 
-      // Wait for all role assignments to complete
       if (roleAssignments.length > 0) {
         await Promise.all(roleAssignments);
-
-        // If there were role assignment errors, show warning but still consider it a success
         if (roleErrors.length > 0) {
           setError(
-            `User created successfully, but some roles could not be assigned: ${roleErrors.join(", ")}. You can assign them manually later.`
+            `User added successfully, but some roles could not be assigned: ${roleErrors.join(", ")}. You can assign them manually later.`
           );
           setSubmitting(false);
           return;
@@ -263,53 +278,104 @@ export function AddManualUserDialog({
       setTimeout(() => {
         handleClose(false);
       }, 2000);
-    } catch (error: any) {
-      console.error("Failed to create user:", error);
-      const errorMessage =
-        error?.message || "An unexpected error occurred. Please try again.";
-      const errorString = errorMessage.toLowerCase();
-
-      // Check if this is a duplicate user error
-      const isDuplicateUser =
-        error?.status === 409 || // Conflict status code
-        error?.status === 422 || // Unprocessable Entity
-        errorString.includes("already exists") ||
-        errorString.includes("already registered") ||
-        errorString.includes("user already registered") ||
-        errorString.includes("duplicate") ||
-        errorString.includes("unique constraint") ||
-        errorString.includes("email already") ||
-        errorString.includes("already been registered") ||
-        errorString.includes("user with this email");
-
-      if (isDuplicateUser) {
-        setError(
-          `A user with the email ${email.trim()} already exists. Please use a different email address.`
-        );
-      } else {
-        setError(errorMessage);
-      }
+    } catch (err: unknown) {
+      console.error("Failed to create user:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "An unexpected error occurred. Please try again."
+      );
       setSubmitting(false);
     }
   };
 
   if (!school) return null;
 
+  const stepDescription =
+    step === "email"
+      ? `Enter an email address for ${school.name}`
+      : step === "details"
+        ? userExists
+          ? "Review this user's details and roles for this school."
+          : "Enter details for the new user."
+        : "Review before adding to this school.";
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="!max-w-md">
         <DialogHeader>
           <DialogTitle>Add User</DialogTitle>
-          <DialogDescription>
-            {step === "form"
-              ? school?.name || ""
-              : "Review the user details before creating."}
-          </DialogDescription>
+          <DialogDescription>{stepDescription}</DialogDescription>
         </DialogHeader>
 
-        {step === "form" ? (
+        {step === "email" && (
+          <div className="space-y-4 py-2">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="space-y-1.5">
+              <Label
+                htmlFor="user-email"
+                className="text-xs text-muted-foreground ml-2"
+              >
+                Email <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="user-email"
+                type="email"
+                placeholder="Enter email address"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError(null);
+                }}
+                className={
+                  email && !hasValidEmail
+                    ? "border-red-500 focus-visible:ring-red-500"
+                    : ""
+                }
+                autoFocus
+              />
+              {email && !hasValidEmail && (
+                <p className="text-sm text-red-500 ml-2">
+                  Please enter a valid email address (e.g., name@domain.com)
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+
+        {step === "details" && (
           <div className="space-y-4 py-2 overflow-y-auto flex-1 min-h-0">
-            {/* First Name and Last Name in same row */}
+            {userExists ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Existing user</AlertTitle>
+                <AlertDescription>
+                  This email is already registered. Details are prefilled from
+                  their profile. Choose roles for this school.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert>
+                <UserPlus className="h-4 w-4" />
+                <AlertTitle>Create new user</AlertTitle>
+                <AlertDescription>
+                  This email is not registered yet. Enter their name and select
+                  roles to add them to {school.name}.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground ml-2">Email</Label>
+              <Input value={email} disabled className="bg-muted" />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label
@@ -324,6 +390,8 @@ export function AddManualUserDialog({
                   placeholder="Enter first name"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
+                  disabled={userExists}
+                  className={userExists ? "bg-muted" : ""}
                 />
               </div>
               <div className="space-y-1.5">
@@ -339,50 +407,24 @@ export function AddManualUserDialog({
                   placeholder="Enter last name"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
+                  disabled={userExists}
+                  className={userExists ? "bg-muted" : ""}
                 />
               </div>
-            </div>
-            {/* Email on its own row */}
-            <div className="space-y-1.5">
-              <Label
-                htmlFor="user-email"
-                className="text-xs text-muted-foreground ml-2"
-              >
-                Email <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="user-email"
-                type="email"
-                placeholder="Enter email address"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={
-                  email && !hasValidEmail
-                    ? "border-red-500 focus-visible:ring-red-500"
-                    : ""
-                }
-              />
-              {email && !hasValidEmail && (
-                <p className="text-sm text-red-500 ml-2">
-                  Please enter a valid email address (e.g., name@domain.com)
-                </p>
-              )}
             </div>
 
             <Separator />
 
-            {/* Roles Section */}
             <div className="space-y-3 pt-2">
               <Label className="text-xs text-muted-foreground ml-2">
                 Roles
               </Label>
 
-              {/* Staff Role - Always checked and disabled */}
               <div className="flex items-center gap-3 rounded-lg border border-[var(--role-school-staff)]/50 bg-[var(--role-school-staff)]/10 p-3 cursor-not-allowed opacity-60 shadow-sm">
                 <Checkbox
                   id="user-role-staff"
-                  checked={true}
-                  disabled={true}
+                  checked
+                  disabled
                   className="data-[state=checked]:border-[var(--role-school-staff)] data-[state=checked]:bg-[var(--role-school-staff)] data-[state=checked]:text-[var(--role-school-staff-text)] rounded"
                 />
                 <span className="text-sm font-medium text-primary">
@@ -390,7 +432,6 @@ export function AddManualUserDialog({
                 </span>
               </div>
 
-              {/* AP Teacher Role */}
               <Label
                 htmlFor="user-role-ap-teacher"
                 className={cn(
@@ -409,7 +450,6 @@ export function AddManualUserDialog({
                 <span className="text-sm font-medium">AP Teacher</span>
               </Label>
 
-              {/* School Admin Role */}
               <Label
                 htmlFor="user-role-school-admin"
                 className={cn(
@@ -431,9 +471,12 @@ export function AddManualUserDialog({
               </Label>
             </div>
           </div>
-        ) : (
+        )}
+
+
+
+        {step === "preview" && (
           <div className="space-y-4 py-2 px-6 overflow-y-auto flex-1 min-h-0">
-            {/* Error Alert */}
             {error && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -442,11 +485,9 @@ export function AddManualUserDialog({
               </Alert>
             )}
 
-            {/* ID Badge Preview */}
             <Card className="border-2">
               <CardContent className="p-6">
                 <div className="flex flex-col items-center gap-4">
-                  {/* Avatar/Initials */}
                   <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                     <span className="text-2xl font-bold text-primary">
                       {firstName && lastName
@@ -459,7 +500,6 @@ export function AddManualUserDialog({
                     </span>
                   </div>
 
-                  {/* Name */}
                   <div className="text-center">
                     <h3 className="text-xl font-semibold">
                       {firstName || lastName
@@ -471,13 +511,11 @@ export function AddManualUserDialog({
                     </p>
                   </div>
 
-                  {/* School */}
                   <div className="w-full border-t pt-4">
                     <p className="text-xs text-muted-foreground mb-2">School</p>
-                    <p className="text-sm font-medium">{school?.name}</p>
+                    <p className="text-sm font-medium">{school.name}</p>
                   </div>
 
-                  {/* Roles */}
                   <div className="w-full border-t pt-4">
                     <p className="text-xs text-muted-foreground mb-3">Roles</p>
                     <div className="flex flex-wrap gap-2 justify-center">
@@ -486,9 +524,7 @@ export function AddManualUserDialog({
                         const RoleIcon =
                           role.key === "SCHOOL_ADMIN"
                             ? ShieldCheck
-                            : role.key === "TEACHER"
-                              ? UsersIcon
-                              : UsersIcon;
+                            : UsersIcon;
 
                         return (
                           <Badge
@@ -512,30 +548,55 @@ export function AddManualUserDialog({
           </div>
         )}
 
-        <DialogFooter className=" flex-shrink-0">
-          {step === "form" ? (
+        <DialogFooter className="flex-shrink-0">
+          {step === "email" && (
             <>
               <Button variant="ghost" onClick={() => handleClose(false)}>
                 Cancel
+              </Button>
+              <Button
+                onClick={handleEmailNext}
+                disabled={!hasValidEmail || lookupLoading}
+              >
+                {lookupLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Checking...
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+          {step === "details" && (
+            <>
+              <Button variant="ghost" onClick={handleBackToEmail}>
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </Button>
               <Button
                 onClick={() => {
                   setError(null);
                   setStep("preview");
                 }}
-                disabled={!canProceed}
+                disabled={!canProceedDetails}
               >
                 Next
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </>
-          ) : (
+          )}
+          {step === "preview" && (
             <>
               <Button
                 variant="ghost"
                 onClick={() => {
                   setError(null);
-                  setStep("form");
+                  setStep("details");
                 }}
                 disabled={submitting}
               >
@@ -556,8 +617,10 @@ export function AddManualUserDialog({
                 ) : submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
+                    Adding...
                   </>
+                ) : userExists ? (
+                  "Add to School"
                 ) : (
                   "Create User"
                 )}
