@@ -878,7 +878,7 @@ export default function LessonPreparePage() {
 
       {/* Slide gallery drawer - from bottom */}
       <Drawer open={showGalleryDrawer} onOpenChange={setShowGalleryDrawer}>
-        <DrawerContent className="z-[100] !left-1/2 !right-auto -translate-x-1/2 w-full max-w-[75rem] max-h-[50vh] rounded-t-xl border-x border-t shadow-lg data-[vaul-drawer-direction=bottom]:!left-1/2 data-[vaul-drawer-direction=bottom]:!right-auto">
+        <DrawerContent className="!left-1/2 !right-auto -translate-x-1/2 w-full max-w-[75rem] max-h-[50vh] rounded-t-xl border-x border-t shadow-lg data-[vaul-drawer-direction=bottom]:!left-1/2 data-[vaul-drawer-direction=bottom]:!right-auto">
           <DrawerHeader>
             <DrawerTitle>Jump to slide</DrawerTitle>
           </DrawerHeader>

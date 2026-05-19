@@ -4,7 +4,7 @@ export default function PresentationLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-[9999] overflow-hidden w-full">
+    <div className="fixed inset-0 z-fullscreen overflow-hidden w-full">
       {children}
     </div>
   );
