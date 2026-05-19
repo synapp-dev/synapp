@@ -20,6 +20,10 @@ import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
+import {
+  findAuthUserIdByEmail,
+  getOrCreateAuthUserId,
+} from "@/server/user/resolve-auth-user-by-email";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { licencesRepo } from "@/server/licences/licences.repo";
 import { z } from "zod";
@@ -88,87 +92,35 @@ export async function POST(request: Request) {
         data.email
       );
 
-      // Check if user already exists
-      const { data: existingUsers, error: listUsersError } =
-        await adminClient.auth.admin.listUsers();
+      const userMetadata: Record<string, string> = {};
+      if (data.firstName) userMetadata.first_name = data.firstName;
+      if (data.lastName) userMetadata.last_name = data.lastName;
 
-      if (listUsersError) {
-        console.error(
-          "[SCHOOL LICENSE CREATE] Database error - Failed to list users:",
-          {
-            error: listUsersError,
-            message: listUsersError.message,
-            status: listUsersError.status,
-          }
-        );
-        throw new Error(
-          `Failed to check existing users: ${listUsersError.message}`
-        );
-      }
-
-      const existingUser = existingUsers?.users?.find(
-        (u: { email?: string }) =>
-          u.email?.toLowerCase() === data.email!.toLowerCase()
+      const existingAuthUserId = await findAuthUserIdByEmail(
+        adminClient.auth.admin,
+        data.email
       );
 
-      if (existingUser) {
-        console.log(
-          "[SCHOOL LICENSE CREATE] User already exists, userId:",
-          existingUser.id
-        );
-        licenceUserId = existingUser.id;
-      } else {
-        // Create new user in auth.users
-        console.log("[SCHOOL LICENSE CREATE] Creating new user in auth.users");
-        const userMetadata: Record<string, any> = {};
-        if (data.firstName) userMetadata.first_name = data.firstName;
-        if (data.lastName) userMetadata.last_name = data.lastName;
-
-        const { data: newUser, error: createError } =
-          await adminClient.auth.admin.createUser({
-            email: data.email,
-            email_confirm: true,
-            user_metadata:
-              Object.keys(userMetadata).length > 0 ? userMetadata : undefined,
-          });
-
-        if (createError) {
-          console.error(
-            "[SCHOOL LICENSE CREATE] Database error - Failed to create user:",
-            {
-              error: createError,
-              message: createError.message,
-              status: createError.status,
-              email: data.email,
-            }
-          );
-          throw new Error(`Failed to create user: ${createError.message}`);
+      console.log("[SCHOOL LICENSE CREATE] Creating new user in auth.users");
+      licenceUserId = await getOrCreateAuthUserId(
+        adminClient.auth.admin,
+        data.email,
+        {
+          userMetadata:
+            Object.keys(userMetadata).length > 0 ? userMetadata : undefined,
         }
+      );
+      console.log(
+        "[SCHOOL LICENSE CREATE] User resolved, userId:",
+        licenceUserId
+      );
 
-        if (!newUser.user) {
-          console.error(
-            "[SCHOOL LICENSE CREATE] Database error - No user returned:",
-            {
-              newUser,
-              email: data.email,
-            }
-          );
-          throw new Error("Failed to create user: No user returned");
-        }
-
-        licenceUserId = newUser.user.id;
-        console.log(
-          "[SCHOOL LICENSE CREATE] User created successfully, userId:",
-          licenceUserId
-        );
-
-        // Wait for trigger to create user_profile
+      if (!existingAuthUserId) {
         console.log(
           "[SCHOOL LICENSE CREATE] Waiting for trigger to create user_profile..."
         );
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Verify user_profile was created
         const { data: profile, error: profileError } = await adminClient
           .from("user_profile")
           .select("id")
@@ -187,7 +139,6 @@ export async function POST(request: Request) {
           );
 
           if (profileError.code === "PGRST116") {
-            // Profile doesn't exist - trigger may have failed, create it manually
             console.log(
               "[SCHOOL LICENSE CREATE] Trigger failed, creating user_profile manually..."
             );
@@ -199,31 +150,15 @@ export async function POST(request: Request) {
               });
 
             if (insertError) {
-              console.error(
-                "[SCHOOL LICENSE CREATE] Database error - Failed to create user_profile:",
-                {
-                  error: insertError,
-                  code: insertError.code,
-                  message: insertError.message,
-                  userId: licenceUserId,
-                }
-              );
               throw new Error(
                 `Failed to create user profile: ${insertError.message}`
               );
             }
-            console.log(
-              "[SCHOOL LICENSE CREATE] User profile created manually successfully"
-            );
           } else {
             throw new Error(
               `Failed to verify user profile: ${profileError.message}`
             );
           }
-        } else {
-          console.log(
-            "[SCHOOL LICENSE CREATE] User profile verified successfully"
-          );
         }
       }
 

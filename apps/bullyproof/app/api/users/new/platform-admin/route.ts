@@ -20,6 +20,10 @@ import { NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { checkFeatureAccess } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
+import {
+  findAuthUserIdByEmail,
+  getOrCreateAuthUserId,
+} from "@/server/user/resolve-auth-user-by-email";
 import { rolesRepo } from "@/server/roles/roles.repo";
 import { db } from "@/server/db/drizzle";
 import { userProfile, userRoles } from "@/server/db/schema";
@@ -90,73 +94,29 @@ export async function POST(request: Request) {
       "[PLATFORM ADMIN CREATE] Checking for existing user:",
       data.email
     );
-    const { data: existingUsers, error: listUsersError } =
-      await adminClient.auth.admin.listUsers();
-
-    if (listUsersError) {
-      console.error(
-        "[PLATFORM ADMIN CREATE] Database error - Failed to list users:",
-        {
-          error: listUsersError,
-          message: listUsersError.message,
-          status: listUsersError.status,
-        }
-      );
-      throw new Error(
-        `Failed to check existing users: ${listUsersError.message}`
-      );
-    }
-
-    const existingUser = existingUsers?.users?.find(
-      (u: { email?: string }) =>
-        u.email?.toLowerCase() === data.email.toLowerCase()
+    const existingAuthUserId = await findAuthUserIdByEmail(
+      adminClient.auth.admin,
+      data.email
     );
 
     let newUserId: string;
 
-    if (existingUser) {
+    if (existingAuthUserId) {
       console.log(
         "[PLATFORM ADMIN CREATE] User already exists, userId:",
-        existingUser.id
+        existingAuthUserId
       );
-      newUserId = existingUser.id;
+      newUserId = existingAuthUserId;
 
       // Wait a bit for profile to be ready
       await new Promise((resolve) => setTimeout(resolve, 500));
     } else {
       // Create new user in auth.users
       console.log("[PLATFORM ADMIN CREATE] Creating new user in auth.users");
-      const { data: newUser, error: createError } =
-        await adminClient.auth.admin.createUser({
-          email: data.email,
-          email_confirm: true,
-        });
-
-      if (createError) {
-        console.error(
-          "[PLATFORM ADMIN CREATE] Database error - Failed to create user:",
-          {
-            error: createError,
-            message: createError.message,
-            status: createError.status,
-            email: data.email,
-          }
-        );
-        throw new Error(`Failed to create user: ${createError.message}`);
-      }
-
-      if (!newUser.user) {
-        console.error(
-          "[PLATFORM ADMIN CREATE] Database error - No user returned:",
-          {
-            newUser,
-            email: data.email,
-          }
-        );
-        throw new Error("Failed to create user: No user returned");
-      }
-
-      newUserId = newUser.user.id;
+      newUserId = await getOrCreateAuthUserId(
+        adminClient.auth.admin,
+        data.email
+      );
       console.log(
         "[PLATFORM ADMIN CREATE] User created successfully, userId:",
         newUserId
