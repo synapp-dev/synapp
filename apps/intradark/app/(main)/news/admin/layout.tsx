@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { hasNewsEditorRole } from "@/entities/news/lib/roles";
 
 export default async function NewsAdminLayout({
@@ -14,7 +14,7 @@ export default async function NewsAdminLayout({
     redirect("/auth");
   }
 
-  const slugs = await getRoleSlugsForUser(userId);
+  const slugs = await getEffectiveRoleSlugsForUser(userId);
   if (!hasNewsEditorRole(slugs)) {
     notFound();
   }

@@ -2,7 +2,7 @@ import { track } from "@vercel/analytics/server";
 import { notFound } from "next/navigation";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { hasRoleSlug } from "@/entities/admin/lib/role-slugs";
 import { ROLE_DEVELOPER } from "@/entities/admin/lib/rbac-constants";
 import { MainSectionShell } from "@/components/organisms/main-section-shell";
@@ -41,7 +41,7 @@ export default async function UtilityMapPage({
     listActiveUtilityMaps(),
     getUtilityLineupUploadGateForPage(),
   ]);
-  const roleSlugs = authUserId ? await getRoleSlugsForUser(authUserId) : [];
+  const roleSlugs = authUserId ? await getEffectiveRoleSlugsForUser(authUserId) : [];
   const canEditUtilitySpots = hasRoleSlug(roleSlugs, ROLE_DEVELOPER);
 
   await track("utility_map_view", { map_slug: mapSlug });

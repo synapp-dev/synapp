@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Map, Newspaper, SquareStack } from "lucide-react";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import {
   hasAnyAdminSlug,
   hasCapability,
@@ -26,7 +26,7 @@ import {
 export default async function AdminHomePage() {
   const userId = await getSessionUserId();
   if (!userId) notFound();
-  const slugs = await getRoleSlugsForUser(userId);
+  const slugs = await getEffectiveRoleSlugsForUser(userId);
   if (!hasAnyAdminSlug(slugs, ADMIN_AREA_SLUGS)) notFound();
 
   const showSandbox = hasCapability(slugs, ROLE_SANDBOX_ACCESS);

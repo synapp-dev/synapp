@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { ROLE_DEVELOPER } from "@/entities/admin/lib/rbac-constants";
 import { hasRoleSlug } from "@/entities/admin/lib/role-slugs";
 import { adminMapUpdateSchema } from "@/entities/utility-lineups/lib/admin-maps-schema";
@@ -21,7 +21,7 @@ async function requireDeveloper(): Promise<AdminMapActionResult | { ok: true }> 
   if (!userId) {
     return { ok: false, code: "FORBIDDEN", message: "Sign in required." };
   }
-  const slugs = await getRoleSlugsForUser(userId);
+  const slugs = await getEffectiveRoleSlugsForUser(userId);
   if (!hasRoleSlug(slugs, ROLE_DEVELOPER)) {
     return { ok: false, code: "FORBIDDEN", message: "Developer role required." };
   }

@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { ROLE_DEVELOPER } from "@/entities/admin/lib/rbac-constants";
 import { hasRoleSlug } from "@/entities/admin/lib/role-slugs";
 import { INTRADARK_MEDIA_BUCKET } from "@/lib/media/constants";
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const slugs = await getRoleSlugsForUser(userId);
+  const slugs = await getEffectiveRoleSlugsForUser(userId);
   if (!hasRoleSlug(slugs, ROLE_DEVELOPER)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

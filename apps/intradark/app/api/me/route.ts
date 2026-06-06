@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { createServerClient } from "@/utils/supabase/server";
 
 export async function GET() {
@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const role_slugs = await getRoleSlugsForUser(user.id);
+  const role_slugs = await getEffectiveRoleSlugsForUser(user.id);
 
   const { data: profile, error } = await supabase
     .from("user_profiles")

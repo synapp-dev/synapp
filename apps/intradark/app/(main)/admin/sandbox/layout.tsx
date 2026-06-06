@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { hasCapability } from "@/entities/admin/lib/role-slugs";
 import { ROLE_SANDBOX_ACCESS } from "@/entities/admin/lib/rbac-constants";
 
@@ -14,7 +14,7 @@ export default async function AdminSandboxLayout({
   const userId = await getSessionUserId();
   if (!userId) notFound();
 
-  const slugs = await getRoleSlugsForUser(userId);
+  const slugs = await getEffectiveRoleSlugsForUser(userId);
   if (!hasCapability(slugs, ROLE_SANDBOX_ACCESS)) notFound();
 
   return (
