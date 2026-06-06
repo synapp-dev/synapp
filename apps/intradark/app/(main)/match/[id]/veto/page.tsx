@@ -1,4 +1,4 @@
-import { VetoPhasePanel } from "./veto-phase-panel";
+import { VetoPhasePanel } from "@/entities/match-lobby";
 
 export default function MatchVetoPhasePage() {
   return <VetoPhasePanel />;

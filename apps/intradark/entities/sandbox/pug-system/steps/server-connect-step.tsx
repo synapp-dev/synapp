@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { ServerPhasePanel } from "@/app/(main)/match/[id]/server/server-phase-panel";
+import { ServerPhasePanel } from "@/entities/match-lobby";
 import { usePugPlayout } from "../pug-playout-context";
 import { Button } from "@workspace/ui/components/button";
 import {

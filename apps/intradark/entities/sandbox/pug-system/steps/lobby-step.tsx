@@ -3,21 +3,19 @@
 import * as React from "react";
 import { Ban, CheckCircle2, CircleDot, Map, RotateCcw, Users } from "lucide-react";
 
-import { ServerPhasePanel } from "@/app/(main)/match/[id]/server/server-phase-panel";
-import { DiscordIcon } from "@/components/organisms/match-lobby/discord-icon";
-import { LobbyTeamColumn } from "@/components/organisms/match-lobby/lobby-team-column";
-import { LobbyVetoColumnFooter } from "@/components/organisms/match-lobby/lobby-veto-column-footer";
-import { MatchLobbyConcentricRings } from "@/components/organisms/match-lobby/match-lobby-concentric-rings";
-import { useMatchLobbyMock } from "@/components/organisms/match-lobby/match-lobby-mock-context";
 import {
+  DiscordIcon,
+  LobbyTeamColumn,
+  LobbyVetoColumnFooter,
+  MatchLobbyConcentricRings,
+  MOCK_TEAM_NORTH,
+  MOCK_TEAM_SOUTH,
+  ServerPhasePanel,
+  useMatchLobbyMock,
   VETO_MAP_POOL,
   type VetoSide,
   useMatchVetoMock,
-} from "@/components/organisms/match-lobby/match-veto-mock-context";
-import {
-  MOCK_TEAM_NORTH,
-  MOCK_TEAM_SOUTH,
-} from "@/lib/match-lobby-mock-data";
+} from "@/entities/match-lobby";
 import { Button } from "@workspace/ui/components/button";
 import {
   Tabs,

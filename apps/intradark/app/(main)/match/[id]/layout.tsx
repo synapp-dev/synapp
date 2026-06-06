@@ -1,4 +1,4 @@
-import { MatchLobbyLayout } from "@/components/organisms/match-lobby/match-lobby-layout";
+import { MatchLobbyLayout } from "@/entities/match-lobby";
 
 export default async function MatchLobbyRouteLayout({
   children,

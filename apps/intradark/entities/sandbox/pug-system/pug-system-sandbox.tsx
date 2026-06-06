@@ -2,8 +2,10 @@
 
 import * as React from "react";
 
-import { MatchLobbyMockProvider } from "@/components/organisms/match-lobby/match-lobby-mock-context";
-import { MatchVetoMockProvider } from "@/components/organisms/match-lobby/match-veto-mock-context";
+import {
+  MatchLobbyMockProvider,
+  MatchVetoMockProvider,
+} from "@/entities/match-lobby";
 import { SandboxShell } from "@/entities/sandbox/shell/sandbox-shell";
 import type { SandboxUrlApi } from "@/lib/sandbox/use-sandbox-url-state";
 

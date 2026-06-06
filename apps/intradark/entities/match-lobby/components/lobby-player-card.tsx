@@ -4,7 +4,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { BadgeCheck, Star } from "lucide-react";
 
-import type { LobbyPlayerMock } from "@/lib/match-lobby-mock-data";
+import type { LobbyPlayerMock } from "../lib/mock-data";
 import { cn } from "@workspace/ui/lib/utils";
 
 import { DiscordIcon } from "./discord-icon";

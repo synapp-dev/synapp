@@ -5,8 +5,8 @@ import { Check, Copy, Server } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 
-import { MatchLobbyConcentricRings } from "@/components/organisms/match-lobby/match-lobby-concentric-rings";
-import { useMatchLobbyMock } from "@/components/organisms/match-lobby/match-lobby-mock-context";
+import { MatchLobbyConcentricRings } from "../match-lobby-concentric-rings";
+import { useMatchLobbyMock } from "../match-lobby-mock-context";
 
 const INITIAL_SECONDS = 120;
 const ACCENT = "#7289DA";

@@ -1,7 +1,7 @@
 import {
   MOCK_TEAM_NORTH,
   MOCK_TEAM_SOUTH,
-} from "@/lib/match-lobby-mock-data";
+} from "../lib/mock-data";
 
 import { LobbyTeamColumn } from "./lobby-team-column";
 import { LobbyVetoColumnFooter } from "./lobby-veto-column-footer";

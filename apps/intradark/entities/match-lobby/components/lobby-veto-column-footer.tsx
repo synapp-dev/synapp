@@ -7,7 +7,7 @@ import { Button } from "@workspace/ui/components/button";
 import {
   type VetoSide,
   useMatchVetoMock,
-} from "@/components/organisms/match-lobby/match-veto-mock-context";
+} from "./match-veto-mock-context";
 
 type LobbyVetoColumnFooterProps = {
   side: VetoSide;

@@ -1,4 +1,4 @@
-import { DiscordPhasePanel } from "./discord-phase-panel";
+import { DiscordPhasePanel } from "@/entities/match-lobby";
 
 export default function MatchDiscordPhasePage() {
   return <DiscordPhasePanel />;

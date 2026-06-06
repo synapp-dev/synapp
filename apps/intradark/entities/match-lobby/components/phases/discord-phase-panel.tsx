@@ -5,9 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 
 import { Button } from "@workspace/ui/components/button";
 
-import { DiscordIcon } from "@/components/organisms/match-lobby/discord-icon";
-import { MatchLobbyConcentricRings } from "@/components/organisms/match-lobby/match-lobby-concentric-rings";
-import { useMatchLobbyMock } from "@/components/organisms/match-lobby/match-lobby-mock-context";
+import { DiscordIcon } from "../discord-icon";
+import { MatchLobbyConcentricRings } from "../match-lobby-concentric-rings";
+import { useMatchLobbyMock } from "../match-lobby-mock-context";
 
 const INITIAL_SECONDS = 120;
 

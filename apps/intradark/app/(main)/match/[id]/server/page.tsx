@@ -1,4 +1,4 @@
-import { ServerPhasePanel } from "./server-phase-panel";
+import { ServerPhasePanel } from "@/entities/match-lobby";
 
 export default function MatchServerPhasePage() {
   return <ServerPhasePanel />;

@@ -5,7 +5,7 @@ import * as React from "react";
 import {
   MOCK_TEAM_NORTH,
   MOCK_TEAM_SOUTH,
-} from "@/lib/match-lobby-mock-data";
+} from "../lib/mock-data";
 
 function buildInitialDiscordJoined(): Record<string, boolean> {
   const m: Record<string, boolean> = {};

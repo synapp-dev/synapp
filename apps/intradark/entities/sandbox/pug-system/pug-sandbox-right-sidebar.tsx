@@ -4,10 +4,12 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { useRegisterSandboxRightSidebar } from "@/components/organisms/sandbox-right-sidebar-provider";
-import { useMatchLobbyMock } from "@/components/organisms/match-lobby/match-lobby-mock-context";
+import {
+  MOCK_TEAM_NORTH,
+  useMatchLobbyMock,
+} from "@/entities/match-lobby";
 import { createAutomateController } from "@/lib/sandbox/create-automate-controller";
 import type { SandboxUrlApi } from "@/lib/sandbox/use-sandbox-url-state";
-import { MOCK_TEAM_NORTH } from "@/lib/match-lobby-mock-data";
 import { Button } from "@workspace/ui/components/button";
 import {
   Accordion,

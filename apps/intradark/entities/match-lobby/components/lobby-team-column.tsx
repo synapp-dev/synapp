@@ -1,4 +1,4 @@
-import type { LobbyTeamMock } from "@/lib/match-lobby-mock-data";
+import type { LobbyTeamMock } from "../lib/mock-data";
 
 import { LobbyPlayerCard } from "./lobby-player-card";
 

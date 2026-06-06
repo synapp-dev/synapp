@@ -10,7 +10,7 @@ import {
   VETO_MAP_POOL,
   type VetoSide,
   useMatchVetoMock,
-} from "@/components/organisms/match-lobby/match-veto-mock-context";
+} from "../match-veto-mock-context";
 
 function mapRowStatus(
   mapId: string,
