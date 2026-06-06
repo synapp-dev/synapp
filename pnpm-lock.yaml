@@ -340,6 +340,9 @@ importers:
       discord.js:
         specifier: ^14.26.3
         version: 14.26.3
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       drizzle-orm:
         specifier: ^0.44.3
         version: 0.44.3(@opentelemetry/api@1.9.0)(postgres@3.4.7)
@@ -681,7 +684,7 @@ importers:
         version: 19.0.4(@types/react@19.0.10)
       '@vitejs/plugin-react':
         specifier: 'catalog:'
-        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
+        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
       '@workspace/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
@@ -705,7 +708,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
+        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
 
   apps/supersolt:
     dependencies:
@@ -739,6 +742,9 @@ importers:
       drizzle-orm:
         specifier: ^0.44.3
         version: 0.44.3(@opentelemetry/api@1.9.0)(postgres@3.4.7)
+      jose:
+        specifier: ^6.0.12
+        version: 6.0.12
       lucide-react:
         specifier: ^0.575.0
         version: 0.575.0(react@19.2.4)
@@ -748,6 +754,9 @@ importers:
       next-themes:
         specifier: ^0.4.4
         version: 0.4.4(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
+      postgres:
+        specifier: ^3.4.7
+        version: 3.4.7
       react:
         specifier: ^19.0.0
         version: 19.2.4
@@ -914,7 +923,7 @@ importers:
         version: 19.0.4(@types/react@19.0.10)
       '@vitejs/plugin-react':
         specifier: 'catalog:'
-        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
+        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
       '@workspace/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
@@ -938,7 +947,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
+        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
 
   apps/web:
     dependencies:
