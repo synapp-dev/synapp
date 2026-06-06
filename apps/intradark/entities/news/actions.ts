@@ -5,7 +5,10 @@ import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-import { getRoleSlugsForUser } from "@/entities/admin/lib/get-role-slugs-for-user";
+import { allocateUniqueUrlSlug } from "@/entities/content/lib/slug";
+import { formatZodActionError } from "@/entities/content/lib/format-zod-error";
+import { isPostgresUniqueViolation } from "@/entities/content/lib/postgres-errors";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import { db } from "@/server/db/drizzle";
 import { newsArticles } from "@/server/db/schema";
@@ -19,23 +22,8 @@ import {
   createArticleDraftSchemaWithSlug,
   updateArticleDraftSchemaWithSlug,
 } from "./lib/schemas";
-import { appendSlugSuffix, slugifyTitle, validateSlug } from "./lib/slug";
+import { slugifyTitle, validateSlug } from "./lib/slug";
 import { EMPTY_TIPTAP_DOC_JSON } from "./lib/constants";
-
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: string }).code === "23505"
-  );
-}
-
-function formatZodError(err: { flatten: () => { fieldErrors: Record<string, string[]> } }): string {
-  const flat = err.flatten();
-  const first = Object.values(flat.fieldErrors).find((a) => a?.length)?.[0];
-  return first ?? "Invalid input.";
-}
 
 async function requireNewsEditor(): Promise<
   NewsActionResult<{ userId: string }>
@@ -44,7 +32,7 @@ async function requireNewsEditor(): Promise<
   if (!userId) {
     return { ok: false, code: "FORBIDDEN", message: "Sign in required." };
   }
-  const slugs = await getRoleSlugsForUser(userId);
+  const slugs = await getEffectiveRoleSlugsForUser(userId);
   if (!hasNewsEditorRole(slugs)) {
     return { ok: false, code: "FORBIDDEN", message: "News editor role required." };
   }
@@ -52,17 +40,12 @@ async function requireNewsEditor(): Promise<
 }
 
 async function allocateUniqueSlug(preferred: string): Promise<string> {
-  const validated = validateSlug(preferred);
-  const base = validated.ok ? preferred : slugifyTitle(preferred);
-  let candidate = base;
-  let n = 2;
-  for (;;) {
-    const taken = await isNewsSlugTaken(candidate);
-    if (!taken) return candidate;
-    candidate = appendSlugSuffix(base, n);
-    n += 1;
-    if (n > 500) return `${base}-${Date.now().toString(36)}`;
-  }
+  return allocateUniqueUrlSlug({
+    preferred,
+    slugify: slugifyTitle,
+    validate: validateSlug,
+    isTaken: isNewsSlugTaken,
+  });
 }
 
 export async function createNewsArticleDraftAction(input: {
@@ -78,7 +61,7 @@ export async function createNewsArticleDraftAction(input: {
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(parsed.error),
+      message: formatZodActionError(parsed.error),
     };
   }
 
@@ -112,7 +95,7 @@ export async function createNewsArticleDraftAction(input: {
     revalidatePath("/news/admin");
     return { ok: true, data: { id: row.id, slug: row.slug } };
   } catch (err) {
-    if (isUniqueViolation(err)) {
+    if (isPostgresUniqueViolation(err)) {
       return {
         ok: false,
         code: "DUPLICATE_SLUG",
@@ -143,7 +126,7 @@ export async function updateNewsArticleDraftAction(input: {
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(parsed.error),
+      message: formatZodActionError(parsed.error),
     };
   }
 
@@ -199,7 +182,7 @@ export async function updateNewsArticleDraftAction(input: {
     revalidatePath(`/news/${article.slug}`);
     return { ok: true, data: { slug: parsed.data.slug } };
   } catch (err) {
-    if (isUniqueViolation(err)) {
+    if (isPostgresUniqueViolation(err)) {
       return {
         ok: false,
         code: "DUPLICATE_SLUG",
@@ -226,7 +209,7 @@ export async function publishNewsArticleAction(
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(idParsed.error),
+      message: formatZodActionError(idParsed.error),
     };
   }
 
@@ -285,7 +268,7 @@ export async function unpublishNewsArticleAction(
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(idParsed.error),
+      message: formatZodActionError(idParsed.error),
     };
   }
 

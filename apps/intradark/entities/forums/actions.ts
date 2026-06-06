@@ -5,6 +5,9 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 
+import { allocateUniqueUrlSlug, validateUrlSlug } from "@/entities/content/lib/slug";
+import { formatZodActionError } from "@/entities/content/lib/format-zod-error";
+import { isPostgresUniqueViolation } from "@/entities/content/lib/postgres-errors";
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import { db } from "@/server/db/drizzle";
 import {
@@ -15,9 +18,8 @@ import {
 
 import type { ForumActionResult } from "./lib/action-types";
 import {
-  appendSlugSuffix,
-  isValidThreadSlug,
   slugifyThreadTitle,
+  FORUM_RESERVED_THREAD_SLUGS,
 } from "./lib/thread-slug";
 import {
   createForumReplySchema,
@@ -38,41 +40,18 @@ import {
   listForumRepliesForThread,
 } from "./lib/queries";
 
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    (err as { code: string }).code === "23505"
-  );
-}
-
-function formatZodError(err: {
-  flatten: () => { fieldErrors: Record<string, string[]> };
-}): string {
-  const flat = err.flatten();
-  const first = Object.values(flat.fieldErrors).find((a) => a?.length)?.[0];
-  return first ?? "Invalid input.";
-}
-
 async function allocateThreadSlug(
   categoryId: string,
   title: string,
 ): Promise<string> {
-  const base = slugifyThreadTitle(title);
-  let candidate = base;
-  let n = 2;
-  while (!isValidThreadSlug(candidate)) {
-    candidate = appendSlugSuffix(base, n);
-    n += 1;
-  }
-  for (let i = 0; i < 200; i++) {
-    const taken = await isThreadSlugTakenInCategory(categoryId, candidate);
-    if (!taken) return candidate;
-    candidate = appendSlugSuffix(base, n);
-    n += 1;
-  }
-  return `${base}-${Date.now().toString(36)}`;
+  return allocateUniqueUrlSlug({
+    preferred: title,
+    slugify: slugifyThreadTitle,
+    validate: (slug) => validateUrlSlug(slug, FORUM_RESERVED_THREAD_SLUGS),
+    isTaken: (candidate) => isThreadSlugTakenInCategory(categoryId, candidate),
+    skipInvalid: true,
+    maxAttempts: 200,
+  });
 }
 
 export async function createForumThreadAction(
@@ -90,7 +69,7 @@ export async function createForumThreadAction(
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(parsed.error),
+      message: formatZodActionError(parsed.error),
     };
   }
 
@@ -169,7 +148,7 @@ export async function createForumThreadAction(
       data: { categorySlug, threadSlug: result.slug },
     };
   } catch (err) {
-    if (isUniqueViolation(err)) {
+    if (isPostgresUniqueViolation(err)) {
       return {
         ok: false,
         code: "THREAD_SLUG_TAKEN",
@@ -199,7 +178,7 @@ export async function createForumReplyAction(
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(parsed.error),
+      message: formatZodActionError(parsed.error),
     };
   }
 
@@ -339,7 +318,7 @@ export async function softDeleteForumThreadAction(
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(parsed.error),
+      message: formatZodActionError(parsed.error),
     };
   }
 
@@ -394,7 +373,7 @@ export async function softDeleteForumReplyAction(
     return {
       ok: false,
       code: "VALIDATION",
-      message: formatZodError(parsed.error),
+      message: formatZodActionError(parsed.error),
     };
   }
 
