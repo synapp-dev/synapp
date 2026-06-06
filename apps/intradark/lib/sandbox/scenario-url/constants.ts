@@ -15,3 +15,12 @@ export const SANDBOX_STEP_PRESET_URL_KEYS = [
   SANDBOX_STEP_QUERY_KEY,
   SANDBOX_PRESET_QUERY_KEY,
 ] as const;
+
+/** Scenario + step only (preset managed in memory, not in URL). */
+export const SANDBOX_SCENARIO_STEP_URL_KEYS = [
+  SANDBOX_SCENARIO_QUERY_KEY,
+  SANDBOX_STEP_QUERY_KEY,
+] as const;
+
+/** Step index only — no scenario or preset in URL. */
+export const SANDBOX_STEP_ONLY_URL_KEYS = [SANDBOX_STEP_QUERY_KEY] as const;

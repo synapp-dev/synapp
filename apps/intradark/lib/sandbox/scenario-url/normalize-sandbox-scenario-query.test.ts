@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { SANDBOX_AUTOMATE_QUERY_KEY } from "./constants";
 import {
   normalizeSandboxScenarioQuery,
+  normalizeScenarioStepQuery,
   normalizeStepPresetQuery,
+  readSandboxUrlState,
 } from "./normalize-sandbox-scenario-query";
 
 const scenarios = ["all-accept", "one-declines"] as const;
@@ -97,5 +99,61 @@ describe("normalizeStepPresetQuery", () => {
     );
     expect(r.didNormalize).toBe(true);
     expect(r.canonicalQuery).toBe("step=0&preset=default");
+  });
+});
+
+function ns(sp: string) {
+  return normalizeScenarioStepQuery({
+    searchParams: new URLSearchParams(sp),
+    defaultScenarioId: "all-accept",
+    scenarioIds: scenarios,
+    maxStepIndex: 6,
+  });
+}
+
+describe("normalizeScenarioStepQuery", () => {
+  it("keeps scenario+step when valid", () => {
+    const r = ns("scenario=all-accept&step=2");
+    expect(r.didNormalize).toBe(false);
+    expect(r.canonicalQuery).toBe("scenario=all-accept&step=2");
+  });
+
+  it("strips preset and unknown keys", () => {
+    const r = ns("scenario=all-accept&step=1&preset=default&foo=bar");
+    expect(r.didNormalize).toBe(true);
+    expect(r.canonicalQuery).toBe("scenario=all-accept&step=1");
+  });
+});
+
+describe("readSandboxUrlState", () => {
+  it("routes PUG-style sandboxes through step+preset normalizer", () => {
+    const r = readSandboxUrlState({
+      searchParams: new URLSearchParams("step=2&preset=quick-tour"),
+      scenarioIds: [],
+      defaultScenarioId: "",
+      maxStepIndex: 6,
+      presetIds: presets,
+      defaultPresetId: "default",
+    });
+    expect(r.scenarioId).toBe("");
+    expect(r.stepIndex).toBe(2);
+    expect(r.presetId).toBe("quick-tour");
+    expect(r.didNormalize).toBe(false);
+  });
+
+  it("routes onboarding-style sandboxes through scenario+preset normalizer", () => {
+    const r = readSandboxUrlState({
+      searchParams: new URLSearchParams(
+        "scenario=all-accept&step=1&preset=default",
+      ),
+      scenarioIds: scenarios,
+      defaultScenarioId: "all-accept",
+      maxStepIndex: 6,
+      presetIds: presets,
+      defaultPresetId: "default",
+    });
+    expect(r.scenarioId).toBe("all-accept");
+    expect(r.stepIndex).toBe(1);
+    expect(r.presetId).toBe("default");
   });
 });
