@@ -2,7 +2,7 @@ import { CardHeader, CardTitle, CardContent } from "@workspace/ui/components/car
 
 import { ChevronsRight, ChevronsUp, Trophy } from "lucide-react";
 import { useState } from "react";
-import type { CSStatsProfile } from "@/hooks/players/queries/read";
+import type { CSStatsProfile } from "@/entities/players";
 import { PremierEloBadge } from "../atoms/premier-elo-badge";
 import Image from "next/image";
 import { Button } from "@workspace/ui/components/button";

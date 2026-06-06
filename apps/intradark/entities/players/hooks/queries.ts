@@ -1,148 +1,29 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-// Type definitions
-export interface SteamProfile {
-  success: boolean;
-  data: {
-    steamid: string;
-    personaname: string;
-    avatarfull: string;
-    profileurl: string;
-    realname?: string;
-    timecreated?: number;
-    lastlogoff?: number;
-    player_level: number;
-    friends_count: number;
-  };
-}
+import { usePlayerStore } from "@/entities/players/model/player-store";
+import type {
+  CSStatsProfile,
+  FaceitProfile,
+  LeetifyProfile,
+  PlayerByVanityUrlResponse,
+  PlayerData,
+  SteamProfile,
+} from "@/entities/players/lib/types";
 
-export interface LeetifyProfile {
-  meta: {
-    name: string;
-    steamAvatarUrl: string;
-    steam64Id: string;
-    faceitNickname?: string;
-    vanityUrl?: string;
-    isProPlan: boolean;
-    isLeetifyStaff: boolean;
-  };
-  games: Array<{
-    enemyTeamSteam64Ids: string[];
-    isCompletedLongMatch: boolean;
-    ownTeamSteam64Ids: string[];
-    ownTeamTotalLeetifyRatingRounds: Record<string, number>;
-    ownTeamTotalLeetifyRatings: Record<string, number>;
-    ctLeetifyRating: number;
-    ctLeetifyRatingRounds: number;
-    dataSource: string;
-    elo: number | null;
-    gameFinishedAt: string;
-    gameId: string;
-    isCs2: boolean;
-    mapName: string;
-    matchResult: string;
-    rankType: number;
-    scores: [number, number];
-    skillLevel: number;
-    tLeetifyRating: number;
-    tLeetifyRatingRounds: number;
-    deaths: number;
-    hasBannedPlayer: boolean;
-    kills: number;
-    partySize: number;
-  }>;
+export type {
+  CSStatsProfile,
+  FaceitProfile,
+  LeetifyProfile,
+  PlayerByVanityUrlResponse,
+  PlayerData,
+  SteamProfile,
+} from "@/entities/players/lib/types";
 
-  recentGameRatings: {
-    aim: number;
-    positioning: number;
-    utility: number;
-    clutch: number;
-    leetify: number;
-    ctLeetify: number;
-    opening: number;
-    tLeetify: number;
-    gamesPlayed: number;
-  };
-  teammates: Array<{
-    steamNickname: string;
-    steamAvatarUrl: string;
-    matchesPlayedTogether: number;
-    winRateTogether: number;
-    teammateLeetifyRating: number;
-  }>;
-  highlights?: Array<{
-    url: string;
-    thumbnailUrl?: string;
-    description?: string;
-  }>;
-}
-
-export interface FaceitProfile {
-  result: string;
-  payload: {
-    id: string;
-    nickname: string;
-    avatar: string;
-    country: string;
-    games: {
-      cs2?: {
-        faceit_elo: number;
-        skill_level: number;
-        skill_level_label: string;
-        region: string;
-      };
-      csgo?: {
-        faceit_elo: number;
-        skill_level: number;
-        skill_level_label: string;
-        region: string;
-      };
-    };
-  };
-}
-
-export interface CSStatsProfile {
-  success: boolean;
-  data: {
-    steamId: string;
-    playerName: string;
-    playerAvatar: string;
-    ranks: Array<{
-      season: number | null;
-      current: number | null;
-      peak: number | null;
-      last_match: string | null;
-      total_wins: number;
-    }>;
-    url: string;
-  };
-}
-
-export interface PlayerData {
-  steamId64: string;
-  vanityUrl: string;
-  steamProfile: SteamProfile | null;
-  leetifyProfile: LeetifyProfile | null;
-  faceitProfile: FaceitProfile | null;
-  csstatsProfile: CSStatsProfile | null;
-  lastUpdated: number;
-  faceitUsername?: string;
-  leetifyUsername?: string;
-}
-
-// Response types
-export type PlayerByVanityUrlResponse = {
-  success: boolean;
-  data: PlayerData | null;
-  error?: string;
-};
-
-// Helper function to check if input is a Steam ID64
 function isSteamId64(input: string): boolean {
   return /^\d{17}$/.test(input);
 }
 
-// Main hook for getting player data by vanity URL or Steam ID64
 export function useGetPlayerByVanityUrl(input: string) {
   return useQuery<PlayerByVanityUrlResponse, Error>({
     queryKey: ["players", "input", input],
@@ -151,19 +32,17 @@ export function useGetPlayerByVanityUrl(input: string) {
       let vanityUrl: string;
 
       if (isSteamId64(input)) {
-        // Input is already a Steam ID64
         steamId64 = input;
-        vanityUrl = ""; // We'll try to get vanity URL from Steam profile later
+        vanityUrl = "";
       } else {
-        // Input is a vanity URL, resolve it to Steam ID64
         const vanityResponse = await fetch(
-          `/api/steam/vanity-to-id64/[id]?vanityUrl=${encodeURIComponent(input)}`
+          `/api/steam/vanity-to-id64/[id]?vanityUrl=${encodeURIComponent(input)}`,
         );
 
         if (!vanityResponse.ok) {
           const errorData = await vanityResponse.json();
           throw new Error(
-            errorData.error || "Failed to resolve Steam vanity URL"
+            errorData.error || "Failed to resolve Steam vanity URL",
           );
         }
 
@@ -177,14 +56,13 @@ export function useGetPlayerByVanityUrl(input: string) {
         vanityUrl = input;
       }
 
-      // Return basic player data - individual services will fetch their own data
       const playerData: PlayerData = {
         steamId64,
         vanityUrl,
-        steamProfile: null, // Will be fetched by useSteamProfile
-        leetifyProfile: null, // Will be fetched by useLeetifyProfile
-        faceitProfile: null, // Will be fetched by useFaceitProfile if needed
-        csstatsProfile: null, // Will be fetched by useCSStatsProfile
+        steamProfile: null,
+        leetifyProfile: null,
+        faceitProfile: null,
+        csstatsProfile: null,
         lastUpdated: Date.now(),
         faceitUsername: "",
         leetifyUsername: "",
@@ -199,7 +77,6 @@ export function useGetPlayerByVanityUrl(input: string) {
   });
 }
 
-// Individual profile hooks
 export function useGetSteamProfile(steamId64: string) {
   return useQuery<SteamProfile, Error>({
     queryKey: ["players", "steam", steamId64],
@@ -230,7 +107,7 @@ export function useGetLeetifyProfile(steamId64: string) {
 
 export function useGetFaceitProfile(
   steamId64: string | undefined,
-  options = {}
+  options = {},
 ) {
   return useQuery<FaceitProfile, Error>({
     queryKey: ["players", "faceit", steamId64],
@@ -260,10 +137,6 @@ export function useGetCSStatsProfile(steamId64: string) {
     enabled: !!steamId64,
   });
 }
-
-// Canonical Faceit profile hook for player store system
-import { usePlayerStore } from "@/stores/players/player-store";
-import { useEffect } from "react";
 
 export function useFaceitProfile(steamId64: string) {
   const { updatePlayer, setLoading, setError } = usePlayerStore();
@@ -299,7 +172,6 @@ export function useFaceitProfile(steamId64: string) {
   };
 }
 
-// Canonical Steam profile hook for player store system
 export function useSteamProfile(steamId64: string) {
   const { updatePlayer, setLoading, setError } = usePlayerStore();
   const query = useGetSteamProfile(steamId64);
@@ -332,7 +204,6 @@ export function useSteamProfile(steamId64: string) {
   };
 }
 
-// Canonical Leetify profile hook for player store system
 export function useLeetifyProfile(steamId64: string) {
   const { updatePlayer, setLoading, setError } = usePlayerStore();
   const query = useGetLeetifyProfile(steamId64);
@@ -365,7 +236,6 @@ export function useLeetifyProfile(steamId64: string) {
   };
 }
 
-// Canonical CSStats profile hook for player store system
 export function useCSStatsProfile(steamId64: string) {
   const { updatePlayer, setLoading, setError } = usePlayerStore();
   const query = useGetCSStatsProfile(steamId64);

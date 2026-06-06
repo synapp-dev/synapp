@@ -1,7 +1,6 @@
 import { create } from "zustand";
-import type { PlayerData } from "@/hooks/players/queries/read";
 
-type PlayerServiceKey = "steam" | "leetify" | "faceit" | "csstats";
+import type { PlayerData, PlayerServiceKey } from "@/entities/players/lib/types";
 
 type PlayerStoreState = {
   selectedPlayer: PlayerData | null;

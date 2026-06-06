@@ -1,4 +1,4 @@
-import { useFaceitProfile, usePlayerStore } from "@/hooks/players";
+import { useFaceitProfile, usePlayerStore } from "@/entities/players";
 import {
   Card,
   CardTitle,

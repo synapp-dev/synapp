@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { PlayerData } from "@/hooks/players/queries/read";
+import type { PlayerData } from "@/entities/players/lib/types";
 
 export function useCreatePlayerMutation() {
   const queryClient = useQueryClient();
