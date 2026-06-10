@@ -30,7 +30,7 @@ const eligibilityMessages: Record<UtilityLineupUploadEligibilityCode, string> = 
 /** Pure gate for profile + email verification (session handled separately). */
 export function utilityLineupUploadEligibilityIssue(args: {
   emailConfirmedAt: string | null | undefined;
-  steamProfileId: number | null | undefined;
+  steamProfileId: string | number | null | undefined;
   discordUserId: string | null | undefined;
   hasProfileRow: boolean;
 }): UtilityLineupUploadEligibilityCode | null {

@@ -10,7 +10,12 @@ import Image from "next/image";
 import { FaceitLevelBadge } from "../atoms/faceit-level-badge";
 import CountUp from "react-countup";
 
-export function FaceitElo() {
+export function FaceitElo({
+  /** Seconds before the count-up begins (e.g. wait for a parent fade-in). */
+  delay = 0,
+}: {
+  delay?: number;
+} = {}) {
   const { selectedPlayer } = usePlayerStore();
   const steamId64 = selectedPlayer?.steamId64;
 
@@ -41,6 +46,7 @@ export function FaceitElo() {
             <CountUp
               end={faceitProfile?.payload.games.cs2?.faceit_elo || 3478}
               duration={2}
+              delay={delay}
               separator=","
             />
           </p>

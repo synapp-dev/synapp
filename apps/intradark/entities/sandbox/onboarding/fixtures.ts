@@ -27,7 +27,7 @@ const SANDBOX_USER = {
 } as unknown as User;
 
 const BASE_STEAM: SteamProfileRow = {
-  steamid64: 76561198000000001,
+  steamid64: "76561198000000001",
   steamid: "76561198000000001",
   personaname: "SandboxPlayer",
   profileurl: "https://steamcommunity.com/id/sandbox/",
@@ -61,12 +61,18 @@ function baseUserProfile(overrides: Partial<UserProfileRow>): UserProfileRow {
     discord_user_id: "123456789012345678",
     username: "sandbox_user",
     display_name: "Sandbox User",
+    first_name: null,
+    last_name: null,
     bio: null,
     avatar_url: "/images/players/donk-headshot.png",
     email: "sandbox@intradark.local",
     is_verified: true,
     is_premium: false,
     preferences: {},
+    anthem_url: null,
+    twitch_url: null,
+    x_url: null,
+    instagram_url: null,
     last_active: ISO,
     created_at: ISO,
     updated_at: ISO,

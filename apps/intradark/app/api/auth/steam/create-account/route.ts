@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 import { ensureMemberTemplateForProfileId } from "@/entities/rbac/lib/ensure-member-template";
+import { ensurePlayer } from "@/entities/players/lib/server/registry";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 /**
@@ -113,6 +114,10 @@ export async function POST(request: NextRequest) {
     if (profileRow?.id) {
       await ensureMemberTemplateForProfileId(adminClient, profileRow.id);
     }
+
+    // Claim any existing archived stats for this steamid64 by binding the
+    // players registry row to the freshly created intradark account.
+    await ensurePlayer(adminClient, String(steamId64));
 
     // Generate a session token for the user
     // We'll create a magic link that auto-signs them in

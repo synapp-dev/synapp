@@ -1,14 +1,10 @@
 import { create } from "zustand";
 
-export interface Team {
-  id: string;
-  name: string;
-  slug: string;
-}
+import type { TeamSummary } from "@/entities/teams/types";
 
 interface TeamState {
-  currentTeam: Team | null;
-  setCurrentTeam: (team: Team | null) => void;
+  currentTeam: TeamSummary | null;
+  setCurrentTeam: (team: TeamSummary | null) => void;
   clearCurrentTeam: () => void;
 }
 
@@ -17,3 +13,5 @@ export const useTeamStore = create<TeamState>((set) => ({
   setCurrentTeam: (team) => set({ currentTeam: team }),
   clearCurrentTeam: () => set({ currentTeam: null }),
 }));
+
+export type { TeamSummary as Team };

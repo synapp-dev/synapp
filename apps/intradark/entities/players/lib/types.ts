@@ -1,3 +1,5 @@
+import type { LeetifyView } from "@/entities/players/lib/parse-leetify";
+
 export interface SteamProfile {
   success: boolean;
   data: {
@@ -13,66 +15,12 @@ export interface SteamProfile {
   };
 }
 
-export interface LeetifyProfile {
-  meta: {
-    name: string;
-    steamAvatarUrl: string;
-    steam64Id: string;
-    faceitNickname?: string;
-    vanityUrl?: string;
-    isProPlan: boolean;
-    isLeetifyStaff: boolean;
-  };
-  games: Array<{
-    enemyTeamSteam64Ids: string[];
-    isCompletedLongMatch: boolean;
-    ownTeamSteam64Ids: string[];
-    ownTeamTotalLeetifyRatingRounds: Record<string, number>;
-    ownTeamTotalLeetifyRatings: Record<string, number>;
-    ctLeetifyRating: number;
-    ctLeetifyRatingRounds: number;
-    dataSource: string;
-    elo: number | null;
-    gameFinishedAt: string;
-    gameId: string;
-    isCs2: boolean;
-    mapName: string;
-    matchResult: string;
-    rankType: number;
-    scores: [number, number];
-    skillLevel: number;
-    tLeetifyRating: number;
-    tLeetifyRatingRounds: number;
-    deaths: number;
-    hasBannedPlayer: boolean;
-    kills: number;
-    partySize: number;
-  }>;
-
-  recentGameRatings: {
-    aim: number;
-    positioning: number;
-    utility: number;
-    clutch: number;
-    leetify: number;
-    ctLeetify: number;
-    opening: number;
-    tLeetify: number;
-    gamesPlayed: number;
-  };
-  teammates: Array<{
-    steamNickname: string;
-    steamAvatarUrl: string;
-    matchesPlayedTogether: number;
-    winRateTogether: number;
-    teammateLeetifyRating: number;
-  }>;
-  highlights?: Array<{
-    url: string;
-    thumbnailUrl?: string;
-    description?: string;
-  }>;
-}
+/**
+ * Normalized Leetify view rendered by the player profile. Derived from the
+ * Leetify web app API (`api.cs-prod.leetify.com/api/profile/id/{steamid64}`).
+ * See `normalizeLeetify` in `parse-leetify.ts`.
+ */
+export type LeetifyProfile = LeetifyView;
 
 export interface FaceitProfile {
   result: string;

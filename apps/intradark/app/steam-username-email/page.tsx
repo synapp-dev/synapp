@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SteamEmailDialog } from "@/components/molecules/steam-email-dialog";
 
 interface SteamAuthData {
-  steamId64: number;
+  steamId64: string;
   personaname: string;
   avatarfull: string;
   profileurl: string;

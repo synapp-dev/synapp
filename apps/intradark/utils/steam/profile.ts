@@ -45,10 +45,6 @@ export async function fetchSteamProfile(
   apiKey?: string
 ): Promise<SteamPlayerSummary | null> {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:43',message:'fetchSteamProfile entry',data:{steamId64,hasApiKey:!!apiKey,apiKeyLength:apiKey?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     // Steam Web API endpoint for GetPlayerSummaries
     const url = new URL("https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/");
     url.searchParams.set("steamids", steamId64);
@@ -56,38 +52,15 @@ export async function fetchSteamProfile(
       url.searchParams.set("key", apiKey);
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:52',message:'URL constructed',data:{url:url.toString(),steamids:url.searchParams.get('steamids'),hasKey:url.searchParams.has('key')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-    // #endregion
-
     const response = await fetch(url.toString());
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:56',message:'Response received',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-    // #endregion
-    
+
     if (!response.ok) {
-      // Read error response body before returning
-      let errorText = '';
-      try {
-        errorText = await response.text();
-      } catch (e) {
-        errorText = 'Unable to read response body';
-      }
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:63',message:'Steam API error response body',data:{status:response.status,statusText:response.statusText,body:errorText.substring(0,500)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       console.error(`Steam API error: ${response.status} ${response.statusText}`);
       return null;
     }
 
     const data: SteamPlayerSummariesResponse = await response.json();
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:68',message:'Response parsed',data:{hasResponse:!!data.response,playersCount:data.response?.players?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
+
     if (!data.response?.players || data.response.players.length === 0) {
       return null;
     }
@@ -97,15 +70,8 @@ export async function fetchSteamProfile(
       return null;
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:74',message:'fetchSteamProfile success',data:{steamid:playerSummary.steamid,personaname:playerSummary.personaname},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-
     return playerSummary;
   } catch (error) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'utils/steam/profile.ts:78',message:'fetchSteamProfile exception',data:{error:error instanceof Error?error.message:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     console.error("Error fetching Steam profile:", error);
     return null;
   }
@@ -117,10 +83,10 @@ export async function fetchSteamProfile(
 export function steamProfileToDbFormat(
   player: SteamPlayerSummary
 ): Database["public"]["Tables"]["steam_profiles"]["Insert"] {
-  const steamId64 = BigInt(player.steamid);
-  
+  // SteamID64 exceeds Number.MAX_SAFE_INTEGER, so it must stay a string end to
+  // end. `player.steamid` is the authoritative string id from the Steam Web API.
   return {
-    steamid64: Number(steamId64),
+    steamid64: player.steamid,
     steamid: player.steamid,
     personaname: player.personaname,
     profileurl: player.profileurl || null,

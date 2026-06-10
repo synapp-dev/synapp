@@ -19,7 +19,7 @@ interface SteamEmailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   steamData: {
-    steamId64: number;
+    steamId64: string;
     personaname: string;
     avatarfull: string;
     profileurl: string;

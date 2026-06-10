@@ -15,7 +15,7 @@ export type Database = {
     Tables: {
       steam_profiles: {
         Row: {
-          steamid64: number;
+          steamid64: string;
           steamid: string;
           personaname: string;
           profileurl: string | null;
@@ -41,7 +41,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
-          steamid64: number;
+          steamid64: string;
           steamid: string;
           personaname: string;
           profileurl?: string | null;
@@ -67,7 +67,7 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
-          steamid64?: number;
+          steamid64?: string;
           steamid?: string;
           personaname?: string;
           profileurl?: string | null;
@@ -97,16 +97,22 @@ export type Database = {
         Row: {
           id: string;
           user_id: string;
-          steam_profile_id: number | null;
+          steam_profile_id: string | null;
           discord_user_id: string | null;
           username: string | null;
           display_name: string | null;
+          first_name: string | null;
+          last_name: string | null;
           bio: string | null;
           avatar_url: string | null;
           email: string | null;
           is_verified: boolean;
           is_premium: boolean;
           preferences: any;
+          anthem_url: string | null;
+          twitch_url: string | null;
+          x_url: string | null;
+          instagram_url: string | null;
           last_active: string;
           created_at: string;
           updated_at: string;
@@ -114,16 +120,22 @@ export type Database = {
         Insert: {
           id?: string;
           user_id: string;
-          steam_profile_id?: number | null;
+          steam_profile_id?: string | null;
           discord_user_id?: string | null;
           username?: string | null;
           display_name?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
           bio?: string | null;
           avatar_url?: string | null;
           email?: string | null;
           is_verified?: boolean;
           is_premium?: boolean;
           preferences?: any;
+          anthem_url?: string | null;
+          twitch_url?: string | null;
+          x_url?: string | null;
+          instagram_url?: string | null;
           last_active?: string;
           created_at?: string;
           updated_at?: string;
@@ -131,19 +143,291 @@ export type Database = {
         Update: {
           id?: string;
           user_id?: string;
-          steam_profile_id?: number | null;
+          steam_profile_id?: string | null;
           discord_user_id?: string | null;
           username?: string | null;
           display_name?: string | null;
+          first_name?: string | null;
+          last_name?: string | null;
           bio?: string | null;
           avatar_url?: string | null;
           email?: string | null;
           is_verified?: boolean;
           is_premium?: boolean;
           preferences?: any;
+          anthem_url?: string | null;
+          twitch_url?: string | null;
+          x_url?: string | null;
+          instagram_url?: string | null;
           last_active?: string;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      players: {
+        Row: {
+          steamid64: string;
+          user_profile_id: string | null;
+          steam_vanity: string | null;
+          faceit_player_id: string | null;
+          faceit_nickname: string | null;
+          country_flag: string | null;
+          first_seen_at: string;
+          last_fetched_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          steamid64: string;
+          user_profile_id?: string | null;
+          steam_vanity?: string | null;
+          faceit_player_id?: string | null;
+          faceit_nickname?: string | null;
+          country_flag?: string | null;
+          first_seen_at?: string;
+          last_fetched_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          steamid64?: string;
+          user_profile_id?: string | null;
+          steam_vanity?: string | null;
+          faceit_player_id?: string | null;
+          faceit_nickname?: string | null;
+          country_flag?: string | null;
+          first_seen_at?: string;
+          last_fetched_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      player_faceit_snapshots: {
+        Row: {
+          id: string;
+          steamid64: string;
+          fetched_at: string;
+          faceit_elo: number | null;
+          skill_level: number | null;
+          region: string | null;
+          nickname: string | null;
+          raw: any;
+        };
+        Insert: {
+          id?: string;
+          steamid64: string;
+          fetched_at?: string;
+          faceit_elo?: number | null;
+          skill_level?: number | null;
+          region?: string | null;
+          nickname?: string | null;
+          raw: any;
+        };
+        Update: {
+          id?: string;
+          steamid64?: string;
+          fetched_at?: string;
+          faceit_elo?: number | null;
+          skill_level?: number | null;
+          region?: string | null;
+          nickname?: string | null;
+          raw?: any;
+        };
+      };
+      player_leetify_snapshots: {
+        Row: {
+          id: string;
+          steamid64: string;
+          fetched_at: string;
+          leetify_rating: number | null;
+          aim: number | null;
+          positioning: number | null;
+          utility: number | null;
+          games_played: number | null;
+          premier_rating: number | null;
+          season_ranks: any | null;
+          raw: any;
+        };
+        Insert: {
+          id?: string;
+          steamid64: string;
+          fetched_at?: string;
+          leetify_rating?: number | null;
+          aim?: number | null;
+          positioning?: number | null;
+          utility?: number | null;
+          games_played?: number | null;
+          premier_rating?: number | null;
+          season_ranks?: any | null;
+          raw: any;
+        };
+        Update: {
+          id?: string;
+          steamid64?: string;
+          fetched_at?: string;
+          leetify_rating?: number | null;
+          aim?: number | null;
+          positioning?: number | null;
+          utility?: number | null;
+          games_played?: number | null;
+          premier_rating?: number | null;
+          season_ranks?: any | null;
+          raw?: any;
+        };
+      };
+      player_cs2_gc_snapshots: {
+        Row: {
+          id: string;
+          steamid64: string;
+          fetched_at: string;
+          player_level: number | null;
+          cmd_friendly: number | null;
+          cmd_teaching: number | null;
+          cmd_leader: number | null;
+          vac_banned: boolean | null;
+          medals: any | null;
+          rankings: any | null;
+          raw: any;
+        };
+        Insert: {
+          id?: string;
+          steamid64: string;
+          fetched_at?: string;
+          player_level?: number | null;
+          cmd_friendly?: number | null;
+          cmd_teaching?: number | null;
+          cmd_leader?: number | null;
+          vac_banned?: boolean | null;
+          medals?: any | null;
+          rankings?: any | null;
+          raw: any;
+        };
+        Update: {
+          id?: string;
+          steamid64?: string;
+          fetched_at?: string;
+          player_level?: number | null;
+          cmd_friendly?: number | null;
+          cmd_teaching?: number | null;
+          cmd_leader?: number | null;
+          vac_banned?: boolean | null;
+          medals?: any | null;
+          rankings?: any | null;
+          raw?: any;
+        };
+      };
+      player_cs2_gc_jobs: {
+        Row: {
+          id: string;
+          steamid64: string;
+          status: string;
+          error: string | null;
+          requested_at: string;
+          started_at: string | null;
+          finished_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          steamid64: string;
+          status?: string;
+          error?: string | null;
+          requested_at?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          steamid64?: string;
+          status?: string;
+          error?: string | null;
+          requested_at?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+        };
+      };
+      teams: {
+        Row: {
+          id: string;
+          slug: string;
+          faceit_team_id: string | null;
+          name: string;
+          nickname: string | null;
+          avatar: string | null;
+          cover_image: string | null;
+          description: string | null;
+          game: string;
+          team_type: string | null;
+          leader_steamid64: string | null;
+          chat_room_id: string | null;
+          faceit_url: string | null;
+          facebook: string | null;
+          twitter: string | null;
+          website: string | null;
+          youtube: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          faceit_team_id?: string | null;
+          name: string;
+          nickname?: string | null;
+          avatar?: string | null;
+          cover_image?: string | null;
+          description?: string | null;
+          game?: string;
+          team_type?: string | null;
+          leader_steamid64?: string | null;
+          chat_room_id?: string | null;
+          faceit_url?: string | null;
+          facebook?: string | null;
+          twitter?: string | null;
+          website?: string | null;
+          youtube?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          faceit_team_id?: string | null;
+          name?: string;
+          nickname?: string | null;
+          avatar?: string | null;
+          cover_image?: string | null;
+          description?: string | null;
+          game?: string;
+          team_type?: string | null;
+          leader_steamid64?: string | null;
+          chat_room_id?: string | null;
+          faceit_url?: string | null;
+          facebook?: string | null;
+          twitter?: string | null;
+          website?: string | null;
+          youtube?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      player_teams: {
+        Row: {
+          team_id: string;
+          steamid64: string;
+          role: string;
+          joined_at: string;
+        };
+        Insert: {
+          team_id: string;
+          steamid64: string;
+          role?: string;
+          joined_at?: string;
+        };
+        Update: {
+          team_id?: string;
+          steamid64?: string;
+          role?: string;
+          joined_at?: string;
         };
       };
       roles: {
@@ -196,7 +480,7 @@ export type Database = {
     Functions: {
       link_steam_profile_to_user: {
         Args: {
-          p_steamid64: number;
+          p_steamid64: string;
           p_user_id?: string;
         };
         Returns: boolean;
@@ -214,7 +498,7 @@ export type Database = {
         Returns: {
           id: string;
           user_id: string;
-          steam_profile_id: number | null;
+          steam_profile_id: string | null;
           username: string | null;
           display_name: string | null;
           bio: string | null;

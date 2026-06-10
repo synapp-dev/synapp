@@ -23,7 +23,7 @@ import { sql } from "drizzle-orm";
 export const steamProfiles = pgTable(
   "steam_profiles",
   {
-    steamid64: bigint({ mode: "number" }).primaryKey(),
+    steamid64: text().primaryKey(),
     steamid: varchar({ length: 20 }).notNull(),
     personaname: varchar({ length: 255 }).notNull(),
     profileurl: varchar({ length: 500 }),
@@ -69,16 +69,22 @@ export const userProfiles = pgTable(
   {
     id: uuid().primaryKey().defaultRandom(),
     userId: uuid("user_id").notNull(),
-    steamProfileId: bigint("steam_profile_id", { mode: "number" }),
+    steamProfileId: text("steam_profile_id"),
     discordUserId: varchar("discord_user_id", { length: 32 }),
     username: varchar({ length: 255 }).unique(),
     displayName: varchar("display_name", { length: 255 }),
+    firstName: varchar("first_name", { length: 255 }),
+    lastName: varchar("last_name", { length: 255 }),
     bio: text(),
     avatarUrl: varchar("avatar_url", { length: 500 }),
     email: varchar({ length: 255 }),
     isVerified: boolean("is_verified").default(false),
     isPremium: boolean("is_premium").default(false),
     preferences: jsonb("preferences").default(sql`'{}'::jsonb`),
+    anthemUrl: text("anthem_url"),
+    twitchUrl: text("twitch_url"),
+    xUrl: text("x_url"),
+    instagramUrl: text("instagram_url"),
     lastActive: timestamp("last_active", {
       withTimezone: true,
       mode: "string",
@@ -792,5 +798,114 @@ export const forumThreadTags = pgTable(
   (table) => [
     primaryKey({ columns: [table.threadId, table.tagId] }),
     index("forum_thread_tags_tag_id_idx").on(table.tagId),
+  ],
+);
+
+/** players registry (steamid64 keyed). */
+export const players = pgTable(
+  "players",
+  {
+    steamid64: text().primaryKey(),
+    userProfileId: uuid("user_profile_id").references(() => userProfiles.id, {
+      onDelete: "set null",
+    }),
+    steamVanity: varchar("steam_vanity", { length: 255 }),
+    faceitPlayerId: uuid("faceit_player_id"),
+    faceitNickname: varchar("faceit_nickname", { length: 255 }),
+    countryFlag: varchar("country_flag", { length: 2 }),
+    firstSeenAt: timestamp("first_seen_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    lastFetchedAt: timestamp("last_fetched_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_players_user_profile_id").on(table.userProfileId),
+  ],
+);
+
+/** Faceit-shaped team row. */
+export const teams = pgTable(
+  "teams",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slug: varchar({ length: 160 }).notNull(),
+    faceitTeamId: uuid("faceit_team_id"),
+    name: varchar({ length: 255 }).notNull(),
+    nickname: varchar({ length: 255 }),
+    avatar: text(),
+    coverImage: text("cover_image"),
+    description: text(),
+    game: varchar({ length: 32 }).default("cs2").notNull(),
+    teamType: varchar("team_type", { length: 32 }),
+    leaderSteamid64: text("leader_steamid64").references(() => players.steamid64, {
+      onDelete: "set null",
+    }),
+    chatRoomId: text("chat_room_id"),
+    faceitUrl: text("faceit_url"),
+    facebook: text(),
+    twitter: text(),
+    website: text(),
+    youtube: text(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_teams_slug").on(sql`LOWER(${table.slug})`),
+    uniqueIndex("idx_teams_faceit_team_id")
+      .on(table.faceitTeamId)
+      .where(sql`${table.faceitTeamId} IS NOT NULL`),
+    index("idx_teams_leader_steamid64").on(table.leaderSteamid64),
+  ],
+);
+
+export const playerTeams = pgTable(
+  "player_teams",
+  {
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    role: varchar({ length: 32 }).default("member").notNull(),
+    joinedAt: timestamp("joined_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.teamId, table.steamid64] }),
+    index("idx_player_teams_steamid64").on(table.steamid64),
+    index("idx_player_teams_team_id").on(table.teamId),
   ],
 );

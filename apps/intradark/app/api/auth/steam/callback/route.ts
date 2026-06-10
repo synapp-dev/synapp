@@ -4,6 +4,7 @@ import openid from "openid";
 import { extractSteamId } from "@/utils/steam/openid";
 import { fetchSteamProfile, steamProfileToDbFormat } from "@/utils/steam/profile";
 import { ensureMemberTemplateForProfileId } from "@/entities/rbac/lib/ensure-member-template";
+import { ensurePlayer } from "@/entities/players/lib/server/registry";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { createServerClient } from "@/utils/supabase/server";
 
@@ -85,17 +86,9 @@ async function processSteamAuth(
   baseUrl: string
 ): Promise<NextResponse> {
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/auth/steam/callback/route.ts:82',message:'processSteamAuth entry',data:{steamId,steamIdType:typeof steamId,steamIdLength:steamId.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
-    
     // Get Steam API key from environment
     const steamApiKey = process.env.STEAM_API_KEY;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/dc743fdb-5dfa-4224-97c2-690d55b78495',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/auth/steam/callback/route.ts:87',message:'Steam API key check',data:{hasApiKey:!!steamApiKey,apiKeyLength:steamApiKey?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
+
     // Fetch Steam profile data
     const steamProfile = await fetchSteamProfile(steamId, steamApiKey);
     
@@ -107,8 +100,6 @@ async function processSteamAuth(
     }
 
     const adminClient = createAdminClient();
-    const steamId64 = BigInt(steamId);
-    const steamId64Number = Number(steamId64);
 
     // Convert to database format
     const profileData = steamProfileToDbFormat(steamProfile);
@@ -131,7 +122,7 @@ async function processSteamAuth(
     const { data: existingProfile, error: profileCheckError } = await adminClient
       .from("user_profiles")
       .select("user_id, email")
-      .eq("steam_profile_id", steamId64Number)
+      .eq("steam_profile_id", steamId)
       .single();
 
     if (profileCheckError && profileCheckError.code !== "PGRST116") {
@@ -177,7 +168,7 @@ async function processSteamAuth(
           "Existing user has no email: user_id=",
           existingProfile.user_id,
           "steam_profile_id=",
-          steamId64Number
+          steamId
         );
       }
       // Fallback: redirect to dashboard (user can try again)
@@ -215,7 +206,7 @@ async function processSteamAuth(
         const { error: linkError } = await adminClient
           .from("user_profiles")
           .update({
-            steam_profile_id: steamId64Number,
+            steam_profile_id: steamId,
             display_name: steamProfile.personaname || null,
             avatar_url: steamProfile.avatarfull || null,
           })
@@ -239,7 +230,7 @@ async function processSteamAuth(
           .from("user_profiles")
           .insert({
             user_id: user.id,
-            steam_profile_id: steamId64Number,
+            steam_profile_id: steamId,
             email,
             display_name: steamProfile.personaname || null,
             avatar_url: steamProfile.avatarfull || null,
@@ -257,11 +248,15 @@ async function processSteamAuth(
         }
       }
 
+      // Backfill the players registry: bind any archived stats for this
+      // steamid64 to the freshly linked intradark account.
+      await ensurePlayer(adminClient, steamId);
+
       return NextResponse.redirect(new URL("/dashboard?steam_linked=true", baseUrl));
     }
 
     // No logged-in user with email - redirect to email collection
-    return storeSteamDataAndRedirect(steamId64Number, steamProfile, baseUrl);
+    return storeSteamDataAndRedirect(steamId, steamProfile, baseUrl);
   } catch (error) {
     console.error("Error processing Steam auth:", error);
     return NextResponse.redirect(
@@ -274,7 +269,7 @@ async function processSteamAuth(
  * Store Steam data in cookies and redirect to email collection page
  */
 async function storeSteamDataAndRedirect(
-  steamId64: number,
+  steamId64: string,
   steamProfile: Awaited<ReturnType<typeof fetchSteamProfile>>,
   baseUrl: string
 ): Promise<NextResponse> {

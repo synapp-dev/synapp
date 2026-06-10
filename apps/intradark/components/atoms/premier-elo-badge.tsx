@@ -26,9 +26,12 @@ function hexToRgba(hex: string, alpha: number) {
 export function PremierEloBadge({
   rank,
   size = "lg",
+  /** Seconds before the count-up begins (e.g. wait for a parent fade-in). */
+  delay = 0,
 }: {
   rank: number;
   size?: "lg" | "normal" | "sm" | "xs";
+  delay?: number;
 }) {
   const rankColor = getRankColor(rank);
 
@@ -85,6 +88,7 @@ export function PremierEloBadge({
           start={0}
           end={rank || 0}
           duration={2}
+          delay={delay}
           useEasing={true}
           separator=","
           decimals={0}

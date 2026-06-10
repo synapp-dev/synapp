@@ -1,13 +1,16 @@
 "use client";
 
-import { useId } from "react";
-
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+
+// Static id: every badge shares the same gradient definition, so the id never
+// needs to be unique. A constant avoids `useId()` hydration mismatches caused
+// by the surrounding tree shifting between server render and client hydration.
+const GOLD_GRADIENT_ID = "gold-verified-seal";
 
 type GoldVerifiedBadgeProps = {
   className?: string;
@@ -20,8 +23,6 @@ export function GoldVerifiedBadge({
   className,
   tooltip = "Pro Player",
 }: GoldVerifiedBadgeProps) {
-  const gradId = `gold-verified-${useId().replace(/:/g, "")}`;
-
   const svg = (
     <svg
       viewBox="0 0 24 24"
@@ -31,7 +32,7 @@ export function GoldVerifiedBadge({
     >
       <defs>
         <linearGradient
-          id={gradId}
+          id={GOLD_GRADIENT_ID}
           x1="5"
           y1="4"
           x2="19"
@@ -46,7 +47,7 @@ export function GoldVerifiedBadge({
       </defs>
       <path
         d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"
-        fill={`url(#${gradId})`}
+        fill={`url(#${GOLD_GRADIENT_ID})`}
         stroke="#4a3a0a"
         strokeWidth={0.5}
         strokeLinejoin="round"

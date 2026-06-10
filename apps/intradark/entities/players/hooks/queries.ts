@@ -36,7 +36,7 @@ export function useGetPlayerByVanityUrl(input: string) {
         vanityUrl = "";
       } else {
         const vanityResponse = await fetch(
-          `/api/steam/vanity-to-id64/[id]?vanityUrl=${encodeURIComponent(input)}`,
+          `/api/steam/vanity-to-id64?vanityUrl=${encodeURIComponent(input)}`,
         );
 
         if (!vanityResponse.ok) {

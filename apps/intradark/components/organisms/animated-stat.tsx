@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import CountUp from "react-countup";
 import { Progress } from "@workspace/ui/components/progress";
 import { cn } from "@workspace/ui/lib/utils";
-import { FireExtinguisher } from "lucide-react";
 
 interface AnimatedStatProps {
   label: string;
@@ -20,9 +19,48 @@ interface AnimatedStatProps {
   showPlusSign?: boolean; // new prop
 }
 
-// Easing function: easeInOutCubic
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+// Ease-in-out with a SHORT ease-in (quick to accelerate) and a long, soft
+// deceleration into the final value. The first control point's x (0.42) sets
+// how long the slow start lasts — lower = sooner acceleration; the second point
+// (0.17, 1) keeps the gentle finish. The bar (CSS transition) and the count-up
+// number both read these same control points so they stay in lockstep.
+const EASE_CONTROL_POINTS = [0.42, 0, 0.17, 1] as const;
+const EASE_IN_OUT = `cubic-bezier(${EASE_CONTROL_POINTS.join(", ")})`;
+
+/** Evaluate a cubic-bezier easing y for a normalized progress x in [0, 1]. */
+function makeBezierEase(p1x: number, p1y: number, p2x: number, p2y: number) {
+  const cx = 3 * p1x;
+  const bx = 3 * (p2x - p1x) - cx;
+  const ax = 1 - cx - bx;
+  const cy = 3 * p1y;
+  const by = 3 * (p2y - p1y) - cy;
+  const ay = 1 - cy - by;
+
+  const sampleX = (t: number) => ((ax * t + bx) * t + cx) * t;
+  const sampleY = (t: number) => ((ay * t + by) * t + cy) * t;
+  const sampleDerivX = (t: number) => (3 * ax * t + 2 * bx) * t + cx;
+
+  return (x: number): number => {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    // Newton-Raphson to solve sampleX(t) = x, then read sampleY(t).
+    let t = x;
+    for (let i = 0; i < 8; i++) {
+      const xEst = sampleX(t) - x;
+      if (Math.abs(xEst) < 1e-5) return sampleY(t);
+      const deriv = sampleDerivX(t);
+      if (Math.abs(deriv) < 1e-6) break;
+      t -= xEst / deriv;
+    }
+    return sampleY(Math.min(1, Math.max(0, t)));
+  };
+}
+
+const bezierEase = makeBezierEase(...EASE_CONTROL_POINTS);
+
+/** react-countup easing signature: matches the bar's cubic-bezier curve. */
+function easeInOut(t: number, b: number, c: number, d: number): number {
+  return b + c * bezierEase(d === 0 ? 1 : t / d);
 }
 
 export function AnimatedStat({
@@ -34,14 +72,13 @@ export function AnimatedStat({
   prefix = "",
   suffix = "",
   progressTransform,
-  duration = 5, // default to 5 seconds
+  duration = 4, // default to 4 seconds
   dataReady = true,
   delay = 0, // default to no delay
   loadingLabel = "Loading...",
   showPlusSign = false, // default false
 }: AnimatedStatProps) {
   const [progress, setProgress] = useState(0);
-  const frameRef = useRef<number | null>(null);
 
   // Calculate the final target value for the progress bar
   const target = progressTransform
@@ -50,45 +87,26 @@ export function AnimatedStat({
       ? value
       : 0;
 
+  // Drive the bar with a single CSS transition rather than per-frame stepping:
+  // hold at 0, then (after the delay) flip to the target so the browser tweens
+  // the whole sweep with the ease-in-out curve below.
   useEffect(() => {
     setProgress(0);
-    const start = 0;
-    const totalSteps = Math.max(1, Math.round(60 * duration)); // 60fps * duration seconds
-    let currentStep = 0;
-    let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
-    function step() {
-      if (cancelled) return;
-      currentStep++;
-      const linearT = Math.min(1, currentStep / totalSteps);
-      const easedT = easeInOutCubic(linearT);
-      const nextValue = start + (target - start) * easedT;
-      setProgress(nextValue);
-      if (currentStep < totalSteps) {
-        frameRef.current = requestAnimationFrame(step);
-      } else {
-        setProgress(target); // ensure it ends exactly at target
-      }
-    }
-
-    // Delay before starting the animation
-    timeoutId = setTimeout(() => {
-      frameRef.current = requestAnimationFrame(step);
+    let raf1 = 0;
+    let raf2 = 0;
+    const timeoutId = setTimeout(() => {
+      // Two rAFs so the 0 state paints before the transition to target begins.
+      raf1 = requestAnimationFrame(() => {
+        raf2 = requestAnimationFrame(() => setProgress(target));
+      });
     }, delay * 1000);
 
     return () => {
-      cancelled = true;
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
-      }
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      clearTimeout(timeoutId);
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
     };
-    // Only re-run when the final animated value changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target, duration, delay]);
+  }, [target, delay]);
 
   return (
     <div className="space-y-0">
@@ -110,6 +128,9 @@ export function AnimatedStat({
               start={0}
               end={value}
               duration={duration}
+              delay={delay}
+              useEasing
+              easingFn={easeInOut}
               decimals={decimals}
               prefix={showPlusSign && value > 0 ? "+" : ""}
               style={{
@@ -134,6 +155,9 @@ export function AnimatedStat({
         )}
         indicatorStyle={{
           backgroundColor: value > 85 ? "orange" : "var(--primary)",
+          transition: dataReady
+            ? `transform ${duration}s ${EASE_IN_OUT}`
+            : "none",
         }}
       />
     </div>

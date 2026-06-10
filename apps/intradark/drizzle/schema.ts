@@ -324,7 +324,7 @@ export const ssoProvidersInAuth = auth.table("sso_providers", {
 
 export const steamProfiles = pgTable("steam_profiles", {
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	steamid64: bigint({ mode: "number" }).primaryKey().notNull(),
+	steamid64: text().primaryKey().notNull(),
 	steamid: varchar({ length: 20 }).notNull(),
 	personaname: varchar({ length: 255 }).notNull(),
 	profileurl: varchar({ length: 500 }),
@@ -424,22 +424,25 @@ export const userProfiles = pgTable("user_profiles", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	userId: uuid("user_id").notNull(),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	steamProfileId: bigint("steam_profile_id", { mode: "number" }),
+	steamProfileId: text("steam_profile_id"),
 	username: varchar({ length: 255 }),
 	displayName: varchar("display_name", { length: 255 }),
+	firstName: varchar("first_name", { length: 255 }),
+	lastName: varchar("last_name", { length: 255 }),
 	bio: text(),
 	avatarUrl: varchar("avatar_url", { length: 500 }),
 	email: varchar({ length: 255 }),
 	isVerified: boolean("is_verified").default(false),
 	isPremium: boolean("is_premium").default(false),
 	preferences: jsonb().default({}),
+	anthemUrl: text("anthem_url"),
 	lastActive: timestamp("last_active", { withTimezone: true, mode: 'string' }).defaultNow(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow(),
 	discordUserId: text("discord_user_id"),
 }, (table) => [
 	uniqueIndex("idx_user_profiles_discord_user_id").using("btree", table.discordUserId.asc().nullsLast().op("text_ops")).where(sql`(discord_user_id IS NOT NULL)`),
-	index("idx_user_profiles_steam_profile_id").using("btree", table.steamProfileId.asc().nullsLast().op("int8_ops")),
+	index("idx_user_profiles_steam_profile_id").using("btree", table.steamProfileId.asc().nullsLast().op("text_ops")),
 	uniqueIndex("idx_user_profiles_user_id").using("btree", table.userId.asc().nullsLast().op("uuid_ops")),
 	index("idx_user_profiles_username").using("btree", table.username.asc().nullsLast().op("text_ops")),
 	foreignKey({

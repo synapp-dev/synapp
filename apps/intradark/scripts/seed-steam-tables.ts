@@ -27,7 +27,7 @@ const admin = createClient<Database>(supabaseUrl, serviceRoleKey, {
 
 const STEAM_PROFILES_SEED: Database["public"]["Tables"]["steam_profiles"]["Insert"][] = [
   {
-    steamid64: 76561198000000000,
+    steamid64: "76561198000000000",
     steamid: "76561198000000000",
     personaname: "Test Steam User",
     profileurl: "https://steamcommunity.com/profiles/76561198000000000",

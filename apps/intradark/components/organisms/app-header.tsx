@@ -17,6 +17,7 @@ import {
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
 import { CommandMenu } from "@/components/molecules/command-menu";
+import { AnthemPlayerControl } from "@/entities/players/components/anthem-player-control";
 import { UtilityLineupUploadQueueIndicator } from "@/entities/utility-lineups/components/utility-lineup-upload-queue-indicator";
 import { appHomeHref } from "@/lib/app-home-href";
 import { buildBreadcrumbTrail } from "@/lib/main-nav-routes";
@@ -118,6 +119,11 @@ export function AppHeader() {
             })}
           </BreadcrumbList>
         </Breadcrumb>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] flex h-full items-center justify-center">
+        <div className="pointer-events-auto">
+          <AnthemPlayerControl variant="compact" />
+        </div>
       </div>
       <div className="flex shrink-0 items-center gap-2 px-4">
         <UtilityLineupUploadQueueIndicator />

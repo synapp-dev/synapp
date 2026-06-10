@@ -1,13 +1,20 @@
+import { notFound } from "next/navigation";
+
+import { TeamRoster } from "@/entities/teams/components/team-roster";
+import { getTeamBySlug, getTeamRoster } from "@/entities/teams/lib/queries";
+
+export const dynamic = "force-dynamic";
+
 export default async function TeamHomePage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  return (
-    <div className="p-6">
-      <h1 className="text-xl font-semibold">Team Home</h1>
-      <p className="text-muted-foreground mt-2">Team slug: {slug}</p>
-    </div>
-  );
+  const team = await getTeamBySlug(decodeURIComponent(slug));
+  if (!team) notFound();
+
+  const roster = await getTeamRoster(team.id);
+
+  return <TeamRoster members={roster} />;
 }
