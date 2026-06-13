@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { redirect } from "next/navigation";
 
-export default function WorkTasksPage() {
-  return <SectionPlaceholder title="Tasks" />;
+export default function WorkTasksRedirectPage() {
+  redirect("/tasks");
 }

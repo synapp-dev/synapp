@@ -12,6 +12,7 @@ export const config = {
     "/home/:path*",
     "/agent",
     "/dashboard/:path*",
+    "/tasks/:path*",
     "/calendar/:path*",
     "/knowledge",
     "/review",

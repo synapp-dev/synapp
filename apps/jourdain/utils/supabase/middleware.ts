@@ -40,6 +40,7 @@ export async function updateSession(request: NextRequest) {
   const isMainRoute =
     pathname.startsWith("/home") ||
     pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/tasks") ||
     pathname.startsWith("/calendar") ||
     pathname.startsWith("/agent") ||
     pathname.startsWith("/knowledge") ||

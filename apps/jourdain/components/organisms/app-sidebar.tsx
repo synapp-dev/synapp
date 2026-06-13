@@ -83,6 +83,12 @@ const platformNavItems: NavMainItem[] = [
     exact: true,
   },
   {
+    title: "Tasks",
+    url: "/tasks",
+    icon: ListTodo,
+    exact: true,
+  },
+  {
     title: "Calendar",
     url: "/calendar",
     icon: CalendarDays,
@@ -182,7 +188,6 @@ const modulesNavItems: NavMainItem[] = [
     items: [
       { title: "Direction", url: "/work/direction", icon: Compass },
       { title: "Projects", url: "/work/projects", icon: FolderKanban },
-      { title: "Tasks", url: "/work/tasks", icon: ListTodo },
       { title: "Calendar", url: "/work/calendar", icon: CalendarDays },
       { title: "Knowledge", url: "/work/knowledge", icon: BookOpen },
       { title: "Meetings", url: "/work/meetings", icon: Video },

@@ -2,165 +2,157 @@
 
 import { Mic, Plus, SendHorizontal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { Badge } from "@workspace/ui/components/badge";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@workspace/ui/components/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import { cn } from "@workspace/ui/lib/utils";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { AgentCardView } from "@/components/organisms/agent-cards";
+import { apiFetch } from "@/lib/api/fetcher.client";
+import { tasksQueryKey, useUpdateTask } from "@/hooks/tasks/use-tasks";
+import { useDictation } from "@/hooks/use-dictation";
+import type {
+  AgentCard,
+  AgentChatMessage,
+  AgentReply,
+} from "@/entities/agent/model/types";
+import type { Task } from "@/entities/tasks/model/types";
 
-type DemoMessage = {
+type AgentMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
-  showRosterCard?: boolean;
-  showDetailCard?: boolean;
+  cards?: AgentCard[];
+  isError?: boolean;
 };
 
-const ROSTER_STAFF = [
-  { name: "Dave", role: "Chef", shift: "06:00-14:00", initials: "DA" },
-  { name: "Jane", role: "FOH", shift: "11:00-19:00", initials: "JA" },
-  { name: "Kelly", role: "Manager", shift: "08:00-16:00", initials: "KE" },
-] as const;
+const HISTORY_LIMIT = 20;
 
-function DemoRosterCard() {
-  return (
-    <Card className="max-w-2xl border-border/80">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">Today&apos;s Roster</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {ROSTER_STAFF.map((person) => (
-          <div
-            key={person.name}
-            className="flex items-center justify-between rounded-md border border-border/70 bg-muted/30 px-3 py-2"
-          >
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                {person.initials}
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">
-                  {person.name}
-                </p>
-                <Badge variant="outline" className="mt-0.5 text-[10px]">
-                  {person.role}
-                </Badge>
-              </div>
-            </div>
-            <p className="text-sm font-medium text-muted-foreground">
-              {person.shift}
-            </p>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
-  );
-}
+const SUGGESTIONS = [
+  "What's on my plate?",
+  "What's due today?",
+  "Remind me to review my budget on Friday",
+];
 
-function DemoDetailCard() {
-  return (
-    <Link
-      href="#"
-      className="block max-w-2xl transition-transform duration-200 hover:scale-[1.01]"
-      onClick={(e) => e.preventDefault()}
-    >
-      <Card className="border-border/80 hover:border-primary/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base">Sample detail</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Preview content and structured fields
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            <Badge variant="secondary">Alpha</Badge>
-            <Badge variant="secondary">Beta</Badge>
-            <Badge variant="secondary">Gamma</Badge>
-            <Badge variant="secondary">Delta</Badge>
-            <Badge variant="secondary">Epsilon</Badge>
-          </div>
-          <p className="text-xs text-primary">Open details (demo)</p>
-        </CardContent>
-      </Card>
-    </Link>
-  );
+function flipTaskInCards(
+  cards: AgentCard[] | undefined,
+  taskId: string,
+  status: Task["status"],
+): AgentCard[] | undefined {
+  if (!cards) return cards;
+  return cards.map((card) => {
+    if (card.type === "task_list") {
+      return {
+        ...card,
+        tasks: card.tasks.map((task) =>
+          task.id === taskId ? { ...task, status } : task,
+        ),
+      };
+    }
+    if (
+      (card.type === "task_created" || card.type === "task_completed") &&
+      card.task.id === taskId
+    ) {
+      return { ...card, task: { ...card.task, status } };
+    }
+    return card;
+  });
 }
 
 export default function AgentPage() {
   const [input, setInput] = useState("");
-  const [messages, setMessages] = useState<DemoMessage[]>([]);
+  const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const thinkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const queryClient = useQueryClient();
+  const updateTask = useUpdateTask();
 
   const hasConversation = messages.length > 0 || isThinking;
 
-  function buildAssistantReply(userText: string): DemoMessage {
-    const normalized = userText.trim().toLowerCase();
+  const dictationBaseRef = useRef("");
+  const {
+    isListening,
+    isSupported: micSupported,
+    toggle: toggleDictation,
+    abort: abortDictation,
+  } = useDictation((transcript) => {
+    const base = dictationBaseRef.current;
+    setInput(base ? `${base} ${transcript}` : transcript);
+  });
 
-    if (normalized.includes("who is working today")) {
-      return {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        showRosterCard: true,
-        text: "According to the roster, Dave, Jane, and Kelly are working today.",
-      };
+  function handleMicClick() {
+    if (!isListening) {
+      dictationBaseRef.current = input.trim();
     }
-
-    if (normalized.includes("show the sample card")) {
-      return {
-        id: `assistant-${Date.now()}`,
-        role: "assistant",
-        showDetailCard: true,
-        text: "Here’s a styled detail card you can refine later.",
-      };
-    }
-
-    return {
-      id: `assistant-${Date.now()}`,
-      role: "assistant",
-      text: 'Demo mode: I can show styled cards with text responses. Try: "who is working today" or "show the sample card".',
-    };
+    toggleDictation();
   }
 
-  function handleSend() {
-    const trimmed = input.trim();
+  async function send(text: string) {
+    const trimmed = text.trim();
     if (!trimmed || isThinking) {
       return;
     }
+    abortDictation();
 
-    const userMessage: DemoMessage = {
+    const userMessage: AgentMessage = {
       id: `user-${Date.now()}`,
       role: "user",
       text: trimmed,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
-    setIsThinking(true);
-    const assistantMessage = buildAssistantReply(trimmed);
-    setInput("");
+    const history: AgentChatMessage[] = [...messages, userMessage]
+      .slice(-HISTORY_LIMIT)
+      .map(({ role, text: messageText }) => ({ role, text: messageText }));
 
-    thinkingTimeoutRef.current = setTimeout(() => {
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsThinking(false);
-      thinkingTimeoutRef.current = null;
-    }, 1300);
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsThinking(true);
+
+    const result = await apiFetch<AgentReply>("/agent", {
+      method: "POST",
+      body: JSON.stringify({ messages: history }),
+    });
+
+    setIsThinking(false);
+
+    if (result.error) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-${Date.now()}`,
+          role: "assistant",
+          text: result.error.message,
+          isError: true,
+        },
+      ]);
+      return;
+    }
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        text: result.data.text,
+        cards: result.data.cards,
+      },
+    ]);
+
+    if (result.data.cards.length > 0) {
+      queryClient.invalidateQueries({ queryKey: tasksQueryKey });
+    }
   }
 
-  useEffect(() => {
-    return () => {
-      if (thinkingTimeoutRef.current) {
-        clearTimeout(thinkingTimeoutRef.current);
-      }
-    };
-  }, []);
+  function handleToggleTask(task: Task) {
+    const nextStatus = task.status === "open" ? "done" : "open";
+    updateTask.mutate({ taskId: task.id, input: { status: nextStatus } });
+    setMessages((prev) =>
+      prev.map((message) => ({
+        ...message,
+        cards: flipTaskInCards(message.cards, task.id, nextStatus),
+      })),
+    );
+  }
 
   useEffect(() => {
     if (!scrollContainerRef.current) {
@@ -201,11 +193,25 @@ export default function AgentPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {message.showRosterCard ? <DemoRosterCard /> : null}
-                    {message.showDetailCard ? <DemoDetailCard /> : null}
-                    <p className="max-w-2xl text-sm text-foreground">
-                      {message.text}
-                    </p>
+                    {message.cards?.map((card, cardIndex) => (
+                      <AgentCardView
+                        key={`${message.id}-card-${cardIndex}`}
+                        card={card}
+                        onToggleTask={handleToggleTask}
+                      />
+                    ))}
+                    {message.text ? (
+                      <p
+                        className={cn(
+                          "max-w-2xl whitespace-pre-wrap text-sm",
+                          message.isError
+                            ? "text-destructive"
+                            : "text-foreground",
+                        )}
+                      >
+                        {message.text}
+                      </p>
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -249,19 +255,33 @@ export default function AgentPage() {
               "overflow-hidden transition-all duration-500",
               hasConversation
                 ? "mb-0 max-h-0 -translate-y-2 opacity-0"
-                : "mb-8 max-h-40 translate-y-0 opacity-100",
+                : "mb-8 max-h-[30rem] translate-y-0 opacity-100",
             )}
           >
+            <div className="mb-6 flex justify-center">
+              <video
+                key="orb-alpha"
+                autoPlay
+                loop
+                muted
+                playsInline
+                aria-hidden="true"
+                className="h-64 w-64 object-cover"
+              >
+                <source src="/videos/jourdain-orb-loop.webm" type="video/webm" />
+                <source src="/videos/jourdain-orb-loop.mp4" type="video/mp4" />
+              </video>
+            </div>
             <h1 className="text-center text-4xl font-semibold tracking-tight text-foreground">
-              What&apos;s on the agenda today?
+              What&apos;s brackin?
             </h1>
           </div>
 
           <form
-            className="mx-auto w-full"
+            className="mx-auto w-full max-w-2xl"
             onSubmit={(event) => {
               event.preventDefault();
-              handleSend();
+              send(input);
             }}
           >
             <div className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-card-foreground shadow-sm ring-1 ring-border/50 transition-[box-shadow] focus-within:ring-2 focus-within:ring-ring/40">
@@ -287,8 +307,21 @@ export default function AgentPage() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                aria-label="Voice input"
+                onClick={handleMicClick}
+                disabled={!micSupported}
+                title={
+                  micSupported
+                    ? undefined
+                    : "Voice needs HTTPS — works on localhost or a deployed/https URL, not a plain http LAN address"
+                }
+                aria-pressed={isListening}
+                aria-label={isListening ? "Stop dictation" : "Start dictation"}
+                className={cn(
+                  "h-9 w-9 shrink-0 rounded-full",
+                  isListening
+                    ? "animate-pulse bg-red-500/10 text-red-500 hover:bg-red-500/20 hover:text-red-500"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
               >
                 <Mic className="h-4 w-4" />
               </Button>
@@ -304,6 +337,30 @@ export default function AgentPage() {
               </Button>
             </div>
           </form>
+
+          <div
+            className={cn(
+              "overflow-hidden transition-all duration-500",
+              hasConversation
+                ? "max-h-0 opacity-0"
+                : "mt-4 max-h-24 opacity-100",
+            )}
+          >
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {SUGGESTIONS.map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full text-xs text-muted-foreground"
+                  onClick={() => send(suggestion)}
+                >
+                  {suggestion}
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </section>
