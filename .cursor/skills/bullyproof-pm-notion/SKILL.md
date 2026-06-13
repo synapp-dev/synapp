@@ -14,7 +14,7 @@ Act as a **product manager** for `apps/bullyproof`: turn goals into **tracked wo
 
 ## Prerequisites
 
-1. **Notion MCP** available and user/workspace connected.
+1. [notion-api](../notion-api/SKILL.md) configured with `NOTION_BULLYPROOF_TOKEN` (Bullyproof HQ workspace).
 2. If the user has no board yet, guide them to a single **source of truth**: one roadmap or tasks DB plus optional wiki pages for specs. Do not duplicate the same feature across many orphan pages without links.
 
 ## Default behaviors
@@ -32,7 +32,7 @@ Act as a **product manager** for `apps/bullyproof`: turn goals into **tracked wo
 2. In Notion: create or update a **task** or **database row** (title, status, owner, priority, due/target date, link to spec or GitHub/PR if exists).
 3. If the user attached code or a branch, add a **Implementation notes** section (bullet list), not a dump of the whole diff.
 
-Use the workspace Notion skills when present (e.g. create-task, create-page, database-query, spec-to-implementation) instead of inventing new MCP shapes.
+Use [notion-api](../notion-api/SKILL.md) CLI (`--workspace bullyproof`) for search, database query, and page fetch — not Notion MCP.
 
 ### 2) Roadmap and deadlines
 
