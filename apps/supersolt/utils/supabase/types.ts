@@ -49,6 +49,7 @@ export type Database = {
           logo_url: string | null;
           name: string;
           phone: string | null;
+          setup_progress: Json;
           slug: string;
           timezone: string;
           updated_at: string;
@@ -67,6 +68,7 @@ export type Database = {
           logo_url?: string | null;
           name: string;
           phone?: string | null;
+          setup_progress?: Json;
           slug: string;
           timezone?: string;
           updated_at?: string;
@@ -112,6 +114,7 @@ export type Database = {
           archived_at: string | null;
           country: string | null;
           created_at: string;
+          data_starts_from: string | null;
           email: string | null;
           id: string;
           is_active: boolean;
@@ -132,6 +135,7 @@ export type Database = {
           archived_at?: string | null;
           country?: string | null;
           created_at?: string;
+          data_starts_from?: string | null;
           email?: string | null;
           id?: string;
           is_active?: boolean;
@@ -177,6 +181,214 @@ export type Database = {
           venue_id: string;
         };
         Update: Partial<Database["public"]["Tables"]["venue_square_connections"]["Insert"]>;
+        Relationships: [];
+      };
+      daily_sales: {
+        Row: {
+          avg_check_cents: number;
+          computed_at: string;
+          date: string;
+          delivery_revenue_cents: number;
+          dine_in_revenue_cents: number;
+          orders_count: number;
+          pick_up_revenue_cents: number;
+          refunds_count: number;
+          refunds_value_cents: number;
+          revenue_cents: number;
+          source: string;
+          venue_id: string;
+          voids_count: number;
+        };
+        Insert: {
+          avg_check_cents?: number;
+          computed_at?: string;
+          date: string;
+          delivery_revenue_cents?: number;
+          dine_in_revenue_cents?: number;
+          orders_count?: number;
+          pick_up_revenue_cents?: number;
+          refunds_count?: number;
+          refunds_value_cents?: number;
+          revenue_cents?: number;
+          source?: string;
+          venue_id: string;
+          voids_count?: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["daily_sales"]["Insert"]>;
+        Relationships: [];
+      };
+      forecasts: {
+        Row: {
+          anomaly_resolution: string | null;
+          computed_at: string;
+          confidence: string;
+          confidence_lower_bound: number | null;
+          confidence_upper_bound: number | null;
+          date: string;
+          forecast_value: number;
+          inputs: Json;
+          is_anomaly_flagged: boolean;
+          metric: string;
+          venue_id: string;
+        };
+        Insert: {
+          anomaly_resolution?: string | null;
+          computed_at?: string;
+          confidence: string;
+          confidence_lower_bound?: number | null;
+          confidence_upper_bound?: number | null;
+          date: string;
+          forecast_value: number;
+          inputs?: Json;
+          is_anomaly_flagged?: boolean;
+          metric: string;
+          venue_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["forecasts"]["Insert"]>;
+        Relationships: [];
+      };
+      insights_alerts: {
+        Row: {
+          destination_key: string | null;
+          destination_payload: Json | null;
+          detected_at: string;
+          dismissed_at: string | null;
+          dismissed_by: string | null;
+          expires_at: string | null;
+          headline: string;
+          id: string;
+          module: string;
+          organisation_id: string;
+          severity: string;
+          source_run_id: string | null;
+          supporting_metric: string | null;
+          venue_id: string | null;
+        };
+        Insert: {
+          destination_key?: string | null;
+          destination_payload?: Json | null;
+          detected_at?: string;
+          dismissed_at?: string | null;
+          dismissed_by?: string | null;
+          expires_at?: string | null;
+          headline: string;
+          id?: string;
+          module: string;
+          organisation_id: string;
+          severity?: string;
+          source_run_id?: string | null;
+          supporting_metric?: string | null;
+          venue_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["insights_alerts"]["Insert"]>;
+        Relationships: [];
+      };
+      venue_forecast_state: {
+        Row: {
+          available_history_days: number;
+          backfill_progress: Json | null;
+          backfill_status: string;
+          data_starts_from: string | null;
+          forecast_ready: boolean;
+          last_computed_at: string | null;
+          last_daily_sales_sync_at: string | null;
+          updated_at: string;
+          venue_id: string;
+        };
+        Insert: {
+          available_history_days?: number;
+          backfill_progress?: Json | null;
+          backfill_status?: string;
+          data_starts_from?: string | null;
+          forecast_ready?: boolean;
+          last_computed_at?: string | null;
+          last_daily_sales_sync_at?: string | null;
+          updated_at?: string;
+          venue_id: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["venue_forecast_state"]["Insert"]>;
+        Relationships: [];
+      };
+      venue_xero_connections: {
+        Row: {
+          created_at: string;
+          id: string;
+          last_invoice_sync_at: string | null;
+          last_invoice_sync_error: string | null;
+          organisation_id: string;
+          token_expires_at: string | null;
+          updated_at: string;
+          venue_id: string;
+          xero_access_token: string;
+          xero_refresh_token: string;
+          xero_tenant_id: string;
+          xero_tenant_name: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          last_invoice_sync_at?: string | null;
+          last_invoice_sync_error?: string | null;
+          organisation_id: string;
+          token_expires_at?: string | null;
+          updated_at?: string;
+          venue_id: string;
+          xero_access_token: string;
+          xero_refresh_token: string;
+          xero_tenant_id: string;
+          xero_tenant_name?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["venue_xero_connections"]["Insert"]>;
+        Relationships: [];
+      };
+      venue_xero_invoices: {
+        Row: {
+          amount_due_cents: number | null;
+          created_at: string;
+          currency_code: string;
+          document_type: string;
+          due_date: string | null;
+          id: string;
+          invoice_date: string | null;
+          invoice_number: string | null;
+          organisation_id: string;
+          reference: string | null;
+          review_status: string;
+          source: string;
+          supplier_name: string | null;
+          synced_at: string;
+          total_cents: number;
+          updated_at: string;
+          venue_id: string;
+          xero_contact_id: string | null;
+          xero_invoice_id: string;
+          xero_status: string;
+          xero_updated_at: string | null;
+        };
+        Insert: {
+          amount_due_cents?: number | null;
+          created_at?: string;
+          currency_code?: string;
+          document_type?: string;
+          due_date?: string | null;
+          id?: string;
+          invoice_date?: string | null;
+          invoice_number?: string | null;
+          organisation_id: string;
+          reference?: string | null;
+          review_status?: string;
+          source?: string;
+          supplier_name?: string | null;
+          synced_at?: string;
+          total_cents: number;
+          updated_at?: string;
+          venue_id: string;
+          xero_contact_id?: string | null;
+          xero_invoice_id: string;
+          xero_status: string;
+          xero_updated_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["venue_xero_invoices"]["Insert"]>;
         Relationships: [];
       };
       venue_square_order_lines: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, Lock, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -22,13 +22,16 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
 import { cn } from "@workspace/ui/lib/utils";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@/lib/ui/staggered-animation";
+
+export type NavLockStatus = "unlocked" | "locked" | "hidden";
 
 export type NavMainSubItem = {
   title: string;
   url: string;
   icon?: LucideIcon;
   exact?: boolean;
+  lockStatus?: NavLockStatus;
 };
 
 export type NavMainItem = {
@@ -37,7 +40,13 @@ export type NavMainItem = {
   icon?: LucideIcon;
   exact?: boolean;
   isActive?: boolean;
+  lockStatus?: NavLockStatus;
   items?: NavMainSubItem[];
+};
+
+export type LockedNavTarget = {
+  title: string;
+  url: string;
 };
 
 function TitleSection({ title }: { title: string }) {
@@ -58,6 +67,7 @@ export function NavMain({
   staggerBaseDelay = 0,
   staggerIncrementDelay = 0.08,
   className,
+  onLockedNavClick,
 }: {
   title?: string;
   items: NavMainItem[];
@@ -65,6 +75,7 @@ export function NavMain({
   staggerBaseDelay?: number;
   staggerIncrementDelay?: number;
   className?: string;
+  onLockedNavClick?: (target: LockedNavTarget) => void;
 }) {
   const pathname = usePathname();
 
@@ -121,18 +132,37 @@ export function NavMain({
           const isOpen = openItem === item.title;
           const itemActive = routeActive || isOpen;
 
+          const itemLocked = item.lockStatus === "locked";
+          const parentLockedWithNoVisibleChildren =
+            itemLocked && !hasChildren;
+
           const menuItem = !hasChildren ? (
               <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton
-                  asChild
-                  isActive={itemActive}
-                  tooltip={item.title}
-                >
-                  <Link href={item.url}>
+                {parentLockedWithNoVisibleChildren ? (
+                  <SidebarMenuButton
+                    isActive={itemActive}
+                    tooltip={item.title}
+                    className="opacity-70"
+                    onClick={() =>
+                      onLockedNavClick?.({ title: item.title, url: item.url })
+                    }
+                  >
                     {item.icon ? <item.icon className="h-4 w-4" /> : null}
                     <span>{item.title}</span>
-                  </Link>
-                </SidebarMenuButton>
+                    <Lock className="ml-auto h-3.5 w-3.5 opacity-60" />
+                  </SidebarMenuButton>
+                ) : (
+                  <SidebarMenuButton
+                    asChild
+                    isActive={itemActive}
+                    tooltip={item.title}
+                  >
+                    <Link href={item.url}>
+                      {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                )}
               </SidebarMenuItem>
           ) : (
             <Collapsible
@@ -145,18 +175,35 @@ export function NavMain({
               key={item.title}
             >
               <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton isActive={itemActive} tooltip={item.title}>
+                {itemLocked ? (
+                  <SidebarMenuButton
+                    isActive={itemActive}
+                    tooltip={item.title}
+                    className="opacity-70"
+                    onClick={() =>
+                      onLockedNavClick?.({ title: item.title, url: item.url })
+                    }
+                  >
                     {item.icon ? <item.icon className="h-4 w-4" /> : null}
                     <span>{item.title}</span>
-                    <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    <Lock className="ml-auto h-3.5 w-3.5 opacity-60" />
                   </SidebarMenuButton>
-                </CollapsibleTrigger>
+                ) : (
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={itemActive} tooltip={item.title}>
+                      {item.icon ? <item.icon className="h-4 w-4" /> : null}
+                      <span>{item.title}</span>
+                      <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                )}
+                {!itemLocked ? (
                 <CollapsibleContent className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-360 ease-[cubic-bezier(0.22,1,0.36,1)] data-[state=open]:grid-rows-[1fr]">
                   <div className="min-h-0 overflow-hidden">
                     <SidebarMenuSub className="w-full origin-left scale-x-0 pt-1 transition-transform duration-360 ease-[cubic-bezier(0.22,1,0.36,1)] group-data-[state=open]/collapsible:scale-x-100">
                       {item.items?.map((subItem, index) => {
                         const subActive = isUrlActive(subItem.url, subItem.exact);
+                        const subLocked = subItem.lockStatus === "locked";
 
                         return (
                           <SidebarMenuSubItem key={subItem.title}>
@@ -166,14 +213,32 @@ export function NavMain({
                               incrementDelay={isOpen ? 0.05 : 0}
                               fadeDirection="left"
                             >
-                              <SidebarMenuSubButton asChild isActive={subActive}>
-                                <Link href={subItem.url}>
+                              {subLocked ? (
+                                <SidebarMenuSubButton
+                                  className={cn("opacity-70")}
+                                  onClick={() =>
+                                    onLockedNavClick?.({
+                                      title: subItem.title,
+                                      url: subItem.url,
+                                    })
+                                  }
+                                >
                                   {subItem.icon ? (
                                     <subItem.icon className="h-3 w-3 text-muted-foreground/70" />
                                   ) : null}
                                   <span className="text-xs">{subItem.title}</span>
-                                </Link>
-                              </SidebarMenuSubButton>
+                                  <Lock className="ml-auto h-3 w-3 opacity-60" />
+                                </SidebarMenuSubButton>
+                              ) : (
+                                <SidebarMenuSubButton asChild isActive={subActive}>
+                                  <Link href={subItem.url}>
+                                    {subItem.icon ? (
+                                      <subItem.icon className="h-3 w-3 text-muted-foreground/70" />
+                                    ) : null}
+                                    <span className="text-xs">{subItem.title}</span>
+                                  </Link>
+                                </SidebarMenuSubButton>
+                              )}
                             </StaggeredAnimation>
                           </SidebarMenuSubItem>
                         );
@@ -181,6 +246,7 @@ export function NavMain({
                     </SidebarMenuSub>
                   </div>
                 </CollapsibleContent>
+                ) : null}
               </SidebarMenuItem>
             </Collapsible>
           );

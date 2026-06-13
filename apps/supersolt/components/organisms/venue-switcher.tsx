@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
+import {
+  OrganisationLogoAvatar,
+  organisationLogoBoxClassName,
+} from "@/components/branding/organisation-logo-avatar";
 import {
   Building2,
   Check,
   ChevronsUpDown,
   Plus,
   Store,
-  type LucideIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -110,44 +112,6 @@ function getVenueLocationLabel(venue: Venue) {
   }
 
   return "Unknown location";
-}
-
-function VenueAvatar({
-  logoUrl,
-  fallbackIcon: FallbackIcon,
-  className,
-  fallbackClassName,
-}: {
-  logoUrl: string | null;
-  fallbackIcon: LucideIcon;
-  className: string;
-  fallbackClassName?: string;
-}) {
-  const [hasImageError, setHasImageError] = useState(false);
-
-  useEffect(() => {
-    setHasImageError(false);
-  }, [logoUrl]);
-
-  const showLogo = Boolean(logoUrl && !hasImageError);
-
-  return (
-    <div className={className}>
-      {showLogo ? (
-        <Image
-          src={logoUrl!}
-          alt="Organisation logo"
-          width={32}
-          height={32}
-          className="h-full w-full object-cover"
-          unoptimized
-          onError={() => setHasImageError(true)}
-        />
-      ) : (
-        <FallbackIcon className={fallbackClassName} />
-      )}
-    </div>
-  );
 }
 
 export function VenueSwitcher({
@@ -265,19 +229,19 @@ export function VenueSwitcher({
 
   return (
     <SidebarMenu className="mb-0">
-      <SidebarMenuItem>
+      <SidebarMenuItem className="flex justify-center">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <SidebarMenuButton
               size="lg"
               tooltip="Switch venue"
-              className="group/venue-switcher"
+              className="group/venue-switcher "
             >
-              <VenueAvatar
+              <OrganisationLogoAvatar
                 logoUrl={selectedVenue?.organisationLogoUrl ?? null}
                 fallbackIcon={Store}
-                className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-md text-sidebar-primary-foreground"
-                fallbackClassName="h-4 w-4"
+                className={organisationLogoBoxClassName}
+                fallbackClassName="h-4 w-4 text-muted-foreground"
               />
               {!isCollapsed && (
                 <>
@@ -291,7 +255,7 @@ export function VenueSwitcher({
                       {isLoading
                         ? "loading venues"
                         : selectedVenue
-                          ? `${getVenueLocationLabel(selectedVenue)} • ${selectedVenue.organisationName}`
+                          ? `${selectedVenue.organisationName} • ${selectedVenue.state ?? ""}`
                           : "Ask an admin to assign a venue"}
                     </span>
                   </div>
@@ -328,7 +292,7 @@ export function VenueSwitcher({
                             setOpen(false);
                           }}
                         >
-                          <VenueAvatar
+                          <OrganisationLogoAvatar
                             logoUrl={venue.organisationLogoUrl}
                             fallbackIcon={Building2}
                             className="mr-2 flex h-7 w-7 items-center justify-center overflow-hidden rounded bg-muted"

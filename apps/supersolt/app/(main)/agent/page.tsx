@@ -1,9 +1,5 @@
-import { AgentChatPanel } from "@/entities/ai-agent-chat/components/agent-chat-panel";
+import { redirectToScopedVenuePath } from "@/server/access/redirect-to-scoped-venue-path";
 
-export const metadata = {
-  title: "Agent | Supersolt",
-};
-
-export default function AgentPage() {
-  return <AgentChatPanel />;
+export default async function AgentRedirectPage() {
+  await redirectToScopedVenuePath("agent");
 }

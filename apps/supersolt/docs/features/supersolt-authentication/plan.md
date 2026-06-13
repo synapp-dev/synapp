@@ -5,34 +5,107 @@
 > **Status:** Implemented (MVP)
 > **Owner:** TBD
 > **Created:** 2026-05-11
+> **Updated:** 2026-05-22
+> **Route:** `/auth`
 
 ## 1. Summary
 
-Harden **sign-in**, **email confirmation**, and **sign-up** (Supabase identity + `user_profiles` via existing trigger) for hospitality operators, then add **forgot password / recovery** and a dedicated **set-new-password** route. **Org and venue creation** stay in **onboarding** (later triads), including **AI-guided** completion when the user has not finished setup. This work **refactors and extends** existing surfaces (`app/(auth)/`, `components/organisms/auth-form.tsx`, `app/(auth)/auth/callback/route.ts`, `utils/supabase/middleware.ts`) rather than replacing the auth stack.
+Authentication gates access to the Supersolt platform. For manually vetted customers (first 10), authentication has a single job: ensure only emails explicitly whitelisted can log in, with no friction once they are on the list.
+
+Three design choices shape this:
+
+1. **Passwordless.** No customer creates or types a password. Login is via a one-time code sent to email.
+2. **Whitelist-gated.** Even with the magic link, only whitelisted emails authenticate. The platform is not public.
+3. **30-day trial enforced at the auth layer.** When a customer's trial expires, login is rejected with a clear "trial expired — get in touch" message.
+
+**Personas:** The owner / ops lead receiving the welcome email — not technical; expects login to "just work."
+
+**Notion:** [Authentication (Module Overview)](https://www.notion.so/35064094bde6800280dcd3feb827b30c)
+
+> **Conflict (human review):** Repo §3+ below describes **password sign-in**, **forgot password**, and **sign-up** from an earlier implementation pass. Notion product truth is **passwordless OTP + whitelist**. Reconcile engineering plan with Notion before further auth work.
 
 ## 2. Scope
 
-### In scope (MVP)
+### In scope
 
-- **Sign-in:** email + password, session refresh via middleware, safe `next` handling after `exchangeCodeForSession` on `/auth/callback`.
-- **Sign-up (user-only):** existing `AuthForm` signup path; metadata for names; email confirmation UX (resend, OTP paths already in UI where present).
-- **Forgot password:** client `resetPasswordForEmail` with redirect URLs pointing at existing **`/auth/callback`** (or Supabase-configured equivalent); **curated** error copy for common failures.
-- **Set new password:** dedicated route (e.g. `/auth/update-password`) after recovery session is established; post-success navigation **`/setup` if `needsSetup`, else `/dashboard`** (same outcome shape as successful callback).
-- **Middleware alignment:** authenticated users on new auth routes follow the same rules as `/auth` (no stranded states).
-- **Operator-facing errors:** curated messages for high-traffic cases + generic fallback (no raw Supabase strings as default).
+- Welcome email containing the login link
+- Email-entry screen at `/auth`
+- One-time code generation, delivery, and verification
+- Whitelist enforcement (non-list emails rejected with a clear, non-revealing message)
+- Session creation post-verification
+- 30-day trial expiry enforcement at the auth layer
+- Re-login flow (OTP every time, or remembered device — see Open questions)
+- Logout
+- Multi-organisation users: org selector post-OTP when more than one accessible org
 
-### Out of scope (deferred)
+### Out of scope
 
-- **Organisation / venue at signup** — belongs to **`supersolt-onboarding`** and Notion onboarding steps.
-- **Social / OAuth identity providers** for end-user login (unless already present); Square OAuth remains product integration, not this triad.
-- **Migrating Supersolt to `@workspace/supabase`** — separate cross-app initiative; this triad keeps **`@/utils/supabase/*`** as canonical.
-- **Product analytics SDK** — telemetry table documents **future** events only.
-- **Playwright (or other) E2E harness** for this app — Vitest + manual smoke only.
+- Self-serve sign-up — no "create account" path in MVP
+- Password creation or password recovery
+- Multi-factor authentication beyond the OTP itself
+- SSO / Google / SAML — not in MVP
+- Whitelist admin UI — for first 10 customers, emails added via Supabase admin (minimal admin tool TBD)
 
 ### Non-goals
 
-- Re-implementing Supabase Auth or replacing PKCE callback semantics.
-- New shared packages without a second real consumer ([ARCHITECTURE.md §5.1](../../../../../ARCHITECTURE.md)).
+- Organisation / venue creation at auth (onboarding owns `/setup`)
+- Square OAuth as end-user identity (product integration only)
+
+## Notion specification
+
+### User flows
+
+1. **First login from welcome email** — land on `/auth` with email pre-filled, Send Code, 6-digit OTP; single whitelist row → `/setup`; multiple rows → org selector.
+2. **Email entered manually** — generic rejection if not whitelisted; multi-org → org selector after OTP.
+3. **Returning user** — same OTP flow (subject to remembered-device decision).
+4. **Trial expired** — reject with "Your trial has ended — contact us to continue"; no code sent.
+5. **Logout** — session terminated → `/auth`.
+6. **Second org whitelisted** — org selector shows active vs setup-required orgs; Org 2 → `/setup`.
+
+### Intended functionality
+
+- **Welcome email:** personalised greeting, 30-day access line, Log In → `/auth?email=…`, help contact.
+- **`/auth` screen:** single email field + Send Code; pre-fill from link when present.
+- **Whitelist check** before OTP: `email` → `org_id` → `trial_expires_at`; not found → generic error, no code sent.
+- **OTP:** 6-digit, 10-minute expiry; new code invalidates prior; 3 failed attempts → 15-minute block.
+- **Session:** after OTP → `/setup` if onboarding incomplete, else `/dashboard`.
+- **Trial:** per-org `trial_expires_at`; all expired → block login; mixed → selector shows only active orgs.
+- **Multi-org:** one whitelist row per email-per-org; fully separate workspaces.
+
+### Data + integrations
+
+- **Whitelist table:** `email`, `org_id`, `trial_expires_at`, `added_by`, `added_at`, `status` (active / expired / revoked)
+- **Email delivery:** transactional provider (Resend, Postmark, or similar)
+- **Session storage:** existing auth layer
+- **No external auth providers** in MVP
+
+### Other modules this touches
+
+- **Onboarding** — gate before `/setup`
+- **Dashboard** — post-onboarding redirect
+- **Settings → Permissions/User** — invited users use same auth; whitelist updated on invite
+- **Free Growth Consultation** sales process — triggers whitelist add (outside platform)
+
+## Open questions
+
+- **Remembered devices:** skip OTP on known browser within 30 days? Lean: yes.
+- **Trial extension UI:** Supabase update vs minimal admin screen? Lean: Supabase for first 10.
+- **Whitelist admin UI:** same lean as trial extension.
+- **Email sender domain:** `hello@` vs `noreply@` — product call.
+- **Failed-OTP lockout duration:** proposed 15 minutes after 3 failures.
+- **Org selector UX:** card per org with status badge and CTA (Enter / Continue setup / Trial expired).
+
+### Engineering
+
+- [ ] **Recovery redirect URL** — confirm Supabase allowlist for local, preview, prod if password-recovery paths remain during transition — owner: TBD, due: TBD
+
+## Decision log
+
+- *29 Apr 2026* — Passwordless only; no password create/reset.
+- *29 Apr 2026* — Whitelist-gated; generic message for unknown emails.
+- *29 Apr 2026* — 30-day trial enforced at auth layer.
+- *3 May 2026* — Multi-org supported in MVP; one row per email-per-org; per-org trial clock.
+- *3 May 2026* — Org selector post-OTP for multi-org; single-org skips selector.
 
 ## 3. Architecture placement
 
@@ -170,15 +243,21 @@ Adjust ordering if tests prefer extraction of redirect helpers first.
 - **Migration sequencing:** No migration in default path; if a security migration is added, apply **`apps/supersolt/supabase/migrations/`** in timestamp order before or with deploy ([ARCHITECTURE.md §8.1](../../../../../ARCHITECTURE.md)).
 - **Backout:** Revert application commit; rollback Supabase email template edits if copy was wrong; no forward-only data migration in default path.
 
-## 11. Open questions
-
-Only items grill-me could not resolve. Each must have an owner and due date.
-
-- [ ] **Recovery redirect URL** — confirm exact Supabase “Redirect to” URL list for **local**, **preview**, and **prod** match the new update-password route if Supabase requires a separate allowlist entry — owner: TBD, due: TBD.
-
 ## 12. Cross-references
 
 - TDD: [`tdd.md`](tdd.md)
 - User flows + error states: [`flows.md`](flows.md)
 - Architecture source of truth: [ARCHITECTURE.md](../../../../../ARCHITECTURE.md)
 - Program context: [`../../roadmap.md`](../../roadmap.md)
+- Program index: [`module-overview-program.md`](../../module-overview-program.md)
+
+## Compliance audit (program 2026-06-01)
+
+| Notion (passwordless OTP + whitelist) | Repo today | Status |
+|---------------------------------------|------------|--------|
+| Email OTP login | Password + forgot password paths in code | **Drift** — reconcile toward Notion |
+| Whitelist gate | `api/auth/whitelist-check` | **Partial** |
+| Trial expiry at auth | Per plan §2 | **Verify** |
+| Magic link callback | `auth/callback` page route | **Shipped** |
+
+**Updated:** 2026-06-01

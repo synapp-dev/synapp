@@ -1,9 +1,12 @@
 "use client";
 
 import { Fragment, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
-import { SupersoltLogo } from "@/components/atoms/supersolt-logo";
+import {
+  OrganisationLogoAvatar,
+  organisationLogoBoxClassNameSm,
+} from "@/components/branding/organisation-logo-avatar";
+import { SupersoltLogo } from "@/components/branding/supersolt-logo";
 import { usePathname } from "next/navigation";
 import { Bot, Building2 } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
@@ -16,22 +19,15 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
-import { ThemeToggle } from "@/components/atoms/theme-toggle";
-import { CommandMenu } from "@/components/molecules/command-menu";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
+import { InventorySetupImportHeaderButton } from "@/entities/inventory-setup/components/inventory-setup-import-header-button";
+import { CommandMenu } from "@/components/shell/command-menu";
 import { shouldShowAgentRightShell } from "@/entities/ai-agent-chat/lib/agent-right-shell-pathname";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 import { RightSidebarTrigger } from "@workspace/ui/components/right-sidebar-trigger";
 
-const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
-  "auth",
-  "dashboard",
-  "support",
-  "settings",
-  "logout",
-  "api",
-  "_next",
-  "images",
-]);
+import { getScopedContextFromPathname } from "@/entities/access/scoped-navigation-context";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
 function formatSegment(segment: string): string {
   return segment
@@ -51,13 +47,7 @@ type ScopedVenueInfo = {
 };
 
 function getScopedContext(pathname: string) {
-  const segments = pathname.split("/").filter(Boolean);
-  if (segments.length < 2) return null;
-
-  const [first, second] = segments;
-  if (!first || !second || RESERVED_TOP_LEVEL_SEGMENTS.has(first)) return null;
-
-  return { organisationSlug: first, venueSlug: second };
+  return getScopedContextFromPathname(pathname);
 }
 
 function buildBreadcrumbs(
@@ -132,34 +122,6 @@ function useScopedVenueInfo(
   }, [mounted, organisations, organisationSlug, venueSlug]);
 }
 
-function OrganisationLogo({ logoUrl }: { logoUrl: string | null }) {
-  const [hasImageError, setHasImageError] = useState(false);
-
-  useEffect(() => {
-    setHasImageError(false);
-  }, [logoUrl]);
-
-  if (logoUrl && !hasImageError) {
-    return (
-      <Image
-        src={logoUrl}
-        alt="Organisation logo"
-        width={25}
-        height={25}
-        className="h-4 w-4 rounded-sm object-cover"
-        unoptimized
-        onError={() => setHasImageError(true)}
-      />
-    );
-  }
-
-  return (
-    <span className="flex h-4 w-4 items-center justify-center rounded-sm bg-muted text-muted-foreground">
-      <Building2 className="h-2.5 w-2.5" />
-    </span>
-  );
-}
-
 export function AppHeader() {
   const pathname = usePathname();
   const scoped = useMemo(() => getScopedContext(pathname), [pathname]);
@@ -172,6 +134,9 @@ export function AppHeader() {
     () => buildBreadcrumbs(pathname, scopedVenueInfo.venueName),
     [pathname, scopedVenueInfo.venueName],
   );
+  const dashboardHref = scoped
+    ? buildScopedPath(scoped.organisationSlug, scoped.venueSlug, "dashboard")
+    : "/dashboard";
 
   return (
     <header className="sticky top-0 z-50 flex h-16 shrink-0 items-center justify-between gap-2 bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-14">
@@ -186,7 +151,7 @@ export function AppHeader() {
             <BreadcrumbItem>
               {crumbs.length > 0 ? (
                 <BreadcrumbLink asChild>
-                  <Link href="/dashboard">
+                  <Link href={dashboardHref}>
                     <SupersoltLogo variant="mark" className="h-5 w-auto mt-1" />
                   </Link>
                 </BreadcrumbLink>
@@ -201,8 +166,11 @@ export function AppHeader() {
               const isScopedVenueCrumb = Boolean(scoped) && index === 0;
               const crumbLabel = isScopedVenueCrumb ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <OrganisationLogo
+                  <OrganisationLogoAvatar
                     logoUrl={scopedVenueInfo.organisationLogoUrl}
+                    fallbackIcon={Building2}
+                    className={organisationLogoBoxClassNameSm}
+                    fallbackClassName="h-2.5 w-2.5 text-muted-foreground"
                   />
                   <span>{crumb.label}</span>
                 </span>
@@ -229,6 +197,7 @@ export function AppHeader() {
         </Breadcrumb>
       </div>
       <div className="flex items-center gap-2 px-4">
+        <InventorySetupImportHeaderButton />
         <CommandMenu />
         <div className="mx-2 h-0.5 w-0.5 rounded-full bg-muted-foreground" />
         <ThemeToggle />

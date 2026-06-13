@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
+
 import {
   createOrganisationVenueForOwner,
   CreateOrganisationVenueError,
@@ -19,17 +21,9 @@ export async function POST(
   request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation } = await context.params;
@@ -38,20 +32,17 @@ export async function POST(
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json(
-      { data: null, error: { message: "Invalid JSON", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("Invalid JSON", 400);
   }
 
   try {
-    const venue = await createOrganisationVenueForOwner(supabase, user.id, {
+    const venue = await createOrganisationVenueForOwner(ctx, {
       organisationSlug: organisation,
       name: body.name ?? "",
       addressLine1: body.addressLine1,
       timezone: body.timezone,
     });
-    return NextResponse.json({ data: { venue }, error: null });
+    return jsonDataResponse({ venue });
   } catch (e) {
     if (e instanceof CreateOrganisationVenueError) {
       return NextResponse.json(

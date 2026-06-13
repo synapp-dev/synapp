@@ -1,8 +1,11 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
+import type { RequestAuthContext } from "@/server/auth/context";
+import {
+  assertOrganisationAdmin,
+  resolveOrganisationIdBySlug,
+} from "@/server/auth/rbac";
+import { AuthError } from "@/server/auth/errors";
 import { PLATFORM_ROLE_IDS, type PlatformRoleSlug } from "@/lib/roles/platform-role-ids";
-
-type Supabase = SupabaseClient<Database>;
+import { venuesRepo } from "@/server/venues/venues.repo";
 
 /** Venue-level role override (nullable = inherit org role in roster UI). */
 const VENUE_ROLE_SLUGS = ["admin", "manager", "supervisor", "crew"] as const satisfies readonly (
@@ -23,106 +26,66 @@ export class VenueStaffAssignmentError extends Error {
   }
 }
 
+function mapAuthError(error: unknown): never {
+  if (error instanceof AuthError) {
+    throw new VenueStaffAssignmentError(error.status, error.message);
+  }
+  throw error;
+}
+
 function isVenueRoleSlug(value: string): value is VenueAssignableRoleSlug {
   return (VENUE_ROLE_SLUGS as readonly string[]).includes(value);
 }
 
 function displayName(profile: {
-  full_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
+  fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
   email: string;
 }): string {
-  if (profile.full_name?.trim()) return profile.full_name.trim();
-  const first = profile.first_name?.trim() ?? "";
-  const last = profile.last_name?.trim() ?? "";
+  if (profile.fullName?.trim()) return profile.fullName.trim();
+  const first = profile.firstName?.trim() ?? "";
+  const last = profile.lastName?.trim() ?? "";
   const combined = `${first} ${last}`.trim();
   if (combined) return combined;
   return profile.email;
 }
 
-async function getOrganisationIdBySlug(
-  supabase: Supabase,
-  organisationSlug: string
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("organisations")
-    .select("id")
-    .eq("slug", organisationSlug)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) {
-    throw new VenueStaffAssignmentError(500, error.message);
+function resolveVenueRoleId(venueRoleSlug: string | null | undefined): string | null {
+  if (venueRoleSlug == null || venueRoleSlug === "") {
+    return null;
   }
-  return data?.id ?? null;
+  const normalized = venueRoleSlug.trim().toLowerCase();
+  if (!isVenueRoleSlug(normalized)) {
+    throw new VenueStaffAssignmentError(400, "Invalid venue role");
+  }
+  return PLATFORM_ROLE_IDS[normalized as PlatformRoleSlug];
 }
 
-/**
- * Ensures the user is an active org member whose platform role grants org admin
- * (matches `user_venues_admin_manage` / `is_org_admin` RLS).
- */
-export async function assertOrganisationAdmin(
-  supabase: Supabase,
-  userId: string,
-  organisationSlug: string
-): Promise<string> {
-  const orgId = await getOrganisationIdBySlug(supabase, organisationSlug);
+async function resolveAdminVenueScope(
+  ctx: RequestAuthContext,
+  organisationSlug: string,
+  venueSlug: string,
+): Promise<{ orgId: string; venueId: string }> {
+  const orgId = resolveOrganisationIdBySlug(ctx.tenantRoles, organisationSlug);
   if (!orgId) {
     throw new VenueStaffAssignmentError(404, "Organisation not found");
   }
 
-  const { data: uo, error: uoError } = await supabase
-    .from("user_organisations")
-    .select("id, role_id")
-    .eq("user_profile_id", userId)
-    .eq("organisation_id", orgId)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (uoError) {
-    throw new VenueStaffAssignmentError(500, uoError.message);
-  }
-  if (!uo) {
-    throw new VenueStaffAssignmentError(403, "Forbidden");
+  try {
+    assertOrganisationAdmin(ctx.tenantRoles, orgId);
+  } catch (error) {
+    mapAuthError(error);
   }
 
-  const { data: roleRow, error: roleError } = await supabase
-    .from("roles")
-    .select("grants_org_admin")
-    .eq("id", uo.role_id)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (roleError) {
-    throw new VenueStaffAssignmentError(500, roleError.message);
-  }
-  if (!roleRow?.grants_org_admin) {
-    throw new VenueStaffAssignmentError(403, "Forbidden");
+  const venueId = await ctx.appDb.rls((tx) =>
+    venuesRepo.getVenueIdBySlug(tx, { organisationId: orgId, venueSlug }),
+  );
+  if (!venueId) {
+    throw new VenueStaffAssignmentError(404, "Venue not found");
   }
 
-  return orgId;
-}
-
-async function getVenueIdInOrganisation(
-  supabase: Supabase,
-  organisationId: string,
-  venueSlug: string
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("venues")
-    .select("id")
-    .eq("organisation_id", organisationId)
-    .eq("slug", venueSlug)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) {
-    throw new VenueStaffAssignmentError(500, error.message);
-  }
-  return data?.id ?? null;
+  return { orgId, venueId };
 }
 
 export type OrgMemberVenueRow = {
@@ -136,129 +99,90 @@ export type OrgMemberVenueRow = {
   venueRoleSlug: string | null;
 };
 
-function resolveVenueRoleId(venueRoleSlug: string | null | undefined): string | null {
-  if (venueRoleSlug == null || venueRoleSlug === "") {
-    return null;
-  }
-  const normalized = venueRoleSlug.trim().toLowerCase();
-  if (!isVenueRoleSlug(normalized)) {
-    throw new VenueStaffAssignmentError(400, "Invalid venue role");
-  }
-  return PLATFORM_ROLE_IDS[normalized as PlatformRoleSlug];
-}
-
 export const venueStaffAssignmentService = {
   async listOrgMembersForVenue(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
       organisationSlug: string;
       venueSlug: string;
-      actorUserId: string;
-    }
+    },
   ): Promise<{ venueId: string; members: OrgMemberVenueRow[] }> {
-    const orgId = await assertOrganisationAdmin(
-      supabase,
-      args.actorUserId,
-      args.organisationSlug
+    const { orgId, venueId } = await resolveAdminVenueScope(
+      ctx,
+      args.organisationSlug,
+      args.venueSlug,
     );
 
-    const venueId = await getVenueIdInOrganisation(supabase, orgId, args.venueSlug);
-    if (!venueId) {
-      throw new VenueStaffAssignmentError(404, "Venue not found");
-    }
+    const uoRows = await ctx.appDb.rls((tx) =>
+      venuesRepo.listActiveOrgMembers(tx, orgId),
+    );
 
-    const { data: uoRows, error: uoError } = await supabase
-      .from("user_organisations")
-      .select("id, user_profile_id, role_id")
-      .eq("organisation_id", orgId)
-      .eq("is_active", true)
-      .is("archived_at", null);
-
-    if (uoError) {
-      throw new VenueStaffAssignmentError(500, uoError.message);
-    }
-
-    const rows = uoRows ?? [];
-    if (rows.length === 0) {
+    if (uoRows.length === 0) {
       return { venueId, members: [] };
     }
 
-    const profileIds = [...new Set(rows.map((r) => r.user_profile_id))];
-    const orgRoleIds = [...new Set(rows.map((r) => r.role_id))];
+    const profileIds = [...new Set(uoRows.map((r) => r.userProfileId))];
+    const orgRoleIds = [...new Set(uoRows.map((r) => r.roleId))];
+    const uoIds = uoRows.map((r) => r.id);
 
-    const uoIds = rows.map((r) => r.id);
+    const uvRows = await ctx.appDb.rls((tx) =>
+      venuesRepo.listUserVenuesForMembers(tx, {
+        organisationId: orgId,
+        venueId,
+        userOrganisationIds: uoIds,
+      }),
+    );
 
-    const { data: uvRows, error: uvError } = await supabase
-      .from("user_venues")
-      .select("id, user_organisation_id, role_id, archived_at, is_active")
-      .eq("organisation_id", orgId)
-      .eq("venue_id", venueId)
-      .in("user_organisation_id", uoIds);
-
-    if (uvError) {
-      throw new VenueStaffAssignmentError(500, uvError.message);
-    }
-
-    const uvByUoId = new Map<string, { role_id: string | null; active: boolean }>();
-    for (const uv of uvRows ?? []) {
-      const active = uv.archived_at == null && uv.is_active;
-      const prev = uvByUoId.get(uv.user_organisation_id);
+    const uvByUoId = new Map<string, { roleId: string | null; active: boolean }>();
+    for (const uv of uvRows) {
+      const active = uv.archivedAt == null && uv.isActive;
+      const prev = uvByUoId.get(uv.userOrganisationId);
       if (prev == null) {
-        uvByUoId.set(uv.user_organisation_id, { role_id: uv.role_id, active });
+        uvByUoId.set(uv.userOrganisationId, { roleId: uv.roleId, active });
       } else if (active) {
-        uvByUoId.set(uv.user_organisation_id, { role_id: uv.role_id, active: true });
+        uvByUoId.set(uv.userOrganisationId, { roleId: uv.roleId, active: true });
       } else if (!prev.active) {
-        uvByUoId.set(uv.user_organisation_id, { role_id: uv.role_id, active: false });
+        uvByUoId.set(uv.userOrganisationId, { roleId: uv.roleId, active: false });
       }
     }
 
     const venueRoleIds = new Set<string>();
-    for (const uv of uvRows ?? []) {
-      if (uv.role_id) venueRoleIds.add(uv.role_id);
-    }
-
-    const { data: profiles, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("id, email, first_name, last_name, full_name")
-      .in("id", profileIds);
-
-    if (profileError) {
-      throw new VenueStaffAssignmentError(500, profileError.message);
+    for (const uv of uvRows) {
+      if (uv.roleId) venueRoleIds.add(uv.roleId);
     }
 
     const allRoleIds = [...new Set([...orgRoleIds, ...venueRoleIds])];
-    const { data: roleRows, error: rolesError } = await supabase
-      .from("roles")
-      .select("id, slug, display_name")
-      .in("id", allRoleIds);
 
-    if (rolesError) {
-      throw new VenueStaffAssignmentError(500, rolesError.message);
-    }
+    const [profiles, roleRows] = await ctx.appDb.rls((tx) =>
+      Promise.all([
+        venuesRepo.listProfilesByIds(tx, profileIds),
+        venuesRepo.listRolesByIds(tx, allRoleIds),
+      ]),
+    );
 
     const roleById = new Map(
-      (roleRows ?? []).map((r) => [r.id, { slug: r.slug, display_name: r.display_name }])
+      roleRows.map((r) => [r.id, { slug: r.slug, displayName: r.displayName }]),
     );
-    const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
+    const profileById = new Map(profiles.map((p) => [p.id, p]));
 
-    const members: OrgMemberVenueRow[] = rows
+    const members: OrgMemberVenueRow[] = uoRows
       .map((uo) => {
-        const profile = profileById.get(uo.user_profile_id);
-        const orgRole = roleById.get(uo.role_id);
+        const profile = profileById.get(uo.userProfileId);
+        const orgRole = roleById.get(uo.roleId);
         if (!profile || !orgRole) return null;
 
         const uv = uvByUoId.get(uo.id);
         const hasVenueAccess = Boolean(uv?.active);
-        const venueRoleId = uv?.role_id ?? null;
+        const venueRoleId = uv?.roleId ?? null;
         const venueRole = venueRoleId ? roleById.get(venueRoleId) : null;
 
         return {
           userOrganisationId: uo.id,
-          userProfileId: uo.user_profile_id,
+          userProfileId: uo.userProfileId,
           name: displayName(profile),
           email: profile.email,
           orgRoleSlug: orgRole.slug,
-          orgRoleDisplayName: orgRole.display_name,
+          orgRoleDisplayName: orgRole.displayName,
           hasVenueAccess,
           venueRoleSlug: venueRole?.slug ?? null,
         };
@@ -270,25 +194,19 @@ export const venueStaffAssignmentService = {
   },
 
   async assignVenueAccess(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
       organisationSlug: string;
       venueSlug: string;
-      actorUserId: string;
       userOrganisationIds: string[];
       venueRoleSlug?: string | null;
-    }
+    },
   ): Promise<{ linked: number; skipped: number }> {
-    const orgId = await assertOrganisationAdmin(
-      supabase,
-      args.actorUserId,
-      args.organisationSlug
+    const { orgId, venueId } = await resolveAdminVenueScope(
+      ctx,
+      args.organisationSlug,
+      args.venueSlug,
     );
-
-    const venueId = await getVenueIdInOrganisation(supabase, orgId, args.venueSlug);
-    if (!venueId) {
-      throw new VenueStaffAssignmentError(404, "Venue not found");
-    }
 
     const roleId = resolveVenueRoleId(args.venueRoleSlug);
 
@@ -302,35 +220,23 @@ export const venueStaffAssignmentService = {
     const now = new Date().toISOString();
 
     for (const uoId of ids) {
-      const { data: uo, error: uoErr } = await supabase
-        .from("user_organisations")
-        .select("id, organisation_id")
-        .eq("id", uoId)
-        .maybeSingle();
-
-      if (uoErr) {
-        throw new VenueStaffAssignmentError(500, uoErr.message);
-      }
-      if (!uo || uo.organisation_id !== orgId) {
+      const uo = await ctx.appDb.rls((tx) =>
+        venuesRepo.getUserOrganisation(tx, uoId),
+      );
+      if (!uo || uo.organisationId !== orgId) {
         throw new VenueStaffAssignmentError(400, "Invalid membership selection");
       }
 
-      const { data: uvRows, error: uvQErr } = await supabase
-        .from("user_venues")
-        .select("id, archived_at, is_active")
-        .eq("user_organisation_id", uoId)
-        .eq("venue_id", venueId)
-        .eq("organisation_id", orgId)
-        .order("updated_at", { ascending: false })
-        .limit(1);
+      const existingUv = await ctx.appDb.rls((tx) =>
+        venuesRepo.findLatestUserVenueMapping(tx, {
+          userOrganisationId: uoId,
+          venueId,
+          organisationId: orgId,
+        }),
+      );
 
-      if (uvQErr) {
-        throw new VenueStaffAssignmentError(500, uvQErr.message);
-      }
-
-      const existingUv = uvRows?.[0];
       const alreadyActive =
-        existingUv != null && existingUv.archived_at == null && existingUv.is_active;
+        existingUv != null && existingUv.archivedAt == null && existingUv.isActive;
 
       if (alreadyActive) {
         skipped += 1;
@@ -338,35 +244,27 @@ export const venueStaffAssignmentService = {
       }
 
       if (existingUv) {
-        const { error: upErr } = await supabase
-          .from("user_venues")
-          .update({
-            archived_at: null,
-            is_active: true,
-            role_id: roleId,
-            updated_at: now,
-          })
-          .eq("id", existingUv.id)
-          .eq("organisation_id", orgId);
-
-        if (upErr) {
-          throw new VenueStaffAssignmentError(500, upErr.message);
-        }
+        await ctx.appDb.rls((tx) =>
+          venuesRepo.reactivateUserVenue(tx, {
+            id: existingUv.id,
+            organisationId: orgId,
+            roleId,
+            updatedAt: now,
+          }),
+        );
         linked += 1;
         continue;
       }
 
-      const { error: insErr } = await supabase.from("user_venues").insert({
-        user_organisation_id: uoId,
-        organisation_id: orgId,
-        venue_id: venueId,
-        role_id: roleId,
-        is_active: true,
-      });
-
-      if (insErr) {
-        throw new VenueStaffAssignmentError(500, insErr.message);
-      }
+      await ctx.appDb.rls((tx) =>
+        venuesRepo.insertUserVenue(tx, {
+          userOrganisationId: uoId,
+          organisationId: orgId,
+          venueId,
+          roleId,
+          isActive: true,
+        }),
+      );
       linked += 1;
     }
 

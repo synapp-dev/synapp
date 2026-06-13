@@ -169,3 +169,9 @@ Granular conventional commits; each leaves the tree green.
 - TDD: [`tdd.md`](tdd.md)
 - Flows: [`flows.md`](flows.md)
 - Architecture: [ARCHITECTURE.md](../../../../../ARCHITECTURE.md)
+
+## Compliance audit (program 2026-06-01)
+
+Slice of Notion **Agent** (side panel). **Done** — parent [`ai-agent-tools-inline-ui/plan.md`](../ai-agent-tools-inline-ui/plan.md).
+
+**Updated:** 2026-06-01

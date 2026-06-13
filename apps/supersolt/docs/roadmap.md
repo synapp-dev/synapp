@@ -2,6 +2,8 @@
 
 ## Summary
 
+**Compliance program (Module Overview):** [`module-overview-program.md`](module-overview-program.md) · **Production QA:** [`production-readiness-checklist.md`](production-readiness-checklist.md) · **Launch test session:** [`launch-test-checklist.md`](launch-test-checklist.md)
+
 **Supersolt** is a multi-tenant hospitality operations platform for **multi-venue owners and ops leads**: organisations own venues; each venue gets scoped navigation for insights, catalog/stock, purchasing workflows, workforce, and operations. **One-line promise:** *Connect Square once, see venue-level sales truth, and get a path to control stock and labour without exporting spreadsheets.* This document consolidates the **Notion `Module Overview`** database (Supersolt-MVP workspace) with **evidence from `apps/supersolt`**. **Client-approved decisions captured in Notion** (onboarding, automation, integrations—see **Plan of record**) define the **implementation plan** when engineering work had drifted. **Program baseline (below):** work is **reset to Notion as the target** while **reusing and refactoring** the current codebase. Depth for individual capabilities belongs in `docs/features/<slug>/` via the **build-feature** skill—not duplicated here.
 
 ## Plan of record (Notion)
@@ -128,7 +130,7 @@ Build **parents before children** so RBAC, routing, and data contracts stay stab
 - **Status:** Partial
 - **Evidence:** `app/(main)/[organisation]/[venue]/insights/sales/page.tsx`, `labour`, `inventory`, `p-and-l`
 - **How it should work:** Sales unlocked by POS connection; other tabs depend on labour, stock, and accounting signals as they exist.
-- **Drill-down:** *Suggested slug:* `supersolt-insights` — run build-feature
+- **Drill-down:** [`docs/features/insights-platform/plan.md`](features/insights-platform/plan.md) (parent + `forecast-engine`, `sales`, `labour`, `inventory`, `p-and-l` children)
 
 #### Catalog & stock (Notion: “Stock Management”)
 
@@ -221,7 +223,7 @@ Statuses reflect **current code behaviour** (see **Program baseline**); **intent
 | Onboarding / Setup | Partial | yes | *Suggested slug:* `supersolt-onboarding` |
 | Square / POS integration | Partial | yes | *Suggested slug:* `supersolt-square-integration` |
 | Forecast Engine | Planned | | *Suggested slug:* `supersolt-forecast-engine` |
-| Insights (Sales, Labour, Inventory, P&L) | Partial | yes (Sales) | *Suggested slug:* `supersolt-insights` |
+| Insights (Sales, Labour, Inventory, P&L) | Partial | yes (Sales) | [`insights-platform/plan.md`](features/insights-platform/plan.md) |
 | Catalog & stock | Partial | | *Suggested slug:* `supersolt-catalog-stock` |
 | Purchasing (suppliers, orders) | Partial | yes | *Suggested slug:* `supersolt-purchasing` |
 | Invoice automation & ingestion (onboarding-led) | Planned | yes | *Suggested slug:* `supersolt-invoice-automation` (+ `supersolt-email-infrastructure`) |

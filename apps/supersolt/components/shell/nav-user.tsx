@@ -23,6 +23,8 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar";
 import { useMeStore } from "@/entities/me/model/store";
+import { ReplaySetupIntroMenuItem } from "@/components/shell/replay-setup-intro-menu-item";
+import { RestartInventorySetupMenuItem } from "@/components/shell/restart-inventory-setup-menu-item";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -71,9 +73,11 @@ export function NavUser() {
             sideOffset={4}
           >
             <DropdownMenuGroup>
-              <DropdownMenuItem disabled>
-                <Cpu />
-                About
+              <DropdownMenuItem asChild>
+                <Link href="/about">
+                  <Cpu />
+                  About
+                </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuGroup>
@@ -84,6 +88,9 @@ export function NavUser() {
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <ReplaySetupIntroMenuItem />
+            <RestartInventorySetupMenuItem />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href="/logout">

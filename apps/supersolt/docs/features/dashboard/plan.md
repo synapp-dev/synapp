@@ -5,47 +5,128 @@
 > **Status:** Planned
 > **Owner:** TBD
 > **Created:** 2026-05-14
+> **Updated:** 2026-05-22
+> **Route:** `/dashboard` (future `/{organisation}/{venue}/dashboard`)
 
 ## 1. Summary
 
-The **Dashboard** is the signed-in **operator home** for **Owner**, **Area Manager**, and **Venue Manager**: a **permission-gated tile grid** with **time-window** and (where applicable) **venue** selectors, **agent morning digest**, **drill-down** into other modules with **filters preserved**, **staleness** indicators for external data, **empty states**, and **silent redirect** for **Staff**. It is a **read-mostly presentation layer** with **no authoritative business tables of its own** beyond **small app-owned persistence** for **UI scope** and **digest cache**. Product requirements trace to the Module Overview spec: [Dashboard (Notion)](https://www.notion.so/34f64094bde6803c8ac5ca001f005d39).
+Dashboard is the operator's daily home: where every login lands (post-onboarding) and where the operator gets a 30-second read on the business before deciding what to act on. Unlike Insights modules (deep dives), the Dashboard is **breadth** — sales pulse, COGS direction, labour position, stock anomalies, integration health, items needing action, and the Agent's morning digest.
 
-**Implementation posture:** ship **straight to production** for allowed roles—**no feature flags** and **no env kill-switches**. Until upstream modules or integrations return reliable reads, **tiles may render from typed mock/fixture payloads** in code or from API handlers that **synthesize demo-shaped data**; `plan.md` §2 phases call out **mock vs wired** per capability so wiring can replace fixtures without rescoping UX.
+The Dashboard aggregates from every module; is **permission-gated and personalised**; and is **drill-down-first** (every tile is a doorway with filters preserved).
 
-**Child slice:** [`../dashboard-superbot-suggestions/`](../dashboard-superbot-suggestions/) — keep that triad as the source of truth for the **Superbot suggestions** card; this parent links it and avoids duplicating card-level TDD.
+**Personas:** **Owner** (primary — rolled-up KPIs, agent digest); **Area Manager** (region rollup); **Venue Manager** (single venue, operational tiles, no financial KPIs); **Staff** does not land here (roster surface).
+
+**Notion:** [Dashboard (Module Overview)](https://www.notion.so/34f64094bde6803c8ac5ca001f005d39)
+
+**Implementation posture:** ship for allowed roles without feature flags; tiles may use fixtures until upstream modules wire ([§2 phases](#2-scope) below). **Child slice:** [`../dashboard-superbot-suggestions/`](../dashboard-superbot-suggestions/) for Superbot suggestions card spec.
 
 ## 2. Scope
 
-### In scope (MVP — requirements, phased delivery)
+### In scope
 
-Requirements align with Notion **In scope**; each row adds a **Phase** note for implementation (`stub` | `dummy` | `wired`).
+- Dashboard landing (`/{org}/{venue}/dashboard`)
+- Default tile set per permission level + industry sub-type
+- Per-tile drill-down with time window + venue preserved
+- Time-window selector (today / yesterday / this week / last week / this month / last month / custom)
+- Venue selector (Owner / Area Manager): all venues, single, or selected
+- Agent morning digest tile + notifications surface
+- Refresh behaviour and live-data freshness indicators
+- Empty states (new org, single-tile empty, filter-empty)
+- Permission gating (Staff → silent redirect)
 
-| Capability | Phase (first shippable → target) |
-|------------|-----------------------------------|
-| Route **`/dashboard`** (current app shape); future **`/{org}/{venue}/dashboard`** called out in §5 | `stub` → `wired` when org-scoped shell is canonical |
-| **Server guard**: Staff (and other disallowed roles) → **silent `redirect()`** | `wired` |
-| **Tile grid** zones (digest, KPI strip, financial KPIs for Owner/Area, operations, system/notifications) | `stub` → `dummy` → `wired` |
-| **Time-window** selector + persistence | `dummy` (local) → `wired` (DB prefs table) |
-| **Venue** selector (Owner / Area Manager) + persistence | `dummy` → `wired` |
-| **Agent morning digest** + optional insight cards + CTA into side panel | `dummy` → `wired` (digest cache + agent pipeline) |
-| **Drill-down** tiles → module routes with **time + venue context** preserved | `stub` (links) → `wired` |
-| **Refresh** / staleness (Square/Xero **> 5m**), manual refresh | `dummy` → `wired` |
-| **Empty states** (new org, single-tile empty, filter-empty) | `dummy` → `wired` |
-| **Industry sub-type** tile variants (Notion: Cafe, QSR, Bar in MVP; others generic) | `dummy` → `wired` |
-| **Notifications** surface on dashboard | `mock`/`dummy` until Notifications module API exists |
-| **Integration health** tile | `mock` → `wired` from Settings/Integrations reads |
-| **API**: Route Handlers + server services (see §5) | `stub` → `wired` |
+**Phased delivery** (engineering):
 
-### Out of scope (deferred — Notion)
+| Capability | Phase |
+|------------|-------|
+| Route + Staff guard | `stub` → `wired` |
+| Tile grid zones | `stub` → `dummy` → `wired` |
+| Time-window + venue persistence | `dummy` → `wired` (DB prefs) |
+| Agent digest + drill-down | `dummy` → `wired` |
+| Staleness / refresh | `dummy` → `wired` |
+| Industry variants (Cafe, QSR, Bar MVP) | `dummy` → `wired` |
+| Notifications / integration health | `mock` until module APIs exist |
 
-- Custom drag/drop layouts, hide/show tiles, multiple saved layouts, export, embedded reports.
-- Mobile-specific UX beyond **responsive stacking** (Notion: responsive in MVP).
-- Voice/agent reordering of tiles.
+### Out of scope
+
+- Custom dashboard editing (drag/drop, hide/show, custom KPIs) — Phase 2
+- Multiple saved layouts, dashboard sharing/export, embedded reports — Phase 2
+- Mobile-specific layout beyond responsive stacking — Phase 2
+- Voice / Agent-driven tile reordering — Phase 2
 
 ### Non-goals
 
-- **Feature flags** or **env-based dashboard kill switches** for production.
-- Duplicating the **Superbot suggestions** spec—link the child folder instead.
+- Feature flags or env kill-switches for production
+- Duplicating Superbot suggestions spec (child folder)
+
+## Notion specification
+
+### User flows
+
+1. **Owner morning login** — yesterday revenue, agent digest, labour %, COGS %, top items, integration health, notifications.
+2. **Drill-down from anomaly tile** — Sales Insights with filter + agent analysis in side panel.
+3. **Venue Manager** — covers, stock warnings, roster gaps, pending invoices, sales-so-far; no financial roll-ups.
+4. **Area Manager** — region rollup + per-venue mini cards.
+5. **Time-window switch** — all tiles re-render; comparison deltas update.
+6. **Empty state post-onboarding** — welcome tile, complete-setup cards, integration health until data flows.
+7. **Agent action from dashboard** — "dig in" opens side-panel chat; dashboard stays visible.
+8. **Live-data freshness** — "last updated Nm ago" when Square lag > 5m.
+9. **Staff manual navigation** — silent redirect to roster landing (no access denied page).
+
+### Intended functionality
+
+**Tile zones:** Agent digest + KPI strip; financial KPIs (Owner/Area); operations (stock, invoices, roster gaps, top items); system (notifications, integration health, license expiry). **Industry sub-types:** Cafe, QSR, Bar tile variants in MVP; Full Service, Catering, Multi-site, Other → generic default in MVP.
+
+**Selectors:** Time-window top-right (default Today or Yesterday before service); venue selector for Owner/Area; both persist per user.
+
+**Agent morning digest:** Daily refresh; 2–4 lines operator-specific copy + insight cards with dig deeper.
+
+**Drill-down routes:** Revenue → Sales; COGS → Inventory/Sales; Labour → Labour Insights; stock → Stock Management; invoices → Purchasing; roster → Workforce; licenses → Settings/Venues; integrations → Settings.
+
+**Refresh:** Manual refresh; Square/Xero staleness indicators; internal data real-time.
+
+**Empty states:** Brand-new org; single-tile empty (e.g. no recipes); filter-empty.
+
+### Data + integrations
+
+- Reads from every operational module — **no dashboard-owned transactional facts** (presentation layer only)
+- Aggregation via same queries as Insights (top-line numbers)
+- Agent digest cached per user per day
+- Notifications module data layer
+- Integration health from Settings → Integrations
+
+### Other modules this touches
+
+Onboarding, Authentication, Insights (Sales/Inventory/Labour), Stock Management, Purchasing/Invoices, Workforce/Roster, Settings (Integrations, Venues), People (certifications), Notifications, Agent.
+
+## Open questions
+
+- Agent digest cadence vs real-time anomaly insertion mid-day
+- Auto-refresh on long-open browser (lean: every 5m for live tiles)
+- Per-venue vs per-org default for Owner (confirmed: single-venue default to venue; multi-venue to all-venues rollup)
+- Drill-down preserves dashboard time window (lean: yes)
+- Custom dashboards in MVP (lean: no)
+- Mobile responsive in MVP; mobile-specific UX Phase 2
+- Tile-level permissions edge cases (e.g. license expiry for Venue Manager — lean: yes)
+- New venue mid-life sparse dashboard (same empty pattern, venue-scoped)
+- Performance of multi-venue aggregation (materialised views / snapshots — engineering)
+- Industry sub-type tile sets: Cafe, QSR, Bar in MVP; Full Service + Catering Phase 2
+
+### Engineering
+
+- [ ] **Staff landing URL** exact path — Workforce TBC
+- [ ] **Digest generation** job vs on-demand; real-time anomaly cadence
+- [ ] **Canonical URL** transition to `/{org}/{venue}/dashboard`
+
+## Decision log
+
+- *3 May 2026* — Post-login home for Owner / Area Manager / Venue Manager; Staff elsewhere; aggregates only, no own data.
+- *3 May 2026* — Tiles by permission + industry sub-type; Venue Manager operational only.
+- *3 May 2026* — Agent morning digest most prominent; daily + real-time anomaly cards.
+- *3 May 2026* — Every KPI tile drill-down preserves time + venue filters.
+- *3 May 2026* — Selectors persist per user; custom layouts Phase 2.
+- *3 May 2026* — Cafe, QSR, Bar industry tiles MVP; others generic.
+- *3 May 2026* — Responsive grid MVP; mobile-specific Phase 2.
+- *3 May 2026* — Three empty-state levels; stale external data never silent.
 
 ## 3. Architecture placement
 
@@ -181,14 +262,6 @@ Granular conventional commits; each leaves the tree green.
 - **Migration sequencing:** deploy migrations **before** or **with** code paths that **require** new tables; rollback = revert app + reverse migration (prefs/digest discard acceptable).
 - **Mock data:** **in-app fixtures** or handler-level synthesis when external modules are unavailable—**not** hidden behind flags; replace with live reads incrementally.
 
-## 11. Open questions
-
-Track in Notion or here with owner/due:
-
-- [ ] **Staff landing URL** exact path (`/{org}/{venue}/workforce/...`) — Workforce module TBC.
-- [ ] **Digest generation** job vs on-demand; **real-time anomaly** insertion cadence (Notion open questions).
-- [ ] **Canonical URL** transition from flat `/dashboard` to **`/{org}/{venue}/dashboard`** when shell is ready.
-
 ## 12. Cross-references
 
 - TDD: [`tdd.md`](tdd.md)
@@ -196,3 +269,16 @@ Track in Notion or here with owner/due:
 - Child: [`../dashboard-superbot-suggestions/`](../dashboard-superbot-suggestions/)
 - Architecture: [ARCHITECTURE.md](../../../../../ARCHITECTURE.md)
 - Spec: [Dashboard — Module Overview (Notion)](https://www.notion.so/34f64094bde6803c8ac5ca001f005d39)
+- Program: [`module-overview-program.md`](../../module-overview-program.md)
+
+## Compliance audit (program 2026-06-01)
+
+| Notion capability | Status | Notes |
+|-------------------|--------|-------|
+| Executive snapshot + drill-down | **Partial** | `dashboard/page.tsx`, prefs API |
+| Cross-module tiles | **Partial** | Some fixtures/DEMO |
+| Superbot suggestions | **Partial** | [`dashboard-superbot-suggestions/`](../dashboard-superbot-suggestions/) |
+
+Product sections unchanged; gaps tracked for v1 QA in [`production-readiness-checklist.md`](../../production-readiness-checklist.md).
+
+**Updated:** 2026-06-01

@@ -1,53 +1,52 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
+  BookOpen,
   BotMessageSquare,
   Boxes,
   CalendarDays,
-  Carrot,
   ClipboardList,
   Clock3,
-  CookingPot,
   FileDown,
   FileText,
   HardHat,
   LayoutDashboard,
+  ListOrdered,
+  Cpu,
   LifeBuoy,
   NotebookPen,
-  PackageCheck,
+  Package,
   Plane,
   Receipt,
-  ShoppingCart,
   Timer,
   Trash2,
   TrendingUp,
   Truck,
   Users,
   Rocket,
-  LayoutGrid,
   Settings,
   Shield,
   Building2,
-  MapPin,
   Plug,
   type LucideIcon,
 } from "lucide-react";
 import {
   NavMain,
+  type LockedNavTarget,
   type NavMainItem,
   type NavMainSubItem,
 } from "@/components/organisms/nav-main";
+import { ReadinessNavModal } from "@/components/organisms/readiness-nav-modal";
+import { ReadinessUnlockCelebration } from "@/components/organisms/readiness-unlock-celebration";
 import {
   VenueSwitcher,
   type Venue,
 } from "@/components/organisms/venue-switcher";
-import { NavUser } from "@/components/molecules/nav-user";
-import {
-  useScopedNavigation,
-} from "@/entities/access/scoped-navigation-context";
+import { NavUser } from "@/components/shell/nav-user";
+import { useScopedNavigation } from "@/entities/access/scoped-navigation-context";
 import { useMeStore } from "@/entities/me/model/store";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 import {
@@ -61,7 +60,17 @@ import {
   SidebarHeader,
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
-import { SupersoltLogo } from "@/components/atoms/supersolt-logo";
+import { SupersoltLogo } from "@/components/branding/supersolt-logo";
+import { isReservedTopLevelSegment } from "@/lib/reserved-top-level-segments";
+import { setVenueScopeCookieClient } from "@/lib/venue-scope-cookie";
+import { useOnboardingStateQuery } from "@/entities/onboarding/model/use-onboarding-setup";
+import type { ReadinessBlockerDto } from "@/entities/readiness/model/types";
+import {
+  pathSuffixFromScopedNavUrl,
+  readinessModuleIdFromPathSuffix,
+} from "@/entities/readiness/lib/module-paths";
+import { useVenueReadinessQuery } from "@/entities/readiness/model/use-venue-readiness-query";
+import { applyReadinessToNavItems } from "@/lib/readiness/apply-readiness-to-nav";
 
 type AccessControlledItem = {
   title: string;
@@ -79,19 +88,6 @@ type AccessControlledSubItem = NavMainSubItem & {
 };
 
 const DEFAULT_SCOPED_SECTION_PATH = "insights/sales";
-const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
-  "auth",
-  "agent",
-  "dashboard",
-  "support",
-  "settings",
-  "logout",
-  "setup",
-  "api",
-  "_next",
-  "images",
-]);
-
 function buildScopedPath(
   organisationSlug: string,
   venueSlug: string,
@@ -111,7 +107,7 @@ function buildVenueNavigationPath(
   const hasScopedRoute =
     segments.length >= 2 &&
     first !== undefined &&
-    !RESERVED_TOP_LEVEL_SEGMENTS.has(first);
+    !isReservedTopLevelSegment(first);
 
   if (hasScopedRoute) {
     if (rest.length === 0) {
@@ -123,14 +119,31 @@ function buildVenueNavigationPath(
 
   // Unscoped app shell routes (e.g. /agent, /dashboard): keep the path when the
   // venue switcher resolves — do not force a jump into scoped insights.
-  if (
-    first !== undefined &&
-    RESERVED_TOP_LEVEL_SEGMENTS.has(first)
-  ) {
+  if (first !== undefined && isReservedTopLevelSegment(first)) {
     return `/${segments.join("/")}`;
   }
 
   return `/${organisationSlug}/${venueSlug}/${DEFAULT_SCOPED_SECTION_PATH}`;
+}
+
+function makeScopedHomeNavItems(
+  organisationSlug: string,
+  venueSlug: string,
+): AccessControlledItem[] {
+  return [
+    {
+      title: "Agent",
+      url: buildScopedPath(organisationSlug, venueSlug, "agent"),
+      icon: BotMessageSquare,
+      exact: true,
+    },
+    {
+      title: "Dashboard",
+      url: buildScopedPath(organisationSlug, venueSlug, "dashboard"),
+      icon: LayoutDashboard,
+      exact: true,
+    },
+  ];
 }
 
 function makePlatformNavItems(
@@ -138,6 +151,7 @@ function makePlatformNavItems(
   venueSlug: string,
 ): AccessControlledItem[] {
   return [
+    ...makeScopedHomeNavItems(organisationSlug, venueSlug),
     {
       title: "Insights",
       url: buildScopedPath(organisationSlug, venueSlug, "insights"),
@@ -170,94 +184,65 @@ function makePlatformNavItems(
       ],
     },
     {
-      title: "Catalog",
-      url: buildScopedPath(organisationSlug, venueSlug, "catalog"),
-      icon: LayoutGrid,
+      title: "Purchasing",
+      url: buildScopedPath(organisationSlug, venueSlug, "purchasing/orders"),
+      icon: Package,
       items: [
         {
-          title: "Items",
-          url: buildScopedPath(organisationSlug, venueSlug, "catalog/items"),
-          icon: CookingPot,
-        },
-        {
-          title: "Menu",
-          url: buildScopedPath(organisationSlug, venueSlug, "catalog/menu"),
+          title: "Orders",
+          url: buildScopedPath(
+            organisationSlug,
+            venueSlug,
+            "purchasing/orders",
+          ),
           icon: ClipboardList,
-        },
-        {
-          title: "Ingredients",
-          url: buildScopedPath(
-            organisationSlug,
-            venueSlug,
-            "catalog/ingredients",
-          ),
-          icon: Carrot,
-        },
-      ],
-    },
-    {
-      title: "Inventory",
-      url: buildScopedPath(organisationSlug, venueSlug, "inventory"),
-      icon: Boxes,
-      items: [
-        {
-          title: "Overview",
-          url: buildScopedPath(
-            organisationSlug,
-            venueSlug,
-            "inventory/overview",
-          ),
-          icon: LayoutDashboard,
-        },
-        {
-          title: "Order Guide",
-          url: buildScopedPath(
-            organisationSlug,
-            venueSlug,
-            "inventory/order-guide",
-          ),
-          icon: FileText,
-        },
-        {
-          title: "Purchase Orders",
-          url: buildScopedPath(
-            organisationSlug,
-            venueSlug,
-            "inventory/purchase-orders",
-          ),
-          icon: ShoppingCart,
         },
         {
           title: "Invoices",
           url: buildScopedPath(
             organisationSlug,
             venueSlug,
-            "inventory/invoices",
+            "purchasing/invoices",
           ),
           icon: Receipt,
-        },
-        {
-          title: "Stock Counts",
-          url: buildScopedPath(
-            organisationSlug,
-            venueSlug,
-            "inventory/stock-counts",
-          ),
-          icon: PackageCheck,
-        },
-        {
-          title: "Waste",
-          url: buildScopedPath(organisationSlug, venueSlug, "inventory/waste"),
-          icon: Trash2,
         },
         {
           title: "Suppliers",
           url: buildScopedPath(
             organisationSlug,
             venueSlug,
-            "inventory/suppliers",
+            "purchasing/suppliers",
           ),
           icon: Truck,
+        },
+      ],
+    },
+    {
+      title: "Stock Management",
+      url: buildScopedPath(
+        organisationSlug,
+        venueSlug,
+        "stock-management/stock-counts",
+      ),
+      icon: BookOpen,
+      items: [
+        {
+          title: "Stock Counts",
+          url: buildScopedPath(
+            organisationSlug,
+            venueSlug,
+            "stock-management/stock-counts",
+          ),
+          icon: ListOrdered,
+        },
+        {
+          title: "Waste",
+          url: buildScopedPath(
+            organisationSlug,
+            venueSlug,
+            "stock-management/waste",
+          ),
+          icon: Trash2,
         },
       ],
     },
@@ -350,11 +335,6 @@ function makePlatformNavItems(
           icon: Building2,
         },
         {
-          title: "Venue",
-          url: buildScopedPath(organisationSlug, venueSlug, "settings/venue"),
-          icon: MapPin,
-        },
-        {
           title: "Integrations",
           url: buildScopedPath(
             organisationSlug,
@@ -362,6 +342,15 @@ function makePlatformNavItems(
             "settings/integrations",
           ),
           icon: Plug,
+        },
+        {
+          title: "Inventory Setup",
+          url: buildScopedPath(
+            organisationSlug,
+            venueSlug,
+            "settings/inventory-setup",
+          ),
+          icon: Package,
         },
       ],
     },
@@ -387,11 +376,14 @@ function applySettingsNavAccess(
         if (child.url.endsWith("/settings/organisation")) {
           return access.canSeeOrganisation;
         }
-        if (child.url.endsWith("/settings/venue")) {
-          return access.canSeeVenue;
-        }
         if (child.url.endsWith("/settings/integrations")) {
           return access.canSeePermissions;
+        }
+        if (
+          child.url.endsWith("/settings/inventory-setup") ||
+          child.url.endsWith("/settings/inventory")
+        ) {
+          return access.canSeeSettingsNav;
         }
         return true;
       });
@@ -403,17 +395,11 @@ function applySettingsNavAccess(
     .filter((item): item is AccessControlledItem => item !== null);
 }
 
-const defaultTopPlatformNavItems: NavMainItem[] = [
+const helpNavItems: NavMainItem[] = [
   {
-    title: "Agent",
-    url: "/agent",
-    icon: BotMessageSquare,
-    exact: true,
-  },
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: LayoutDashboard,
+    title: "About",
+    url: "/about",
+    icon: Cpu,
     exact: true,
   },
   {
@@ -480,16 +466,40 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const router = useRouter();
   const currentUser = useMeStore((state) => state.currentUser);
   const features = currentUser?.features ?? [];
+  const { data: onboardingState } = useOnboardingStateQuery();
   const needsSetupNav =
-    pathname.startsWith("/setup") || Boolean(currentUser?.needsSetup);
-  const topPlatformNavItems = needsSetupNav
-    ? setupOnlyPlatformNavItems
-    : defaultTopPlatformNavItems;
-  const {
-    activeScopedContext,
-    resolvedScope,
-    setScopedContext,
-  } = useScopedNavigation();
+    Boolean(currentUser?.needsSetup) ||
+    (pathname.startsWith("/setup") &&
+      (!onboardingState || !onboardingState.completed));
+  const topPlatformNavItems = useMemo(() => {
+    if (!needsSetupNav) {
+      return [];
+    }
+    return setupOnlyPlatformNavItems;
+  }, [needsSetupNav]);
+
+  const { activeScopedContext, resolvedScope, setScopedContext } =
+    useScopedNavigation();
+
+  useEffect(() => {
+    if (
+      !needsSetupNav ||
+      !onboardingState ||
+      onboardingState.completed ||
+      !onboardingState.organisationSlug ||
+      !onboardingState.primaryVenueSlug
+    ) {
+      return;
+    }
+    setScopedContext({
+      organisationSlug: onboardingState.organisationSlug,
+      venueSlug: onboardingState.primaryVenueSlug,
+    });
+    setVenueScopeCookieClient({
+      organisationSlug: onboardingState.organisationSlug,
+      venueSlug: onboardingState.primaryVenueSlug,
+    });
+  }, [needsSetupNav, onboardingState, setScopedContext]);
   const { data: accessOrganisations = [] } = useAccessibleVenueGroupsQuery({
     enabled: Boolean(resolvedScope?.organisationSlug),
   });
@@ -528,6 +538,49 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     features,
   );
 
+  const { data: venueReadiness } = useVenueReadinessQuery({
+    organisationSlug: resolvedScope?.organisationSlug,
+    venueSlug: resolvedScope?.venueSlug,
+    enabled: Boolean(resolvedScope && !needsSetupNav),
+  });
+
+  const readinessNavItems = useMemo(
+    () => applyReadinessToNavItems(visiblePlatformItems, venueReadiness ?? null),
+    [visiblePlatformItems, venueReadiness],
+  );
+
+  const [readinessModal, setReadinessModal] = useState<{
+    moduleTitle: string;
+    blockers: ReadinessBlockerDto[];
+  } | null>(null);
+
+  const handleLockedNavClick = (target: LockedNavTarget) => {
+    const suffix = pathSuffixFromScopedNavUrl(target.url);
+    const moduleId = suffix ? readinessModuleIdFromPathSuffix(suffix) : null;
+    const moduleState =
+      (moduleId
+        ? venueReadiness?.modulesDetailed.find(
+            (candidate) => candidate.id === moduleId,
+          )
+        : null) ??
+      venueReadiness?.modulesDetailed.find(
+        (candidate) =>
+          candidate.status !== "unlocked" && candidate.title === target.title,
+      ) ??
+      venueReadiness?.modulesDetailed.find(
+        (candidate) => candidate.status !== "unlocked",
+      );
+
+    if (!moduleState?.blockers.length) {
+      return;
+    }
+
+    setReadinessModal({
+      moduleTitle: target.title,
+      blockers: moduleState.blockers,
+    });
+  };
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -539,14 +592,16 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               priority
             />
           </div>
-          <div className="hidden min-h-10 items-center justify-center group-data-[collapsible=icon]:flex">
-            <SupersoltLogo variant="mark" className="h-7 w-auto" priority />
+          <div className="hidden min-h-10 w-full items-center justify-center group-data-[collapsible=icon]:flex">
+            <SupersoltLogo variant="mark" className="h-8 w-auto" priority />
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
-        <NavMain title="Platform" items={topPlatformNavItems} />
+        {topPlatformNavItems.length > 0 ? (
+          <NavMain title="Platform" items={topPlatformNavItems} />
+        ) : null}
         {!needsSetupNav ? (
           <>
             <Separator className="my-0.5" />
@@ -556,10 +611,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
               }
               currentVenueSlug={activeScopedContext?.venueSlug ?? null}
               onVenueChange={(venue: Venue) => {
-                setScopedContext({
+                const nextScope = {
                   organisationSlug: venue.organisationSlug,
                   venueSlug: venue.slug,
-                });
+                };
+                setScopedContext(nextScope);
+                setVenueScopeCookieClient(nextScope);
                 const nextPath = buildVenueNavigationPath(
                   pathname,
                   venue.organisationSlug,
@@ -573,16 +630,39 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         {resolvedScope && !needsSetupNav ? (
           <NavMain
             className="-mt-2"
-            items={visiblePlatformItems}
+            items={readinessNavItems}
             enableStaggeredAnimation
             staggerBaseDelay={0.06}
             staggerIncrementDelay={0.06}
+            onLockedNavClick={venueReadiness?.appliesGating ? handleLockedNavClick : undefined}
           />
         ) : null}
+        <NavMain className="mt-auto" items={helpNavItems} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
       </SidebarFooter>
+      {resolvedScope && !needsSetupNav && venueReadiness?.appliesGating ? (
+        <>
+          <ReadinessNavModal
+            open={Boolean(readinessModal)}
+            onOpenChange={(open) => {
+              if (!open) {
+                setReadinessModal(null);
+              }
+            }}
+            moduleTitle={readinessModal?.moduleTitle ?? ""}
+            moduleId={null}
+            blockers={readinessModal?.blockers ?? []}
+            organisationSlug={resolvedScope.organisationSlug}
+            venueSlug={resolvedScope.venueSlug}
+          />
+          <ReadinessUnlockCelebration
+            organisationSlug={resolvedScope.organisationSlug}
+            venueSlug={resolvedScope.venueSlug}
+          />
+        </>
+      ) : null}
     </Sidebar>
   );
 }

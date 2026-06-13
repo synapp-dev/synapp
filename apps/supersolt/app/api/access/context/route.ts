@@ -1,40 +1,17 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import { loadAccessContextForUser } from "@/server/access/load-access-context-for-user";
 
-export async function GET() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      {
-        data: null,
-        error: {
-          message: "Unauthorized",
-          status: 401,
-        },
-      },
-      { status: 401 }
-    );
+export async function GET(request: Request) {
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
-  const result = await loadAccessContextForUser(supabase, user.id);
+  const result = await loadAccessContextForUser(ctx.appDb, ctx.userId);
   if (result.error) {
-    return NextResponse.json(
-      {
-        data: null,
-        error: {
-          message: result.error.message,
-          status: 500,
-        },
-      },
-      { status: 500 }
-    );
+    return validationErrorResponse(result.error.message, 500);
   }
 
-  return NextResponse.json({ data: result.data, error: null });
+  return jsonDataResponse(result.data);
 }

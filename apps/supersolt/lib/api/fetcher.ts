@@ -1,23 +1,19 @@
 import type { RequestInit } from "next/dist/server/web/spec-extension/request";
-import { createServerClient } from "@/utils/supabase/server";
+import { headers } from "next/headers";
 
 type ApiOk<T> = { data: T; error: null };
 type ApiErr = { data: null; error: { message: string; status?: number } };
 export type ApiResult<T> = ApiOk<T> | ApiErr;
 
 async function withAuth(init?: RequestInit): Promise<RequestInit> {
-  const headers = new Headers(init?.headers);
-  const supabase = await createServerClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-
-  const token = session?.access_token;
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
+  const headersOut = new Headers(init?.headers);
+  const incoming = await headers();
+  const cookie = incoming.get("cookie");
+  if (cookie) {
+    headersOut.set("cookie", cookie);
   }
 
-  return { ...init, headers };
+  return { ...init, headers: headersOut };
 }
 
 export async function apiFetch<T>(

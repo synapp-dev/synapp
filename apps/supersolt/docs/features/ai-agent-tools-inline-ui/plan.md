@@ -194,3 +194,16 @@ Phased work that **extends** the same `/agent` + `/api/agent/chat` stack without
 - User flows + error states: [`flows.md`](flows.md)
 - Architecture source of truth: [ARCHITECTURE.md](../../../../../ARCHITECTURE.md)
 - Prior art (auth placement tone): [`../supersolt-authentication/plan.md`](../supersolt-authentication/plan.md)
+- Notion Agent row: [Module Overview](https://www.notion.so/34f64094bde68003a437faeae06a6bf5)
+- Program: [`module-overview-program.md`](../../module-overview-program.md)
+
+## Compliance audit (program 2026-06-01)
+
+| Notion Agent | Status | Notes |
+|--------------|--------|-------|
+| `/agent` multi-tenant chat | **Partial** | Plan + route exist |
+| Tool allowlist + widgets | **Partial** | Square payments; nav cards sub-feature |
+| Onboarding-driven agent on `/setup` | **Missing** | See [`onboarding/plan.md`](../onboarding/plan.md) |
+| Nav targets `purchasing/*` | **Verify** | [`app-navigation-catalog.ts`](../../../entities/ai-agent-chat/lib/app-navigation-catalog.ts) |
+
+**Updated:** 2026-06-01
