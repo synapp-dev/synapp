@@ -21,7 +21,7 @@ export default function MainLayout({
       <div className="mx-auto flex min-h-0 min-w-0 flex-1 max-w-7xl flex-col overflow-hidden">
         <AppHeader />
         <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-6">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-6 pb-[env(safe-area-inset-bottom)]">
             {children}
           </div>
         </SidebarInset>

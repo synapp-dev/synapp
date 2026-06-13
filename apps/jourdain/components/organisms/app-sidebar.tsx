@@ -256,7 +256,7 @@ const modulesNavItems: NavMainItem[] = [
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
-      <SidebarHeader>
+      <SidebarHeader className="pt-[env(safe-area-inset-top)]">
         <div className="px-2">
           <div className="flex min-h-10 items-start justify-center px-2 py-4 gap-0.5 group-data-[collapsible=icon]:hidden">
             <span className="text-xl font-semibold tracking-tight">
@@ -287,7 +287,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           staggerIncrementDelay={0.06}
         />
       </SidebarContent>
-      <SidebarFooter>
+      <SidebarFooter className="pb-[env(safe-area-inset-bottom)]">
         <NavUser />
       </SidebarFooter>
     </Sidebar>
