@@ -11,6 +11,8 @@ import { AgentCardView } from "@/components/organisms/agent-cards";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { tasksQueryKey, useUpdateTask } from "@/hooks/tasks/use-tasks";
 import { useDictation } from "@/hooks/use-dictation";
+import { useStreamingText } from "@/hooks/use-streaming-text";
+import { useMeStore } from "@/entities/me/model/store";
 import type {
   AgentCard,
   AgentChatMessage,
@@ -68,6 +70,19 @@ export default function AgentPage() {
   const updateTask = useUpdateTask();
 
   const hasConversation = messages.length > 0 || isThinking;
+
+  // Personalized greeting that types itself out on the welcome screen. Wait for
+  // the /api/me fetch to resolve so it streams the final text once (no flicker
+  // from a nameless first pass), then re-streams if the name arrives later.
+  const currentUser = useMeStore((state) => state.currentUser);
+  const meError = useMeStore((state) => state.error);
+  const meResolved = currentUser !== null || meError !== null;
+  const firstName = currentUser?.fullName?.trim().split(/\s+/)[0] ?? null;
+  const greeting = firstName
+    ? `What are we doing, ${firstName}?`
+    : "What are we doing?";
+  const greetingLen = useStreamingText(greeting, !hasConversation && meResolved);
+  const greetingDone = greetingLen >= greeting.length;
 
   const dictationBaseRef = useRef("");
   const {
@@ -272,8 +287,17 @@ export default function AgentPage() {
                 <source src="/videos/jourdain-orb-loop.mp4" type="video/mp4" />
               </video>
             </div>
-            <h1 className="text-center text-4xl font-semibold tracking-tight text-foreground">
-              What&apos;s brackin?
+            <h1
+              aria-label={greeting}
+              className="text-center text-4xl font-semibold tracking-tight text-foreground"
+            >
+              {greeting.slice(0, greetingLen)}
+              {!greetingDone ? (
+                <span
+                  aria-hidden
+                  className="ml-0.5 inline-block h-[0.85em] w-[3px] translate-y-[1px] animate-pulse rounded-full bg-foreground/70 align-middle"
+                />
+              ) : null}
             </h1>
           </div>
 
