@@ -8,10 +8,12 @@ import {
 import type {
   CreatePersonInput,
   Person,
+  PersonEmailResult,
   UpdatePersonInput,
 } from "@/entities/people/model/types";
 
 export const peopleQueryKey = ["people"] as const;
+export const personEmailsQueryKey = ["person-emails"] as const;
 
 export function usePeople() {
   return useQuery({
@@ -21,6 +23,19 @@ export function usePeople() {
       if (result.error) throw new Error(result.error.message);
       return result.data;
     },
+  });
+}
+
+export function usePersonEmails(personId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: [...personEmailsQueryKey, personId],
+    queryFn: async (): Promise<PersonEmailResult> => {
+      const result = await peopleApi.get.emails(personId as string);
+      if (result.error) throw new Error(result.error.message);
+      return result.data;
+    },
+    enabled: enabled && personId !== null,
+    staleTime: 60_000,
   });
 }
 

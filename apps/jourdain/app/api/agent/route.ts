@@ -9,9 +9,12 @@ import { createTask, listTasks, updateTask } from "@/lib/tasks/service";
 import {
   appendPersonFacts,
   createPerson,
+  getPerson,
   listPeople,
 } from "@/lib/people/service";
 import { syncTaskCalendarEvent } from "@/lib/google/task-sync";
+import { getGmailContext } from "@/lib/google/client";
+import { listPersonEmailThreads } from "@/lib/google/gmail";
 import type { AgentCard, AgentReply } from "@/entities/agent/model/types";
 import type { PersonCircle } from "@/entities/people/model/types";
 
@@ -83,6 +86,7 @@ You also keep the user's personal CRM — people in their life, grouped into cir
 - create_person: when the user mentions someone new worth remembering. Pass birthday words verbatim in "birthday" if given.
 - log_person_fact: when the user shares something about a person — life events, things they like, updates. Set mark_touch=true when the user actually interacted with them (caught up, called, saw them). Put durable hobbies/likes in "interests" as well.
 - list_people: when the user asks who's in a circle or about their relationships.
+- get_person_emails: when the user asks about email with someone — recent threads, what a contact said, or what they're waiting on. Call find_person first to get the id, then summarise the threads in a sentence or two; don't dump them verbatim.
 If the user shares a fact about someone who doesn't exist yet, create them first, then log the fact. Don't ask permission for this — capturing people-context silently is your job.
 
 When creating tasks, always categorize:
@@ -366,6 +370,48 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  const getPersonEmailsTool = betaZodTool({
+    name: "get_person_emails",
+    description:
+      "Read the user's recent Gmail threads with a specific person. Call when the user asks about emails from someone, what a contact said, or what they're waiting on. Requires the person id from find_person.",
+    inputSchema: z.object({
+      person_id: z.uuid(),
+    }),
+    run: async (input) => {
+      try {
+        const person = await getPerson(supabase, input.person_id);
+        if (!person) {
+          return JSON.stringify({ ok: false, error: "person not found" });
+        }
+        if (person.emails.length === 0) {
+          return JSON.stringify({
+            ok: true,
+            count: 0,
+            note: "no email address on file for this person",
+            threads: [],
+          });
+        }
+        const context = await getGmailContext(user.id);
+        if (!context) {
+          return JSON.stringify({
+            ok: false,
+            error: "the user's Google account is not connected",
+          });
+        }
+        const threads = await listPersonEmailThreads(
+          context.gmail,
+          person.emails
+        );
+        return JSON.stringify({ ok: true, count: threads.length, threads });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "email lookup failed",
+        });
+      }
+    },
+  });
+
   try {
     const anthropic = new Anthropic();
     const finalMessage = await anthropic.beta.messages.toolRunner({
@@ -380,6 +426,7 @@ export async function POST(request: NextRequest) {
         createPersonTool,
         logPersonFactTool,
         listPeopleTool,
+        getPersonEmailsTool,
       ],
       messages: parsed.data.messages.map((message) => ({
         role: message.role,

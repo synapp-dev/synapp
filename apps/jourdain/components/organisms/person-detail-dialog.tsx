@@ -21,6 +21,7 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { CIRCLE_CONFIG, lastTouchLabel } from "@/components/molecules/person-card";
+import { PersonEmails } from "@/components/molecules/person-emails";
 import {
   PERSON_CIRCLES,
   type Person,
@@ -235,6 +236,8 @@ function PersonEditor({ person, close }: { person: Person; close: () => void }) 
             </Button>
           </form>
         </div>
+
+        <PersonEmails personId={person.id} />
 
         {fieldError ? (
           <p className="text-sm text-destructive">{fieldError}</p>

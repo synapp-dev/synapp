@@ -3,6 +3,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 
 export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar",
+  "https://www.googleapis.com/auth/gmail.readonly",
   "https://www.googleapis.com/auth/userinfo.email",
 ];
 
@@ -52,4 +53,13 @@ export async function getCalendarContext(userId: string) {
   const auth = authorizedClientFor(connection);
   const calendar = google.calendar({ version: "v3", auth });
   return { connection, calendar };
+}
+
+/** Connection + authorized Gmail client; null when not connected. */
+export async function getGmailContext(userId: string) {
+  const connection = await getGoogleConnection(userId);
+  if (!connection) return null;
+  const auth = authorizedClientFor(connection);
+  const gmail = google.gmail({ version: "v1", auth });
+  return { connection, gmail };
 }

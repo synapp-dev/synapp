@@ -2,6 +2,7 @@ import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type {
   CreatePersonInput,
   Person,
+  PersonEmailResult,
   UpdatePersonInput,
 } from "@/entities/people/model/types";
 
@@ -15,6 +16,9 @@ export const peopleApi = {
   get: {
     list(): Promise<ApiResult<Person[]>> {
       return apiFetch<Person[]>("/people");
+    },
+    emails(personId: string): Promise<ApiResult<PersonEmailResult>> {
+      return apiFetch<PersonEmailResult>(`/people/${personId}/emails`);
     },
   },
   post: {
