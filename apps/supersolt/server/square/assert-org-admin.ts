@@ -1,35 +1,14 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
-
-type Supabase = SupabaseClient<Database>;
+import type { AppDb } from "@/server/db/create-app-db";
+import {
+  getUserTenantRoles,
+  isOrganisationAdmin,
+} from "@/server/auth/rbac";
 
 export async function userIsOrgAdmin(
-  supabase: Supabase,
+  appDb: AppDb,
   userId: string,
-  organisationId: string
+  organisationId: string,
 ): Promise<boolean> {
-  const { data: membership, error } = await supabase
-    .from("user_organisations")
-    .select("role_id")
-    .eq("user_profile_id", userId)
-    .eq("organisation_id", organisationId)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error || !membership?.role_id) {
-    return false;
-  }
-
-  const { data: role, error: roleError } = await supabase
-    .from("roles")
-    .select("grants_org_admin")
-    .eq("id", membership.role_id)
-    .maybeSingle();
-
-  if (roleError || !role) {
-    return false;
-  }
-
-  return role.grants_org_admin === true;
+  const tenantRoles = await getUserTenantRoles(appDb, userId);
+  return isOrganisationAdmin(tenantRoles, organisationId);
 }

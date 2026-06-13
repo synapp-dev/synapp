@@ -73,7 +73,7 @@ export async function listSquareInvoicesForVenue(args: {
 
   const collected: SquareInvoiceApiItem[] = [];
   let cursor: string | undefined;
-  const maxPages = 8;
+  const maxPages = 50;
 
   for (let page = 0; page < maxPages; page += 1) {
     const url = new URL(`${base}/v2/invoices`);

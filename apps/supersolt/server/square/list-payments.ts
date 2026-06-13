@@ -1,6 +1,13 @@
 import { getSquareBaseUrl, type SquareEnvironment } from "@/server/square/config";
 
 const SQUARE_API_VERSION = "2025-12-17";
+/** Square allows up to 100 payments per List Payments page. */
+const PAYMENTS_PAGE_SIZE = 100;
+/**
+ * Safety cap so a runaway cursor cannot loop forever.
+ * 500 pages × 100 = 50_000 payments per date-range request.
+ */
+const PAYMENTS_MAX_PAGES = 500;
 
 export type SquarePaymentListItem = {
   id?: string;
@@ -42,19 +49,26 @@ export async function listSquarePaymentsForVenue(args: {
   endTime: string;
   locationId?: string | null;
 }): Promise<
-  { ok: true; payments: SquarePaymentListItem[] } | { ok: false; message: string; status: number }
+  | {
+      ok: true;
+      payments: SquarePaymentListItem[];
+      truncated: boolean;
+      pagesFetched: number;
+    }
+  | { ok: false; message: string; status: number }
 > {
   const base = apiBaseForStoredEnv(args.storedEnvironment);
   const collected: SquarePaymentListItem[] = [];
   let cursor: string | undefined;
-  const maxPages = 8;
+  let pagesFetched = 0;
+  let truncated = false;
 
-  for (let page = 0; page < maxPages; page += 1) {
+  while (pagesFetched < PAYMENTS_MAX_PAGES) {
     const url = new URL(`${base}/v2/payments`);
     url.searchParams.set("begin_time", args.beginTime);
     url.searchParams.set("end_time", args.endTime);
     url.searchParams.set("sort_order", "DESC");
-    url.searchParams.set("limit", "100");
+    url.searchParams.set("limit", String(PAYMENTS_PAGE_SIZE));
     if (args.locationId) {
       url.searchParams.set("location_id", args.locationId);
     }
@@ -83,11 +97,25 @@ export async function listSquarePaymentsForVenue(args: {
 
     const batch = body.payments ?? [];
     collected.push(...batch);
+    pagesFetched += 1;
     cursor = body.cursor;
     if (!cursor || batch.length === 0) {
       break;
     }
   }
 
-  return { ok: true, payments: collected };
+  if (cursor) {
+    truncated = true;
+    console.warn(
+      "[square] list payments truncated",
+      JSON.stringify({
+        beginTime: args.beginTime,
+        endTime: args.endTime,
+        pagesFetched,
+        paymentCount: collected.length,
+      })
+    );
+  }
+
+  return { ok: true, payments: collected, truncated, pagesFetched };
 }

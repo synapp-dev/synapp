@@ -40,4 +40,18 @@ describe("safeRelativeNextPath", () => {
     expect(safeRelativeNextPath("/dash board")).toBeNull();
     expect(safeRelativeNextPath("/dash\nboard")).toBeNull();
   });
+
+  it("accepts oauth bridge paths with query strings", () => {
+    expect(
+      safeRelativeNextPath("/setup/oauth-bridge?provider=square&step=3"),
+    ).toBe("/setup/oauth-bridge?provider=square&step=3");
+  });
+
+  it("decodes once-encoded relative paths (legacy double-encoding)", () => {
+    expect(
+      safeRelativeNextPath(
+        "%2Fsetup%2Foauth-bridge%3Fprovider%3Dsquare%26step%3D3",
+      ),
+    ).toBe("/setup/oauth-bridge?provider=square&step=3");
+  });
 });

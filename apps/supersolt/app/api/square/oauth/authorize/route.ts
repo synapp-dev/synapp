@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
-import { userIsOrgAdmin } from "@/server/square/assert-org-admin";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+
+import { isOrganisationAdmin } from "@/server/auth/rbac";
+import { scopeRepo } from "@/server/db/scope.repo";
 import {
   attachSquareOAuthCookie,
   createSquareOAuthCookiePair,
@@ -20,18 +21,11 @@ export async function GET(request: NextRequest) {
     venue: request.nextUrl.searchParams.get("venue")?.trim() ?? "",
   });
 
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
   const authorizeUrl = request.nextUrl.toString();
 
-  if (authError || !user) {
-    oauthWarnAuthorize("unauthenticated", {
-      authError: Boolean(authError),
-    });
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    oauthWarnAuthorize("unauthenticated", { authError: true });
     const signIn = new URL("/auth", request.nextUrl.origin);
     signIn.searchParams.set("next", authorizeUrl);
     return NextResponse.redirect(signIn);
@@ -44,24 +38,24 @@ export async function GET(request: NextRequest) {
   if (!organisation || !venue) {
     oauthWarnAuthorize("missing_organisation_or_venue");
     return NextResponse.redirect(
-      new URL("/dashboard?square_error=missing_params", request.nextUrl.origin)
+      new URL("/dashboard?square_error=missing_params", request.nextUrl.origin),
     );
   }
 
-  const context = await ingredientsRepo.getVenueContextBySlugs(supabase, organisation, venue);
+  const context = await ctx.appDb.rls((tx) =>
+    scopeRepo.getVenueContextBySlugs(tx, organisation, venue),
+  );
   if (!context) {
     oauthWarnAuthorize("venue_not_found", { organisation, venue });
     return NextResponse.redirect(
-      new URL("/dashboard?square_error=venue_not_found", request.nextUrl.origin)
+      new URL("/dashboard?square_error=venue_not_found", request.nextUrl.origin),
     );
   }
 
-  const isAdmin = await userIsOrgAdmin(supabase, user.id, context.organisationId);
-  if (!isAdmin) {
+  if (!isOrganisationAdmin(ctx.tenantRoles, context.organisationId)) {
     oauthWarnAuthorize("forbidden_not_org_admin", {
       organisation,
       venue,
-      userId: user.id,
     });
     const dest = new URL(
       `/${organisation}/${venue}/settings/integrations`,
@@ -79,7 +73,7 @@ export async function GET(request: NextRequest) {
     const { cookieValue: cv, stateParam } = createSquareOAuthCookiePair({
       venueId: context.venueId,
       organisationId: context.organisationId,
-      userId: user.id,
+      userId: ctx.userId,
       orgSlug: organisation,
       venueSlug: venue,
       next: nextPath,
@@ -96,7 +90,6 @@ export async function GET(request: NextRequest) {
 
     const env = getSquareOAuthEnvConfig().environment;
     oauthLogAuthorize("redirecting_to_square", {
-      userId: user.id,
       organisation,
       venue,
       venueId: context.venueId,
@@ -110,7 +103,7 @@ export async function GET(request: NextRequest) {
       message: e instanceof Error ? e.message : String(e),
     });
     return NextResponse.redirect(
-      new URL("/dashboard?square_error=config", request.nextUrl.origin)
+      new URL("/dashboard?square_error=config", request.nextUrl.origin),
     );
   }
 
