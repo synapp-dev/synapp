@@ -300,7 +300,9 @@ export default function AgentPage() {
                 onChange={(event) => setInput(event.target.value)}
                 placeholder="Ask anything"
                 disabled={isThinking}
-                className="h-9 min-w-0 flex-1 border-0 bg-transparent px-0 text-sm text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent"
+                /* text-base (16px) on mobile stops iOS Safari auto-zooming on
+                   focus; sm:text-sm restores the 14px look on desktop. */
+                className="h-9 min-w-0 flex-1 border-0 bg-transparent px-0 text-base text-foreground shadow-none placeholder:text-muted-foreground focus-visible:border-transparent focus-visible:ring-0 sm:text-sm dark:bg-transparent"
               />
 
               <Button
