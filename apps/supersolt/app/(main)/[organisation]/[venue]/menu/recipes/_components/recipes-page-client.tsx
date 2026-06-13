@@ -43,6 +43,7 @@ import {
 type RecipesPageClientProps = {
   organisation: string;
   venue: string;
+  hidePageHeader?: boolean;
 };
 
 type RecipeStatus = RecipeSummary["status"];
@@ -104,7 +105,11 @@ function StatusIndicator({ status }: { status: RecipeStatus }) {
   }
 }
 
-export function RecipesPageClient({ organisation, venue }: RecipesPageClientProps) {
+export function RecipesPageClient({
+  organisation,
+  venue,
+  hidePageHeader = false,
+}: RecipesPageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -283,13 +288,17 @@ export function RecipesPageClient({ organisation, venue }: RecipesPageClientProp
   return (
     <>
       <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <CookingPot className="h-5 w-5 text-muted-foreground" />
-            Items
-          </h1>
-        </div>
-        <Separator />
+        {hidePageHeader ? null : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
+                <CookingPot className="h-5 w-5 text-muted-foreground" />
+                Items
+              </h1>
+            </div>
+            <Separator />
+          </>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative">

@@ -1,11 +1,11 @@
-import { IngredientsPageClient } from "@/app/(main)/[organisation]/[venue]/menu/ingredients/_components/ingredients-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function IngredientsPage({
+export default async function LegacyMenuIngredientsPage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <IngredientsPageClient organisation={organisation} venue={venue} />;
+  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/master-inventory-list"));
 }

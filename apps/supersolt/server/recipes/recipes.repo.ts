@@ -1,15 +1,30 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  isNull,
+  type SQL,
+} from "drizzle-orm";
 
-type Supabase = SupabaseClient<Database>;
+import type { RlsTx } from "@/server/db/drizzle";
+import {
+  recipeAllergens,
+  recipeIngredients,
+  recipeMethodSteps,
+  recipes,
+} from "@/server/db/schema";
 
-export type RecipeRow = Database["public"]["Tables"]["recipes"]["Row"];
-export type RecipeIngredientRow =
-  Database["public"]["Tables"]["recipe_ingredients"]["Row"];
-export type RecipeMethodStepRow =
-  Database["public"]["Tables"]["recipe_method_steps"]["Row"];
-export type RecipeAllergenRow =
-  Database["public"]["Tables"]["recipe_allergens"]["Row"];
+export type RecipeRow = typeof recipes.$inferSelect;
+export type RecipeInsert = typeof recipes.$inferInsert;
+export type RecipeUpdate = Partial<
+  Omit<RecipeInsert, "id" | "organisationId" | "venueId">
+>;
+export type RecipeIngredientRow = typeof recipeIngredients.$inferSelect;
+export type RecipeMethodStepRow = typeof recipeMethodSteps.$inferSelect;
+export type RecipeAllergenRow = typeof recipeAllergens.$inferSelect;
 
 export type RecipeIngredientInput = {
   ingredientId?: string | null;
@@ -21,34 +36,8 @@ export type RecipeIngredientInput = {
 };
 
 export const recipesRepo = {
-  async getVenueContextBySlugs(
-    supabase: Supabase,
-    organisationSlug: string,
-    venueSlug: string
-  ): Promise<{ organisationId: string; venueId: string } | null> {
-    const { data, error } = await supabase
-      .from("venues")
-      .select("id, organisation_id, organisations:organisation_id (slug)")
-      .eq("slug", venueSlug)
-      .eq("is_active", true)
-      .is("archived_at", null)
-      .eq("organisations.slug", organisationSlug)
-      .maybeSingle();
-
-    if (error || !data) {
-      return null;
-    }
-
-    const venueRow = data as { id: string; organisation_id: string };
-
-    return {
-      organisationId: venueRow.organisation_id,
-      venueId: venueRow.id,
-    };
-  },
-
   async listRecipes(
-    supabase: Supabase,
+    tx: RlsTx,
     args: {
       organisationId: string;
       venueId: string;
@@ -57,224 +46,192 @@ export const recipesRepo = {
       status?: string;
       page: number;
       pageSize: number;
-    }
+    },
   ): Promise<{ rows: RecipeRow[]; total: number }> {
-    const from = (args.page - 1) * args.pageSize;
-    const to = from + args.pageSize - 1;
-    let query = supabase
-      .from("recipes")
-      .select("*", { count: "exact" })
-      .eq("organisation_id", args.organisationId)
-      .eq("venue_id", args.venueId)
-      .is("archived_at", null);
+    const conditions: SQL[] = [
+      eq(recipes.organisationId, args.organisationId),
+      eq(recipes.venueId, args.venueId),
+      isNull(recipes.archivedAt),
+    ];
 
     if (args.search) {
-      query = query.ilike("name", `%${args.search}%`);
+      conditions.push(ilike(recipes.name, `%${args.search}%`));
     }
     if (args.category) {
-      query = query.eq("category", args.category);
+      conditions.push(eq(recipes.category, args.category));
     }
     if (args.status) {
-      query = query.eq("status", args.status);
+      conditions.push(eq(recipes.status, args.status));
     }
 
-    const { data, error, count } = await query
-      .order("updated_at", { ascending: false })
-      .range(from, to);
+    const where = and(...conditions);
+    const offset = (args.page - 1) * args.pageSize;
 
-    if (error) {
-      throw new Error(error.message);
-    }
+    const [rows, totalRow] = await Promise.all([
+      tx
+        .select()
+        .from(recipes)
+        .where(where)
+        .orderBy(desc(recipes.updatedAt))
+        .limit(args.pageSize)
+        .offset(offset),
+      tx.select({ value: count() }).from(recipes).where(where),
+    ]);
 
     return {
-      rows: (data ?? []) as RecipeRow[],
-      total: count ?? 0,
+      rows,
+      total: Number(totalRow[0]?.value ?? 0),
     };
   },
 
   async getRecipeById(
-    supabase: Supabase,
-    args: { organisationId: string; venueId: string; recipeId: string }
+    tx: RlsTx,
+    args: { organisationId: string; venueId: string; recipeId: string },
   ): Promise<RecipeRow | null> {
-    const { data, error } = await supabase
-      .from("recipes")
-      .select("*")
-      .eq("id", args.recipeId)
-      .eq("organisation_id", args.organisationId)
-      .eq("venue_id", args.venueId)
-      .is("archived_at", null)
-      .maybeSingle();
+    const rows = await tx
+      .select()
+      .from(recipes)
+      .where(
+        and(
+          eq(recipes.id, args.recipeId),
+          eq(recipes.organisationId, args.organisationId),
+          eq(recipes.venueId, args.venueId),
+          isNull(recipes.archivedAt),
+        ),
+      )
+      .limit(1);
 
-    if (error) {
-      throw new Error(error.message);
-    }
-    return (data as RecipeRow | null) ?? null;
+    return rows[0] ?? null;
   },
 
-  async createRecipe(
-    supabase: Supabase,
-    row: Database["public"]["Tables"]["recipes"]["Insert"]
-  ): Promise<RecipeRow> {
-    const { data, error } = await supabase
-      .from("recipes")
-      .insert(row)
-      .select("*")
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
+  async createRecipe(tx: RlsTx, row: RecipeInsert): Promise<RecipeRow> {
+    const inserted = await tx.insert(recipes).values(row).returning();
+    const created = inserted[0];
+    if (!created) {
+      throw new Error("Failed to create recipe");
     }
-    return data as RecipeRow;
+    return created;
   },
 
   async updateRecipe(
-    supabase: Supabase,
+    tx: RlsTx,
     args: {
       organisationId: string;
       venueId: string;
       recipeId: string;
-      row: Database["public"]["Tables"]["recipes"]["Update"];
-    }
+      row: RecipeUpdate;
+    },
   ): Promise<RecipeRow | null> {
-    const { data, error } = await supabase
-      .from("recipes")
-      .update(args.row)
-      .eq("id", args.recipeId)
-      .eq("organisation_id", args.organisationId)
-      .eq("venue_id", args.venueId)
-      .is("archived_at", null)
-      .select("*")
-      .maybeSingle();
+    const updated = await tx
+      .update(recipes)
+      .set(args.row)
+      .where(
+        and(
+          eq(recipes.id, args.recipeId),
+          eq(recipes.organisationId, args.organisationId),
+          eq(recipes.venueId, args.venueId),
+          isNull(recipes.archivedAt),
+        ),
+      )
+      .returning();
 
-    if (error) {
-      throw new Error(error.message);
-    }
-    return (data as RecipeRow | null) ?? null;
+    return updated[0] ?? null;
   },
 
   async softDeleteRecipe(
-    supabase: Supabase,
-    args: { organisationId: string; venueId: string; recipeId: string }
+    tx: RlsTx,
+    args: { organisationId: string; venueId: string; recipeId: string },
   ): Promise<boolean> {
-    const { data, error } = await supabase
-      .from("recipes")
-      .update({
+    const now = new Date().toISOString();
+    const updated = await tx
+      .update(recipes)
+      .set({
         status: "archived",
-        is_active: false,
-        archived_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        isActive: false,
+        archivedAt: now,
+        updatedAt: now,
       })
-      .eq("id", args.recipeId)
-      .eq("organisation_id", args.organisationId)
-      .eq("venue_id", args.venueId)
-      .is("archived_at", null)
-      .select("id")
-      .maybeSingle();
+      .where(
+        and(
+          eq(recipes.id, args.recipeId),
+          eq(recipes.organisationId, args.organisationId),
+          eq(recipes.venueId, args.venueId),
+          isNull(recipes.archivedAt),
+        ),
+      )
+      .returning({ id: recipes.id });
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return Boolean(data?.id);
+    return updated.length > 0;
   },
 
   async listIngredients(
-    supabase: Supabase,
-    recipeId: string
+    tx: RlsTx,
+    recipeId: string,
   ): Promise<RecipeIngredientRow[]> {
-    const { data, error } = await supabase
-      .from("recipe_ingredients")
-      .select("*")
-      .eq("recipe_id", recipeId)
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    return (data ?? []) as RecipeIngredientRow[];
+    return tx
+      .select()
+      .from(recipeIngredients)
+      .where(eq(recipeIngredients.recipeId, recipeId))
+      .orderBy(asc(recipeIngredients.sortOrder));
   },
 
   async listMethodSteps(
-    supabase: Supabase,
-    recipeId: string
+    tx: RlsTx,
+    recipeId: string,
   ): Promise<RecipeMethodStepRow[]> {
-    const { data, error } = await supabase
-      .from("recipe_method_steps")
-      .select("*")
-      .eq("recipe_id", recipeId)
-      .order("step_order", { ascending: true });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    return (data ?? []) as RecipeMethodStepRow[];
+    return tx
+      .select()
+      .from(recipeMethodSteps)
+      .where(eq(recipeMethodSteps.recipeId, recipeId))
+      .orderBy(asc(recipeMethodSteps.stepOrder));
   },
 
   async listAllergens(
-    supabase: Supabase,
-    recipeId: string
+    tx: RlsTx,
+    recipeId: string,
   ): Promise<RecipeAllergenRow[]> {
-    const { data, error } = await supabase
-      .from("recipe_allergens")
-      .select("*")
-      .eq("recipe_id", recipeId)
-      .order("allergen_code", { ascending: true });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-    return (data ?? []) as RecipeAllergenRow[];
+    return tx
+      .select()
+      .from(recipeAllergens)
+      .where(eq(recipeAllergens.recipeId, recipeId))
+      .orderBy(asc(recipeAllergens.allergenCode));
   },
 
   async replaceIngredients(
-    supabase: Supabase,
+    tx: RlsTx,
     recipeId: string,
-    ingredients: RecipeIngredientInput[]
+    ingredients: RecipeIngredientInput[],
   ): Promise<void> {
-    const { error: deleteError } = await supabase
-      .from("recipe_ingredients")
-      .delete()
-      .eq("recipe_id", recipeId);
-    if (deleteError) {
-      throw new Error(deleteError.message);
-    }
+    await tx
+      .delete(recipeIngredients)
+      .where(eq(recipeIngredients.recipeId, recipeId));
 
     if (ingredients.length === 0) {
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from("recipe_ingredients")
-      .insert(
-        ingredients.map((item, index) => ({
-          recipe_id: recipeId,
-          ingredient_id: item.ingredientId ?? null,
-          ingredient_name: item.name,
-          quantity: item.quantity,
-          unit: item.unit,
-          unit_cost_cents: item.unitCostCents,
-          is_sub_recipe: item.isSubRecipe,
-          sort_order: index + 1,
-        }))
-      );
-
-    if (insertError) {
-      throw new Error(insertError.message);
-    }
+    await tx.insert(recipeIngredients).values(
+      ingredients.map((item, index) => ({
+        recipeId,
+        ingredientId: item.ingredientId ?? null,
+        ingredientName: item.name,
+        quantity: String(item.quantity),
+        unit: item.unit,
+        unitCostCents: item.unitCostCents,
+        isSubRecipe: item.isSubRecipe,
+        sortOrder: index + 1,
+      })),
+    );
   },
 
   async replaceMethodSteps(
-    supabase: Supabase,
+    tx: RlsTx,
     recipeId: string,
-    steps: string[]
+    steps: string[],
   ): Promise<void> {
-    const { error: deleteError } = await supabase
-      .from("recipe_method_steps")
-      .delete()
-      .eq("recipe_id", recipeId);
-    if (deleteError) {
-      throw new Error(deleteError.message);
-    }
+    await tx
+      .delete(recipeMethodSteps)
+      .where(eq(recipeMethodSteps.recipeId, recipeId));
 
     const normalized = steps
       .map((step) => step.trim())
@@ -283,55 +240,40 @@ export const recipesRepo = {
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from("recipe_method_steps")
-      .insert(
-        normalized.map((instruction, index) => ({
-          recipe_id: recipeId,
-          step_order: index + 1,
-          instruction,
-        }))
-      );
-    if (insertError) {
-      throw new Error(insertError.message);
-    }
+    await tx.insert(recipeMethodSteps).values(
+      normalized.map((instruction, index) => ({
+        recipeId,
+        stepOrder: index + 1,
+        instruction,
+      })),
+    );
   },
 
   async replaceAllergens(
-    supabase: Supabase,
+    tx: RlsTx,
     recipeId: string,
-    allergens: string[]
+    allergens: string[],
   ): Promise<void> {
-    const { error: deleteError } = await supabase
-      .from("recipe_allergens")
-      .delete()
-      .eq("recipe_id", recipeId);
-    if (deleteError) {
-      throw new Error(deleteError.message);
-    }
+    await tx
+      .delete(recipeAllergens)
+      .where(eq(recipeAllergens.recipeId, recipeId));
 
     const normalized = Array.from(
       new Set(
         allergens
           .map((allergen) => allergen.trim())
-          .filter((allergen) => allergen.length > 0)
-      )
+          .filter((allergen) => allergen.length > 0),
+      ),
     );
     if (normalized.length === 0) {
       return;
     }
 
-    const { error: insertError } = await supabase
-      .from("recipe_allergens")
-      .insert(
-        normalized.map((allergenCode) => ({
-          recipe_id: recipeId,
-          allergen_code: allergenCode,
-        }))
-      );
-
-    if (insertError) {
-      throw new Error(insertError.message);
-    }
+    await tx.insert(recipeAllergens).values(
+      normalized.map((allergenCode) => ({
+        recipeId,
+        allergenCode,
+      })),
+    );
   },
 };

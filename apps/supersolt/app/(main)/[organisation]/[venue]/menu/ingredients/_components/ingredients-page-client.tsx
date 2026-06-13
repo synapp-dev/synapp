@@ -40,6 +40,7 @@ import type {
 type IngredientsPageClientProps = {
   organisation: string;
   venue: string;
+  hidePageHeader?: boolean;
 };
 
 const CATEGORIES: Array<{ value: IngredientCategory; label: string }> = [
@@ -106,7 +107,11 @@ function formatInputCurrency(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
-export function IngredientsPageClient({ organisation, venue }: IngredientsPageClientProps) {
+export function IngredientsPageClient({
+  organisation,
+  venue,
+  hidePageHeader = false,
+}: IngredientsPageClientProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [sheetMode, setSheetMode] = useState<"create" | "edit" | null>(null);
   const [editingIngredient, setEditingIngredient] = useState<IngredientSummary | null>(null);
@@ -252,13 +257,17 @@ export function IngredientsPageClient({ organisation, venue }: IngredientsPageCl
   return (
     <>
       <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
-            <Package className="h-5 w-5 text-muted-foreground" />
-            Ingredients
-          </h1>
-        </div>
-        <Separator />
+        {hidePageHeader ? null : (
+          <>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
+                <Package className="h-5 w-5 text-muted-foreground" />
+                Ingredients
+              </h1>
+            </div>
+            <Separator />
+          </>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative">

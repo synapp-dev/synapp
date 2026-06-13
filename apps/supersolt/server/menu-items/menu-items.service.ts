@@ -1,11 +1,11 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
+import type { RequestAuthContext } from "@/server/auth/context";
+import { AuthError } from "@/server/auth/errors";
+import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import {
   menuItemsRepo,
   type MenuItemRecipeInput,
+  type MenuItemRow,
 } from "./menu-items.repo";
-
-type Supabase = SupabaseClient<Database>;
 
 const PRICE_MODES = ["MANUAL", "AUTO_FROM_RECIPE"] as const;
 const GST_MODES = ["INC", "EX"] as const;
@@ -40,7 +40,10 @@ export type MenuItemSummary = {
   recipeCount: number;
 };
 
-export type MenuItemDetail = Omit<MenuItemSummary, "recipeSummary" | "recipeCount"> & {
+export type MenuItemDetail = Omit<
+  MenuItemSummary,
+  "recipeSummary" | "recipeCount"
+> & {
   components: MenuItemRecipeComponent[];
 };
 
@@ -64,6 +67,13 @@ export class MenuItemsServiceError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+function mapAuthError(error: unknown): never {
+  if (error instanceof AuthError) {
+    throw new MenuItemsServiceError(error.status, error.message);
+  }
+  throw error;
 }
 
 function assertPriceMode(value: string): PriceMode {
@@ -91,68 +101,27 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function computeGpPercent(priceCents: number, costPerServeCents: number): number {
+export function computeGpPercent(priceCents: number, costPerServeCents: number): number {
   if (priceCents <= 0) {
     return 0;
   }
-  return Number((((priceCents - costPerServeCents) / priceCents) * 100).toFixed(2));
+  return Number(
+    (((priceCents - costPerServeCents) / priceCents) * 100).toFixed(2),
+  );
 }
 
-async function assertVenueAccess(
-  supabase: Supabase,
-  args: {
-    userId: string;
-    organisationId: string;
-    venueId: string;
-  }
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("user_organisations")
-    .select("id")
-    .eq("user_profile_id", args.userId)
-    .eq("organisation_id", args.organisationId)
-    .eq("is_active", true)
-    .is("archived_at", null);
-
-  if (error) {
-    throw new MenuItemsServiceError(500, error.message);
-  }
-
-  const membershipIds = (data ?? []).map((item) => item.id);
-  if (membershipIds.length === 0) {
-    throw new MenuItemsServiceError(403, "Forbidden");
-  }
-
-  const { data: venueAccess, error: venueError } = await supabase
-    .from("user_venues")
-    .select("id")
-    .in("user_organisation_id", membershipIds)
-    .eq("venue_id", args.venueId)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .limit(1);
-
-  if (venueError) {
-    throw new MenuItemsServiceError(500, venueError.message);
-  }
-
-  if (!venueAccess || venueAccess.length === 0) {
-    throw new MenuItemsServiceError(403, "Forbidden");
-  }
+async function resolveScope(
+  ctx: RequestAuthContext,
+  organisationSlug: string,
+  venueSlug: string,
+) {
+  return resolveVenueScopeForService(ctx, organisationSlug, venueSlug, {
+    notFound: (message) => new MenuItemsServiceError(404, message),
+    forbidden: (auth) => new MenuItemsServiceError(auth.status, auth.message),
+  });
 }
 
-function normalizeInput(input: UpsertMenuItemInput): {
-  name: string;
-  sectionName: string;
-  tags: string[];
-  priceMode: PriceMode;
-  gstMode: GstMode;
-  priceCents: number;
-  pluCode: string | null;
-  showOnMenu: boolean;
-  status: MenuItemStatus;
-  components: MenuItemRecipeInput[];
-} {
+function normalizeInput(input: UpsertMenuItemInput) {
   const name = input.name.trim();
   if (name.length === 0) {
     throw new MenuItemsServiceError(400, "Menu name is required");
@@ -173,7 +142,7 @@ function normalizeInput(input: UpsertMenuItemInput): {
   if (components.length === 0) {
     throw new MenuItemsServiceError(
       400,
-      "At least one recipe component is required"
+      "At least one recipe component is required",
     );
   }
 
@@ -181,7 +150,7 @@ function normalizeInput(input: UpsertMenuItemInput): {
     name,
     sectionName,
     tags: Array.from(
-      new Set((input.tags ?? []).map((tag) => tag.trim()).filter(Boolean))
+      new Set((input.tags ?? []).map((tag) => tag.trim()).filter(Boolean)),
     ),
     priceMode: assertPriceMode(input.priceMode),
     gstMode: assertGstMode(input.gstMode),
@@ -193,103 +162,129 @@ function normalizeInput(input: UpsertMenuItemInput): {
   };
 }
 
+function componentsFromLookup(
+  rows: Awaited<ReturnType<typeof menuItemsRepo.listComponentsForMenuItems>>,
+): MenuItemRecipeComponent[] {
+  return rows.map((component) => ({
+    recipeId: component.recipeId,
+    recipeName: component.recipeName ?? "Unknown recipe",
+    recipeCostPerServeCents: component.recipeCostPerServeCents ?? 0,
+    quantity: component.quantity,
+  }));
+}
+
 function toSummary(
-  row: Database["public"]["Tables"]["menu_items"]["Row"],
-  components: MenuItemRecipeComponent[]
+  row: MenuItemRow,
+  components: MenuItemRecipeComponent[],
 ): MenuItemSummary {
   const recipeNames = components.map((component) => component.recipeName);
   const recipeSummary =
     recipeNames.length === 0
       ? "No recipes"
       : recipeNames.length === 1
-        ? recipeNames[0] ?? "No recipes"
+        ? (recipeNames[0] ?? "No recipes")
         : `${recipeNames[0] ?? "Recipe"} +${recipeNames.length - 1}`;
 
   return {
     id: row.id,
-    sectionName: row.section_name,
+    sectionName: row.sectionName,
     name: row.name,
-    tags: row.tags,
-    priceMode: row.price_mode as PriceMode,
-    priceCents: row.price_cents,
-    gstMode: row.gst_mode as GstMode,
-    costPerServeCents: row.cost_per_serve_cents,
-    gpPercent: Number(row.gp_percent),
-    pluCode: row.plu_code ?? "",
-    showOnMenu: row.show_on_menu,
+    tags: row.tags ?? [],
+    priceMode: row.priceMode as PriceMode,
+    priceCents: row.priceCents,
+    gstMode: row.gstMode as GstMode,
+    costPerServeCents: row.costPerServeCents,
+    gpPercent: Number(row.gpPercent),
+    pluCode: row.pluCode ?? "",
+    showOnMenu: row.showOnMenu,
     status: row.status as MenuItemStatus,
-    updatedAt: row.updated_at,
+    updatedAt: row.updatedAt,
     recipeSummary,
     recipeCount: components.length,
   };
 }
 
+async function computeCostFromRecipes(
+  ctx: RequestAuthContext,
+  scope: { organisationId: string; venueId: string },
+  components: MenuItemRecipeInput[],
+) {
+  const recipeRows = await ctx.appDb.rls((tx) =>
+    menuItemsRepo.listScopedRecipesByIds(tx, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+      recipeIds: components.map((c) => c.recipeId),
+    }),
+  );
+  if (recipeRows.length !== components.length) {
+    throw new MenuItemsServiceError(400, "One or more recipes are invalid");
+  }
+
+  const recipeCostMap = new Map(
+    recipeRows.map((recipe) => [recipe.id, recipe.costPerServeCents] as const),
+  );
+  return components.reduce((sum, component) => {
+    return (
+      sum +
+      Math.round(
+        (recipeCostMap.get(component.recipeId) ?? 0) * component.quantity,
+      )
+    );
+  }, 0);
+}
+
 export const menuItemsService = {
   async list(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       search?: string;
       sectionName?: string;
       page?: number;
       pageSize?: number;
-    }
-  ): Promise<{
-    menuItems: MenuItemSummary[];
-    total: number;
-    sections: string[];
-  }> {
-    const context = await menuItemsRepo.getVenueContextBySlugs(
-      supabase,
-      args.organisationSlug,
-      args.venueSlug
-    );
-    if (!context) {
-      throw new MenuItemsServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
+    },
+  ) {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
     const page = Math.max(1, Number(args.page ?? 1));
     const pageSize = clampNumber(Number(args.pageSize ?? 20), 1, 200);
-    const result = await menuItemsRepo.listMenuItems(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      search: args.search?.trim() || undefined,
-      sectionName: args.sectionName?.trim() || undefined,
-      page,
-      pageSize,
-    });
 
-    const components = await menuItemsRepo.listComponentsForMenuItems(
-      supabase,
-      result.rows.map((row) => row.id)
+    const result = await ctx.appDb.rls((tx) =>
+      menuItemsRepo.listMenuItems(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        search: args.search?.trim() || undefined,
+        sectionName: args.sectionName?.trim() || undefined,
+        page,
+        pageSize,
+      }),
+    );
+
+    const components = await ctx.appDb.rls((tx) =>
+      menuItemsRepo.listComponentsForMenuItems(
+        tx,
+        result.rows.map((row) => row.id),
+      ),
     );
 
     const componentMap = new Map<string, MenuItemRecipeComponent[]>();
     for (const component of components) {
-      const list = componentMap.get(component.menu_item_id) ?? [];
+      const list = componentMap.get(component.menuItemId) ?? [];
       list.push({
-        recipeId: component.recipe_id,
-        recipeName: component.recipes?.name ?? "Unknown recipe",
-        recipeCostPerServeCents: component.recipes?.cost_per_serve_cents ?? 0,
-        quantity: Number(component.quantity),
+        recipeId: component.recipeId,
+        recipeName: component.recipeName ?? "Unknown recipe",
+        recipeCostPerServeCents: component.recipeCostPerServeCents ?? 0,
+        quantity: component.quantity,
       });
-      componentMap.set(component.menu_item_id, list);
+      componentMap.set(component.menuItemId, list);
     }
 
     const menuItems = result.rows.map((row) =>
-      toSummary(row, componentMap.get(row.id) ?? [])
+      toSummary(row, componentMap.get(row.id) ?? []),
     );
 
     const sections = Array.from(
-      new Set(menuItems.map((item) => item.sectionName))
+      new Set(menuItems.map((item) => item.sectionName)),
     ).sort((a, b) => a.localeCompare(b));
 
     return {
@@ -300,50 +295,32 @@ export const menuItemsService = {
   },
 
   async getById(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       menuItemId: string;
-    }
+    },
   ): Promise<MenuItemDetail | null> {
-    const context = await menuItemsRepo.getVenueContextBySlugs(
-      supabase,
-      args.organisationSlug,
-      args.venueSlug
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+
+    const row = await ctx.appDb.rls((tx) =>
+      menuItemsRepo.getMenuItemById(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        menuItemId: args.menuItemId,
+      }),
     );
-    if (!context) {
-      throw new MenuItemsServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
-    const row = await menuItemsRepo.getMenuItemById(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      menuItemId: args.menuItemId,
-    });
     if (!row) {
       return null;
     }
 
-    const componentsRows = await menuItemsRepo.listComponentsForMenuItem(
-      supabase,
-      row.id
+    const componentsRows = await ctx.appDb.rls((tx) =>
+      menuItemsRepo.listComponentsForMenuItem(tx, row.id),
     );
-    const components: MenuItemRecipeComponent[] = componentsRows.map((component) => ({
-      recipeId: component.recipe_id,
-      recipeName: component.recipes?.name ?? "Unknown recipe",
-      recipeCostPerServeCents: component.recipes?.cost_per_serve_cents ?? 0,
-      quantity: Number(component.quantity),
-    }));
-
+    const components = componentsFromLookup(componentsRows);
     const summary = toSummary(row, components);
+
     return {
       id: summary.id,
       sectionName: summary.sectionName,
@@ -363,80 +340,47 @@ export const menuItemsService = {
   },
 
   async create(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       input: UpsertMenuItemInput;
-    }
+    },
   ): Promise<MenuItemDetail> {
-    const context = await menuItemsRepo.getVenueContextBySlugs(
-      supabase,
-      args.organisationSlug,
-      args.venueSlug
-    );
-    if (!context) {
-      throw new MenuItemsServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
     const payload = normalizeInput(args.input);
-    const recipeRows = await menuItemsRepo.listScopedRecipesByIds(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      recipeIds: payload.components.map((component) => component.recipeId),
-    });
-    if (recipeRows.length !== payload.components.length) {
-      throw new MenuItemsServiceError(400, "One or more recipes are invalid");
-    }
-
-    const recipeCostMap = new Map(
-      recipeRows.map((recipe) => [recipe.id, recipe.cost_per_serve_cents] as const)
+    const costPerServeCents = await computeCostFromRecipes(
+      ctx,
+      scope,
+      payload.components,
     );
-    const costPerServeCents = payload.components.reduce((sum, component) => {
-      return (
-        sum +
-        Math.round(
-          (recipeCostMap.get(component.recipeId) ?? 0) * component.quantity
-        )
-      );
-    }, 0);
     const gpPercent = computeGpPercent(payload.priceCents, costPerServeCents);
 
-    const created = await menuItemsRepo.createMenuItem(supabase, {
-      organisation_id: context.organisationId,
-      venue_id: context.venueId,
-      section_name: payload.sectionName,
-      name: payload.name,
-      tags: payload.tags,
-      price_mode: payload.priceMode,
-      price_cents: payload.priceCents,
-      gst_mode: payload.gstMode,
-      cost_per_serve_cents: costPerServeCents,
-      gp_percent: gpPercent,
-      plu_code: payload.pluCode,
-      show_on_menu: payload.showOnMenu,
-      status: payload.status,
-      is_active: payload.status === "active",
-      created_by: args.userId,
-      updated_by: args.userId,
-      updated_at: new Date().toISOString(),
+    const created = await ctx.appDb.rls(async (tx) => {
+      const row = await menuItemsRepo.createMenuItem(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        sectionName: payload.sectionName,
+        name: payload.name,
+        tags: payload.tags,
+        priceMode: payload.priceMode,
+        priceCents: payload.priceCents,
+        gstMode: payload.gstMode,
+        costPerServeCents,
+        gpPercent: Math.round(gpPercent),
+        pluCode: payload.pluCode,
+        showOnMenu: payload.showOnMenu,
+        status: payload.status,
+        isActive: payload.status === "active",
+        createdBy: ctx.userId,
+        updatedBy: ctx.userId,
+        updatedAt: new Date().toISOString(),
+      });
+      await menuItemsRepo.replaceComponents(tx, row.id, payload.components);
+      return row;
     });
 
-    await menuItemsRepo.replaceComponents(
-      supabase,
-      created.id,
-      payload.components
-    );
-
-    const detail = await this.getById(supabase, {
-      userId: args.userId,
+    const detail = await this.getById(ctx, {
       organisationSlug: args.organisationSlug,
       venueSlug: args.venueSlug,
       menuItemId: created.id,
@@ -449,87 +393,57 @@ export const menuItemsService = {
   },
 
   async update(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       menuItemId: string;
       input: UpsertMenuItemInput;
-    }
+    },
   ): Promise<MenuItemDetail | null> {
-    const context = await menuItemsRepo.getVenueContextBySlugs(
-      supabase,
-      args.organisationSlug,
-      args.venueSlug
-    );
-    if (!context) {
-      throw new MenuItemsServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
     const payload = normalizeInput(args.input);
-    const recipeRows = await menuItemsRepo.listScopedRecipesByIds(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      recipeIds: payload.components.map((component) => component.recipeId),
-    });
-    if (recipeRows.length !== payload.components.length) {
-      throw new MenuItemsServiceError(400, "One or more recipes are invalid");
-    }
-
-    const recipeCostMap = new Map(
-      recipeRows.map((recipe) => [recipe.id, recipe.cost_per_serve_cents] as const)
+    const costPerServeCents = await computeCostFromRecipes(
+      ctx,
+      scope,
+      payload.components,
     );
-    const costPerServeCents = payload.components.reduce((sum, component) => {
-      return (
-        sum +
-        Math.round(
-          (recipeCostMap.get(component.recipeId) ?? 0) * component.quantity
-        )
-      );
-    }, 0);
     const gpPercent = computeGpPercent(payload.priceCents, costPerServeCents);
 
-    const updated = await menuItemsRepo.updateMenuItem(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      menuItemId: args.menuItemId,
-      row: {
-        section_name: payload.sectionName,
-        name: payload.name,
-        tags: payload.tags,
-        price_mode: payload.priceMode,
-        price_cents: payload.priceCents,
-        gst_mode: payload.gstMode,
-        cost_per_serve_cents: costPerServeCents,
-        gp_percent: gpPercent,
-        plu_code: payload.pluCode,
-        show_on_menu: payload.showOnMenu,
-        status: payload.status,
-        is_active: payload.status === "active",
-        updated_by: args.userId,
-        updated_at: new Date().toISOString(),
-      },
+    const updated = await ctx.appDb.rls(async (tx) => {
+      const row = await menuItemsRepo.updateMenuItem(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        menuItemId: args.menuItemId,
+        row: {
+          sectionName: payload.sectionName,
+          name: payload.name,
+          tags: payload.tags,
+          priceMode: payload.priceMode,
+          priceCents: payload.priceCents,
+          gstMode: payload.gstMode,
+          costPerServeCents,
+          gpPercent: Math.round(gpPercent),
+          pluCode: payload.pluCode,
+          showOnMenu: payload.showOnMenu,
+          status: payload.status,
+          isActive: payload.status === "active",
+          updatedBy: ctx.userId,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+      if (!row) {
+        return null;
+      }
+      await menuItemsRepo.replaceComponents(tx, row.id, payload.components);
+      return row;
     });
 
     if (!updated) {
       return null;
     }
 
-    await menuItemsRepo.replaceComponents(
-      supabase,
-      updated.id,
-      payload.components
-    );
-
-    return this.getById(supabase, {
-      userId: args.userId,
+    return this.getById(ctx, {
       organisationSlug: args.organisationSlug,
       venueSlug: args.venueSlug,
       menuItemId: updated.id,
@@ -537,33 +451,21 @@ export const menuItemsService = {
   },
 
   async delete(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       menuItemId: string;
-    }
+    },
   ): Promise<boolean> {
-    const context = await menuItemsRepo.getVenueContextBySlugs(
-      supabase,
-      args.organisationSlug,
-      args.venueSlug
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+
+    return ctx.appDb.rls((tx) =>
+      menuItemsRepo.softDeleteMenuItem(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        menuItemId: args.menuItemId,
+      }),
     );
-    if (!context) {
-      throw new MenuItemsServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
-    return menuItemsRepo.softDeleteMenuItem(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      menuItemId: args.menuItemId,
-    });
   },
 };

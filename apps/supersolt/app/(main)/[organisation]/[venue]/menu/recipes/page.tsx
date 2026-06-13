@@ -1,16 +1,11 @@
-import { RecipesPageClient } from "./_components/recipes-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function RecipesPage({
+export default async function LegacyMenuRecipesPage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-
-
-
-  return (
-    <RecipesPageClient organisation={organisation} venue={venue} />
-  );
+  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/recipes"));
 }

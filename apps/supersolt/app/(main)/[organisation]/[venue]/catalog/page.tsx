@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
 export default async function CatalogIndexPage({
   params,
@@ -6,5 +7,5 @@ export default async function CatalogIndexPage({
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-  redirect(`/${organisation}/${venue}/catalog/items`);
+  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/recipes"));
 }

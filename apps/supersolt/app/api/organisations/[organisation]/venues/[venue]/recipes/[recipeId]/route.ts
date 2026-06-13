@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
+
 import {
   recipesService,
   RecipesServiceError,
@@ -12,61 +14,31 @@ type RouteParams = {
   recipeId: string;
 };
 
-async function getUserId() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return { supabase, userId: null as string | null };
-  }
-
-  return { supabase, userId: user.id };
-}
-
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue, recipeId } = await context.params;
 
   try {
-    const data = await recipesService.getById(supabase, {
-      userId,
+    const data = await recipesService.getById(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       recipeId,
     });
 
     if (!data) {
-      return NextResponse.json(
-        { data: null, error: { message: "Recipe not found", status: 404 } },
-        { status: 404 }
-      );
+      return validationErrorResponse("Recipe not found", 404);
     }
 
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof RecipesServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "recipes");
   }
 }
 
@@ -74,20 +46,16 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue, recipeId } = await context.params;
   const payload = (await request.json()) as UpsertRecipeInput;
 
   try {
-    const data = await recipesService.update(supabase, {
-      userId,
+    const data = await recipesService.update(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       recipeId,
@@ -95,67 +63,39 @@ export async function PATCH(
     });
 
     if (!data) {
-      return NextResponse.json(
-        { data: null, error: { message: "Recipe not found", status: 404 } },
-        { status: 404 }
-      );
+      return validationErrorResponse("Recipe not found", 404);
     }
 
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof RecipesServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "recipes");
   }
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue, recipeId } = await context.params;
 
   try {
-    const deleted = await recipesService.delete(supabase, {
-      userId,
+    const deleted = await recipesService.delete(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       recipeId,
     });
 
     if (!deleted) {
-      return NextResponse.json(
-        { data: null, error: { message: "Recipe not found", status: 404 } },
-        { status: 404 }
-      );
+      return validationErrorResponse("Recipe not found", 404);
     }
 
-    return NextResponse.json({ data: { deleted: true }, error: null });
+    return jsonDataResponse({ deleted: true });
   } catch (error) {
-    if (error instanceof RecipesServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "recipes");
   }
 }
