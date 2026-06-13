@@ -46,6 +46,19 @@ function resolveDueDate(phrase: string | undefined): string | null {
   return parsed ? format(parsed, "yyyy-MM-dd") : null;
 }
 
+// Reminders need a precise moment (date AND time), not just a calendar day, so
+// the cron runner can push exactly when it arrives. We keep chrono's full
+// timestamp instead of truncating to a date like resolveDueDate does. Note:
+// time-of-day words ("5pm") are interpreted in the SERVER's timezone — UTC on
+// Vercel — until per-user timezones are threaded through here.
+function resolveRemindAt(phrase: string | undefined): string | null {
+  if (!phrase) return null;
+  const parsed = chrono.parseDate(phrase.trim(), new Date(), {
+    forwardDate: true,
+  });
+  return parsed ? parsed.toISOString() : null;
+}
+
 // Birthday phrases ("9 March", "March 9 1992") → month/day, year only when stated.
 function resolveBirthday(phrase: string | undefined): {
   birthdayMonth: number | null;
@@ -77,9 +90,10 @@ function buildSystemPrompt(): string {
 Today's date is ${today} (${weekday}).
 
 Tool guidance:
-- create_task: call this when the user asks to add, remember, schedule, or be reminded of something actionable. When the user mentions timing, pass their date words verbatim in "due" (e.g. "tomorrow", "next Wednesday", "June 20") — do not convert or calculate dates yourself.
+- create_task: call this when the user asks to add, remember, schedule, or be reminded of something actionable. When the user mentions a due day, pass their date words verbatim in "due" (e.g. "tomorrow", "next Wednesday", "June 20") — do not convert or calculate dates yourself. When the user wants to be reminded or notified AT A SPECIFIC TIME (a push to their phone), also pass their reminder words verbatim in "remind", including the time (e.g. "tomorrow at 5pm", "in 2 hours"). Use "remind" only when they actually asked to be reminded/notified at a time, not for every dated task.
 - list_tasks: call this when the user asks what's on their plate, what's due or overdue, or before completing a task you only know by name.
 - complete_task: call this when the user says they finished or did something. If you only know the task by title, call list_tasks first to find its id.
+- set_reminder: call this to add, change, or clear the push reminder on a task the user ALREADY has (e.g. "remind me about the dentist task at 3pm", "move my call-mum reminder to tomorrow morning"). Find the task id with list_tasks first if you only know its title.
 
 You also keep the user's personal CRM — people in their life, grouped into circles (work, friends, family):
 - find_person: ALWAYS call this first when the user mentions someone by name, to get their id and profile.
@@ -145,6 +159,13 @@ export async function POST(request: NextRequest) {
         .describe(
           'The user\'s timing words, verbatim — e.g. "tomorrow", "next Wednesday", "June 20". Omit if no timing was given. Do not calculate dates yourself.'
         ),
+      remind: z
+        .string()
+        .max(100)
+        .optional()
+        .describe(
+          'When the user wants a push notification at a specific time, their reminder words verbatim INCLUDING the time — e.g. "tomorrow at 5pm", "in 2 hours", "June 20 at 9am". Omit unless the user asked to be reminded/notified at a time. Do not calculate this yourself.'
+        ),
       notes: z.string().max(5000).optional().describe("Extra detail, if any"),
       priority: z
         .number()
@@ -167,6 +188,7 @@ export async function POST(request: NextRequest) {
         const task = await createTask(supabase, user.id, {
           title: input.title,
           dueDate: resolveDueDate(input.due),
+          remindAt: resolveRemindAt(input.remind),
           notes: input.notes ?? null,
           priority: (input.priority as 1 | 2 | 3 | 4 | undefined) ?? 4,
           domains: input.domains ?? [],
@@ -231,6 +253,35 @@ export async function POST(request: NextRequest) {
         return JSON.stringify({
           ok: false,
           error: err instanceof Error ? err.message : "complete failed",
+        });
+      }
+    },
+  });
+
+  const setReminderTool = betaZodTool({
+    name: "set_reminder",
+    description:
+      "Set or change the push-notification reminder time on an existing task. Call this when the user asks to be reminded/notified about a task they already have, or wants to move a reminder. Requires the task id — call list_tasks first if you only know the title. Pass an empty string for `remind` to clear the reminder.",
+    inputSchema: z.object({
+      task_id: z.uuid().describe("The id of the task to remind about"),
+      remind: z
+        .string()
+        .max(100)
+        .describe(
+          'The reminder words verbatim INCLUDING the time — e.g. "tomorrow at 5pm", "in 2 hours", "June 20 at 9am". Pass an empty string to clear the reminder. Do not calculate this yourself.'
+        ),
+    }),
+    run: async (input) => {
+      try {
+        const task = await updateTask(supabase, input.task_id, {
+          remindAt: input.remind.trim() ? resolveRemindAt(input.remind) : null,
+        });
+        cards.push({ type: "task_list", title: "Reminder set", tasks: [task] });
+        return JSON.stringify({ ok: true, task });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "set reminder failed",
         });
       }
     },
@@ -422,6 +473,7 @@ export async function POST(request: NextRequest) {
         createTaskTool,
         listTasksTool,
         completeTaskTool,
+        setReminderTool,
         findPersonTool,
         createPersonTool,
         logPersonFactTool,

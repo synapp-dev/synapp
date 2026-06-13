@@ -23,9 +23,17 @@ import {
 } from "@/hooks/tasks/use-tasks";
 import type { Task, TaskPriority } from "@/entities/tasks/model/types";
 
+// datetime-local is in the browser's local time; the API stores ISO/UTC.
+function localInputToIso(value: string): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export default function TasksPage() {
   const [title, setTitle] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [remindAt, setRemindAt] = useState("");
   const [priority, setPriority] = useState<TaskPriority>(4);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
@@ -43,11 +51,17 @@ export default function TasksPage() {
     const trimmed = title.trim();
     if (!trimmed || createTask.isPending) return;
     createTask.mutate(
-      { title: trimmed, dueDate: dueDate || null, priority },
+      {
+        title: trimmed,
+        dueDate: dueDate || null,
+        remindAt: localInputToIso(remindAt),
+        priority,
+      },
       {
         onSuccess: () => {
           setTitle("");
           setDueDate("");
+          setRemindAt("");
           setPriority(4);
         },
       },
@@ -77,7 +91,7 @@ export default function TasksPage() {
       </div>
 
       <form
-        className="flex items-center gap-2"
+        className="flex flex-wrap items-center gap-2"
         onSubmit={(event) => {
           event.preventDefault();
           handleCreate();
@@ -87,7 +101,7 @@ export default function TasksPage() {
           value={title}
           onChange={(event) => setTitle(event.target.value)}
           placeholder="Add a task..."
-          className="flex-1"
+          className="min-w-[12rem] flex-1"
         />
         <Input
           type="date"
@@ -95,6 +109,14 @@ export default function TasksPage() {
           onChange={(event) => setDueDate(event.target.value)}
           className="w-40"
           aria-label="Due date"
+        />
+        <Input
+          type="datetime-local"
+          value={remindAt}
+          onChange={(event) => setRemindAt(event.target.value)}
+          className="w-52"
+          aria-label="Reminder time"
+          title="Push a notification at this time"
         />
         <Select
           value={String(priority)}
