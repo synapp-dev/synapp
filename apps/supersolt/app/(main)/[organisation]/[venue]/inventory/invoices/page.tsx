@@ -1,11 +1,11 @@
-import { InvoicesPageClient } from "@/app/(main)/[organisation]/[venue]/inventory/invoices/_components/invoices-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function InventoryInvoicesPage({
+export default async function LegacyInventoryInvoicesPage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <InvoicesPageClient organisation={organisation} venue={venue} />;
+  redirect(buildScopedPath(organisation, venue, "purchasing/invoices"));
 }

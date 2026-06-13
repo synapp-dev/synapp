@@ -25,6 +25,7 @@ export function supplierDetailToUpsert(detail: SupplierDetail): UpsertSupplierIn
     certificateNumber: detail.certificateNumber,
     certificateExpiry: detail.certificateExpiry,
     notes: detail.notes,
+    orderingEmail: detail.orderingEmail ?? detail.email,
     deliverySchedule: detail.deliverySchedule,
     scheduleOverrides: detail.scheduleOverrides,
   };

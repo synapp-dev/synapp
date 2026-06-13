@@ -1,11 +1,11 @@
-import { OrderGuidePageClient } from "@/app/(main)/[organisation]/[venue]/inventory/order-guide/_components/order-guide-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function InventoryOrderGuidePage({
+export default async function LegacyInventoryOrderGuidePage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <OrderGuidePageClient organisation={organisation} venue={venue} />;
+  redirect(buildScopedPath(organisation, venue, "purchasing/orders"));
 }

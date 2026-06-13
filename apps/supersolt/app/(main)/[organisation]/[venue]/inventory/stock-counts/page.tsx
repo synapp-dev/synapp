@@ -1,11 +1,11 @@
-import { StockCountsPageClient } from "@/app/(main)/[organisation]/[venue]/inventory/stock-counts/_components/stock-counts-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function StockCountsPage({
+export default async function LegacyInventoryStockCountsPage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <StockCountsPageClient organisation={organisation} venue={venue} />;
+  redirect(buildScopedPath(organisation, venue, "stock-management/stock-counts"));
 }

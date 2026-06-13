@@ -1,11 +1,11 @@
-import { PurchaseOrdersPageClient } from "@/app/(main)/[organisation]/[venue]/inventory/purchase-orders/_components/purchase-orders-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function PurchaseOrdersPage({
+export default async function LegacyInventoryPurchaseOrdersPage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <PurchaseOrdersPageClient organisation={organisation} venue={venue} />;
+  redirect(buildScopedPath(organisation, venue, "purchasing/orders"));
 }

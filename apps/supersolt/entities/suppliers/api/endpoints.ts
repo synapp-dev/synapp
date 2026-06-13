@@ -11,6 +11,9 @@ type ListSuppliersInput = {
   search?: string;
   category?: string;
   status?: string;
+  archived?: boolean;
+  hasProducts?: boolean;
+  sort?: "name" | "last_invoice" | "ytd_spend";
   page?: number;
   pageSize?: number;
 };
@@ -37,6 +40,17 @@ export const suppliersApi = {
       }
       if (input.status && input.status !== "all") {
         params.set("status", input.status);
+      }
+      if (input.archived) {
+        params.set("archived", "true");
+      }
+      if (input.hasProducts === true) {
+        params.set("hasProducts", "true");
+      } else if (input.hasProducts === false) {
+        params.set("hasProducts", "false");
+      }
+      if (input.sort) {
+        params.set("sort", input.sort);
       }
       if (input.page) {
         params.set("page", String(input.page));

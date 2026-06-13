@@ -1,11 +1,11 @@
-import { WastePageClient } from "@/app/(main)/[organisation]/[venue]/inventory/waste/_components/waste-page-client";
+import { redirect } from "next/navigation";
+import { buildScopedPath } from "@/lib/build-scoped-path";
 
-export default async function InventoryWastePage({
+export default async function LegacyInventoryWastePage({
   params,
 }: {
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <WastePageClient organisation={organisation} venue={venue} />;
+  redirect(buildScopedPath(organisation, venue, "stock-management/waste"));
 }

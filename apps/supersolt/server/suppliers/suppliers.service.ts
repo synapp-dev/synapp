@@ -1,19 +1,22 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
 import type {
   DeliveryScheduleEntry,
   ScheduleOverrideEntry,
 } from "@/entities/suppliers/model/schedule-types";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
-import { suppliersRepo } from "@/server/suppliers/suppliers.repo";
+import type { RequestAuthContext } from "@/server/auth/context";
+import { AuthError } from "@/server/auth/errors";
+import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
+import {
+  suppliersRepo,
+  type SupplierInsert,
+  type SupplierRow,
+  type SupplierUpdate,
+} from "@/server/suppliers/suppliers.repo";
 import {
   parseDeliverySchedule,
   parseScheduleOverrides,
   serializeDeliverySchedule,
   serializeScheduleOverrides,
 } from "@/server/suppliers/supplier-schedule";
-
-type Supabase = SupabaseClient<Database>;
 
 const SUPPLIER_CATEGORIES = [
   "produce",
@@ -31,6 +34,7 @@ export type SupplierSummary = {
   name: string;
   contactPerson: string;
   email: string;
+  orderingEmail: string;
   phone: string;
   abn: string;
   category: SupplierCategory;
@@ -40,7 +44,9 @@ export type SupplierSummary = {
   deliveryDays: string;
   orderMethod: string;
   monthlySpendCents: number;
+  ytdSpendCents: number;
   productCount: number;
+  lastInvoiceDate: string | null;
   updatedAt: string;
 };
 
@@ -83,6 +89,7 @@ export type UpsertSupplierInput = {
   certificateNumber?: string;
   certificateExpiry?: string | null;
   notes?: string;
+  orderingEmail?: string;
   deliverySchedule?: DeliveryScheduleEntry[];
   scheduleOverrides?: ScheduleOverrideEntry[];
 };
@@ -96,6 +103,13 @@ export class SuppliersServiceError extends Error {
   }
 }
 
+function mapAuthError(error: unknown): never {
+  if (error instanceof AuthError) {
+    throw new SuppliersServiceError(error.status, error.message);
+  }
+  throw error;
+}
+
 function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
@@ -107,41 +121,50 @@ function assertSupplierCategory(value: string): SupplierCategory {
   return value as SupplierCategory;
 }
 
-function toSummary(row: Database["public"]["Tables"]["suppliers"]["Row"]): SupplierSummary {
+function toSummary(
+  row: SupplierRow,
+  metrics?: { productCount: number; ytdSpendCents: number; lastInvoiceDate: string | null },
+): SupplierSummary {
   return {
     id: row.id,
     name: row.name,
-    contactPerson: row.contact_person ?? "",
+    contactPerson: row.contactPerson ?? "",
     email: row.email ?? "",
+    orderingEmail: row.orderingEmail ?? row.email ?? "",
     phone: row.phone ?? "",
     abn: row.abn ?? "",
     category: row.category as SupplierCategory,
     active: row.active,
-    sharedAcrossVenues: row.venue_id === null,
-    paymentTerms: row.payment_terms ?? "",
-    deliveryDays: row.delivery_days ?? "",
-    orderMethod: row.order_method ?? "",
-    monthlySpendCents: 0,
-    productCount: 0,
-    updatedAt: row.updated_at,
+    sharedAcrossVenues: row.venueId === null,
+    paymentTerms: row.paymentTerms ?? "",
+    deliveryDays: row.deliveryDays ?? "",
+    orderMethod: row.orderMethod ?? "",
+    monthlySpendCents: metrics?.ytdSpendCents ?? 0,
+    ytdSpendCents: metrics?.ytdSpendCents ?? 0,
+    productCount: metrics?.productCount ?? 0,
+    lastInvoiceDate: metrics?.lastInvoiceDate ?? null,
+    updatedAt: row.updatedAt,
   };
 }
 
-function toDetail(row: Database["public"]["Tables"]["suppliers"]["Row"]): SupplierDetail {
+function toDetail(
+  row: SupplierRow,
+  metrics?: { productCount: number; ytdSpendCents: number; lastInvoiceDate: string | null },
+): SupplierDetail {
   return {
-    ...toSummary(row),
-    addressLine1: row.address_line1 ?? "",
-    addressLine2: row.address_line2 ?? "",
+    ...toSummary(row, metrics),
+    addressLine1: row.addressLine1 ?? "",
+    addressLine2: row.addressLine2 ?? "",
     suburb: row.suburb ?? "",
     state: row.state ?? "",
     postcode: row.postcode ?? "",
     country: row.country ?? "",
-    isGstRegistered: row.is_gst_registered,
-    deliverySchedule: parseDeliverySchedule(row.delivery_schedule),
-    scheduleOverrides: parseScheduleOverrides(row.schedule_overrides),
-    haccpCertified: row.haccp_certified,
-    certificateNumber: row.certificate_number ?? "",
-    certificateExpiry: row.certificate_expiry,
+    isGstRegistered: row.isGstRegistered,
+    deliverySchedule: parseDeliverySchedule(row.deliverySchedule as never),
+    scheduleOverrides: parseScheduleOverrides(row.scheduleOverrides as never),
+    haccpCertified: row.haccpCertified,
+    certificateNumber: row.certificateNumber ?? "",
+    certificateExpiry: row.certificateExpiry,
     notes: row.notes ?? "",
   };
 }
@@ -154,47 +177,15 @@ function strOrNull(v: string | undefined, existing: string | null): string | nul
   return existing;
 }
 
-async function assertVenueAccess(
-  supabase: Supabase,
-  args: {
-    userId: string;
-    organisationId: string;
-    venueId: string;
-  }
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("user_organisations")
-    .select("id")
-    .eq("user_profile_id", args.userId)
-    .eq("organisation_id", args.organisationId)
-    .eq("is_active", true)
-    .is("archived_at", null);
-
-  if (error) {
-    throw new SuppliersServiceError(500, error.message);
-  }
-
-  const membershipIds = (data ?? []).map((item) => item.id);
-  if (membershipIds.length === 0) {
-    throw new SuppliersServiceError(403, "Forbidden");
-  }
-
-  const { data: venueAccess, error: venueError } = await supabase
-    .from("user_venues")
-    .select("id")
-    .in("user_organisation_id", membershipIds)
-    .eq("venue_id", args.venueId)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .limit(1);
-
-  if (venueError) {
-    throw new SuppliersServiceError(500, venueError.message);
-  }
-
-  if (!venueAccess || venueAccess.length === 0) {
-    throw new SuppliersServiceError(403, "Forbidden");
-  }
+async function resolveScope(
+  ctx: RequestAuthContext,
+  organisationSlug: string,
+  venueSlug: string,
+) {
+  return resolveVenueScopeForService(ctx, organisationSlug, venueSlug, {
+    notFound: (message) => new SuppliersServiceError(404, message),
+    forbidden: (auth) => new SuppliersServiceError(auth.status, auth.message),
+  });
 }
 
 function normalizeUpsertInput(input: UpsertSupplierInput) {
@@ -219,98 +210,97 @@ function normalizeUpsertInput(input: UpsertSupplierInput) {
 }
 
 function buildUpdateRow(
-  existing: Database["public"]["Tables"]["suppliers"]["Row"],
+  existing: SupplierRow,
   core: ReturnType<typeof normalizeUpsertInput>,
   input: UpsertSupplierInput,
-  userId: string
-): Database["public"]["Tables"]["suppliers"]["Update"] {
+  userId: string,
+): SupplierUpdate {
   const now = new Date().toISOString();
   return {
     name: core.name,
-    contact_person: core.contactPerson || null,
+    contactPerson: core.contactPerson || null,
     email: core.email || null,
     phone: core.phone || null,
     abn: core.abn || null,
     category: core.category,
-    payment_terms: core.paymentTerms || null,
-    delivery_days: core.deliveryDays || null,
-    order_method: core.orderMethod || null,
+    paymentTerms: core.paymentTerms || null,
+    deliveryDays: core.deliveryDays || null,
+    orderMethod: core.orderMethod || null,
     active: core.active,
-    address_line1: strOrNull(input.addressLine1, existing.address_line1),
-    address_line2: strOrNull(input.addressLine2, existing.address_line2),
+    addressLine1: strOrNull(input.addressLine1, existing.addressLine1),
+    addressLine2: strOrNull(input.addressLine2, existing.addressLine2),
     suburb: strOrNull(input.suburb, existing.suburb),
     state: strOrNull(input.state, existing.state),
     postcode: strOrNull(input.postcode, existing.postcode),
     country: strOrNull(input.country, existing.country),
-    is_gst_registered:
-      input.isGstRegistered !== undefined ? input.isGstRegistered : existing.is_gst_registered,
-    haccp_certified:
-      input.haccpCertified !== undefined ? input.haccpCertified : existing.haccp_certified,
-    certificate_number: strOrNull(input.certificateNumber, existing.certificate_number),
-    certificate_expiry:
+    isGstRegistered:
+      input.isGstRegistered !== undefined
+        ? input.isGstRegistered
+        : existing.isGstRegistered,
+    haccpCertified:
+      input.haccpCertified !== undefined
+        ? input.haccpCertified
+        : existing.haccpCertified,
+    certificateNumber: strOrNull(
+      input.certificateNumber,
+      existing.certificateNumber,
+    ),
+    certificateExpiry:
       input.certificateExpiry !== undefined
         ? input.certificateExpiry === null || input.certificateExpiry === ""
           ? null
           : input.certificateExpiry
-        : existing.certificate_expiry,
+        : existing.certificateExpiry,
     notes: strOrNull(input.notes, existing.notes),
-    delivery_schedule:
+    orderingEmail: strOrNull(input.orderingEmail, existing.orderingEmail),
+    deliverySchedule:
       input.deliverySchedule !== undefined
         ? serializeDeliverySchedule(input.deliverySchedule)
-        : existing.delivery_schedule,
-    schedule_overrides:
+        : existing.deliverySchedule,
+    scheduleOverrides:
       input.scheduleOverrides !== undefined
         ? serializeScheduleOverrides(input.scheduleOverrides)
-        : existing.schedule_overrides,
-    updated_by: userId,
-    updated_at: now,
+        : existing.scheduleOverrides,
+    updatedBy: userId,
+    updatedAt: now,
   };
 }
 
-/** When un-sharing, pin supplier to current venue; when sharing, clear venue_id. */
 function resolveVenueIdOnUpdate(
-  existing: Database["public"]["Tables"]["suppliers"]["Row"],
+  existing: SupplierRow,
   core: ReturnType<typeof normalizeUpsertInput>,
-  contextVenueId: string
+  contextVenueId: string,
 ): string | null {
   if (core.sharedAcrossVenues) {
     return null;
   }
-  if (existing.venue_id === null) {
+  if (existing.venueId === null) {
     return contextVenueId;
   }
-  return existing.venue_id;
+  return existing.venueId;
 }
 
 export const suppliersService = {
   async list(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       search?: string;
       category?: string;
       status?: string;
+      archived?: boolean;
+      hasProducts?: boolean;
+      sort?: "name" | "last_invoice" | "ytd_spend";
       page?: number;
       pageSize?: number;
-    }
+    },
   ): Promise<{ suppliers: SupplierSummary[]; total: number }> {
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const scope = await resolveScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
-
-    if (!context) {
-      throw new SuppliersServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
 
     const page = Math.max(1, Number(args.page ?? 1));
     const pageSize = clampNumber(Number(args.pageSize ?? 20), 1, 200);
@@ -319,217 +309,232 @@ export const suppliersService = {
       category = assertSupplierCategory(args.category);
     }
 
-    const result = await suppliersRepo.listSuppliers(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      search: args.search?.trim() || undefined,
-      category,
-      status: args.status,
-      page,
-      pageSize,
-    });
+    const result = await ctx.appDb.rls((tx) =>
+      suppliersRepo.listSuppliers(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        search: args.search?.trim() || undefined,
+        category,
+        status: args.status,
+        archived: args.archived,
+        hasProducts: args.hasProducts,
+        sort: args.sort,
+        page,
+        pageSize,
+      }),
+    );
+
+    const supplierIds = result.rows.map((r) => r.id);
+    const metricsMap = await ctx.appDb.rls((tx) =>
+      suppliersRepo.getSupplierMetrics(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierIds,
+      }),
+    );
+
+    let suppliers = result.rows.map((row) =>
+      toSummary(row, metricsMap.get(row.id)),
+    );
+
+    if (args.sort === "ytd_spend") {
+      suppliers = [...suppliers].sort((a, b) => b.ytdSpendCents - a.ytdSpendCents);
+    } else if (args.sort === "last_invoice") {
+      suppliers = [...suppliers].sort((a, b) => {
+        const aDate = a.lastInvoiceDate ?? "";
+        const bDate = b.lastInvoiceDate ?? "";
+        return bDate.localeCompare(aDate);
+      });
+    }
 
     return {
-      suppliers: result.rows.map(toSummary),
+      suppliers,
       total: result.total,
     };
   },
 
   async getById(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       supplierId: string;
-    }
+    },
   ): Promise<SupplierDetail | null> {
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const scope = await resolveScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
 
-    if (!context) {
-      throw new SuppliersServiceError(404, "Venue not found");
-    }
+    const row = await ctx.appDb.rls((tx) =>
+      suppliersRepo.getSupplierById(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierId: args.supplierId,
+      }),
+    );
 
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
+    if (!row) return null;
 
-    const row = await suppliersRepo.getSupplierById(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      supplierId: args.supplierId,
-    });
+    const metricsMap = await ctx.appDb.rls((tx) =>
+      suppliersRepo.getSupplierMetrics(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierIds: [args.supplierId],
+      }),
+    );
 
-    if (!row) {
-      return null;
-    }
-
-    return toDetail(row);
+    return toDetail(row, metricsMap.get(args.supplierId));
   },
 
   async create(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       input: UpsertSupplierInput;
-    }
+    },
   ): Promise<SupplierDetail> {
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const scope = await resolveScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
-
-    if (!context) {
-      throw new SuppliersServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
     const payload = normalizeUpsertInput(args.input);
     const now = new Date().toISOString();
 
-    const created = await suppliersRepo.createSupplier(supabase, {
-      organisation_id: context.organisationId,
-      venue_id: payload.sharedAcrossVenues ? null : context.venueId,
+    const insertRow: SupplierInsert = {
+      organisationId: scope.organisationId,
+      venueId: payload.sharedAcrossVenues ? null : scope.venueId,
       name: payload.name,
-      contact_person: payload.contactPerson || null,
+      contactPerson: payload.contactPerson || null,
       email: payload.email || null,
       phone: payload.phone || null,
       abn: payload.abn || null,
       category: payload.category,
-      payment_terms: payload.paymentTerms || null,
-      delivery_days: payload.deliveryDays || null,
-      order_method: payload.orderMethod || null,
+      paymentTerms: payload.paymentTerms || null,
+      deliveryDays: payload.deliveryDays || null,
+      orderMethod: payload.orderMethod || null,
       active: payload.active,
-      address_line1: args.input.addressLine1 !== undefined ? strOrNull(args.input.addressLine1, null) : null,
-      address_line2: args.input.addressLine2 !== undefined ? strOrNull(args.input.addressLine2, null) : null,
-      suburb: args.input.suburb !== undefined ? strOrNull(args.input.suburb, null) : null,
-      state: args.input.state !== undefined ? strOrNull(args.input.state, null) : null,
-      postcode: args.input.postcode !== undefined ? strOrNull(args.input.postcode, null) : null,
-      country: args.input.country !== undefined ? strOrNull(args.input.country, null) : null,
-      is_gst_registered: args.input.isGstRegistered ?? true,
-      haccp_certified: args.input.haccpCertified ?? false,
-      certificate_number:
+      addressLine1:
+        args.input.addressLine1 !== undefined
+          ? strOrNull(args.input.addressLine1, null)
+          : null,
+      addressLine2:
+        args.input.addressLine2 !== undefined
+          ? strOrNull(args.input.addressLine2, null)
+          : null,
+      suburb:
+        args.input.suburb !== undefined ? strOrNull(args.input.suburb, null) : null,
+      state:
+        args.input.state !== undefined ? strOrNull(args.input.state, null) : null,
+      postcode:
+        args.input.postcode !== undefined
+          ? strOrNull(args.input.postcode, null)
+          : null,
+      country:
+        args.input.country !== undefined
+          ? strOrNull(args.input.country, null)
+          : null,
+      isGstRegistered: args.input.isGstRegistered ?? true,
+      haccpCertified: args.input.haccpCertified ?? false,
+      certificateNumber:
         args.input.certificateNumber !== undefined
           ? strOrNull(args.input.certificateNumber, null)
           : null,
-      certificate_expiry:
-        args.input.certificateExpiry === undefined || args.input.certificateExpiry === ""
+      certificateExpiry:
+        args.input.certificateExpiry === undefined ||
+        args.input.certificateExpiry === ""
           ? null
           : args.input.certificateExpiry,
-      notes: args.input.notes !== undefined ? strOrNull(args.input.notes, null) : null,
-      delivery_schedule:
+      notes:
+        args.input.notes !== undefined ? strOrNull(args.input.notes, null) : null,
+      orderingEmail:
+        args.input.orderingEmail !== undefined
+          ? strOrNull(args.input.orderingEmail, null)
+          : null,
+      deliverySchedule:
         args.input.deliverySchedule !== undefined
           ? serializeDeliverySchedule(args.input.deliverySchedule)
           : [],
-      schedule_overrides:
+      scheduleOverrides:
         args.input.scheduleOverrides !== undefined
           ? serializeScheduleOverrides(args.input.scheduleOverrides)
           : [],
-      created_by: args.userId,
-      updated_by: args.userId,
-      updated_at: now,
-    });
+      createdBy: ctx.userId,
+      updatedBy: ctx.userId,
+      updatedAt: now,
+    };
+
+    const created = await ctx.appDb.rls((tx) =>
+      suppliersRepo.createSupplier(tx, insertRow),
+    );
 
     return toDetail(created);
   },
 
   async update(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       supplierId: string;
       input: UpsertSupplierInput;
-    }
+    },
   ): Promise<SupplierDetail | null> {
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const scope = await resolveScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
 
-    if (!context) {
-      throw new SuppliersServiceError(404, "Venue not found");
-    }
+    const updated = await ctx.appDb.rls(async (tx) => {
+      const existing = await suppliersRepo.getSupplierById(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierId: args.supplierId,
+      });
 
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
+      if (!existing) {
+        return null;
+      }
+
+      const payload = normalizeUpsertInput(args.input);
+      const row = buildUpdateRow(existing, payload, args.input, ctx.userId);
+      row.venueId = resolveVenueIdOnUpdate(existing, payload, scope.venueId);
+
+      return suppliersRepo.updateSupplier(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierId: args.supplierId,
+        row,
+      });
     });
 
-    const existing = await suppliersRepo.getSupplierById(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      supplierId: args.supplierId,
-    });
-
-    if (!existing) {
-      return null;
-    }
-
-    const payload = normalizeUpsertInput(args.input);
-    const row = buildUpdateRow(existing, payload, args.input, args.userId);
-    row.venue_id = resolveVenueIdOnUpdate(existing, payload, context.venueId);
-
-    const updated = await suppliersRepo.updateSupplier(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      supplierId: args.supplierId,
-      row,
-    });
-
-    if (!updated) {
-      return null;
-    }
-
-    return toDetail(updated);
+    return updated ? toDetail(updated) : null;
   },
 
   async delete(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       supplierId: string;
-    }
+    },
   ): Promise<boolean> {
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const scope = await resolveScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
 
-    if (!context) {
-      throw new SuppliersServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
-    return suppliersRepo.softDeleteSupplier(supabase, {
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-      supplierId: args.supplierId,
-    });
+    return ctx.appDb.rls((tx) =>
+      suppliersRepo.softDeleteSupplier(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierId: args.supplierId,
+      }),
+    );
   },
 };

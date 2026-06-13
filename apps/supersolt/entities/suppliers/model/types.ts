@@ -15,6 +15,7 @@ export type SupplierSummary = {
   name: string;
   contactPerson: string;
   email: string;
+  orderingEmail: string;
   phone: string;
   abn: string;
   category: SupplierCategory;
@@ -24,7 +25,9 @@ export type SupplierSummary = {
   deliveryDays: string;
   orderMethod: string;
   monthlySpendCents: number;
+  ytdSpendCents: number;
   productCount: number;
+  lastInvoiceDate: string | null;
   updatedAt: string;
 };
 
@@ -42,6 +45,7 @@ export type SupplierDetail = SupplierSummary & {
   certificateNumber: string;
   certificateExpiry: string | null;
   notes: string;
+  orderingEmail?: string;
 };
 
 export type SupplierListResponse = {
@@ -72,6 +76,7 @@ export type UpsertSupplierInput = {
   certificateNumber?: string;
   certificateExpiry?: string | null;
   notes?: string;
+  orderingEmail?: string;
   deliverySchedule?: DeliveryScheduleEntry[];
   scheduleOverrides?: ScheduleOverrideEntry[];
 };

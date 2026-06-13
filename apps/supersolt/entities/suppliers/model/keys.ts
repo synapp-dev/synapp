@@ -9,6 +9,9 @@ export const suppliersKeys = {
       search?: string;
       category?: string;
       status?: string;
+      archived?: boolean;
+      hasProducts?: boolean;
+      sort?: string;
       page?: number;
       pageSize?: number;
     }

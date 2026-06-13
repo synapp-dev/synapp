@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
+
 import {
   suppliersService,
   SuppliersServiceError,
@@ -12,62 +14,31 @@ type RouteParams = {
   supplierId: string;
 };
 
-async function getUserId() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return { supabase, userId: null as string | null };
-  }
-
-  return { supabase, userId: user.id };
-}
-
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue, supplierId } = await context.params;
 
   try {
-    const data = await suppliersService.getById(supabase, {
-      userId,
+    const data = await suppliersService.getById(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       supplierId,
     });
 
     if (!data) {
-      return NextResponse.json(
-        { data: null, error: { message: "Supplier not found", status: 404 } },
-        { status: 404 }
-      );
+      return validationErrorResponse("Supplier not found", 404);
     }
 
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof SuppliersServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "suppliers");
   }
 }
 
@@ -75,20 +46,16 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue, supplierId } = await context.params;
   const payload = (await request.json()) as UpsertSupplierInput;
 
   try {
-    const data = await suppliersService.update(supabase, {
-      userId,
+    const data = await suppliersService.update(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       supplierId,
@@ -96,69 +63,39 @@ export async function PATCH(
     });
 
     if (!data) {
-      return NextResponse.json(
-        { data: null, error: { message: "Supplier not found", status: 404 } },
-        { status: 404 }
-      );
+      return validationErrorResponse("Supplier not found", 404);
     }
 
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof SuppliersServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "suppliers");
   }
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue, supplierId } = await context.params;
 
   try {
-    const deleted = await suppliersService.delete(supabase, {
-      userId,
+    const deleted = await suppliersService.delete(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       supplierId,
     });
 
     if (!deleted) {
-      return NextResponse.json(
-        { data: null, error: { message: "Supplier not found", status: 404 } },
-        { status: 404 }
-      );
+      return validationErrorResponse("Supplier not found", 404);
     }
 
-    return NextResponse.json({ data: { deleted: true }, error: null });
+    return jsonDataResponse({ deleted: true });
   } catch (error) {
-    if (error instanceof SuppliersServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "suppliers");
   }
 }

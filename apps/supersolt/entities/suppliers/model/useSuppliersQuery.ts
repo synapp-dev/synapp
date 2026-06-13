@@ -11,6 +11,9 @@ type UseSuppliersQueryInput = {
   search?: string;
   category?: string;
   status?: string;
+  archived?: boolean;
+  hasProducts?: boolean;
+  sort?: "name" | "last_invoice" | "ytd_spend";
   page?: number;
   pageSize?: number;
 };
@@ -23,6 +26,9 @@ export function useSuppliersQuery(
       search: input.search,
       category: input.category,
       status: input.status,
+      archived: input.archived,
+      hasProducts: input.hasProducts,
+      sort: input.sort,
       page: input.page,
       pageSize: input.pageSize,
     }),
