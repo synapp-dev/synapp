@@ -124,6 +124,35 @@ function SelectItem({
   )
 }
 
+function SelectItemWithLeadingIcon({
+  icon: Icon,
+  label,
+  className,
+  ...props
+}: React.ComponentProps<typeof SelectPrimitive.Item> & {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <SelectPrimitive.Item
+      data-slot="select-item"
+      className={cn(
+        "focus:bg-accent focus:text-accent-foreground relative flex w-full cursor-default items-center gap-2 rounded-sm py-1.5 pr-8 pl-2 text-sm outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        className,
+      )}
+      {...props}
+    >
+      <span className="absolute right-2 flex size-3.5 items-center justify-center">
+        <SelectPrimitive.ItemIndicator>
+          <CheckIcon className="size-4" />
+        </SelectPrimitive.ItemIndicator>
+      </span>
+      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      <SelectPrimitive.ItemText>{label}</SelectPrimitive.ItemText>
+    </SelectPrimitive.Item>
+  );
+}
+
 function SelectSeparator({
   className,
   ...props
@@ -178,6 +207,7 @@ export {
   SelectContent,
   SelectGroup,
   SelectItem,
+  SelectItemWithLeadingIcon,
   SelectLabel,
   SelectScrollDownButton,
   SelectScrollUpButton,

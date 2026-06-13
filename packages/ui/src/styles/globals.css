@@ -54,6 +54,7 @@
   --brand-steam: #1387b8;
   --brand-leetify: #f84982;
   --brand-faceit: #fd5a00;
+  --brand-intradark-primary: #0483c8;
   --brand-bullyproof-primary: #038493;
   --brand-bullyproof-secondary: #ea6f4d;
   --brand-supersolt-primary: #beda8e;
@@ -182,6 +183,7 @@
   --brand-steam: #1387b8;
   --brand-leetify: #f84982;
   --brand-faceit: #fd5a00;
+  --brand-intradark-primary: #0483c8;
   --brand-bullyproof-primary: #038493;
   --brand-bullyproof-secondary: #ea6f4d;
   --brand-supersolt-primary: #beda8e;
@@ -210,6 +212,8 @@
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
   --animate-spin-slow: spin-slow 3s linear infinite;
+  --animate-equalize-bar: equalize-bar 0.9s ease-in-out infinite;
+  --animate-glow-breathe: glow-breathe 7s ease-in-out infinite;
   --animate-spin-reverse: spin-reverse 1s linear infinite;
   --animate-spin-slow-reverse: spin-slow-reverse 3s linear infinite;
   --animate-caret-blink: caret-blink 1.25s ease-out infinite;
@@ -240,6 +244,17 @@
   --animate-slide-right-fade-in-slowest: slide-right-fade-in 1s ease-out
     forwards;
   --animate-slide-up-from-bottom: slideUpFromBottom 0.4s ease-out forwards;
+  /** Emerge from behind a clip edge — no opacity change; pair with overflow-hidden. */
+  --animate-emerge-behind-wall-bottom: emerge-behind-wall-bottom 0.55s
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-emerge-behind-wall-top: emerge-behind-wall-top 0.55s
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-emerge-behind-wall-left: emerge-behind-wall-left 0.55s
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-emerge-behind-wall-right: emerge-behind-wall-right 0.55s
+    cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-rise-behind-wall: emerge-behind-wall-bottom 0.55s
+    cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-banner-reveal: bannerReveal 0.6s ease-in-out forwards;
   --animate-bounce-right: bounce-right 1s ease-in-out infinite;
   --animate-bounce-right-subtle: bounce-right-subtle 1s ease-in-out infinite;
@@ -411,6 +426,24 @@
       transform: rotate(360deg);
     }
   }
+  @keyframes equalize-bar {
+    0%,
+    100% {
+      transform: scaleY(0.35);
+    }
+    50% {
+      transform: scaleY(1);
+    }
+  }
+  @keyframes glow-breathe {
+    0%,
+    100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
   @keyframes spin-reverse {
     0% {
       transform: rotate(0deg);
@@ -476,6 +509,38 @@
     100% {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+  @keyframes emerge-behind-wall-bottom {
+    0% {
+      transform: translateY(100%);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+  @keyframes emerge-behind-wall-top {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+  @keyframes emerge-behind-wall-left {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+  @keyframes emerge-behind-wall-right {
+    0% {
+      transform: translateX(100%);
+    }
+    100% {
+      transform: translateX(0);
     }
   }
   @keyframes bannerReveal {
