@@ -45,6 +45,19 @@ export const steamProfiles = pgTable(
     loccountrycode: varchar({ length: 2 }),
     locstatecode: varchar({ length: 2 }),
     loccityid: integer(),
+    vacBanned: boolean("vac_banned"),
+    gameBanned: boolean("game_banned"),
+    communityBanned: boolean("community_banned"),
+    economyBan: text("economy_ban"),
+    banAgeDays: integer("ban_age_days"),
+    cs2PlaytimeMinutes: integer("cs2_playtime_minutes"),
+    badgeCount: integer("badge_count"),
+    steamLevel: integer("steam_level"),
+    friendsCount: integer("friends_count"),
+    enrichmentFetchedAt: timestamp("enrichment_fetched_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "string",
@@ -853,6 +866,8 @@ export const teams = pgTable(
     avatar: text(),
     coverImage: text("cover_image"),
     description: text(),
+    primaryColor: varchar("primary_color", { length: 7 }),
+    secondaryColor: varchar("secondary_color", { length: 7 }),
     game: varchar({ length: 32 }).default("cs2").notNull(),
     teamType: varchar("team_type", { length: 32 }),
     leaderSteamid64: text("leader_steamid64").references(() => players.steamid64, {
@@ -886,6 +901,55 @@ export const teams = pgTable(
   ],
 );
 
+export const playerLegitimacyScores = pgTable(
+  "player_legitimacy_scores",
+  {
+    steamid64: text()
+      .primaryKey()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    score: integer().notNull(),
+    tier: varchar({ length: 32 }).notNull(),
+    confidence: varchar({ length: 8 }).notNull(),
+    coverage: doublePrecision().notNull(),
+    breakdown: jsonb().notNull(),
+    computedAt: timestamp("computed_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_legitimacy_tier").on(table.tier),
+    index("idx_legitimacy_computed_at").on(table.computedAt),
+    check("player_legitimacy_scores_score_check", sql`score >= 0 AND score <= 100`),
+    check(
+      "player_legitimacy_scores_tier_check",
+      sql`tier IN ('suspicious', 'unverified', 'established', 'trusted')`,
+    ),
+    check(
+      "player_legitimacy_scores_confidence_check",
+      sql`confidence IN ('low', 'med', 'high')`,
+    ),
+    check(
+      "player_legitimacy_scores_coverage_check",
+      sql`coverage >= 0 AND coverage <= 1`,
+    ),
+  ],
+);
+
 export const playerTeams = pgTable(
   "player_teams",
   {
@@ -907,5 +971,118 @@ export const playerTeams = pgTable(
     primaryKey({ columns: [table.teamId, table.steamid64] }),
     index("idx_player_teams_steamid64").on(table.steamid64),
     index("idx_player_teams_team_id").on(table.teamId),
+  ],
+);
+
+/** Threaded comments on a player profile (keyed by subject steamid64). */
+export const playerProfileComments = pgTable(
+  "player_profile_comments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    subjectSteamid64: text("subject_steamid64")
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    parentCommentId: uuid("parent_comment_id"),
+    body: text().notNull(),
+    authorUserId: uuid("author_user_id").notNull(),
+    trustSignal: varchar("trust_signal", { length: 16 }),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+  },
+  (table) => [
+    index("idx_ppc_subject_created_at").on(
+      table.subjectSteamid64,
+      table.createdAt,
+    ),
+    index("idx_ppc_parent_comment_id").on(table.parentCommentId),
+    index("idx_ppc_author_subject_created").on(
+      table.authorUserId,
+      table.subjectSteamid64,
+      table.createdAt,
+    ),
+    foreignKey({
+      columns: [table.parentCommentId],
+      foreignColumns: [table.id],
+      name: "player_profile_comments_parent_comment_id_fkey",
+    }).onDelete("cascade"),
+    check(
+      "player_profile_comments_trust_signal_check",
+      sql`trust_signal IS NULL OR trust_signal IN ('legit', 'suspicious')`,
+    ),
+  ],
+);
+
+/** One active legit/suspicious signal per voter per profile subject. */
+export const playerProfileTrustVotes = pgTable(
+  "player_profile_trust_votes",
+  {
+    subjectSteamid64: text("subject_steamid64")
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    voterUserId: uuid("voter_user_id").notNull(),
+    signal: varchar({ length: 16 }).notNull(),
+    sourceCommentId: uuid("source_comment_id").references(
+      () => playerProfileComments.id,
+      { onDelete: "set null" },
+    ),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.subjectSteamid64, table.voterUserId] }),
+    index("idx_pptv_subject_signal").on(table.subjectSteamid64, table.signal),
+    check(
+      "player_profile_trust_votes_signal_check",
+      sql`signal IN ('legit', 'suspicious')`,
+    ),
+  ],
+);
+
+/** Stored reports; no mod UI in MVP. */
+export const playerProfileCommentReports = pgTable(
+  "player_profile_comment_reports",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    commentId: uuid("comment_id")
+      .notNull()
+      .references(() => playerProfileComments.id, { onDelete: "cascade" }),
+    reporterUserId: uuid("reporter_user_id").notNull(),
+    reason: text(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_ppcr_comment_reporter").on(
+      table.commentId,
+      table.reporterUserId,
+    ),
   ],
 );

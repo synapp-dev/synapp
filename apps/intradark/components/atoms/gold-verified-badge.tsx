@@ -26,7 +26,7 @@ export function GoldVerifiedBadge({
   const svg = (
     <svg
       viewBox="0 0 24 24"
-      className="size-7 shrink-0 drop-shadow-md sm:size-8"
+      className="size-7 shrink-0 drop-shadow-[0_2px_6px_rgba(0,0,0,0.85)] sm:size-8"
       role="img"
       aria-hidden
     >

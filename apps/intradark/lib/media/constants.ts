@@ -1,6 +1,6 @@
 export const INTRADARK_MEDIA_BUCKET = "intradark-media" as const;
 
-export const MEDIA_PREFIXES = ["maps", "players", "news", "utility"] as const;
+export const MEDIA_PREFIXES = ["maps", "players", "news", "utility", "avatars"] as const;
 export type MediaPrefix = (typeof MEDIA_PREFIXES)[number];
 
 export const ALLOWED_UPLOAD_MIME_TYPES = [

@@ -1,6 +1,13 @@
 import { cn } from "@workspace/ui/lib/utils";
 import CountUp from "react-countup";
 
+const READABLE_TEXT_SHADOW =
+  "0 1px 2px rgba(0,0,0,0.95), 0 2px 10px rgba(0,0,0,0.75)";
+
+/** Drop-shadow on the skewed stripe + panel reads better than box-shadow on skewed boxes. */
+const BADGE_SHAPE_FILTER =
+  "drop-shadow(0 2px 6px rgba(0,0,0,0.85)) drop-shadow(0 4px 14px rgba(0,0,0,0.55))";
+
 function getRankColor(rank: number) {
   if (rank >= 30000) return "#f0ae34";
   if (rank >= 25000) return "#ff6060";
@@ -49,34 +56,40 @@ export function PremierEloBadge({
       className={`relative font-stratum tracking-tighter italic font-extrabold text-center ${sizeClass}`}
     >
       <div
-        className={cn(
-          "-skew-x-12 h-full w-1.5 absolute -left-0 z-0",
-          size === "xs" && "w-1 -left-1",
-          size === "sm" && "w-1 -left-0.5",
-        )}
-        style={{
-          backgroundColor: rankColor,
-        }}
-      />
-      <div
-        className={cn(
-          "-skew-x-12 h-full w-1.5 absolute -left-2 z-0",
-          size === "xs" && "w-1",
-          size === "sm" && "w-1 -left-2",
-        )}
-        style={{ backgroundColor: rankColor }}
-      />
-      <div
-        className={cn(
-          "-skew-x-12 bg-gradient-to-r h-full w-full absolute mr-4 -left-2 z-0",
-          size === "xs" && "mr-0 -left-1",
-          size === "sm" && "mr-0",
-        )}
-        style={{
-          background: `linear-gradient(to right, ${hexToRgba(rankColor, 0.3)}, ${hexToRgba(rankColor, 0.2)}, ${hexToRgba(rankColor, 0.05)})`,
-          border: `1px solid ${hexToRgba(rankColor, 0.25)}`,
-        }}
-      />
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{ filter: BADGE_SHAPE_FILTER }}
+        aria-hidden
+      >
+        <div
+          className={cn(
+            "-skew-x-12 h-full w-1.5 absolute -left-0",
+            size === "xs" && "w-1 -left-1",
+            size === "sm" && "w-1 -left-0.5",
+          )}
+          style={{
+            backgroundColor: rankColor,
+          }}
+        />
+        <div
+          className={cn(
+            "-skew-x-12 h-full w-1.5 absolute -left-2",
+            size === "xs" && "w-1",
+            size === "sm" && "w-1 -left-2",
+          )}
+          style={{ backgroundColor: rankColor }}
+        />
+        <div
+          className={cn(
+            "-skew-x-12 bg-gradient-to-r h-full w-full absolute mr-4 -left-2",
+            size === "xs" && "mr-0 -left-1",
+            size === "sm" && "mr-0",
+          )}
+          style={{
+            background: `linear-gradient(to right, ${hexToRgba(rankColor, 0.3)}, ${hexToRgba(rankColor, 0.2)}, ${hexToRgba(rankColor, 0.05)})`,
+            border: `1px solid ${hexToRgba(rankColor, 0.25)}`,
+          }}
+        />
+      </div>
 
       <div
         className={cn(
@@ -93,7 +106,7 @@ export function PremierEloBadge({
           separator=","
           decimals={0}
           className="mr-4"
-          style={{ color: rankColor }}
+          style={{ color: rankColor, textShadow: READABLE_TEXT_SHADOW }}
         />
       </div>
     </div>

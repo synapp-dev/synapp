@@ -59,18 +59,50 @@ export async function ensurePlayer(
  * If a user_profiles row has this steamid64 as its steam_profile_id, set the
  * players.user_profile_id mapping and return the linked account.
  */
+type LinkedProfileRow = {
+  id: string;
+  username: string | null;
+  display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  anthem_url: string | null;
+  twitch_url?: string | null;
+  x_url?: string | null;
+  instagram_url?: string | null;
+};
+
+const LINKED_PROFILE_CORE_COLUMNS =
+  "id, username, display_name, first_name, last_name, anthem_url";
+const LINKED_PROFILE_SOCIAL_COLUMNS = "twitch_url, x_url, instagram_url";
+
+async function fetchLinkedProfile(
+  admin: Admin,
+  steamid64: string,
+): Promise<LinkedProfileRow | null> {
+  const { data: withSocial, error: socialError } = await admin
+    .from("user_profiles")
+    .select(`${LINKED_PROFILE_CORE_COLUMNS}, ${LINKED_PROFILE_SOCIAL_COLUMNS}`)
+    .eq("steam_profile_id", steamid64)
+    .maybeSingle();
+
+  if (!socialError && withSocial) return withSocial as LinkedProfileRow;
+
+  // Social-link columns may not be migrated yet; account linking must still work.
+  const { data: coreOnly, error: coreError } = await admin
+    .from("user_profiles")
+    .select(LINKED_PROFILE_CORE_COLUMNS)
+    .eq("steam_profile_id", steamid64)
+    .maybeSingle();
+
+  if (coreError || !coreOnly) return null;
+  return coreOnly as LinkedProfileRow;
+}
+
 export async function mapAccountBySteamId(
   admin: Admin,
   steamid64: string,
 ): Promise<LinkedAccount | null> {
-  const { data: profile } = await admin
-    .from("user_profiles")
-    .select(
-      "id, username, display_name, first_name, last_name, anthem_url, twitch_url, x_url, instagram_url",
-    )
-    .eq("steam_profile_id", steamid64)
-    .maybeSingle();
-
+  const profile = await fetchLinkedProfile(admin, steamid64);
   if (!profile) return null;
 
   // Write-once: only set the bond when unset, so an authenticated Steam ←→

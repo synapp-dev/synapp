@@ -27,4 +27,11 @@ describe("validateMediaObjectPath", () => {
     const r = validateMediaObjectPath("/maps/a/b.png");
     expect(r).toEqual({ ok: true, path: "maps/a/b.png" });
   });
+
+  it("accepts team avatar path", () => {
+    const r = validateMediaObjectPath(
+      "avatars/teams/11111111-1111-4111-8111-111111111111/logo.png",
+    );
+    expect(r.ok).toBe(true);
+  });
 });

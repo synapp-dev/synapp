@@ -1,6 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 
+import { getProfileCommentEligibilityForViewer } from "@/entities/players/actions/profile-comments-actions";
 import { resolvePlayerIdentifier } from "@/entities/players/lib/server/resolve-server";
+import {
+  getPlayerProfileTrustCounts,
+  listCommentsForSubject,
+} from "@/entities/players/lib/profile-comments/queries";
+import { getPlayerTeamForProfile } from "@/entities/teams/lib/queries";
 import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 import { PlayerProfile } from "@/entities/players/components/player-profile";
 
@@ -34,6 +40,17 @@ export default async function PlayerProfilePage({
     viewer?.userProfile.steam_profile_id != null &&
     viewer.userProfile.steam_profile_id === resolved.steamid64;
 
+  const [teamMembership, trustCounts, commentsPage, commentEligibility] =
+    await Promise.all([
+      getPlayerTeamForProfile(resolved.steamid64),
+      getPlayerProfileTrustCounts(resolved.steamid64),
+      listCommentsForSubject(resolved.steamid64),
+      getProfileCommentEligibilityForViewer({
+        subjectSteamid64: resolved.steamid64,
+        isProfileOwner: isOwner,
+      }),
+    ]);
+
   return (
     <PlayerProfile
       steamid64={resolved.steamid64}
@@ -43,6 +60,11 @@ export default async function PlayerProfilePage({
       anthemUrl={resolved.anthemUrl}
       socialLinks={resolved.socialLinks}
       isOwner={isOwner}
+      team={teamMembership?.team ?? null}
+      trustCounts={trustCounts}
+      commentsPage={commentsPage}
+      commentEligibility={commentEligibility}
+      viewerUserId={viewer?.user.id ?? null}
     />
   );
 }

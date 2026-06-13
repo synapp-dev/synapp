@@ -3,6 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { usePlayerStore } from "@/entities/players/model/player-store";
 import type {
+  LegitimacyBreakdown,
+  LegitimacyTier,
+} from "@/entities/players/lib/legitimacy";
+import type { ConfidenceBand } from "@/entities/players/lib/legitimacy/types";
+import type {
   CSStatsProfile,
   FaceitProfile,
   LeetifyProfile,
@@ -122,6 +127,42 @@ export function useGetFaceitProfile(
     enabled: !!steamId64,
     ...options,
   });
+}
+
+export interface LegitimacyScoreRow {
+  steamid64: string;
+  score: number;
+  tier: LegitimacyTier;
+  confidence: ConfidenceBand;
+  coverage: number;
+  breakdown: LegitimacyBreakdown;
+  computed_at: string;
+}
+
+export type LegitimacyApiResponse = {
+  success: boolean;
+  enabled?: boolean;
+  data: LegitimacyScoreRow | null;
+  error?: string;
+};
+
+export function useGetLegitimacyScore(steamId64: string) {
+  const query = useQuery<LegitimacyApiResponse, Error>({
+    queryKey: ["players", steamId64, "legitimacy"],
+    queryFn: async () => {
+      const response = await fetch(`/api/players/${steamId64}/legitimacy`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch legitimacy score");
+      }
+      return response.json();
+    },
+    enabled: !!steamId64,
+  });
+
+  return {
+    ...query,
+    isEnabled: query.data?.enabled !== false,
+  };
 }
 
 export function useGetCSStatsProfile(steamId64: string) {

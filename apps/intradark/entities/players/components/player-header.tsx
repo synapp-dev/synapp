@@ -14,13 +14,15 @@ import { PremierEloBadge } from "@/components/atoms/premier-elo-badge";
 import { ProStatusBadge } from "@/components/atoms/pro-status-badge";
 import { CountryFlag } from "@/entities/players/components/country-flag";
 import { AnthemPanel } from "@/entities/players/components/panels/anthem-panel";
-import { VeritasSummary } from "@/entities/players/components/veritas-summary";
+import { LegitimacySummary } from "@/entities/players/components/legitimacy-summary";
 import { anthemProvider } from "@/entities/players/lib/anthem";
 import {
   listProfileSocialLinks,
   type PlayerSocialLinks,
 } from "@/entities/players/lib/social-links";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import type { TeamSummary } from "@/entities/teams/types";
+import { resolveTeamHeaderTheme } from "@/entities/teams/lib/header-theme";
 
 /**
  * Entrance choreography for the header. Each layer emerges from behind a clip
@@ -90,12 +92,9 @@ export function getHeaderRevealDurationMs(
 }
 
 /**
- * Header "theme": the background watermark logo + the glow colour. These will
- * eventually be derived from the player's team; until then they fall back to
- * the Intradark brand (blue glow + Intradark star).
+ * Header fallback when the player has no team brand colours.
  */
 const DEFAULT_THEME = {
-  accentColor: "#00497d", // intradark blue
   logoSrc: "/images/logos/intradark-symbol-blue.svg",
 } as const;
 
@@ -116,14 +115,11 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 /**
- * TODO(team-db): team and role are still placeholder content until the team
- * schema exists.
+ * TODO(team-db): in-game role is still placeholder content until we store it.
  */
 const PLACEHOLDER = {
   role: "Rifler",
   roleIconSrc: "/images/icons/ak47-icon-white.svg",
-  teamName: "Falcons",
-  teamLogoSrc: "/images/teams/falcons-logo.png",
 } as const;
 
 function steamProfileUrl(steamid64: string): string {
@@ -207,11 +203,9 @@ export interface PlayerHeaderProps {
   steamid64: string;
   /** Whether the player has a linked intradark account (drives verified badge). */
   isMember: boolean;
-  /**
-   * TODO(team-db): glow colour + watermark logo. Default to the Intradark brand
-   * until they can be derived from the player's team.
-   */
-  accentColor?: string;
+  /** Live team from `player_teams`; null when the player is not on a team. */
+  team?: TeamSummary | null;
+  /** Override watermark logo (defaults to team avatar or Intradark star). */
   teamLogoSrc?: string;
   /**
    * Gates the staggered entrance: while false the header shows a loading
@@ -241,8 +235,8 @@ export function PlayerHeader({
   avatarSrc,
   steamid64,
   isMember,
-  accentColor = DEFAULT_THEME.accentColor,
-  teamLogoSrc = DEFAULT_THEME.logoSrc,
+  teamLogoSrc,
+  team = null,
   start = true,
   onRevealComplete,
   premierRating = null,
@@ -252,6 +246,10 @@ export function PlayerHeader({
   anthemUrl = null,
   isOwner = false,
 }: PlayerHeaderProps) {
+  const watermarkLogoSrc =
+    teamLogoSrc ?? team?.avatar ?? DEFAULT_THEME.logoSrc;
+  const isTeamLogoWatermark = watermarkLogoSrc !== DEFAULT_THEME.logoSrc;
+  const { primaryColor, secondaryColor } = resolveTeamHeaderTheme(team);
   const initials = name.slice(0, 2).toUpperCase();
   const prefersReducedMotion = usePrefersReducedMotion();
   const hasAnthemSocial = !!anthemProvider(anthemUrl) || isOwner;
@@ -381,7 +379,7 @@ export function PlayerHeader({
   });
 
   const veritasLayoutClass = cn(
-    "w-full min-w-0 border-t border-white/10 pt-4 md:w-1/4 md:min-w-[12rem] md:max-w-[18rem] md:shrink-0 md:self-end md:border-l md:border-t-0 md:border-white/10 md:pt-0 md:pl-4 lg:pl-5",
+    "flex h-full min-h-0 w-full min-w-0 flex-col border-t border-white/10 pt-4 md:w-1/2 md:min-w-[24rem] md:max-w-[36rem] md:shrink-0 md:self-stretch md:border-t-0 md:pt-0 md:pl-4 lg:pl-5",
   );
   const veritasSummary = revealSlideFade(STEP.stats, "right", {
     className: veritasLayoutClass,
@@ -394,7 +392,10 @@ export function PlayerHeader({
 
   return (
     <header
-      className={cn(headerShellClassName, "overflow-x-visible overflow-y-hidden")}
+      className={cn(
+        headerShellClassName,
+        "overflow-x-visible overflow-y-hidden",
+      )}
       style={headerShellStyle()}
     >
       <div className={cn(card.clipClassName, "h-full min-h-0")}>
@@ -405,8 +406,8 @@ export function PlayerHeader({
           {/* Bottom border: drawn in as its own beat after the card shell. */}
           <div className={border.clipClassName} aria-hidden>
             <div
-              className={cn(border.innerClassName, "h-0.5 bg-[#0483c8]")}
-              style={border.innerStyle}
+              className={cn(border.innerClassName, "h-0.5")}
+              style={{ ...border.innerStyle, backgroundColor: secondaryColor }}
             />
           </div>
           {/* Gradient glow: emerge wrapper; inner layer keeps the idle breathe. */}
@@ -418,7 +419,7 @@ export function PlayerHeader({
               <div
                 className="absolute inset-0 motion-safe:animate-glow-breathe"
                 style={{
-                  backgroundImage: `linear-gradient(to top, ${hexToRgba(accentColor, 0.6)}, ${hexToRgba(accentColor, 0.06)}, transparent)`,
+                  backgroundImage: `linear-gradient(to top, ${hexToRgba(primaryColor, 0.6)}, ${hexToRgba(primaryColor, 0.06)}, transparent)`,
                 }}
               />
             </div>
@@ -441,24 +442,37 @@ export function PlayerHeader({
                     maskRepeat: "no-repeat",
                   }}
                 >
-                  {/* Square wrapper holds the position; the image spins around its
-                  own centre (one revolution / 60s). Keeping translate on the
-                  wrapper avoids clashing with the rotate transform. */}
-                  <div className="absolute left-0 -top-[12%] aspect-square h-[124%]">
+                  {/* Team logos bob slowly; the Intradark star keeps its spin. */}
+                  <div
+                    className={cn(
+                      "absolute left-0 -top-[12%] aspect-square h-[124%]",
+                      isTeamLogoWatermark &&
+                        "motion-safe:animate-[float-gentle_16s_ease-in-out_infinite]",
+                    )}
+                  >
                     <Image
-                      src={teamLogoSrc}
+                      src={watermarkLogoSrc}
                       alt=""
                       fill
-                      className="object-contain opacity-[0.5] motion-safe:animate-[spin_60s_linear_infinite]"
+                      className={cn(
+                        "object-contain opacity-[0.5]",
+                        !isTeamLogoWatermark &&
+                          "motion-safe:animate-[spin_60s_linear_infinite]",
+                      )}
                       sizes="(max-width: 640px) 320px, (max-width: 1024px) 384px, 448px"
                     />
                   </div>
                 </div>
               </div>
-              {/* Steam is always shown; member social links only when set on user_profiles. */}
-              <div className="relative z-[3] shrink-0 self-center overflow-visible">
+              {/* Steam is always shown; member social links only when set on user_profiles.
+                  Social icons occupy the top 80% (centered); anthem sits in the bottom 20%
+                  aligned with the icon column. */}
+              <div className="relative z-[3] flex h-full min-h-0 shrink-0 flex-col overflow-visible pr-2 sm:pr-3">
                 <nav
-                  className="flex flex-col items-center justify-center gap-1 overflow-visible pr-2 sm:gap-1.5 sm:pr-3"
+                  className={cn(
+                    "flex min-h-0 flex-col items-center justify-center gap-1 overflow-visible sm:gap-1.5",
+                    hasAnthemSocial ? "flex-[4]" : "flex-1",
+                  )}
                   aria-label="Social links"
                 >
                   <StaggeredAnimation
@@ -503,7 +517,9 @@ export function PlayerHeader({
                       </Link>
                     </StaggeredAnimation>
                   ))}
-                  {hasAnthemSocial ? (
+                </nav>
+                {hasAnthemSocial ? (
+                  <div className="flex min-h-0 flex-[1] items-end justify-center overflow-visible pb-16 md:pb-4">
                     <StaggeredAnimation
                       index={profileSocialLinks.length + 1}
                       chainFromZero
@@ -518,8 +534,8 @@ export function PlayerHeader({
                         isOwner={isOwner}
                       />
                     </StaggeredAnimation>
-                  ) : null}
-                </nav>
+                  </div>
+                ) : null}
               </div>
               <div className={avatar.className} style={avatar.style}>
                 {avatarSrc ? (
@@ -540,7 +556,7 @@ export function PlayerHeader({
               </div>
             </div>
 
-            <div className="relative flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden p-6 pb-16 md:flex-row md:items-stretch md:gap-6 md:pb-6">
+            <div className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden p-6 pb-16 md:flex-row md:items-stretch md:gap-6 md:pb-6">
               <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col justify-end gap-2 overflow-hidden">
                 <div className={alias.clipClassName}>
                   <div
@@ -574,7 +590,7 @@ export function PlayerHeader({
                   </div>
                 ) : null}
 
-                {/* TODO(team-db): role + team are placeholder until the team schema exists. */}
+                {/* TODO(team-db): in-game role is placeholder until we store it. */}
                 <div className={roleTeam.clipClassName}>
                   <div
                     className={roleTeam.innerClassName}
@@ -595,19 +611,33 @@ export function PlayerHeader({
                           {PLACEHOLDER.role}
                         </p>
                       </div>
-                      <p className="text-xs leading-none text-primary/50">@</p>
-                      <div className="inline-flex items-center gap-1.5">
-                        <Image
-                          src={PLACEHOLDER.teamLogoSrc}
-                          alt={`${PLACEHOLDER.teamName} logo`}
-                          width={40}
-                          height={16}
-                          className="h-5 w-auto shrink-0 object-contain"
-                        />
-                        <p className="text-sm font-semibold text-emerald-300">
-                          {PLACEHOLDER.teamName}
-                        </p>
-                      </div>
+                      {team ? (
+                        <>
+                          <p className="text-xs leading-none text-primary/50">
+                            @
+                          </p>
+                          <Link
+                            href={`/teams/${team.slug}/home`}
+                            className="inline-flex items-center gap-1 transition-opacity hover:opacity-80"
+                          >
+                            {team.avatar ? (
+                              <Image
+                                src={team.avatar}
+                                alt=""
+                                width={40}
+                                height={16}
+                                className="h-5 w-auto shrink-0 object-contain"
+                              />
+                            ) : null}
+                            <p
+                              className="text-sm font-semibold"
+                              style={{ color: primaryColor }}
+                            >
+                              {team.name}
+                            </p>
+                          </Link>
+                        </>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -638,7 +668,7 @@ export function PlayerHeader({
                         </div>
                       ) : null}
                       <div className="mt-0.5">
-                        <FaceitElo delay={countUpDelay} />
+                        <FaceitElo steamid64={steamid64} delay={countUpDelay} />
                       </div>
                     </div>
                   </div>
@@ -649,7 +679,10 @@ export function PlayerHeader({
                 className={veritasSummary.className}
                 style={veritasSummary.style}
               >
-                <VeritasSummary />
+                <LegitimacySummary
+                  steamid64={steamid64}
+                  delay={countUpDelay}
+                />
               </div>
             </div>
           </div>

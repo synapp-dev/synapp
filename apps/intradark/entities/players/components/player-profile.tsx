@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { usePrefersReducedMotion } from "@/hooks/use-prefers-reduced-motion";
@@ -23,7 +24,19 @@ import { SteamCard } from "@/entities/players/components/steam-card";
 import { SteamPanel } from "@/entities/players/components/panels/steam-panel";
 import { FaceitPanel } from "@/entities/players/components/panels/faceit-panel";
 import { LeetifyPanel } from "@/entities/players/components/panels/leetify-panel";
-import { CommentsCard } from "@/components/organisms/comments-card";
+import { PlayerProfileMatchesPanel } from "@/components/organisms/player-profile/player-profile-matches-panel";
+import { PlayerProfileMediaPanel } from "@/components/organisms/player-profile/player-profile-media-panel";
+import { ProfileCommentsCard } from "@/entities/players/components/profile-comments-card";
+import {
+  PlayerProfileTabs,
+  type PlayerProfileTab,
+} from "@/entities/players/components/player-profile-tabs";
+import type { ProfileCommentEligibility } from "@/entities/players/lib/profile-comments/eligibility";
+import type {
+  ProfileCommentsPage,
+  ProfileTrustCounts,
+} from "@/entities/players/lib/profile-comments/queries";
+import type { TeamSummary } from "@/entities/teams/types";
 
 /** If playback never starts and no gesture arrives, don't block forever. */
 const PLAYBACK_FALLBACK_MS = 12_000;
@@ -51,6 +64,12 @@ export interface PlayerProfileProps {
   socialLinks?: PlayerSocialLinks;
   /** Whether the current viewer owns this profile (gates the anthem editor). */
   isOwner?: boolean;
+  /** Most recently joined team; drives header watermark and team badge. */
+  team?: TeamSummary | null;
+  trustCounts?: ProfileTrustCounts;
+  commentsPage?: ProfileCommentsPage;
+  commentEligibility?: ProfileCommentEligibility;
+  viewerUserId?: string | null;
 }
 
 /**
@@ -66,14 +85,27 @@ export function PlayerProfile({
   anthemUrl = null,
   socialLinks = EMPTY_PLAYER_SOCIAL_LINKS,
   isOwner = false,
+  team = null,
+  trustCounts = { legit: 0, suspicious: 0 },
+  commentsPage,
+  commentEligibility,
+  viewerUserId = null,
 }: PlayerProfileProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
+  const queryClient = useQueryClient();
   const { data } = useGetSteamProfile(steamid64);
   const { data: leetify } = useGetLeetifyProfile(steamid64);
   const steam = data?.success ? data.data : null;
   const steamName = steam?.personaname || null;
   const isMember = !!linkedUsername;
   const { badges, initialLoadDone } = useGcBadges(steamid64);
+
+  useEffect(() => {
+    if (!badges) return;
+    void queryClient.invalidateQueries({
+      queryKey: ["players", steamid64, "legitimacy"],
+    });
+  }, [badges, queryClient, steamid64]);
 
   // Alias precedence: intradark name first, Steam persona as fallback.
   const name = linkedUsername || displayName || steamName || steamid64;
@@ -99,6 +131,7 @@ export function PlayerProfile({
     useState(!expectsSoundcloud);
   const [headerComplete, setHeaderComplete] = useState(false);
   const [showBottomSections, setShowBottomSections] = useState(false);
+  const [activeTab, setActiveTab] = useState<PlayerProfileTab>("overview");
 
   // SoundCloud: reveal when the song actually starts. If autoplay is blocked,
   // reveal on the first page gesture instead (see AnthemPlayerProvider).
@@ -151,90 +184,90 @@ export function PlayerProfile({
         anthemUrl={anthemUrl}
         socialLinks={socialLinks}
         isOwner={isOwner}
+        team={team}
         start={startHeaderReveal}
         onRevealComplete={handleHeaderRevealComplete}
       />
 
       {showBottomSections ? (
-        <>
-          {/* <StaggeredAnimation
-            index={0}
-            chainFromZero
-            baseDelay={0}
-            incrementDelay={SECTION_STAGGER_S}
-            fadeDirection="up"
-            reducedMotion={prefersReducedMotion}
-            className="flex justify-end"
-          >
-            <RefreshButton steamid64={steamid64} />
-          </StaggeredAnimation> */}
+        <PlayerProfileTabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          trustCounts={trustCounts}
+          className="pt-2"
+          overview={
+            <div className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-3">
+                <StaggeredAnimation
+                  index={0}
+                  chainFromZero
+                  baseDelay={0}
+                  incrementDelay={CARD_STAGGER_S}
+                  fadeDirection="up"
+                  durationMs={CARD_ANIM_MS}
+                  easing={CARD_EASING}
+                  reducedMotion={prefersReducedMotion}
+                  className="h-full"
+                >
+                  <LeetifyRatingsCard steamid64={steamid64} />
+                </StaggeredAnimation>
+                <StaggeredAnimation
+                  index={1}
+                  chainFromZero
+                  baseDelay={0}
+                  incrementDelay={CARD_STAGGER_S}
+                  fadeDirection="up"
+                  durationMs={CARD_ANIM_MS}
+                  easing={CARD_EASING}
+                  reducedMotion={prefersReducedMotion}
+                  className="h-full"
+                >
+                  <FaceitRatingsCard steamid64={steamid64} />
+                </StaggeredAnimation>
+                <StaggeredAnimation
+                  index={2}
+                  chainFromZero
+                  baseDelay={0}
+                  incrementDelay={CARD_STAGGER_S}
+                  fadeDirection="up"
+                  durationMs={CARD_ANIM_MS}
+                  easing={CARD_EASING}
+                  reducedMotion={prefersReducedMotion}
+                  className="h-full"
+                >
+                  <SteamCard steamid64={steamid64} badges={badges} />
+                </StaggeredAnimation>
+              </div>
 
-          <div className="grid gap-4 pt-4 sm:grid-cols-3">
-            <StaggeredAnimation
-              index={0}
-              chainFromZero
-              baseDelay={0}
-              incrementDelay={CARD_STAGGER_S}
-              fadeDirection="up"
-              durationMs={CARD_ANIM_MS}
-              easing={CARD_EASING}
-              reducedMotion={prefersReducedMotion}
-              className="h-full"
-            >
-              <LeetifyRatingsCard steamid64={steamid64} />
-            </StaggeredAnimation>
-            <StaggeredAnimation
-              index={1}
-              chainFromZero
-              baseDelay={0}
-              incrementDelay={CARD_STAGGER_S}
-              fadeDirection="up"
-              durationMs={CARD_ANIM_MS}
-              easing={CARD_EASING}
-              reducedMotion={prefersReducedMotion}
-              className="h-full"
-            >
-              <FaceitRatingsCard steamid64={steamid64} />
-            </StaggeredAnimation>
-            <StaggeredAnimation
-              index={2}
-              chainFromZero
-              baseDelay={0}
-              incrementDelay={CARD_STAGGER_S}
-              fadeDirection="up"
-              durationMs={CARD_ANIM_MS}
-              easing={CARD_EASING}
-              reducedMotion={prefersReducedMotion}
-              className="h-full"
-            >
-              <SteamCard steamid64={steamid64} badges={badges} />
-            </StaggeredAnimation>
-          </div>
-
-          <StaggeredAnimation
-            index={PROFILE_RATING_CARD_COUNT}
-            chainFromZero
-            baseDelay={0}
-            incrementDelay={CARD_STAGGER_S}
-            fadeDirection="up"
-            durationMs={CARD_ANIM_MS}
-            easing={CARD_EASING}
-            reducedMotion={prefersReducedMotion}
-          >
-            <CommentsCard />
-          </StaggeredAnimation>
-
-          {/* <StaggeredAnimation
-            index={4}
-            chainFromZero
-            baseDelay={0}
-            incrementDelay={SECTION_STAGGER_S}
-            fadeDirection="up"
-            reducedMotion={prefersReducedMotion}
-          >
-            <SteamPanel steamid64={steamid64} />
-          </StaggeredAnimation> */}
-        </>
+              <StaggeredAnimation
+                index={PROFILE_RATING_CARD_COUNT}
+                chainFromZero
+                baseDelay={0}
+                incrementDelay={CARD_STAGGER_S}
+                fadeDirection="up"
+                durationMs={CARD_ANIM_MS}
+                easing={CARD_EASING}
+                reducedMotion={prefersReducedMotion}
+              >
+                {commentsPage && commentEligibility ? (
+                  <ProfileCommentsCard
+                    steamid64={steamid64}
+                    linkedUsername={linkedUsername}
+                    initialPage={commentsPage}
+                    eligibility={commentEligibility}
+                    viewerUserId={viewerUserId}
+                  />
+                ) : null}
+              </StaggeredAnimation>
+            </div>
+          }
+          matches={
+            <PlayerProfileMatchesPanel playerId={steamid64} className="pt-2" />
+          }
+          media={
+            <PlayerProfileMediaPanel playerId={steamid64} className="pt-2" />
+          }
+        />
       ) : null}
     </div>
   );

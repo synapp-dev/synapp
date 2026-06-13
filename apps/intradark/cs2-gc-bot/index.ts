@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 import { GcClient } from "./gc-client.js";
 import { startGcBotHttpServer } from "./http-server.js";
 import { parseGcProfile } from "../entities/players/lib/parse-gc.js";
+import { recomputeLegitimacy } from "../entities/players/lib/server/recompute-legitimacy.js";
 
 const tokenStorePath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -64,6 +65,7 @@ async function main(): Promise<void> {
       raw: profile,
     });
     if (error) throw new Error(error.message);
+    void recomputeLegitimacy(steamid64);
   }
 
   let draining = false;

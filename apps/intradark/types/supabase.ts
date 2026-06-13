@@ -355,6 +355,8 @@ export type Database = {
           avatar: string | null;
           cover_image: string | null;
           description: string | null;
+          primary_color: string | null;
+          secondary_color: string | null;
           game: string;
           team_type: string | null;
           leader_steamid64: string | null;
@@ -376,6 +378,8 @@ export type Database = {
           avatar?: string | null;
           cover_image?: string | null;
           description?: string | null;
+          primary_color?: string | null;
+          secondary_color?: string | null;
           game?: string;
           team_type?: string | null;
           leader_steamid64?: string | null;
@@ -397,6 +401,8 @@ export type Database = {
           avatar?: string | null;
           cover_image?: string | null;
           description?: string | null;
+          primary_color?: string | null;
+          secondary_color?: string | null;
           game?: string;
           team_type?: string | null;
           leader_steamid64?: string | null;

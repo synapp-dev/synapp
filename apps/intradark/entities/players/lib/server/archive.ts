@@ -25,6 +25,8 @@ import {
   touchPlayerFetched,
 } from "@/entities/players/lib/server/registry";
 import { normalizeCountryCode } from "@/entities/players/lib/country-code";
+import { recomputeLegitimacy } from "@/entities/players/lib/server/recompute-legitimacy";
+import { fetchSteamEnrichment } from "@/entities/players/lib/server/steam-enrichment";
 import { isStale, SOURCE_TTL_MS } from "@/entities/players/lib/staleness";
 import type {
   SteamProfile,
@@ -45,6 +47,10 @@ type SteamRow = {
   realname: string | null;
   timecreated: string | null;
   lastlogoff: string | null;
+  steam_level?: number | null;
+  friends_count?: number | null;
+  communityvisibilitystate?: number | null;
+  enrichment_fetched_at?: string | null;
 };
 
 function deriveVanity(profileurl: string | null | undefined): string | null {
@@ -64,10 +70,56 @@ function toSteamProfile(row: SteamRow, steamid64: string): SteamProfile {
       realname: row.realname ?? undefined,
       timecreated: row.timecreated ? Date.parse(row.timecreated) / 1000 : undefined,
       lastlogoff: row.lastlogoff ? Date.parse(row.lastlogoff) / 1000 : undefined,
-      player_level: 0,
-      friends_count: 0,
+      player_level: row.steam_level ?? 0,
+      friends_count: row.friends_count ?? 0,
     },
   };
+}
+
+const ENRICHMENT_TTL_MS = SOURCE_TTL_MS.steam;
+
+async function maybeEnrichSteamProfile(
+  steamid64: string,
+  communityVisibility: number | undefined,
+  force: boolean,
+): Promise<void> {
+  const admin = createAdminClient();
+  const { data: row } = await admin
+    .from("steam_profiles")
+    .select("enrichment_fetched_at")
+    .eq("steamid64", steamid64)
+    .maybeSingle();
+
+  if (
+    !force &&
+    row?.enrichment_fetched_at &&
+    !isStale(row.enrichment_fetched_at, ENRICHMENT_TTL_MS)
+  ) {
+    return;
+  }
+
+  const enrichment = await fetchSteamEnrichment(
+    steamid64,
+    process.env.STEAM_API_KEY,
+    communityVisibility,
+  );
+  if (!enrichment) return;
+
+  await admin
+    .from("steam_profiles")
+    .update({
+      vac_banned: enrichment.vacBanned,
+      game_banned: enrichment.gameBanned,
+      community_banned: enrichment.communityBanned,
+      economy_ban: enrichment.economyBan,
+      ban_age_days: enrichment.banAgeDays,
+      cs2_playtime_minutes: enrichment.cs2PlaytimeMinutes,
+      badge_count: enrichment.badgeCount,
+      steam_level: enrichment.steamLevel,
+      friends_count: enrichment.friendsCount,
+      enrichment_fetched_at: new Date().toISOString(),
+    })
+    .eq("steamid64", steamid64);
 }
 
 export async function archiveSteam(
@@ -78,12 +130,19 @@ export async function archiveSteam(
 
   const { data: existing } = await admin
     .from("steam_profiles")
-    .select("steamid, personaname, avatarfull, profileurl, realname, timecreated, lastlogoff, updated_at")
+    .select(
+      "steamid, personaname, avatarfull, profileurl, realname, timecreated, lastlogoff, updated_at, steam_level, friends_count, communityvisibilitystate, enrichment_fetched_at",
+    )
     .eq("steamid64", steamid64)
     .maybeSingle();
 
   if (!opts.force && existing && !isStale(existing.updated_at, SOURCE_TTL_MS.steam)) {
     await ensurePlayer(admin, steamid64);
+    void maybeEnrichSteamProfile(
+      steamid64,
+      existing.communityvisibilitystate ?? undefined,
+      false,
+    ).then(() => recomputeLegitimacy(steamid64));
     return { cached: true, data: toSteamProfile(existing, steamid64) };
   }
 
@@ -116,11 +175,25 @@ export async function archiveSteam(
     ...(countryFlag ? { countryFlag } : {}),
   });
   await touchPlayerFetched(admin, steamid64);
+  await maybeEnrichSteamProfile(
+    steamid64,
+    summary.communityvisibilitystate,
+    !!opts.force,
+  );
+  void recomputeLegitimacy(steamid64);
+
+  const { data: refreshed } = await admin
+    .from("steam_profiles")
+    .select(
+      "steamid, personaname, avatarfull, profileurl, realname, timecreated, lastlogoff, steam_level, friends_count",
+    )
+    .eq("steamid64", steamid64)
+    .maybeSingle();
 
   return {
     cached: false,
     data: toSteamProfile(
-      {
+      refreshed ?? {
         steamid: summary.steamid,
         personaname: summary.personaname,
         avatarfull: summary.avatarfull ?? null,
@@ -191,6 +264,7 @@ export async function archiveFaceit(
     faceitPlayerId: parsed.faceit_player_id,
     ...(parsed.country ? { countryFlag: parsed.country } : {}),
   });
+  void recomputeLegitimacy(steamid64);
 
   return { cached: false, data: toFaceitProfile(raw) };
 }
@@ -246,6 +320,7 @@ export async function archiveLeetify(
     raw,
   });
   await ensurePlayer(admin, steamid64);
+  void recomputeLegitimacy(steamid64);
 
   return { cached: false, data: normalizeLeetify(raw) };
 }

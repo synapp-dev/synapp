@@ -80,12 +80,14 @@ export function AnimatedStat({
 }: AnimatedStatProps) {
   const [progress, setProgress] = useState(0);
 
-  // Calculate the final target value for the progress bar
-  const target = progressTransform
+  // Calculate the final target value for the progress bar (clamp to max so
+  // values above the section scale, e.g. clutch > 16, still render as full).
+  const rawTarget = progressTransform
     ? progressTransform(dataReady ? value : 0)
     : dataReady
       ? value
       : 0;
+  const target = Math.min(progressMax, Math.max(0, rawTarget));
 
   // Drive the bar with a single CSS transition rather than per-frame stepping:
   // hold at 0, then (after the delay) flip to the target so the browser tweens

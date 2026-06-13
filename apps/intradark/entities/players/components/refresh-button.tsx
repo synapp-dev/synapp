@@ -39,6 +39,9 @@ export function RefreshButton({ steamid64 }: { steamid64: string }) {
         queryClient.invalidateQueries({
           queryKey: ["players", "leetify", steamid64],
         }),
+        queryClient.invalidateQueries({
+          queryKey: ["players", steamid64, "legitimacy"],
+        }),
       ]);
       toast.success("Refreshing player data…");
     } catch (e) {
