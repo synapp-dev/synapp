@@ -12,7 +12,8 @@ export function useSalesInsightsQuery({
   organisationSlug,
   venueSlug,
   dateRange,
-}: SalesQueryInput): UseQueryResult<SalesOrdersApiPayload, Error> {
+  enabled = true,
+}: SalesQueryInput & { enabled?: boolean }): UseQueryResult<SalesOrdersApiPayload, Error> {
   const startIso = dateRange.start.toISOString();
   const endIso = dateRange.end.toISOString();
 
@@ -26,5 +27,6 @@ export function useSalesInsightsQuery({
         endIso,
       });
     },
+    enabled,
   });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -20,6 +21,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@work
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
+import { useInsightsPeriod } from "@/entities/insights/model/insights-period-provider";
+import { useVenueXeroConnectionQuery } from "@/entities/xero/model/use-venue-xero-connection";
+import { useVenueXeroInvoicesQuery } from "@/entities/xero/model/use-venue-xero-invoices-query";
 
 type InventoryInsightsPageClientProps = {
   organisation: string;
@@ -204,8 +208,16 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
 }
 
 export function InventoryInsightsPageClient({ organisation, venue }: InventoryInsightsPageClientProps) {
-  const [datePreset, setDatePreset] = useState<DatePreset>("last-week");
-  const dateRange = useMemo(() => getDateRange(datePreset), [datePreset]);
+  const xeroConnection = useVenueXeroConnectionQuery(organisation, venue);
+  const xeroInvoices = useVenueXeroInvoicesQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    enabled: xeroConnection.data?.connected === true,
+  });
+  const xeroBillCount = xeroInvoices.data?.invoices.length ?? 0;
+  const invoicesHref = `/${organisation}/${venue}/purchasing/invoices`;
+
+  const { preset: datePreset } = useInsightsPeriod();
 
   const totalStockValue = useMemo(
     () => CATEGORY_STOCK_VALUE.reduce((sum, category) => sum + category.value, 0),
@@ -249,35 +261,16 @@ export function InventoryInsightsPageClient({ organisation, venue }: InventoryIn
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Inventory Insights</h1>
-          <p className="text-sm text-muted-foreground">
-            Organisation: <span className="font-medium">{organisation}</span> | Venue:{" "}
-            <span className="font-medium">{venue}</span>
-          </p>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={datePreset} onValueChange={(value) => setDatePreset(value as DatePreset)}>
-            <SelectTrigger className="w-[148px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="this-week">This Week</SelectItem>
-              <SelectItem value="last-week">Last Week</SelectItem>
-              <SelectItem value="this-month">This Month</SelectItem>
-              <SelectItem value="last-30">Last 30 Days</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {formatDateRange(dateRange.start, dateRange.end)}
-          </span>
-          <Button onClick={handleExportKpis} className="gap-2">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          <h2 className="text-lg font-semibold tracking-tight">Inventory</h2>
+          <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
+            Demo data
+          </Badge>
         </div>
+        <Button onClick={handleExportKpis} className="gap-2">
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -481,8 +474,20 @@ export function InventoryInsightsPageClient({ organisation, venue }: InventoryIn
       <Card className="border-dashed">
         <CardContent className="flex items-start gap-2 py-4 text-sm text-muted-foreground">
           <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          Reference layout has been ported into this route with local seeded data. Hook and chart
-          integrations can be swapped in once inventory reporting endpoints are ready.
+          <span>
+            Charts here still use seeded demo data.{" "}
+            {xeroConnection.data?.connected ? (
+              <>
+                Supplier bills from Xero are available in{" "}
+                <Link href={invoicesHref} className="font-medium text-foreground underline">
+                  Inventory → Invoices
+                </Link>
+                {xeroBillCount > 0 ? ` (${xeroBillCount} synced).` : " — sync bills to populate COGS inputs."}
+              </>
+            ) : (
+              "Connect Xero under Settings → Integrations to sync supplier bills."
+            )}
+          </span>
         </CardContent>
       </Card>
     </section>

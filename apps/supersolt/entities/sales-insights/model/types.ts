@@ -1,11 +1,10 @@
-export type DatePreset =
-  | "today"
-  | "yesterday"
-  | "this-week"
-  | "last-week"
-  | "this-month"
-  | "last-30"
-  | "custom";
+import type {
+  InsightsDatePreset,
+  InsightsDateRange,
+} from "@/entities/insights/model/types";
+
+export type DatePreset = InsightsDatePreset;
+export type SalesDateRange = InsightsDateRange;
 
 export type SortField =
   | "order_datetime"
@@ -96,9 +95,17 @@ export type SalesOrderRow = {
 
 export type SalesInsightsMeta = {
   dataSource: "square" | "demo";
+  /** IANA timezone for hour-of-day grouping (venue wall clock). */
+  venueTimezone?: string;
   squareError?: string;
   /** Set when payments loaded but Square Orders API failed (missing ORDERS_READ or API error). */
   squareOrdersError?: string;
+  /** True when Square returned more payments than we could fetch in one request. */
+  squarePaymentsTruncated?: boolean;
+  /** Last successful payment mirror sync (ISO). */
+  lastSyncedAt?: string | null;
+  syncStatus?: "idle" | "syncing" | "failed";
+  backfillStatus?: "idle" | "running" | "complete" | "failed";
 };
 
 /** Square Invoices API row for Sales Insights (published invoices in date range). */
@@ -124,11 +131,6 @@ export type SquareInvoicesMeta = {
 export type SquareInvoicesApiPayload = {
   invoices: SquareInvoiceRow[];
   meta: SquareInvoicesMeta;
-};
-
-export type SalesDateRange = {
-  start: Date;
-  end: Date;
 };
 
 export type SalesQueryInput = {

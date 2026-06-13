@@ -15,6 +15,8 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
+import { useVenueXeroConnectionQuery } from "@/entities/xero/model/use-venue-xero-connection";
+import { useVenueXeroInvoicesQuery } from "@/entities/xero/model/use-venue-xero-invoices-query";
 
 type PAndLInsightsPageClientProps = {
   organisation: string;
@@ -175,6 +177,18 @@ export function PAndLInsightsPageClient({ organisation, venue }: PAndLInsightsPa
   const [preset, setPreset] = useState<PLPreset>("this-month");
   const period = useMemo(() => getPLDateRange(preset), [preset]);
 
+  const xeroConnection = useVenueXeroConnectionQuery(organisation, venue);
+  const xeroInvoices = useVenueXeroInvoicesQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    enabled: xeroConnection.data?.connected === true,
+  });
+
+  const xeroConnected = xeroConnection.data?.connected === true;
+  const invoiceCount = xeroInvoices.data?.invoices.length ?? 0;
+  const integrationsHref = `/${organisation}/${venue}/settings/integrations`;
+  const invoicesHref = `/${organisation}/${venue}/purchasing/invoices`;
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -207,20 +221,46 @@ export function PAndLInsightsPageClient({ organisation, venue }: PAndLInsightsPa
         <div className="flex items-start gap-3">
           <BarChart3 className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
-              P&L data will appear here once Xero is connected
-            </p>
-            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-500">
-              Connect your Xero account to automatically pull income, COGS, payroll, and expense
-              data into your P&L.
-            </p>
+            {xeroConnected ? (
+              <>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
+                  Xero is connected — P&L actuals are not wired yet
+                </p>
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-500">
+                  Supplier bills sync to Inventory → Invoices
+                  {invoiceCount > 0
+                    ? ` (${invoiceCount} bill${invoiceCount === 1 ? "" : "s"} loaded).`
+                    : ". Sync bills there, then P&L will use them in a future release."}
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-400">
+                  P&L data will appear here once Xero is connected
+                </p>
+                <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-500">
+                  Connect your Xero account to pull supplier bills and, later, income, COGS,
+                  payroll, and expenses into P&L.
+                </p>
+              </>
+            )}
           </div>
-          <Button asChild size="sm" variant="outline" className="shrink-0">
-            <Link href={`/${organisation}/${venue}/settings/integrations`}>
-              <ExternalLink className="mr-1 h-3.5 w-3.5" />
-              Connect Xero
-            </Link>
-          </Button>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            {xeroConnected ? (
+              <Button asChild size="sm" variant="outline">
+                <Link href={invoicesHref}>
+                  <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                  View invoices
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild size="sm" variant="outline">
+              <Link href={integrationsHref}>
+                <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                {xeroConnected ? "Integrations" : "Connect Xero"}
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 

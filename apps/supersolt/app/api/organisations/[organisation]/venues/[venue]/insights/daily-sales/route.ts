@@ -4,7 +4,7 @@ import {
   serviceErrorResponse,
   validationErrorResponse,
 } from "@/lib/api/service-error-response";
-import { getSalesInsightsOrders } from "@/server/sales/sales-insights.service";
+import { getDailySalesForVenue } from "@/server/forecast/forecast.service";
 
 type RouteParams = {
   organisation: string;
@@ -22,24 +22,24 @@ export async function GET(
 
   const { organisation, venue } = await context.params;
   const url = new URL(request.url);
-  const startIso = url.searchParams.get("start")?.trim() ?? "";
-  const endIso = url.searchParams.get("end")?.trim() ?? "";
+  const fromDate = url.searchParams.get("from")?.trim() ?? "";
+  const toDate = url.searchParams.get("to")?.trim() ?? "";
 
-  if (!startIso || !endIso) {
+  if (!fromDate || !toDate) {
     return validationErrorResponse(
-      "Query params start and end (ISO 8601) are required",
+      "Query params from and to (YYYY-MM-DD) are required",
     );
   }
 
   try {
-    const result = await getSalesInsightsOrders(ctx, {
+    const result = await getDailySalesForVenue(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
-      startIso,
-      endIso,
+      fromDate,
+      toDate,
     });
     return jsonDataResponse(result);
   } catch (error) {
-    return serviceErrorResponse(error, "sales-insights");
+    return serviceErrorResponse(error, "insights/daily-sales");
   }
 }

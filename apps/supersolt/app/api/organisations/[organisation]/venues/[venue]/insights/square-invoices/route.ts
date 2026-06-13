@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdmin } from "@/utils/supabase/admin";
-import { VenueAccessError } from "@/server/access/venue-access";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import {
+  jsonDataResponse,
+  serviceErrorResponse,
+  validationErrorResponse,
+} from "@/lib/api/service-error-response";
 import { getSquareInvoicesForInsights } from "@/server/sales/square-invoices.service";
 
 type RouteParams = {
@@ -11,19 +13,11 @@ type RouteParams = {
 
 export async function GET(
   request: Request,
-  context: { params: Promise<RouteParams> }
+  context: { params: Promise<RouteParams> },
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue } = await context.params;
@@ -32,37 +26,20 @@ export async function GET(
   const endIso = url.searchParams.get("end")?.trim() ?? "";
 
   if (!startIso || !endIso) {
-    return NextResponse.json(
-      {
-        data: null,
-        error: { message: "Query params start and end (ISO 8601) are required", status: 400 },
-      },
-      { status: 400 }
+    return validationErrorResponse(
+      "Query params start and end (ISO 8601) are required",
     );
   }
 
   try {
-    const admin = createSupabaseAdmin();
-    const result = await getSquareInvoicesForInsights(supabase, admin, {
-      userId: user.id,
+    const result = await getSquareInvoicesForInsights(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       startIso,
       endIso,
     });
-    return NextResponse.json({ data: result, error: null });
+    return jsonDataResponse(result);
   } catch (error) {
-    if (error instanceof VenueAccessError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    console.error("[sales-insights] square-invoices", error);
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "insights/square-invoices");
   }
 }

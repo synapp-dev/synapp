@@ -1,8 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
-import { assertUserHasVenueAccess, VenueAccessError } from "@/server/access/venue-access";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
-import { loadSquareConnectionForVenue } from "@/server/sales/sales-insights.service";
+import type { RequestAuthContext } from "@/server/auth/context";
+import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
+import {
+  loadSquareConnectionForVenue,
+  VenueAccessError,
+} from "@/server/sales/sales-insights.service";
 import {
   listSquareInvoicesForVenue,
   type SquareInvoiceApiItem,
@@ -12,10 +13,9 @@ import type {
   SquareInvoicesApiPayload,
 } from "@/entities/sales-insights/model/types";
 
-type Supabase = SupabaseClient<Database>;
-type AdminClient = SupabaseClient<Database>;
-
-function recipientLabel(recipient: SquareInvoiceApiItem["primary_recipient"]): string | null {
+function recipientLabel(
+  recipient: SquareInvoiceApiItem["primary_recipient"],
+): string | null {
   if (!recipient) {
     return null;
   }
@@ -68,32 +68,28 @@ function mapSquareInvoiceRow(inv: SquareInvoiceApiItem): SquareInvoiceRow | null
 }
 
 export async function getSquareInvoicesForInsights(
-  userSupabase: Supabase,
-  admin: AdminClient | null,
+  ctx: RequestAuthContext,
   args: {
-    userId: string;
     organisationSlug: string;
     venueSlug: string;
     startIso: string;
     endIso: string;
-  }
+  },
 ): Promise<SquareInvoicesApiPayload> {
-  const context = await ingredientsRepo.getVenueContextBySlugs(
-    userSupabase,
+  const context = await resolveVenueScopeForService(
+    ctx,
     args.organisationSlug,
-    args.venueSlug
+    args.venueSlug,
+    {
+      notFound: (message) => new VenueAccessError(404, message),
+      forbidden: (auth) => new VenueAccessError(auth.status, auth.message),
+    },
   );
-  if (!context) {
-    throw new VenueAccessError(404, "Venue not found");
-  }
 
-  await assertUserHasVenueAccess(userSupabase, {
-    userId: args.userId,
-    organisationId: context.organisationId,
-    venueId: context.venueId,
-  });
-
-  const connection = await loadSquareConnectionForVenue(userSupabase, admin, context.venueId);
+  const connection = await loadSquareConnectionForVenue(
+    ctx.appDb,
+    context.venueId,
+  );
 
   if (!connection) {
     return {
@@ -102,7 +98,7 @@ export async function getSquareInvoicesForInsights(
     };
   }
 
-  const locationId = connection.square_location_id?.trim() ?? "";
+  const locationId = connection.squareLocationId?.trim() ?? "";
   if (!locationId) {
     return {
       invoices: [],
@@ -115,7 +111,7 @@ export async function getSquareInvoicesForInsights(
   }
 
   const listed = await listSquareInvoicesForVenue({
-    accessToken: connection.square_access_token,
+    accessToken: connection.squareAccessToken,
     storedEnvironment: connection.environment,
     locationId,
     startIso: args.startIso,
@@ -132,20 +128,14 @@ export async function getSquareInvoicesForInsights(
     };
   }
 
-  const rows: SquareInvoiceRow[] = [];
-  for (const inv of listed.invoices) {
-    const row = mapSquareInvoiceRow(inv);
-    if (row) {
-      rows.push(row);
-    }
-  }
-
-  rows.sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  const invoices = listed.invoices
+    .map(mapSquareInvoiceRow)
+    .filter((row): row is SquareInvoiceRow => row !== null);
 
   return {
-    invoices: rows,
-    meta: { dataSource: "square" },
+    invoices,
+    meta: {
+      dataSource: "square",
+    },
   };
 }

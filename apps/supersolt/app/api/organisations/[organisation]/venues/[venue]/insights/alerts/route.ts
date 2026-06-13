@@ -4,12 +4,20 @@ import {
   serviceErrorResponse,
   validationErrorResponse,
 } from "@/lib/api/service-error-response";
-import { getSalesInsightsOrders } from "@/server/sales/sales-insights.service";
+import { listInsightsAlertsForVenue } from "@/server/insights/alerts.service";
+import type { InsightsAlertModule } from "@/entities/insights/model/types";
 
 type RouteParams = {
   organisation: string;
   venue: string;
 };
+
+const MODULES: InsightsAlertModule[] = [
+  "sales",
+  "labour",
+  "inventory",
+  "forecast",
+];
 
 export async function GET(
   request: Request,
@@ -22,24 +30,20 @@ export async function GET(
 
   const { organisation, venue } = await context.params;
   const url = new URL(request.url);
-  const startIso = url.searchParams.get("start")?.trim() ?? "";
-  const endIso = url.searchParams.get("end")?.trim() ?? "";
+  const moduleParam = url.searchParams.get("module")?.trim();
 
-  if (!startIso || !endIso) {
-    return validationErrorResponse(
-      "Query params start and end (ISO 8601) are required",
-    );
+  if (moduleParam && !MODULES.includes(moduleParam as InsightsAlertModule)) {
+    return validationErrorResponse("Invalid module filter");
   }
 
   try {
-    const result = await getSalesInsightsOrders(ctx, {
+    const result = await listInsightsAlertsForVenue(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
-      startIso,
-      endIso,
+      module: moduleParam as InsightsAlertModule | undefined,
     });
     return jsonDataResponse(result);
   } catch (error) {
-    return serviceErrorResponse(error, "sales-insights");
+    return serviceErrorResponse(error, "insights/alerts");
   }
 }

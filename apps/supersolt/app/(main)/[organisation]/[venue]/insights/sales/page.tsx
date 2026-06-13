@@ -1,4 +1,4 @@
-import { SalesInsightsPageClient } from "@/app/(main)/[organisation]/[venue]/insights/sales/_components/sales-insights-page-client";
+import { SalesInsightsPageClient } from "@/entities/sales-insights/components/sales-insights-page";
 
 export default async function SalesInsightsPage({
   params,

@@ -27,11 +27,6 @@ import {
 } from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -55,91 +50,39 @@ import {
   TableRow,
 } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
+import { SquareWordmark } from "@/components/branding/square-wordmark";
+import { useInsightsAlertsQuery } from "@/entities/insights/model/use-insights-alerts-query";
+import { useInsightsPeriod } from "@/entities/insights/model/insights-period-provider";
+import { SalesKpiMetricCard } from "@/entities/sales-insights/components/sales-kpi-metric-card";
+import { SalesVsForecastChart } from "@/entities/sales-insights/components/sales-vs-forecast-chart";
+import {
+  buildSalesVsForecastChartPoints,
+  calendarDatesInRange,
+  chartHasForecastSeries,
+  computeForecastDelta,
+  confidenceLabel,
+  daysUntilForecastReady,
+  maxConfidenceInRange,
+  summarizeComparableForecastPeriod,
+} from "@/entities/sales-insights/lib/sales-forecast-ui";
 import { useSalesInsightsQuery } from "@/entities/sales-insights/model/useSalesInsightsQuery";
-import { useSquareInvoicesQuery } from "@/entities/sales-insights/model/useSquareInvoicesQuery";
+import {
+  dateRangeToCalendarIso,
+  useForecastRangeQuery,
+} from "@/entities/forecast/model/use-forecast-range-query";
+import { toDateInputValue } from "@/entities/insights/lib/period";
 import type {
-  DatePreset,
-  SalesDateRange,
   SalesMixRow,
   SalesOrderRow,
   SalesOrderSource,
   SortDir,
   SortField,
-  SquareInvoiceRow,
 } from "@/entities/sales-insights/model/types";
 
 type SalesInsightsPageClientProps = {
   organisation: string;
   venue: string;
 };
-
-function startOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
-  return next;
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function startOfWeekMonday(date: Date): Date {
-  const day = date.getDay();
-  const delta = day === 0 ? -6 : 1 - day;
-  return startOfDay(addDays(date, delta));
-}
-
-function endOfWeekMonday(date: Date): Date {
-  return endOfDay(addDays(startOfWeekMonday(date), 6));
-}
-
-function startOfMonth(date: Date): Date {
-  return startOfDay(new Date(date.getFullYear(), date.getMonth(), 1));
-}
-
-function endOfMonth(date: Date): Date {
-  return endOfDay(new Date(date.getFullYear(), date.getMonth() + 1, 0));
-}
-
-function getPresetDateRange(preset: DatePreset): SalesDateRange {
-  const now = new Date();
-
-  switch (preset) {
-    case "today":
-      return { start: startOfDay(now), end: endOfDay(now) };
-    case "yesterday": {
-      const yesterday = addDays(now, -1);
-      return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-    }
-    case "this-week":
-      return { start: startOfWeekMonday(now), end: endOfWeekMonday(now) };
-    case "last-week": {
-      const lastWeekAnchor = addDays(now, -7);
-      return {
-        start: startOfWeekMonday(lastWeekAnchor),
-        end: endOfWeekMonday(lastWeekAnchor),
-      };
-    }
-    case "this-month":
-      return { start: startOfMonth(now), end: endOfMonth(now) };
-    case "last-30":
-      return { start: startOfDay(addDays(now, -30)), end: endOfDay(now) };
-    case "custom":
-      return { start: startOfDay(now), end: endOfDay(now) };
-    default: {
-      const neverPreset: never = preset;
-      return neverPreset;
-    }
-  }
-}
 
 function formatCurrency(cents: number): string {
   const abs = Math.abs(cents / 100);
@@ -151,7 +94,7 @@ function formatCurrency(cents: number): string {
 }
 
 function formatSquareMoney(
-  m: { amount?: number; currency?: string } | undefined
+  m: { amount?: number; currency?: string } | undefined,
 ): string {
   if (!m || typeof m.amount !== "number") return "—";
   const cur = m.currency?.toUpperCase();
@@ -190,41 +133,6 @@ function formatCsvDateTime(value: string): string {
   return `${year}-${month}-${day} ${hour}:${minute}`;
 }
 
-function formatDateRangeText(dateRange: SalesDateRange): string {
-  const start = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "short",
-  }).format(dateRange.start);
-  const end = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(dateRange.end);
-  return `${start} - ${end}`;
-}
-
-function toDateInputValue(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function fromDateInputValue(value: string, isEnd: boolean): Date | undefined {
-  if (!value) {
-    return undefined;
-  }
-  const [yearValue, monthValue, dayValue] = value.split("-");
-  const year = Number(yearValue);
-  const month = Number(monthValue);
-  const day = Number(dayValue);
-  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
-    return undefined;
-  }
-  const next = new Date(year, month - 1, day);
-  return isEnd ? endOfDay(next) : startOfDay(next);
-}
-
 function channelLabel(channel: string): string {
   const map: Record<string, string> = {
     "dine-in": "Dine-in",
@@ -233,7 +141,9 @@ function channelLabel(channel: string): string {
     online: "Online",
     pos: "POS",
   };
-  return map[channel] ?? `${channel.charAt(0).toUpperCase()}${channel.slice(1)}`;
+  return (
+    map[channel] ?? `${channel.charAt(0).toUpperCase()}${channel.slice(1)}`
+  );
 }
 
 function paymentLabel(paymentMethod: string | null): string {
@@ -252,7 +162,10 @@ function paymentLabel(paymentMethod: string | null): string {
     return map[paymentMethod];
   }
 
-  return paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1).replaceAll("_", " ");
+  return (
+    paymentMethod.charAt(0).toUpperCase() +
+    paymentMethod.slice(1).replaceAll("_", " ")
+  );
 }
 
 function statusLabel(order: SalesOrderRow): "Void" | "Refund" | "Sale" {
@@ -269,35 +182,6 @@ function sourceLabel(source: SalesOrderSource | undefined): string {
   if (source === "square") return "Square";
   if (source === "demo") return "Demo";
   return "Manual";
-}
-
-function squareInvoiceStatusLabel(status: string): string {
-  if (!status) {
-    return "Unknown";
-  }
-  return status
-    .split("_")
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
-}
-
-function formatInvoiceDueAmount(row: SquareInvoiceRow): string {
-  if (row.next_payment_amount_cents == null) {
-    return "—";
-  }
-  const cur = row.next_payment_currency?.toUpperCase();
-  if (cur && cur.length === 3) {
-    try {
-      return (row.next_payment_amount_cents / 100).toLocaleString("en-AU", {
-        style: "currency",
-        currency: cur,
-        minimumFractionDigits: 2,
-      });
-    } catch {
-      /* invalid currency */
-    }
-  }
-  return formatCurrency(row.next_payment_amount_cents);
 }
 
 function formatDetailDateTime(iso: string): string {
@@ -318,7 +202,9 @@ function DetailField({
 }) {
   return (
     <div className="space-y-1">
-      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">{label}</p>
+      <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">
+        {label}
+      </p>
       <div className="text-sm break-words">{children}</div>
     </div>
   );
@@ -353,11 +239,15 @@ function SalesMixItemCell({ row }: { row: SalesMixRow }) {
     row.squareLineName &&
     mixLineDetailKey(row.squareLineName) !== mixLineDetailKey(row.label);
 
-  const hasSecondary = Boolean(variation || catalog || receiptDiffers || (!row.mapped && !catalog));
+  const hasSecondary = Boolean(
+    variation || catalog || receiptDiffers || (!row.mapped && !catalog),
+  );
 
   return (
     <TableCell className="max-w-[min(300px,42vw)] align-top">
-      <div className="text-sm leading-snug font-medium break-words">{row.label}</div>
+      <div className="text-sm leading-snug font-medium break-words">
+        {row.label}
+      </div>
       {hasSecondary ? (
         <div className="text-muted-foreground mt-1.5 space-y-1 text-[11px] leading-snug">
           {variation ? (
@@ -367,13 +257,17 @@ function SalesMixItemCell({ row }: { row: SalesMixRow }) {
             </p>
           ) : null}
           {catalog ? (
-            <p className="font-mono text-[10px] tracking-tight break-all">{catalog}</p>
+            <p className="font-mono text-[10px] tracking-tight break-all">
+              {catalog}
+            </p>
           ) : !row.mapped ? (
             <p className="text-[10px] italic">No Square catalog id</p>
           ) : null}
           {receiptDiffers ? (
             <p className="break-words">
-              <span className="font-medium text-foreground/70">Receipt line</span>{" "}
+              <span className="font-medium text-foreground/70">
+                Receipt line
+              </span>{" "}
               {row.squareLineName}
             </p>
           ) : null}
@@ -387,10 +281,12 @@ export function SalesInsightsPageClient({
   organisation,
   venue,
 }: SalesInsightsPageClientProps) {
-  const [datePreset, setDatePreset] = useState<DatePreset>("last-week");
-  const [customFrom, setCustomFrom] = useState<Date | undefined>();
-  const [customTo, setCustomTo] = useState<Date | undefined>();
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const { dateRange } = useInsightsPeriod();
+  const salesAlertsQuery = useInsightsAlertsQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    module: "sales",
+  });
   const [channelFilter, setChannelFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -398,28 +294,11 @@ export function SalesInsightsPageClient({
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [detailOrder, setDetailOrder] = useState<SalesOrderRow | null>(null);
 
-  const dateRange = useMemo((): SalesDateRange => {
-    if (datePreset === "custom") {
-      const now = new Date();
-      return {
-        start: customFrom ?? startOfDay(now),
-        end: customTo ?? endOfDay(now),
-      };
-    }
-    return getPresetDateRange(datePreset);
-  }, [customFrom, customTo, datePreset]);
-
-  const { data: payload, isPending, refetch } = useSalesInsightsQuery({
-    organisationSlug: organisation,
-    venueSlug: venue,
-    dateRange,
-  });
-
   const {
-    data: invoicesPayload,
-    isPending: invoicesPending,
-    refetch: refetchInvoices,
-  } = useSquareInvoicesQuery({
+    data: payload,
+    isPending,
+    refetch,
+  } = useSalesInsightsQuery({
     organisationSlug: organisation,
     venueSlug: venue,
     dateRange,
@@ -427,9 +306,21 @@ export function SalesInsightsPageClient({
 
   const orders = payload?.orders ?? [];
   const meta = payload?.meta;
+
+  const calendarRange = useMemo(
+    () => dateRangeToCalendarIso(dateRange),
+    [dateRange]
+  );
+
+  const forecastQuery = useForecastRangeQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    fromDate: calendarRange.fromDate,
+    toDate: calendarRange.toDate,
+    enabled: meta?.dataSource === "square",
+  });
   const salesMix: SalesMixRow[] = payload?.salesMix ?? [];
-  const invoices = invoicesPayload?.invoices ?? [];
-  const invoiceMeta = invoicesPayload?.meta;
+  const salesAlerts = salesAlertsQuery.data ?? [];
 
   useEffect(() => {
     if (meta?.squareError) {
@@ -450,20 +341,23 @@ export function SalesInsightsPageClient({
   }, [meta?.squareOrdersError]);
 
   useEffect(() => {
-    if (invoiceMeta?.squareInvoicesError) {
-      toast.error("Could not load Square invoices", {
-        description: invoiceMeta.squareInvoicesError,
+    if (meta?.squarePaymentsTruncated) {
+      toast.warning("Some Square payments were not loaded", {
+        description:
+          "This date range has more transactions than we could fetch in one pass. Try a shorter range or contact support.",
         duration: 14_000,
       });
     }
-  }, [invoiceMeta?.squareInvoicesError]);
+  }, [meta?.squarePaymentsTruncated]);
 
   const channels = useMemo(() => {
     return [...new Set(orders.map((order) => order.channel))].sort();
   }, [orders]);
 
   const paymentMethods = useMemo(() => {
-    return [...new Set(orders.map((order) => order.payment_method ?? "unknown"))].sort();
+    return [
+      ...new Set(orders.map((order) => order.payment_method ?? "unknown")),
+    ].sort();
   }, [orders]);
 
   const filteredOrders = useMemo(() => {
@@ -475,7 +369,7 @@ export function SalesInsightsPageClient({
 
     if (paymentFilter !== "all") {
       result = result.filter(
-        (order) => (order.payment_method ?? "unknown") === paymentFilter
+        (order) => (order.payment_method ?? "unknown") === paymentFilter,
       );
     }
 
@@ -500,7 +394,9 @@ export function SalesInsightsPageClient({
             new Date(right.order_datetime).getTime();
           break;
         case "order_number":
-          compareValue = (left.order_number ?? "").localeCompare(right.order_number ?? "");
+          compareValue = (left.order_number ?? "").localeCompare(
+            right.order_number ?? "",
+          );
           break;
         case "channel":
           compareValue = left.channel.localeCompare(right.channel);
@@ -516,7 +412,7 @@ export function SalesInsightsPageClient({
           break;
         case "payment_method":
           compareValue = (left.payment_method ?? "").localeCompare(
-            right.payment_method ?? ""
+            right.payment_method ?? "",
           );
           break;
         default: {
@@ -529,28 +425,116 @@ export function SalesInsightsPageClient({
     });
   }, [orders, channelFilter, paymentFilter, searchQuery, sortField, sortDir]);
 
-  const stats = useMemo(() => {
-    const validTransactions = filteredOrders.filter((order) => !order.is_void);
+  const periodStats = useMemo(() => {
+    const validTransactions = orders.filter((order) => !order.is_void);
     const sales = validTransactions.filter((order) => !order.is_refund);
     const refunds = validTransactions.filter((order) => order.is_refund);
 
-    const totalRevenue = sales.reduce((sum, order) => sum + order.net_amount, 0);
-    const totalRefunds = refunds.reduce((sum, order) => sum + order.net_amount, 0);
-    const totalTax = sales.reduce((sum, order) => sum + order.tax_amount, 0);
-
+    const totalRevenue = sales.reduce(
+      (sum, order) => sum + order.net_amount,
+      0,
+    );
+    const totalRefunds = refunds.reduce(
+      (sum, order) => sum + order.net_amount,
+      0,
+    );
     return {
       totalOrders: sales.length,
       totalRevenue,
-      totalTax,
       totalRefunds,
       refundCount: refunds.length,
-      voidCount: filteredOrders.filter((order) => order.is_void).length,
+      voidCount: orders.filter((order) => order.is_void).length,
       avgCheck: sales.length === 0 ? 0 : totalRevenue / sales.length,
     };
-  }, [filteredOrders]);
+  }, [orders]);
+
+  const rangeDates = useMemo(
+    () => calendarDatesInRange(dateRange.start, dateRange.end),
+    [dateRange]
+  );
+
+  const forecastUi = useMemo(() => {
+    const { forecasts, dailySales, state } = forecastQuery;
+    const forecastReady = state?.forecastReady ?? false;
+    const chartPoints = buildSalesVsForecastChartPoints(
+      dailySales,
+      forecasts,
+      rangeDates
+    );
+    const showForecast = forecastReady && chartHasForecastSeries(chartPoints);
+    const comparable = summarizeComparableForecastPeriod(
+      dailySales,
+      forecasts,
+      rangeDates
+    );
+    const confidence = maxConfidenceInRange(
+      forecasts,
+      comparable.comparableDates
+    );
+
+    const hasForecastCoverage =
+      comparable.forecastRevenueCents > 0 ||
+      comparable.forecastOrders > 0 ||
+      comparable.forecastAvgCheckCents > 0;
+
+    const revenueDelta =
+      forecastReady &&
+      hasForecastCoverage &&
+      comparable.forecastRevenueCents > 0
+        ? computeForecastDelta(
+            comparable.actualRevenueCents,
+            comparable.forecastRevenueCents
+          )
+        : null;
+    const ordersDelta =
+      forecastReady && hasForecastCoverage && comparable.forecastOrders > 0
+        ? computeForecastDelta(
+            comparable.actualOrders,
+            comparable.forecastOrders
+          )
+        : null;
+    const avgCheckDelta =
+      forecastReady &&
+      hasForecastCoverage &&
+      comparable.forecastAvgCheckCents > 0
+        ? computeForecastDelta(
+            comparable.actualAvgCheckCents,
+            comparable.forecastAvgCheckCents
+          )
+        : null;
+
+    const periodActualChartTotal = comparable.actualRevenueCents / 100;
+    const periodForecastChartTotal = showForecast
+      ? comparable.forecastRevenueCents / 100
+      : null;
+    const comparableDayCount = comparable.comparableDates.length;
+
+    return {
+      forecastReady,
+      chartPoints,
+      showForecast,
+      confidence: confidenceLabel(confidence),
+      revenueDelta,
+      ordersDelta,
+      avgCheckDelta,
+      periodActualChartTotal,
+      periodForecastChartTotal,
+      comparableDayCount,
+      daysUntilReady: daysUntilForecastReady(state?.availableHistoryDays ?? 0),
+      availableHistoryDays: state?.availableHistoryDays ?? 0,
+    };
+  }, [
+    forecastQuery.forecasts,
+    forecastQuery.dailySales,
+    forecastQuery.state,
+    rangeDates,
+    periodStats,
+  ]);
 
   const hasActiveFilters =
-    channelFilter !== "all" || paymentFilter !== "all" || searchQuery.trim().length > 0;
+    channelFilter !== "all" ||
+    paymentFilter !== "all" ||
+    searchQuery.trim().length > 0;
 
   function clearFilters() {
     setChannelFilter("all");
@@ -596,7 +580,7 @@ export function SalesInsightsPageClient({
     const link = document.createElement("a");
     link.href = csvUrl;
     link.download = `sales-${toDateInputValue(dateRange.start)}-to-${toDateInputValue(
-      dateRange.end
+      dateRange.end,
     )}.csv`;
     link.click();
     URL.revokeObjectURL(csvUrl);
@@ -618,115 +602,60 @@ export function SalesInsightsPageClient({
     if (meta.dataSource === "demo") {
       return true;
     }
-    if (meta.dataSource === "square" && (meta.squareError || meta.squareOrdersError)) {
+    if (
+      meta.dataSource === "square" &&
+      (meta.squareError || meta.squareOrdersError)
+    ) {
       return true;
     }
     return false;
   }, [isPending, meta]);
 
   const squareConnectPrimaryLabel =
-    meta?.dataSource === "square" && (meta.squareError || meta.squareOrdersError)
+    meta?.dataSource === "square" &&
+    (meta.squareError || meta.squareOrdersError)
       ? "Reconnect Square"
       : "Connect Square";
 
   return (
     <section className="space-y-4">
+      {salesAlerts.length > 0 ? (
+        <div className="space-y-2">
+          {salesAlerts.map((alert) => (
+            <Card key={alert.id} className="border-primary/20 bg-muted/30">
+              <CardContent className="py-3 text-sm">
+                <p className="font-medium">{alert.headline}</p>
+                {alert.supportingMetric ? (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {alert.supportingMetric}
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">Sales Insights</h1>
-            {meta?.dataSource === "square" ? (
-              <Badge variant="secondary" className="text-xs font-normal">
-                Square payments
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
-                Demo data
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Organisation: <span className="font-medium">{organisation}</span> | Venue:{" "}
-            <span className="font-medium">{venue}</span>
-          </p>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select
-            value={datePreset}
-            onValueChange={(value) => {
-              const nextPreset = value as DatePreset;
-              setDatePreset(nextPreset);
-              if (nextPreset === "custom") {
-                setTimeout(() => setPickerOpen(true), 50);
-              }
-            }}
-          >
-            <SelectTrigger className="w-[148px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="this-week">This Week</SelectItem>
-              <SelectItem value="last-week">Last Week</SelectItem>
-              <SelectItem value="this-month">This Month</SelectItem>
-              <SelectItem value="last-30">Last 30 Days</SelectItem>
-              <SelectItem value="custom">Custom...</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="h-9">
-                Custom Range
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-[300px] space-y-3">
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  From
-                </p>
-                <Input
-                  type="date"
-                  value={toDateInputValue(customFrom ?? dateRange.start)}
-                  onChange={(event) => {
-                    const value = fromDateInputValue(event.target.value, false);
-                    setCustomFrom(value);
-                    setDatePreset("custom");
-                  }}
-                />
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  To
-                </p>
-                <Input
-                  type="date"
-                  value={toDateInputValue(customTo ?? dateRange.end)}
-                  onChange={(event) => {
-                    const value = fromDateInputValue(event.target.value, true);
-                    setCustomTo(value);
-                    setDatePreset("custom");
-                  }}
-                />
-              </div>
-              <div className="flex justify-end">
-                <Button size="sm" onClick={() => setPickerOpen(false)}>
-                  Apply
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
-
-          <span className="text-xs text-muted-foreground whitespace-nowrap">
-            {formatDateRangeText(dateRange)}
-          </span>
-
-          <Button className="gap-2" onClick={handleExportCsv}>
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          <h2 className="text-lg font-semibold tracking-tight">Sales</h2>
+          {meta?.dataSource === "square" ? (
+            <Badge variant="secondary" className="px-2 py-0.5">
+              <SquareWordmark className="h-3" decorative />
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-muted-foreground text-xs font-normal"
+            >
+              Demo data
+            </Badge>
+          )}
         </div>
+        <Button className="gap-2" onClick={handleExportCsv}>
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {squareIntegrationNeedsAttention ? (
@@ -743,10 +672,13 @@ export function SalesInsightsPageClient({
                   ? "You are seeing demo transactions. Organisation admins can connect Square POS to load real sales for this venue."
                   : "Your venue may be missing a valid Square link, location, or API access. Reconnect Square from this page or review venue settings."}
               </p>
-              {meta?.dataSource === "square" && (meta.squareError || meta.squareOrdersError) ? (
+              {meta?.dataSource === "square" &&
+              (meta.squareError || meta.squareOrdersError) ? (
                 <ul className="text-destructive list-inside list-disc text-xs">
                   {meta.squareError ? <li>{meta.squareError}</li> : null}
-                  {meta.squareOrdersError ? <li>{meta.squareOrdersError}</li> : null}
+                  {meta.squareOrdersError ? (
+                    <li>{meta.squareOrdersError}</li>
+                  ) : null}
                 </ul>
               ) : null}
             </div>
@@ -762,61 +694,75 @@ export function SalesInsightsPageClient({
         </Card>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">
-              Orders
-            </CardDescription>
-            <CardTitle className="text-3xl">{stats.totalOrders}</CardTitle>
-          </CardHeader>
+      {meta?.dataSource === "square" && !forecastUi.forecastReady ? (
+        <Card className="border-amber-200/80 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20">
+          <CardContent className="py-4 text-sm">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
+              Forecasts warming up
+            </p>
+            <p className="text-muted-foreground mt-1 text-xs leading-relaxed">
+              {forecastUi.availableHistoryDays > 0
+                ? `${forecastUi.availableHistoryDays} day${forecastUi.availableHistoryDays === 1 ? "" : "s"} of sales history synced. Forecasts unlock after 14 days — about ${forecastUi.daysUntilReady} more day${forecastUi.daysUntilReady === 1 ? "" : "s"} needed.`
+                : "Import Square history from DevKit to build daily sales and enable forecasts."}{" "}
+              <Link
+                href={`/${organisation}/${venue}/settings/devkit`}
+                className="text-primary font-medium underline underline-offset-2"
+              >
+                DevKit
+              </Link>
+            </p>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">
-              Revenue
-            </CardDescription>
-            <CardTitle className="text-3xl">{formatCurrency(stats.totalRevenue)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">
-              Avg Check
-            </CardDescription>
-            <CardTitle className="text-3xl">{formatCurrency(stats.avgCheck)}</CardTitle>
-          </CardHeader>
-        </Card>
+      ) : null}
+
+      {meta?.dataSource === "square" ? (
+        <SalesVsForecastChart
+          points={forecastUi.chartPoints}
+          periodActualTotal={forecastUi.periodActualChartTotal}
+          periodForecastTotal={forecastUi.periodForecastChartTotal}
+          comparableDayCount={forecastUi.comparableDayCount}
+          showForecast={forecastUi.showForecast}
+          isLoading={forecastQuery.isPending && !forecastQuery.isError}
+        />
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <SalesKpiMetricCard
+          label="Orders"
+          value={periodStats.totalOrders.toLocaleString("en-AU")}
+          delta={forecastUi.ordersDelta}
+          confidenceLabel={forecastUi.showForecast ? forecastUi.confidence : null}
+        />
+        <SalesKpiMetricCard
+          label="Revenue"
+          value={formatCurrency(periodStats.totalRevenue)}
+          delta={forecastUi.revenueDelta}
+          confidenceLabel={forecastUi.showForecast ? forecastUi.confidence : null}
+        />
+        <SalesKpiMetricCard
+          label="Avg check"
+          value={formatCurrency(periodStats.avgCheck)}
+          delta={forecastUi.avgCheckDelta}
+          confidenceLabel={forecastUi.showForecast ? forecastUi.confidence : null}
+        />
+        <SalesKpiMetricCard
+          label="Refunds"
+          value={`${periodStats.refundCount} (${formatCurrency(periodStats.totalRefunds)})`}
+          size="md"
+        />
+        <SalesKpiMetricCard
+          label="Voids"
+          value={String(periodStats.voidCount)}
+          size="md"
+        />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">
-              Tax Collected
-            </CardDescription>
-            <CardTitle className="text-xl">{formatCurrency(stats.totalTax)}</CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">
-              Refunds
-            </CardDescription>
-            <CardTitle className="text-xl">
-              {stats.refundCount} ({formatCurrency(stats.totalRefunds)})
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="text-xs uppercase tracking-wider">
-              Voids
-            </CardDescription>
-            <CardTitle className="text-xl">{stats.voidCount}</CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
+      {hasActiveFilters ? (
+        <p className="text-muted-foreground text-xs">
+          KPIs and chart use the full selected period. Transaction filters below
+          only affect the list ({filteredOrders.length} of {orders.length}).
+        </p>
+      ) : null}
 
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 border-b py-4">
@@ -859,7 +805,12 @@ export function SalesInsightsPageClient({
           </Select>
 
           {hasActiveFilters ? (
-            <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={clearFilters}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 gap-1 text-xs"
+              onClick={clearFilters}
+            >
               <X className="h-3.5 w-3.5" />
               Clear
             </Button>
@@ -872,7 +823,7 @@ export function SalesInsightsPageClient({
               className="h-8 gap-1 text-xs"
               onClick={() => {
                 void refetch();
-                void refetchInvoices();
+                forecastQuery.refetch();
               }}
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -891,9 +842,10 @@ export function SalesInsightsPageClient({
               <h3 className="text-sm font-semibold">Sales Mix</h3>
             </div>
             <p className="text-muted-foreground max-w-3xl text-xs leading-relaxed">
-              The same label can appear on multiple rows when Square has different catalog items or
-              variations (for example two bottle sizes). Details under each name show how rows differ;
-              map catalog links in venue settings to combine them under one menu line.
+              The same label can appear on multiple rows when Square has
+              different catalog items or variations (for example two bottle
+              sizes). Details under each name show how rows differ; map catalog
+              links in venue settings to combine them under one menu line.
             </p>
           </div>
           {salesMix.length > 0 ? (
@@ -901,8 +853,12 @@ export function SalesInsightsPageClient({
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead className="text-xs font-medium">Item</TableHead>
-                  <TableHead className="text-right text-xs font-medium">Qty</TableHead>
-                  <TableHead className="text-right text-xs font-medium">Revenue</TableHead>
+                  <TableHead className="text-right text-xs font-medium">
+                    Qty
+                  </TableHead>
+                  <TableHead className="text-right text-xs font-medium">
+                    Revenue
+                  </TableHead>
                   <TableHead className="text-xs font-medium">Map</TableHead>
                 </TableRow>
               </TableHeader>
@@ -911,7 +867,9 @@ export function SalesInsightsPageClient({
                   <TableRow key={row.mixKey}>
                     <SalesMixItemCell row={row} />
                     <TableCell className="text-right text-sm tabular-nums">
-                      {row.quantity.toLocaleString("en-AU", { maximumFractionDigits: 2 })}
+                      {row.quantity.toLocaleString("en-AU", {
+                        maximumFractionDigits: 2,
+                      })}
                     </TableCell>
                     <TableCell className="text-right text-sm tabular-nums">
                       {formatCurrency(row.revenueCents)}
@@ -925,7 +883,10 @@ export function SalesInsightsPageClient({
                           Mapped
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground rounded-sm text-xs">
+                        <Badge
+                          variant="outline"
+                          className="text-muted-foreground rounded-sm text-xs"
+                        >
                           Unmapped
                         </Badge>
                       )}
@@ -939,18 +900,24 @@ export function SalesInsightsPageClient({
               <BarChart3 className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
               {meta?.dataSource === "square" ? (
                 <>
-                  <p className="text-sm font-medium">No line-level sales in this range</p>
+                  <p className="text-sm font-medium">
+                    No line-level sales in this range
+                  </p>
                   <p className="mt-1 mb-3 text-xs text-muted-foreground">
-                    Payments need a Square <code className="text-xs">order_id</code> so we can load
-                    line items. Map catalog ids to your menu in settings for labelled mix.
+                    Payments need a Square{" "}
+                    <code className="text-xs">order_id</code> so we can load
+                    line items. Map catalog ids to your menu in settings for
+                    labelled mix.
                   </p>
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-medium">Demo mix appears when line items exist</p>
+                  <p className="text-sm font-medium">
+                    Demo mix appears when line items exist
+                  </p>
                   <p className="mt-1 mb-3 text-xs text-muted-foreground">
-                    Connect Square to load real order lines; use venue settings to map Square catalog
-                    ids to your menu.
+                    Connect Square to load real order lines; use venue settings
+                    to map Square catalog ids to your menu.
                   </p>
                 </>
               )}
@@ -993,7 +960,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("order_datetime")}
                     >
                       Date/Time
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="order_datetime" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="order_datetime"
+                      />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -1002,7 +973,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("order_number")}
                     >
                       Order #
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="order_number" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="order_number"
+                      />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -1011,7 +986,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("channel")}
                     >
                       Channel
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="channel" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="channel"
+                      />
                     </button>
                   </TableHead>
                   <TableHead className="text-right">
@@ -1020,7 +999,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("gross_amount")}
                     >
                       Gross
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="gross_amount" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="gross_amount"
+                      />
                     </button>
                   </TableHead>
                   <TableHead className="text-right">
@@ -1029,7 +1012,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("tax_amount")}
                     >
                       Tax
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="tax_amount" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="tax_amount"
+                      />
                     </button>
                   </TableHead>
                   <TableHead className="text-right">
@@ -1038,7 +1025,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("net_amount")}
                     >
                       Net
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="net_amount" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="net_amount"
+                      />
                     </button>
                   </TableHead>
                   <TableHead>
@@ -1047,7 +1038,11 @@ export function SalesInsightsPageClient({
                       onClick={() => handleSort("payment_method")}
                     >
                       Payment
-                      <SortIcon sortField={sortField} sortDir={sortDir} field="payment_method" />
+                      <SortIcon
+                        sortField={sortField}
+                        sortDir={sortDir}
+                        field="payment_method"
+                      />
                     </button>
                   </TableHead>
                   <TableHead>Source</TableHead>
@@ -1067,7 +1062,7 @@ export function SalesInsightsPageClient({
                       className={cn(
                         "cursor-pointer hover:bg-muted/60",
                         isVoid ? "line-through opacity-50" : "",
-                        isRefund ? "bg-red-50/40 dark:bg-red-950/20" : ""
+                        isRefund ? "bg-red-50/40 dark:bg-red-950/20" : "",
                       )}
                       onClick={() => setDetailOrder(order)}
                       onKeyDown={(event) => {
@@ -1084,7 +1079,9 @@ export function SalesInsightsPageClient({
                         {order.order_number ?? order.id.slice(0, 8)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{channelLabel(order.channel)}</Badge>
+                        <Badge variant="outline">
+                          {channelLabel(order.channel)}
+                        </Badge>
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
                         {formatCurrency(order.gross_amount)}
@@ -1095,7 +1092,7 @@ export function SalesInsightsPageClient({
                       <TableCell
                         className={cn(
                           "text-right text-sm font-medium tabular-nums",
-                          isRefund ? "text-red-600 dark:text-red-400" : ""
+                          isRefund ? "text-red-600 dark:text-red-400" : "",
                         )}
                       >
                         {isRefund ? "-" : ""}
@@ -1105,9 +1102,21 @@ export function SalesInsightsPageClient({
                         {paymentLabel(order.payment_method)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className="rounded-sm px-1.5 py-0.5">
-                          {sourceLabel(order.source)}
-                        </Badge>
+                        {order.source === "square" ? (
+                          <Badge
+                            variant="secondary"
+                            className="rounded-sm px-1.5 py-0.5"
+                          >
+                            <SquareWordmark className="h-2.5" decorative />
+                          </Badge>
+                        ) : (
+                          <Badge
+                            variant="secondary"
+                            className="rounded-sm px-1.5 py-0.5"
+                          >
+                            {sourceLabel(order.source)}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         {isVoid ? (
@@ -1142,113 +1151,6 @@ export function SalesInsightsPageClient({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="border-b pb-4">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Receipt className="h-5 w-5 text-muted-foreground" />
-                Square invoices
-              </CardTitle>
-              <CardDescription>
-                Published Square invoices (excludes drafts) with created date in the range above.
-                Requires Square OAuth scope INVOICES_READ; reconnect Square after scopes change.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="px-0 py-0">
-          {invoicesPending ? (
-            <div className="flex h-40 items-center justify-center text-muted-foreground">
-              <RefreshCw className="mr-2 h-5 w-5 animate-spin" />
-              Loading invoices...
-            </div>
-          ) : invoiceMeta?.dataSource === "demo" ? (
-            <div className="flex flex-col items-center gap-3 px-6 py-8 text-center text-sm text-muted-foreground">
-              <p>
-                Connect Square for this venue to load invoices that have been published to customers
-                in this period.
-              </p>
-              <Button asChild size="sm">
-                <a href={squareConnectHref}>Connect Square</a>
-              </Button>
-            </div>
-          ) : invoiceMeta?.squareInvoicesError ? (
-            <div className="flex flex-col items-center gap-3 px-6 py-8 text-center">
-              <p className="text-sm text-destructive">{invoiceMeta.squareInvoicesError}</p>
-              {invoiceMeta.dataSource === "square" ? (
-                <Button asChild size="sm">
-                  <a href={squareConnectHref}>Reconnect Square</a>
-                </Button>
-              ) : null}
-            </div>
-          ) : invoices.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-2 px-6 py-10 text-center">
-              <Receipt className="h-8 w-8 text-muted-foreground" />
-              <p className="text-sm font-medium">No published Square invoices in this range</p>
-              <p className="text-xs text-muted-foreground">
-                Invoices must be published (not draft) and created within the selected dates.
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="text-xs font-medium">Created</TableHead>
-                  <TableHead className="text-xs font-medium">Invoice #</TableHead>
-                  <TableHead className="text-xs font-medium">Title</TableHead>
-                  <TableHead className="text-xs font-medium">Status</TableHead>
-                  <TableHead className="text-right text-xs font-medium">Amount due</TableHead>
-                  <TableHead className="text-xs font-medium">Customer</TableHead>
-                  <TableHead className="text-xs font-medium">Pay</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((inv) => (
-                  <TableRow key={inv.id}>
-                    <TableCell className="text-sm tabular-nums">
-                      {formatDayTime(inv.created_at)}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {inv.invoice_number ?? inv.id.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="max-w-[200px] text-sm break-words">
-                      {inv.title ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-xs font-normal">
-                        {squareInvoiceStatusLabel(inv.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-sm tabular-nums">
-                      {formatInvoiceDueAmount(inv)}
-                    </TableCell>
-                    <TableCell className="max-w-[160px] text-sm break-words">
-                      {inv.customer_label ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      {inv.public_url ? (
-                        <a
-                          href={inv.public_url}
-                          className="text-primary inline-flex items-center gap-1 text-xs font-medium underline underline-offset-2"
-                          rel="noopener noreferrer"
-                          target="_blank"
-                        >
-                          Open
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
       <Sheet
         open={detailOrder !== null}
         onOpenChange={(open) => {
@@ -1273,14 +1175,18 @@ export function SalesInsightsPageClient({
                   <DetailField label="Date & time">
                     {formatDetailDateTime(detailOrder.order_datetime)}
                   </DetailField>
-                  <DetailField label="Source">{sourceLabel(detailOrder.source)}</DetailField>
+                  <DetailField label="Source">
+                    {sourceLabel(detailOrder.source)}
+                  </DetailField>
                   <DetailField label="Order / reference #">
                     {detailOrder.order_number ?? "—"}
                   </DetailField>
                   <DetailField label="Internal id">
                     <span className="font-mono text-xs">{detailOrder.id}</span>
                   </DetailField>
-                  <DetailField label="Channel">{channelLabel(detailOrder.channel)}</DetailField>
+                  <DetailField label="Channel">
+                    {channelLabel(detailOrder.channel)}
+                  </DetailField>
                   <DetailField label="Payment method">
                     {paymentLabel(detailOrder.payment_method)}
                   </DetailField>
@@ -1293,20 +1199,32 @@ export function SalesInsightsPageClient({
                     Amounts (app view)
                   </p>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <DetailField label="Gross">{formatCurrency(detailOrder.gross_amount)}</DetailField>
-                    <DetailField label="Tax">{formatCurrency(detailOrder.tax_amount)}</DetailField>
+                    <DetailField label="Gross">
+                      {formatCurrency(detailOrder.gross_amount)}
+                    </DetailField>
+                    <DetailField label="Tax">
+                      {formatCurrency(detailOrder.tax_amount)}
+                    </DetailField>
                     <DetailField label="Discount">
                       {formatCurrency(detailOrder.discount_amount)}
                     </DetailField>
-                    <DetailField label="Net">{formatCurrency(detailOrder.net_amount)}</DetailField>
+                    <DetailField label="Net">
+                      {formatCurrency(detailOrder.net_amount)}
+                    </DetailField>
                   </div>
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <DetailField label="Void">{detailOrder.is_void ? "Yes" : "No"}</DetailField>
-                  <DetailField label="Refund">{detailOrder.is_refund ? "Yes" : "No"}</DetailField>
+                  <DetailField label="Void">
+                    {detailOrder.is_void ? "Yes" : "No"}
+                  </DetailField>
+                  <DetailField label="Refund">
+                    {detailOrder.is_refund ? "Yes" : "No"}
+                  </DetailField>
                   {detailOrder.refund_reason ? (
-                    <DetailField label="Refund reason">{detailOrder.refund_reason}</DetailField>
+                    <DetailField label="Refund reason">
+                      {detailOrder.refund_reason}
+                    </DetailField>
                   ) : null}
                 </div>
 
@@ -1340,7 +1258,9 @@ export function SalesInsightsPageClient({
                         </DetailField>
                         <DetailField label="Order id (Square)">
                           {detailOrder.square.orderId ? (
-                            <span className="font-mono text-xs">{detailOrder.square.orderId}</span>
+                            <span className="font-mono text-xs">
+                              {detailOrder.square.orderId}
+                            </span>
                           ) : (
                             "—"
                           )}
@@ -1380,7 +1300,9 @@ export function SalesInsightsPageClient({
                           {formatSquareMoney(detailOrder.square.refundedMoney)}
                         </DetailField>
                         {detailOrder.square.note ? (
-                          <DetailField label="Note">{detailOrder.square.note}</DetailField>
+                          <DetailField label="Note">
+                            {detailOrder.square.note}
+                          </DetailField>
                         ) : null}
                         {detailOrder.square.receiptUrl ? (
                           <div className="sm:col-span-2">
@@ -1406,14 +1328,20 @@ export function SalesInsightsPageClient({
                     <Separator />
                     <div>
                       <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wide">
-                        {detailOrder.source === "demo" ? "Demo line items" : "Order line items"}
+                        {detailOrder.source === "demo"
+                          ? "Demo line items"
+                          : "Order line items"}
                       </p>
                       <Table>
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead className="text-xs">Item</TableHead>
-                            <TableHead className="text-right text-xs">Qty</TableHead>
-                            <TableHead className="text-right text-xs">Line $</TableHead>
+                            <TableHead className="text-right text-xs">
+                              Qty
+                            </TableHead>
+                            <TableHead className="text-right text-xs">
+                              Line $
+                            </TableHead>
                             {detailOrder.source === "square" ? (
                               <TableHead className="text-xs">Map</TableHead>
                             ) : null}
@@ -1429,7 +1357,8 @@ export function SalesInsightsPageClient({
                                     Variation: {li.squareVariationName}
                                   </span>
                                 ) : null}
-                                {detailOrder.source === "square" && li.squareCatalogObjectId ? (
+                                {detailOrder.source === "square" &&
+                                li.squareCatalogObjectId ? (
                                   <span className="text-muted-foreground mt-0.5 block font-mono text-[10px]">
                                     {li.squareCatalogObjectId}
                                   </span>

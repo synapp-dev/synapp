@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@work
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
+import { useInsightsPeriod } from "@/entities/insights/model/insights-period-provider";
 
 type LabourInsightsPageClientProps = {
   organisation: string;
@@ -231,9 +232,7 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
 
 export function LabourInsightsPageClient({ organisation, venue }: LabourInsightsPageClientProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType>("labour-cost");
-  const [datePreset, setDatePreset] = useState<DatePreset>("last-week");
-
-  const dateRange = useMemo(() => getDateRange(datePreset), [datePreset]);
+  const { dateRange, preset: datePreset } = useInsightsPeriod();
 
   const costSummary = useMemo(() => {
     const totalHours = LABOUR_COST_ROWS.reduce((sum, row) => sum + row.totalHours, 0);
@@ -329,35 +328,16 @@ export function LabourInsightsPageClient({ organisation, venue }: LabourInsights
   return (
     <section className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Labour Insights</h1>
-          <p className="text-sm text-muted-foreground">
-            Organisation: <span className="font-medium">{organisation}</span> | Venue:{" "}
-            <span className="font-medium">{venue}</span>
-          </p>
-        </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={datePreset} onValueChange={(value) => setDatePreset(value as DatePreset)}>
-            <SelectTrigger className="w-[148px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Today</SelectItem>
-              <SelectItem value="yesterday">Yesterday</SelectItem>
-              <SelectItem value="this-week">This Week</SelectItem>
-              <SelectItem value="last-week">Last Week</SelectItem>
-              <SelectItem value="this-month">This Month</SelectItem>
-              <SelectItem value="last-30">Last 30 Days</SelectItem>
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {formatDateRange(dateRange.start, dateRange.end)}
-          </span>
-          <Button onClick={handleExport} className="gap-2">
-            <Download className="h-4 w-4" />
-            Export CSV
-          </Button>
+          <h2 className="text-lg font-semibold tracking-tight">Labour</h2>
+          <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
+            Demo data
+          </Badge>
         </div>
+        <Button onClick={handleExport} className="gap-2">
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">

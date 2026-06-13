@@ -1,16 +1,17 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
-import { assertUserHasVenueAccess, VenueAccessError } from "@/server/access/venue-access";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
-import { listSquarePaymentsForVenue, type SquarePaymentListItem } from "@/server/square/list-payments";
-import { batchRetrieveSquareOrders, type SquareOrderLineDto } from "@/server/square/batch-retrieve-orders";
-import { squarePaymentsToSalesOrderRows } from "@/server/sales/square-to-sales-row";
-import {
-  buildCatalogObjectToMenuIdMap,
-  buildMenuNameIndex,
-  resolveSquareOrderLine,
-} from "@/server/sales/square-line-resolve";
+import type { RequestAuthContext } from "@/server/auth/context";
+import { assertVenueMember } from "@/server/auth/rbac";
+import { AuthError } from "@/server/auth/errors";
+import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
+import type { AppDb } from "@/server/db/create-app-db";
+import { scopeRepo } from "@/server/db/scope.repo";
+import { forecastRepo } from "@/server/forecast/forecast.repo";
+import { squareConnectionsRepo } from "@/server/square/square-connections.repo";
+import { salesInsightsRepo } from "@/server/sales/sales-insights.repo";
 import { buildMockSalesOrders } from "@/entities/sales-insights/model/mock-sales-data";
+import {
+  mirrorPaymentsToSalesOrders,
+} from "@/server/square/square-mirror-map";
+import { squareSyncRepo } from "@/server/square/square-sync.repo";
 import type {
   SalesInsightsMeta,
   SalesLineItemRow,
@@ -18,7 +19,19 @@ import type {
   SalesOrderRow,
 } from "@/entities/sales-insights/model/types";
 
-type Supabase = SupabaseClient<Database>;
+/** @deprecated Use AuthError */
+export class VenueAccessError extends AuthError {}
+
+async function resolveInsightsVenueScope(
+  ctx: RequestAuthContext,
+  organisationSlug: string,
+  venueSlug: string,
+) {
+  return resolveVenueScopeForService(ctx, organisationSlug, venueSlug, {
+    notFound: (message) => new VenueAccessError(404, message),
+    forbidden: (auth) => new VenueAccessError(auth.status, auth.message),
+  });
+}
 
 export type SalesInsightsOrdersResult = {
   orders: SalesOrderRow[];
@@ -26,95 +39,11 @@ export type SalesInsightsOrdersResult = {
   salesMix: SalesMixRow[];
 };
 
-type AdminClient = SupabaseClient<Database>;
-
 export async function loadSquareConnectionForVenue(
-  userSupabase: Supabase,
-  admin: AdminClient | null,
-  venueId: string
-): Promise<{
-  square_access_token: string;
-  environment: string;
-  square_location_id: string | null;
-} | null> {
-  const sel =
-    "square_access_token, environment, square_location_id" as const;
-  const { data: asUser } = await userSupabase
-    .from("venue_square_connections")
-    .select(sel)
-    .eq("venue_id", venueId)
-    .maybeSingle();
-
-  if (asUser?.square_access_token) {
-    return {
-      square_access_token: asUser.square_access_token,
-      environment: asUser.environment,
-      square_location_id: asUser.square_location_id,
-    };
-  }
-
-  if (!admin) {
-    return null;
-  }
-
-  const { data: asAdmin } = await admin
-    .from("venue_square_connections")
-    .select(sel)
-    .eq("venue_id", venueId)
-    .maybeSingle();
-
-  if (!asAdmin?.square_access_token) {
-    return null;
-  }
-
-  return {
-    square_access_token: asAdmin.square_access_token,
-    environment: asAdmin.environment,
-    square_location_id: asAdmin.square_location_id,
-  };
-}
-
-function buildLinesByPaymentId(
-  payments: SquarePaymentListItem[],
-  linesByOrderId: Map<string, SquareOrderLineDto[]>
-): Map<string, SquareOrderLineDto[]> {
-  const m = new Map<string, SquareOrderLineDto[]>();
-  for (const p of payments) {
-    const pid = p.id;
-    const oid = p.order_id?.trim();
-    if (!pid || !oid) continue;
-    const lines = linesByOrderId.get(oid);
-    if (lines?.length) {
-      m.set(pid, lines);
-    }
-  }
-  return m;
-}
-
-function toSalesLineItemRow(
-  line: SquareOrderLineDto,
-  catalogByObjectId: Map<string, string>,
-  byNormalizedName: Map<string, { id: string; name: string }>,
-  idToName: Map<string, string>
-): SalesLineItemRow {
-  const r = resolveSquareOrderLine({
-    line,
-    catalogByObjectId,
-    byNormalizedName,
-    idToName,
-  });
-  return {
-    lineUid: r.lineUid,
-    quantity: r.quantity,
-    lineName: r.lineName,
-    grossAmountCents: r.grossAmountCents,
-    currency: r.currency,
-    squareCatalogObjectId: r.squareCatalogObjectId,
-    squareVariationName: r.variationName,
-    menuItemId: r.menuItemId,
-    menuItemName: r.menuItemName,
-    matchSource: r.matchSource,
-  };
+  appDb: AppDb,
+  venueId: string,
+) {
+  return squareConnectionsRepo.loadConnectionForVenue(appDb, venueId, true);
 }
 
 function computeSalesMix(orders: SalesOrderRow[]): SalesMixRow[] {
@@ -168,62 +97,101 @@ function computeSalesMix(orders: SalesOrderRow[]): SalesMixRow[] {
   return [...acc.values()].sort((a, b) => b.revenueCents - a.revenueCents);
 }
 
-async function loadSquareLineMappingContext(
-  userSupabase: Supabase,
-  venueId: string
-): Promise<{
-  catalogByObjectId: Map<string, string>;
-  byNormalizedName: Map<string, { id: string; name: string }>;
-  idToName: Map<string, string>;
-}> {
-  const { data: links } = await userSupabase
-    .from("menu_item_square_catalog_links")
-    .select("square_catalog_object_id, menu_item_id")
-    .eq("venue_id", venueId);
+async function loadSyncMeta(
+  appDb: AppDb,
+  venueId: string,
+): Promise<Pick<
+  SalesInsightsMeta,
+  "lastSyncedAt" | "syncStatus" | "backfillStatus"
+>> {
+  const state = await forecastRepo.getVenueForecastStateAdmin(appDb, venueId);
+  if (!state) {
+    return { syncStatus: "idle", backfillStatus: "idle" };
+  }
 
-  const { data: menus } = await userSupabase
-    .from("menu_items")
-    .select("id, name")
-    .eq("venue_id", venueId)
-    .is("archived_at", null)
-    .eq("is_active", true);
+  let syncStatus: SalesInsightsMeta["syncStatus"] = "idle";
+  if (state.backfillStatus === "running") {
+    syncStatus = "syncing";
+  } else if (state.backfillStatus === "failed") {
+    syncStatus = "failed";
+  }
 
-  const catalogByObjectId = buildCatalogObjectToMenuIdMap(links ?? []);
-  const { byNormalizedName, idToName } = buildMenuNameIndex(menus ?? []);
+  return {
+    lastSyncedAt: state.lastPaymentsSyncAt ?? state.lastDailySalesSyncAt,
+    syncStatus,
+    backfillStatus: state.backfillStatus as SalesInsightsMeta["backfillStatus"],
+  };
+}
 
-  return { catalogByObjectId, byNormalizedName, idToName };
+async function loadOrdersFromMirror(
+  appDb: AppDb,
+  args: {
+    venueId: string;
+    startIso: string;
+    endIso: string;
+  },
+): Promise<SalesOrderRow[]> {
+  const [payments, lines] = await appDb.rls(async (tx) => {
+    const rows = await squareSyncRepo.listPaymentsInRange(tx, {
+      venueId: args.venueId,
+      startIso: args.startIso,
+      endIso: args.endIso,
+    });
+    const paymentIds = rows.map((p) => p.squarePaymentId);
+    const orderLines = await squareSyncRepo.listOrderLinesForPayments(tx, {
+      venueId: args.venueId,
+      squarePaymentIds: paymentIds,
+    });
+    return [rows, orderLines] as const;
+  });
+
+  const orders = mirrorPaymentsToSalesOrders(payments, lines);
+
+  const { menus } = await appDb.rls((tx) =>
+    salesInsightsRepo.loadSquareLineMappingContext(tx, args.venueId),
+  );
+  const idToName = new Map(menus.map((m) => [m.id, m.name]));
+
+  return orders.map((order) => {
+    if (!order.saleLineItems?.length) {
+      return order;
+    }
+    const saleLineItems = order.saleLineItems.map((line) =>
+      enrichLineMenuName(line, idToName),
+    );
+    return { ...order, saleLineItems };
+  });
+}
+
+function enrichLineMenuName(
+  line: SalesLineItemRow,
+  idToName: Map<string, string>,
+): SalesLineItemRow {
+  if (!line.menuItemId || line.menuItemName) {
+    return line;
+  }
+  const name = idToName.get(line.menuItemId);
+  return name ? { ...line, menuItemName: name } : line;
 }
 
 export async function getSalesInsightsOrders(
-  userSupabase: Supabase,
-  admin: AdminClient | null,
+  ctx: RequestAuthContext,
   args: {
-    userId: string;
     organisationSlug: string;
     venueSlug: string;
     startIso: string;
     endIso: string;
-  }
+  },
 ): Promise<SalesInsightsOrdersResult> {
-  const context = await ingredientsRepo.getVenueContextBySlugs(
-    userSupabase,
+  const context = await resolveInsightsVenueScope(
+    ctx,
     args.organisationSlug,
-    args.venueSlug
+    args.venueSlug,
   );
-  if (!context) {
-    throw new VenueAccessError(404, "Venue not found");
-  }
-
-  await assertUserHasVenueAccess(userSupabase, {
-    userId: args.userId,
-    organisationId: context.organisationId,
-    venueId: context.venueId,
-  });
 
   const connection = await loadSquareConnectionForVenue(
-    userSupabase,
-    admin,
-    context.venueId
+    ctx.appDb,
+    context.venueId,
   );
 
   if (!connection) {
@@ -235,176 +203,61 @@ export async function getSalesInsightsOrders(
     });
     return {
       orders,
-      meta: { dataSource: "demo" },
+      meta: { dataSource: "demo", venueTimezone: context.timezone },
       salesMix: computeSalesMix(orders),
     };
   }
 
-  const listed = await listSquarePaymentsForVenue({
-    accessToken: connection.square_access_token,
-    storedEnvironment: connection.environment,
-    beginTime: args.startIso,
-    endTime: args.endIso,
-    locationId: connection.square_location_id,
+  const syncMeta = await loadSyncMeta(ctx.appDb, context.venueId);
+  const orders = await loadOrdersFromMirror(ctx.appDb, {
+    venueId: context.venueId,
+    startIso: args.startIso,
+    endIso: args.endIso,
   });
 
-  if (!listed.ok) {
-    return {
-      orders: [],
-      meta: {
-        dataSource: "square",
-        squareError: listed.message,
-      },
-      salesMix: [],
-    };
-  }
-
-  const mapped = squarePaymentsToSalesOrderRows(listed.payments).filter(
-    (row) => row.order_datetime >= args.startIso && row.order_datetime <= args.endIso
-  );
-
-  const orderIds = [
-    ...new Set(
-      listed.payments
-        .map((p) => p.order_id?.trim())
-        .filter((id): id is string => Boolean(id))
-    ),
-  ];
-
-  const ordersResult = await batchRetrieveSquareOrders({
-    accessToken: connection.square_access_token,
-    storedEnvironment: connection.environment,
-    orderIds,
-    locationId: connection.square_location_id,
-  });
-
-  const linesByOrderId = ordersResult.ok ? ordersResult.linesByOrderId : new Map();
-  const meta: SalesInsightsMeta = { dataSource: "square" };
-  if (!ordersResult.ok) {
-    meta.squareOrdersError = ordersResult.message;
-  }
-
-  const linesByPaymentId = buildLinesByPaymentId(listed.payments, linesByOrderId);
-
-  let catalogByObjectId = new Map<string, string>();
-  let byNormalizedName = new Map<string, { id: string; name: string }>();
-  let idToName = new Map<string, string>();
-  try {
-    const ctx = await loadSquareLineMappingContext(userSupabase, context.venueId);
-    catalogByObjectId = ctx.catalogByObjectId;
-    byNormalizedName = ctx.byNormalizedName;
-    idToName = ctx.idToName;
-  } catch (err) {
-    console.error("[sales-insights] menu / catalog mapping load failed", err);
-  }
-
-  for (const row of mapped) {
-    const spid = row.square?.squarePaymentId;
-    if (!spid) continue;
-    const rawLines = linesByPaymentId.get(spid);
-    if (!rawLines?.length) continue;
-    row.saleLineItems = rawLines.map((line) =>
-      toSalesLineItemRow(line, catalogByObjectId, byNormalizedName, idToName)
-    );
-  }
-
-  if (admin && linesByPaymentId.size > 0) {
-    const upsertRows: Database["public"]["Tables"]["venue_square_order_lines"]["Insert"][] = [];
-    const observedByPayment = new Map<string, string>();
-    for (const p of listed.payments) {
-      const id = p.id;
-      if (!id) continue;
-      observedByPayment.set(
-        id,
-        p.created_at ?? p.updated_at ?? new Date().toISOString()
-      );
-    }
-
-    for (const p of listed.payments) {
-      const pid = p.id;
-      if (!pid) continue;
-      const rawLines = linesByPaymentId.get(pid);
-      if (!rawLines?.length) continue;
-      const observedAt = observedByPayment.get(pid) ?? new Date().toISOString();
-      for (const line of rawLines) {
-        const resolved = toSalesLineItemRow(
-          line,
-          catalogByObjectId,
-          byNormalizedName,
-          idToName
-        );
-        upsertRows.push({
-          venue_id: context.venueId,
-          organisation_id: context.organisationId,
-          square_payment_id: pid,
-          square_order_id: p.order_id?.trim() ?? null,
-          square_line_uid: line.lineUid,
-          quantity: line.quantity,
-          line_name: line.lineName,
-          square_catalog_object_id: line.squareCatalogObjectId,
-          gross_amount_cents: line.grossAmountCents,
-          currency: line.currency,
-          menu_item_id: resolved.menuItemId,
-          match_source: resolved.matchSource,
-          observed_at: observedAt,
-          updated_at: new Date().toISOString(),
-        });
-      }
-    }
-
-    if (upsertRows.length > 0) {
-      const chunkSize = 200;
-      for (let i = 0; i < upsertRows.length; i += chunkSize) {
-        const chunk = upsertRows.slice(i, i + chunkSize);
-        const { error } = await admin.from("venue_square_order_lines").upsert(chunk, {
-          onConflict: "venue_id,square_payment_id,square_line_uid",
-        });
-        if (error) {
-          console.error("[sales-insights] venue_square_order_lines upsert", error);
-          break;
-        }
-      }
-    }
-  }
+  const meta: SalesInsightsMeta = {
+    dataSource: "square",
+    venueTimezone: context.timezone,
+    ...syncMeta,
+  };
 
   return {
-    orders: mapped,
+    orders,
     meta,
-    salesMix: computeSalesMix(mapped),
+    salesMix: computeSalesMix(orders),
   };
 }
 
 export async function getVenueSquareConnectionSummary(
-  userSupabase: Supabase,
-  admin: AdminClient | null,
+  ctx: RequestAuthContext,
   args: {
-    userId: string;
     organisationSlug: string;
     venueSlug: string;
-  }
+  },
 ): Promise<{
   connected: boolean;
   merchantId: string | null;
   environment: string | null;
+  squareLocationId: string | null;
+  locationConfigured: boolean;
   updatedAt: string | null;
 }> {
-  const context = await ingredientsRepo.getVenueContextBySlugs(
-    userSupabase,
-    args.organisationSlug,
-    args.venueSlug
+  const context = await ctx.appDb.rls((tx) =>
+    scopeRepo.getVenueContextBySlugs(tx, args.organisationSlug, args.venueSlug),
   );
   if (!context) {
     return {
       connected: false,
       merchantId: null,
       environment: null,
+      squareLocationId: null,
+      locationConfigured: false,
       updatedAt: null,
     };
   }
 
   try {
-    await assertUserHasVenueAccess(userSupabase, {
-      userId: args.userId,
+    assertVenueMember(ctx.tenantRoles, {
       organisationId: context.organisationId,
       venueId: context.venueId,
     });
@@ -413,55 +266,52 @@ export async function getVenueSquareConnectionSummary(
       connected: false,
       merchantId: null,
       environment: null,
+      squareLocationId: null,
+      locationConfigured: false,
       updatedAt: null,
     };
   }
 
-  const sel = "square_merchant_id, environment, updated_at" as const;
-
-  const { data: asUser } = await userSupabase
-    .from("venue_square_connections")
-    .select(sel)
-    .eq("venue_id", context.venueId)
-    .maybeSingle();
-
-  if (asUser?.square_merchant_id) {
+  const viaRls = await ctx.appDb.rls((tx) =>
+    salesInsightsRepo.getConnectionSummaryRls(tx, context.venueId),
+  );
+  if (viaRls) {
+    const squareLocationId = viaRls.squareLocationId?.trim() || null;
     return {
       connected: true,
-      merchantId: asUser.square_merchant_id,
-      environment: asUser.environment,
-      updatedAt: asUser.updated_at,
+      merchantId: viaRls.squareMerchantId,
+      environment: viaRls.environment,
+      squareLocationId,
+      locationConfigured: Boolean(squareLocationId),
+      updatedAt: viaRls.updatedAt,
     };
   }
 
-  if (!admin) {
+  const viaAdmin = await salesInsightsRepo.getConnectionSummaryAdmin(
+    ctx.appDb,
+    context.venueId,
+  );
+  if (!viaAdmin) {
     return {
       connected: false,
       merchantId: null,
       environment: null,
+      squareLocationId: null,
+      locationConfigured: false,
       updatedAt: null,
     };
   }
 
-  const { data: asAdmin } = await admin
-    .from("venue_square_connections")
-    .select(sel)
-    .eq("venue_id", context.venueId)
-    .maybeSingle();
-
-  if (!asAdmin?.square_merchant_id) {
-    return {
-      connected: false,
-      merchantId: null,
-      environment: null,
-      updatedAt: null,
-    };
-  }
-
+  const squareLocationId = viaAdmin.squareLocationId?.trim() || null;
   return {
     connected: true,
-    merchantId: asAdmin.square_merchant_id,
-    environment: asAdmin.environment,
-    updatedAt: asAdmin.updated_at,
+    merchantId: viaAdmin.squareMerchantId,
+    environment: viaAdmin.environment,
+    squareLocationId,
+    locationConfigured: Boolean(squareLocationId),
+    updatedAt: viaAdmin.updatedAt,
   };
 }
+
+/** Primary seam for sales insights order payloads (venue + date range). */
+export const loadSalesInsightsOrders = getSalesInsightsOrders;
