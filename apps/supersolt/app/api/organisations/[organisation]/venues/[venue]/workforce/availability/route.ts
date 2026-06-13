@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import { availabilityService } from "@/server/workforce/availability.service";
 import { PeopleServiceError } from "@/server/workforce/people.service";
 
@@ -8,27 +9,10 @@ type RouteParams = {
   venue: string;
 };
 
-async function getUserId() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return { supabase, userId: null as string | null };
-  }
-
-  return { supabase, userId: user.id };
-}
-
 export async function GET(request: Request, context: { params: Promise<RouteParams> }) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue } = await context.params;
@@ -36,25 +20,14 @@ export async function GET(request: Request, context: { params: Promise<RoutePara
   const weekStartMonday = url.searchParams.get("weekStartMonday")?.trim() || null;
 
   try {
-    const data = await availabilityService.getForVenue(supabase, {
-      userId,
+    const data = await availabilityService.getForVenue(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       weekStartMonday: weekStartMonday || undefined,
     });
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof PeopleServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "availability");
   }
 }
 
@@ -70,12 +43,9 @@ type PatchBody = {
 };
 
 export async function PATCH(request: Request, context: { params: Promise<RouteParams> }) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue } = await context.params;
@@ -84,10 +54,7 @@ export async function PATCH(request: Request, context: { params: Promise<RoutePa
   try {
     body = (await request.json()) as PatchBody;
   } catch {
-    return NextResponse.json(
-      { data: null, error: { message: "Invalid JSON body", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("Invalid JSON body", 400);
   }
 
   const userProfileId = body.userProfileId?.trim();
@@ -96,27 +63,15 @@ export async function PATCH(request: Request, context: { params: Promise<RoutePa
   const weekStartMonday = body.weekStartMonday?.trim() || undefined;
 
   if (!userProfileId || typeof dayOfWeek !== "number") {
-    return NextResponse.json(
-      {
-        data: null,
-        error: { message: "userProfileId and dayOfWeek are required", status: 400 },
-      },
-      { status: 400 }
-    );
+    return validationErrorResponse("userProfileId and dayOfWeek are required", 400);
   }
 
   if (!("isAvailable" in body)) {
-    return NextResponse.json(
-      { data: null, error: { message: "isAvailable is required (boolean or null to clear)", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("isAvailable is required (boolean or null to clear)", 400);
   }
 
   if (rawAvailable !== null && typeof rawAvailable !== "boolean") {
-    return NextResponse.json(
-      { data: null, error: { message: "isAvailable must be boolean or null", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("isAvailable must be boolean or null", 400);
   }
 
   const nextAvailable: boolean | null = rawAvailable;
@@ -159,8 +114,7 @@ export async function PATCH(request: Request, context: { params: Promise<RoutePa
   }
 
   try {
-    await availabilityService.setAvailabilityCell(supabase, {
-      userId,
+    await availabilityService.setAvailabilityCell(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       userProfileId,
@@ -170,19 +124,9 @@ export async function PATCH(request: Request, context: { params: Promise<RoutePa
       availableStartTime,
       availableEndTime,
     });
-    return NextResponse.json({ data: { ok: true }, error: null });
+    return jsonDataResponse({ ok: true });
   } catch (error) {
-    if (error instanceof PeopleServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "availability");
   }
 }
 
@@ -193,12 +137,9 @@ type PostBody = {
 };
 
 export async function POST(request: Request, context: { params: Promise<RouteParams> }) {
-  const { supabase, userId } = await getUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue } = await context.params;
@@ -207,51 +148,28 @@ export async function POST(request: Request, context: { params: Promise<RoutePar
   try {
     body = (await request.json()) as PostBody;
   } catch {
-    return NextResponse.json(
-      { data: null, error: { message: "Invalid JSON body", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("Invalid JSON body", 400);
   }
 
   if (body.action !== "copy_week") {
-    return NextResponse.json(
-      { data: null, error: { message: "Unsupported action", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("Unsupported action", 400);
   }
 
   const fromWeekStartMonday = body.fromWeekStartMonday?.trim();
   const toWeekStartMonday = body.toWeekStartMonday?.trim();
   if (!fromWeekStartMonday || !toWeekStartMonday) {
-    return NextResponse.json(
-      {
-        data: null,
-        error: { message: "fromWeekStartMonday and toWeekStartMonday are required", status: 400 },
-      },
-      { status: 400 }
-    );
+    return validationErrorResponse("fromWeekStartMonday and toWeekStartMonday are required", 400);
   }
 
   try {
-    await availabilityService.copyWeekInstanceToWeek(supabase, {
-      userId,
+    await availabilityService.copyWeekInstanceToWeek(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       fromWeekStartMonday,
       toWeekStartMonday,
     });
-    return NextResponse.json({ data: { ok: true }, error: null });
+    return jsonDataResponse({ ok: true });
   } catch (error) {
-    if (error instanceof PeopleServiceError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "availability");
   }
 }

@@ -1,15 +1,14 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
+import type { RequestAuthContext } from "@/server/auth/context";
+import { AuthError } from "@/server/auth/errors";
+import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import { peopleService, PeopleServiceError } from "@/server/workforce/people.service";
+import { workforceRepo } from "@/server/workforce/workforce.repo";
 import {
   isVenueStaffWeeklyAvailabilityTableMissing,
   VENUE_STAFF_WEEKLY_AVAILABILITY_SETUP_HINT,
   isVenueStaffWeekInstanceAvailabilityTableMissing,
   VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT,
 } from "@/server/workforce/venue-staff-weekly-availability-schema";
-
-type Supabase = SupabaseClient<Database>;
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_HHMM_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
@@ -31,6 +30,25 @@ export type VenueWeekInstanceAvailabilityRowDto = {
   availableStartTime: string | null;
   availableEndTime: string | null;
 };
+
+function mapAuthError(error: unknown): never {
+  if (error instanceof AuthError) {
+    throw new PeopleServiceError(error.status, error.message);
+  }
+  throw error;
+}
+
+function dbErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return "Unknown database error";
+}
+
+function dbErrorCode(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "code" in error) {
+    return String((error as { code?: string }).code);
+  }
+  return undefined;
+}
 
 function timeToMinutes(hhmmOrHhmmss: string): number {
   const parts = hhmmOrHhmmss.split(":").map((x) => Number(x.trim()));
@@ -60,78 +78,38 @@ function assertIsoDate(label: string, value: string): void {
   }
 }
 
-async function assertVenueAccess(
-  supabase: Supabase,
-  args: { userId: string; organisationId: string; venueId: string }
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("user_organisations")
-    .select("id")
-    .eq("user_profile_id", args.userId)
-    .eq("organisation_id", args.organisationId)
-    .eq("is_active", true)
-    .is("archived_at", null);
-
-  if (error) {
-    throw new PeopleServiceError(500, error.message);
-  }
-
-  const membershipIds = (data ?? []).map((item) => item.id);
-  if (membershipIds.length === 0) {
-    throw new PeopleServiceError(403, "Forbidden");
-  }
-
-  const { data: venueAccess, error: venueError } = await supabase
-    .from("user_venues")
-    .select("id")
-    .in("user_organisation_id", membershipIds)
-    .eq("venue_id", args.venueId)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .limit(1);
-
-  if (venueError) {
-    throw new PeopleServiceError(500, venueError.message);
-  }
-
-  if (!venueAccess || venueAccess.length === 0) {
-    throw new PeopleServiceError(403, "Forbidden");
-  }
+function resolveVenueScope(
+  ctx: RequestAuthContext,
+  organisationSlug: string,
+  venueSlug: string,
+) {
+  return resolveVenueScopeForService(ctx, organisationSlug, venueSlug, {
+    notFound: (message) => new PeopleServiceError(404, message),
+    forbidden: (auth) => new PeopleServiceError(auth.status, auth.message),
+  });
 }
 
 export const availabilityService = {
   async getForVenue(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       /** When set, loads overrides for that roster week (ISO Monday). */
       weekStartMonday?: string | null;
-    }
+    },
   ): Promise<{
     staff: Awaited<ReturnType<typeof peopleService.listForVenue>>["staff"];
     recurringAvailability: VenueWeeklyAvailabilityRowDto[];
     weekInstanceAvailability: VenueWeekInstanceAvailabilityRowDto[];
   }> {
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const context = await resolveVenueScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
 
-    if (!context) {
-      throw new PeopleServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
-
-    const { staff } = await peopleService.listForVenue(supabase, {
-      userId: args.userId,
+    const { staff } = await peopleService.listForVenue(ctx, {
       organisationSlug: args.organisationSlug,
       venueSlug: args.venueSlug,
     });
@@ -140,24 +118,26 @@ export const availabilityService = {
 
     let recurringAvailability: VenueWeeklyAvailabilityRowDto[] = [];
     if (staffIds.length > 0) {
-      const { data: rows, error } = await supabase
-        .from("venue_staff_weekly_availability")
-        .select("user_profile_id, day_of_week, is_available, available_start_time, available_end_time")
-        .eq("venue_id", context.venueId)
-        .in("user_profile_id", staffIds);
-
-      if (error) {
-        if (!isVenueStaffWeeklyAvailabilityTableMissing(error)) {
-          throw new PeopleServiceError(500, error.message);
-        }
-      } else {
-        recurringAvailability = (rows ?? []).map((r) => ({
-          userProfileId: r.user_profile_id,
-          dayOfWeek: r.day_of_week,
-          isAvailable: r.is_available,
-          availableStartTime: mapDbTimeToDto(r.available_start_time),
-          availableEndTime: mapDbTimeToDto(r.available_end_time),
+      try {
+        const rows = await ctx.appDb.rls((tx) =>
+          workforceRepo.listWeeklyAvailability(tx, context.venueId, staffIds),
+        );
+        recurringAvailability = rows.map((r) => ({
+          userProfileId: r.userProfileId,
+          dayOfWeek: r.dayOfWeek,
+          isAvailable: r.isAvailable,
+          availableStartTime: mapDbTimeToDto(r.availableStartTime),
+          availableEndTime: mapDbTimeToDto(r.availableEndTime),
         }));
+      } catch (error) {
+        if (
+          !isVenueStaffWeeklyAvailabilityTableMissing({
+            message: dbErrorMessage(error),
+            code: dbErrorCode(error),
+          })
+        ) {
+          throw new PeopleServiceError(500, dbErrorMessage(error));
+        }
       }
     }
 
@@ -165,28 +145,31 @@ export const availabilityService = {
     const weekStart = args.weekStartMonday?.trim();
     if (staffIds.length > 0 && weekStart) {
       assertIsoDate("weekStartMonday", weekStart);
-      const { data: rows, error } = await supabase
-        .from("venue_staff_week_instance_availability")
-        .select(
-          "user_profile_id, day_of_week, is_available, week_start_monday, available_start_time, available_end_time"
-        )
-        .eq("venue_id", context.venueId)
-        .eq("week_start_monday", weekStart)
-        .in("user_profile_id", staffIds);
-
-      if (error) {
-        if (!isVenueStaffWeekInstanceAvailabilityTableMissing(error)) {
-          throw new PeopleServiceError(500, error.message);
-        }
-      } else {
-        weekInstanceAvailability = (rows ?? []).map((r) => ({
-          userProfileId: r.user_profile_id,
-          dayOfWeek: r.day_of_week,
-          isAvailable: r.is_available,
-          weekStartMonday: r.week_start_monday,
-          availableStartTime: mapDbTimeToDto(r.available_start_time),
-          availableEndTime: mapDbTimeToDto(r.available_end_time),
+      try {
+        const rows = await ctx.appDb.rls((tx) =>
+          workforceRepo.listWeekInstanceAvailability(tx, {
+            venueId: context.venueId,
+            weekStartMonday: weekStart,
+            staffIds,
+          }),
+        );
+        weekInstanceAvailability = rows.map((r) => ({
+          userProfileId: r.userProfileId,
+          dayOfWeek: r.dayOfWeek,
+          isAvailable: r.isAvailable,
+          weekStartMonday: r.weekStartMonday,
+          availableStartTime: mapDbTimeToDto(r.availableStartTime),
+          availableEndTime: mapDbTimeToDto(r.availableEndTime),
         }));
+      } catch (error) {
+        if (
+          !isVenueStaffWeekInstanceAvailabilityTableMissing({
+            message: dbErrorMessage(error),
+            code: dbErrorCode(error),
+          })
+        ) {
+          throw new PeopleServiceError(500, dbErrorMessage(error));
+        }
       }
     }
 
@@ -194,9 +177,8 @@ export const availabilityService = {
   },
 
   async setAvailabilityCell(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       userProfileId: string;
@@ -207,27 +189,17 @@ export const availabilityService = {
       /** When `isAvailable` is true: both null = all day. Ignored when not available. */
       availableStartTime?: string | null;
       availableEndTime?: string | null;
-    }
+    },
   ): Promise<void> {
     if (!Number.isInteger(args.dayOfWeek) || args.dayOfWeek < 0 || args.dayOfWeek > 6) {
       throw new PeopleServiceError(400, "dayOfWeek must be 0–6 (Mon–Sun)");
     }
 
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const context = await resolveVenueScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
-
-    if (!context) {
-      throw new PeopleServiceError(404, "Venue not found");
-    }
-
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
 
     const weekStart = args.weekStartMonday?.trim();
 
@@ -241,7 +213,7 @@ export const availabilityService = {
       if (hasS !== hasE) {
         throw new PeopleServiceError(
           400,
-          "When setting hours, both availableStartTime and availableEndTime are required (or omit both for all day)"
+          "When setting hours, both availableStartTime and availableEndTime are required (or omit both for all day)",
         );
       }
       if (hasS && hasE) {
@@ -256,153 +228,152 @@ export const availabilityService = {
     if (weekStart) {
       assertIsoDate("weekStartMonday", weekStart);
 
-      if (args.isAvailable === null) {
-        const { error } = await supabase
-          .from("venue_staff_week_instance_availability")
-          .delete()
-          .eq("venue_id", context.venueId)
-          .eq("user_profile_id", args.userProfileId)
-          .eq("week_start_monday", weekStart)
-          .eq("day_of_week", args.dayOfWeek);
-
-        if (error) {
-          if (isVenueStaffWeekInstanceAvailabilityTableMissing(error)) {
-            throw new PeopleServiceError(503, VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT);
-          }
-          throw new PeopleServiceError(500, error.message);
+      try {
+        if (args.isAvailable === null) {
+          await ctx.appDb.rls((tx) =>
+            workforceRepo.deleteWeekInstanceAvailabilityCell(tx, {
+              venueId: context.venueId,
+              userProfileId: args.userProfileId,
+              weekStartMonday: weekStart,
+              dayOfWeek: args.dayOfWeek,
+            }),
+          );
+          return;
         }
+
+        const isAvailable = args.isAvailable;
+
+        await ctx.appDb.rls((tx) =>
+          workforceRepo.upsertWeekInstanceAvailabilityCell(tx, {
+            organisationId: context.organisationId,
+            venueId: context.venueId,
+            userProfileId: args.userProfileId,
+            weekStartMonday: weekStart,
+            dayOfWeek: args.dayOfWeek,
+            isAvailable,
+            availableStartTime: isAvailable ? startDb : null,
+            availableEndTime: isAvailable ? endDb : null,
+          }),
+        );
+      } catch (error) {
+        if (
+          isVenueStaffWeekInstanceAvailabilityTableMissing({
+            message: dbErrorMessage(error),
+            code: dbErrorCode(error),
+          })
+        ) {
+          throw new PeopleServiceError(
+            503,
+            VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT,
+          );
+        }
+        throw new PeopleServiceError(400, dbErrorMessage(error));
+      }
+      return;
+    }
+
+    try {
+      if (args.isAvailable === null) {
+        await ctx.appDb.rls((tx) =>
+          workforceRepo.deleteWeeklyAvailabilityCell(tx, {
+            venueId: context.venueId,
+            userProfileId: args.userProfileId,
+            dayOfWeek: args.dayOfWeek,
+          }),
+        );
         return;
       }
 
-      const { error } = await supabase.from("venue_staff_week_instance_availability").upsert(
-        {
-          organisation_id: context.organisationId,
-          venue_id: context.venueId,
-          user_profile_id: args.userProfileId,
-          week_start_monday: weekStart,
-          day_of_week: args.dayOfWeek,
-          is_available: args.isAvailable,
-          available_start_time: args.isAvailable ? startDb : null,
-          available_end_time: args.isAvailable ? endDb : null,
-        },
-        { onConflict: "venue_id,user_profile_id,week_start_monday,day_of_week" }
+      const isAvailable = args.isAvailable;
+
+      await ctx.appDb.rls((tx) =>
+        workforceRepo.upsertWeeklyAvailabilityCell(tx, {
+          organisationId: context.organisationId,
+          venueId: context.venueId,
+          userProfileId: args.userProfileId,
+          dayOfWeek: args.dayOfWeek,
+          isAvailable,
+          availableStartTime: isAvailable ? startDb : null,
+          availableEndTime: isAvailable ? endDb : null,
+        }),
       );
-
-      if (error) {
-        if (isVenueStaffWeekInstanceAvailabilityTableMissing(error)) {
-          throw new PeopleServiceError(503, VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT);
-        }
-        throw new PeopleServiceError(400, error.message);
+    } catch (error) {
+      if (
+        isVenueStaffWeeklyAvailabilityTableMissing({
+          message: dbErrorMessage(error),
+          code: dbErrorCode(error),
+        })
+      ) {
+        throw new PeopleServiceError(
+          503,
+          VENUE_STAFF_WEEKLY_AVAILABILITY_SETUP_HINT,
+        );
       }
-      return;
-    }
-
-    if (args.isAvailable === null) {
-      const { error } = await supabase
-        .from("venue_staff_weekly_availability")
-        .delete()
-        .eq("venue_id", context.venueId)
-        .eq("user_profile_id", args.userProfileId)
-        .eq("day_of_week", args.dayOfWeek);
-
-      if (error) {
-        if (isVenueStaffWeeklyAvailabilityTableMissing(error)) {
-          throw new PeopleServiceError(503, VENUE_STAFF_WEEKLY_AVAILABILITY_SETUP_HINT);
-        }
-        throw new PeopleServiceError(500, error.message);
-      }
-      return;
-    }
-
-    const { error } = await supabase.from("venue_staff_weekly_availability").upsert(
-      {
-        organisation_id: context.organisationId,
-        venue_id: context.venueId,
-        user_profile_id: args.userProfileId,
-        day_of_week: args.dayOfWeek,
-        is_available: args.isAvailable,
-        available_start_time: args.isAvailable ? startDb : null,
-        available_end_time: args.isAvailable ? endDb : null,
-      },
-      { onConflict: "venue_id,user_profile_id,day_of_week" }
-    );
-
-    if (error) {
-      if (isVenueStaffWeeklyAvailabilityTableMissing(error)) {
-        throw new PeopleServiceError(503, VENUE_STAFF_WEEKLY_AVAILABILITY_SETUP_HINT);
-      }
-      throw new PeopleServiceError(400, error.message);
+      throw new PeopleServiceError(400, dbErrorMessage(error));
     }
   },
 
   async copyWeekInstanceToWeek(
-    supabase: Supabase,
+    ctx: RequestAuthContext,
     args: {
-      userId: string;
       organisationSlug: string;
       venueSlug: string;
       fromWeekStartMonday: string;
       toWeekStartMonday: string;
-    }
+    },
   ): Promise<void> {
     assertIsoDate("fromWeekStartMonday", args.fromWeekStartMonday);
     assertIsoDate("toWeekStartMonday", args.toWeekStartMonday);
 
-    const context = await ingredientsRepo.getVenueContextBySlugs(
-      supabase,
+    const context = await resolveVenueScope(
+      ctx,
       args.organisationSlug,
-      args.venueSlug
+      args.venueSlug,
     );
 
-    if (!context) {
-      throw new PeopleServiceError(404, "Venue not found");
-    }
+    try {
+      const source = await ctx.appDb.rls((tx) =>
+        workforceRepo.listWeekInstanceAvailabilityForWeek(tx, {
+          venueId: context.venueId,
+          weekStartMonday: args.fromWeekStartMonday,
+        }),
+      );
 
-    await assertVenueAccess(supabase, {
-      userId: args.userId,
-      organisationId: context.organisationId,
-      venueId: context.venueId,
-    });
+      const rows = source.map((r) => ({
+        organisationId: context.organisationId,
+        venueId: context.venueId,
+        userProfileId: r.userProfileId,
+        weekStartMonday: args.toWeekStartMonday,
+        dayOfWeek: r.dayOfWeek,
+        isAvailable: r.isAvailable,
+        availableStartTime: r.availableStartTime,
+        availableEndTime: r.availableEndTime,
+      }));
 
-    const { data: source, error: readErr } = await supabase
-      .from("venue_staff_week_instance_availability")
-      .select(
-        "user_profile_id, day_of_week, is_available, available_start_time, available_end_time"
-      )
-      .eq("venue_id", context.venueId)
-      .eq("week_start_monday", args.fromWeekStartMonday);
-
-    if (readErr) {
-      if (isVenueStaffWeekInstanceAvailabilityTableMissing(readErr)) {
-        throw new PeopleServiceError(503, VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT);
+      if (rows.length === 0) {
+        throw new PeopleServiceError(
+          400,
+          "No availability saved for the source week to copy",
+        );
       }
-      throw new PeopleServiceError(500, readErr.message);
-    }
 
-    const rows = (source ?? []).map((r) => ({
-      organisation_id: context.organisationId,
-      venue_id: context.venueId,
-      user_profile_id: r.user_profile_id,
-      week_start_monday: args.toWeekStartMonday,
-      day_of_week: r.day_of_week,
-      is_available: r.is_available,
-      available_start_time: r.available_start_time,
-      available_end_time: r.available_end_time,
-    }));
-
-    if (rows.length === 0) {
-      throw new PeopleServiceError(400, "No availability saved for the source week to copy");
-    }
-
-    const { error: upErr } = await supabase.from("venue_staff_week_instance_availability").upsert(rows, {
-      onConflict: "venue_id,user_profile_id,week_start_monday,day_of_week",
-    });
-
-    if (upErr) {
-      if (isVenueStaffWeekInstanceAvailabilityTableMissing(upErr)) {
-        throw new PeopleServiceError(503, VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT);
+      await ctx.appDb.rls((tx) =>
+        workforceRepo.bulkUpsertWeekInstanceAvailability(tx, rows),
+      );
+    } catch (error) {
+      if (error instanceof PeopleServiceError) throw error;
+      if (
+        isVenueStaffWeekInstanceAvailabilityTableMissing({
+          message: dbErrorMessage(error),
+          code: dbErrorCode(error),
+        })
+      ) {
+        throw new PeopleServiceError(
+          503,
+          VENUE_STAFF_WEEK_INSTANCE_AVAILABILITY_SETUP_HINT,
+        );
       }
-      throw new PeopleServiceError(400, upErr.message);
+      throw new PeopleServiceError(400, dbErrorMessage(error));
     }
   },
 };

@@ -1,7 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { Mail, MoreVertical, Phone, Plus, Search, Users } from "lucide-react";
+import { Mail, MoreVertical, Phone, Plus, Search, ShieldAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -19,18 +20,19 @@ import { Separator } from "@workspace/ui/components/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
-import { positionBadgeClass } from "@/lib/roster/position-styles";
-import { PeopleStaffSheet } from "./people-staff-sheet";
+import { usePeopleList } from "@/entities/workforce/people/hooks/use-people-list";
 import {
+  COMPLIANCE_STRIP_LABEL,
   ROLE_BADGE_VARIANT,
   ROLE_STYLES,
-  enrichFromApiRow,
   formatStartDate,
   getInitials,
-  type PeopleApiStaff,
   type StaffMember,
   type SortField,
 } from "./people-staff-model";
+import { buildScopedPath } from "@/lib/build-scoped-path";
+import { positionBadgeClass } from "@/lib/roster/position-styles";
+import { PeopleStaffSheet } from "./people-staff-sheet";
 
 type PeoplePageClientProps = {
   organisation: string;
@@ -38,51 +40,24 @@ type PeoplePageClientProps = {
 };
 
 export function PeoplePageClient({ organisation, venue }: PeoplePageClientProps) {
+  const router = useRouter();
+  const { staffList, loadError, isLoading: isLoadingStaff } = usePeopleList(organisation, venue);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterRole, setFilterRole] = useState<string>("all");
   const [filterEmpType, setFilterEmpType] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortField>("name");
-  const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoadingStaff, setIsLoadingStaff] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isHydrated, setIsHydrated] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setIsLoadingStaff(true);
-      setLoadError(null);
-      try {
-        const path = `/api/organisations/${encodeURIComponent(organisation)}/venues/${encodeURIComponent(venue)}/people`;
-        const res = await fetch(path);
-        const json = (await res.json()) as {
-          data: { staff: PeopleApiStaff[] } | null;
-          error: { message: string } | null;
-        };
-        if (cancelled) return;
-        if (!res.ok || json.error || !json.data) {
-          setLoadError(json.error?.message ?? "Could not load people");
-          setStaffList([]);
-          return;
-        }
-        setStaffList(json.data.staff.map(enrichFromApiRow));
-      } catch {
-        if (!cancelled) {
-          setLoadError("Could not load people");
-          setStaffList([]);
-        }
-      } finally {
-        if (!cancelled) setIsLoadingStaff(false);
-      }
-    }
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [organisation, venue]);
+  const complianceAttentionCount = useMemo(
+    () =>
+      staffList.filter(
+        (s) => s.complianceStatus === "amber" || s.complianceStatus === "red",
+      ).length,
+    [staffList],
+  );
 
   const filteredStaff = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -143,6 +118,17 @@ export function PeoplePageClient({ organisation, venue }: PeoplePageClientProps)
         {loadError ? <span className="text-sm text-destructive">{loadError}</span> : null}
       </div>
       <Separator />
+
+      {complianceAttentionCount > 0 ? (
+        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-700 dark:text-amber-400" />
+          <span>
+            {complianceAttentionCount} staff member
+            {complianceAttentionCount === 1 ? "" : "s"} need compliance attention (
+            {COMPLIANCE_STRIP_LABEL.amber} / {COMPLIANCE_STRIP_LABEL.red}).
+          </span>
+        </div>
+      ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative">
@@ -235,9 +221,21 @@ export function PeoplePageClient({ organisation, venue }: PeoplePageClientProps)
             ) : (
               paginatedStaff.map((person) => (
                 <TableRow
-                  key={person.id}
+                  key={person.userOrganisationId ?? person.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => setSelectedStaff(person)}
+                  onClick={() => {
+                    if (person.userOrganisationId) {
+                      router.push(
+                        buildScopedPath(
+                          organisation,
+                          venue,
+                          `workforce/people/${person.userOrganisationId}`,
+                        ),
+                      );
+                      return;
+                    }
+                    setSelectedStaff(person);
+                  }}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -302,9 +300,21 @@ export function PeoplePageClient({ organisation, venue }: PeoplePageClientProps)
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={person.status === "active" ? "default" : "secondary"}>
-                      {person.status === "active" ? "Active" : "Inactive"}
-                    </Badge>
+                    <div className="flex flex-col gap-1">
+                      <Badge variant={person.status === "active" ? "default" : "secondary"}>
+                        {person.status === "active" ? "Active" : "Inactive"}
+                      </Badge>
+                      {person.complianceStatus && person.complianceStatus !== "green" ? (
+                        <Badge
+                          variant={
+                            person.complianceStatus === "red" ? "destructive" : "outline"
+                          }
+                          className="w-fit text-[10px]"
+                        >
+                          {COMPLIANCE_STRIP_LABEL[person.complianceStatus]}
+                        </Badge>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Button

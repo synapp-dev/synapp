@@ -1,4 +1,5 @@
-import { RosterPageClient } from "@/app/(main)/[organisation]/[venue]/workforce/roster/_components/roster-page-client";
+import { RosterPage } from "@/entities/workforce/roster/components/roster-page";
+import { assertVenueReadinessOrRedirect } from "@/server/readiness/assert-venue-readiness";
 
 export default async function WorkforceRosterPage({
   params,
@@ -6,6 +7,7 @@ export default async function WorkforceRosterPage({
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
+  await assertVenueReadinessOrRedirect(organisation, venue, "workforce-roster");
 
-  return <RosterPageClient organisation={organisation} venue={venue} />;
+  return <RosterPage organisation={organisation} venue={venue} />;
 }

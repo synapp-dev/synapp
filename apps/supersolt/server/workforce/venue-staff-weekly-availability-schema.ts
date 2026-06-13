@@ -7,10 +7,14 @@ export function isVenueStaffWeeklyAvailabilityTableMissing(error: {
   code?: string;
 }): boolean {
   const msg = error.message ?? "";
+  if (error.code === "42P01" && msg.includes("venue_staff_weekly_availability")) {
+    return true;
+  }
   if (!msg.includes("venue_staff_weekly_availability")) return false;
   return (
     msg.includes("schema cache") ||
     msg.includes("Could not find the table") ||
+    msg.includes("does not exist") ||
     error.code === "PGRST205"
   );
 }
@@ -23,10 +27,17 @@ export function isVenueStaffWeekInstanceAvailabilityTableMissing(error: {
   code?: string;
 }): boolean {
   const msg = error.message ?? "";
+  if (
+    error.code === "42P01" &&
+    msg.includes("venue_staff_week_instance_availability")
+  ) {
+    return true;
+  }
   if (!msg.includes("venue_staff_week_instance_availability")) return false;
   return (
     msg.includes("schema cache") ||
     msg.includes("Could not find the table") ||
+    msg.includes("does not exist") ||
     error.code === "PGRST205"
   );
 }

@@ -1,4 +1,4 @@
-import { TimesheetsPageClient } from "@/app/(main)/[organisation]/[venue]/workforce/timesheets/_components/timesheets-page-client";
+import { TimesheetsPage } from "@/entities/workforce/timesheets/components/timesheets-page";
 
 export default async function WorkforceTimesheetsPage({
   params,
@@ -7,5 +7,5 @@ export default async function WorkforceTimesheetsPage({
 }) {
   const { organisation, venue } = await params;
 
-  return <TimesheetsPageClient organisation={organisation} venue={venue} />;
+  return <TimesheetsPage organisation={organisation} venue={venue} />;
 }

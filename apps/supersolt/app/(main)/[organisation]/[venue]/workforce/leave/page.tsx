@@ -1,4 +1,4 @@
-import { LeavePageClient } from "@/app/(main)/[organisation]/[venue]/workforce/leave/_components/leave-page-client";
+import { LeavePage } from "@/entities/workforce/leave/components/leave-page";
 
 export default async function WorkforceLeavePage({
   params,
@@ -6,6 +6,5 @@ export default async function WorkforceLeavePage({
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-
-  return <LeavePageClient organisation={organisation} venue={venue} />;
+  return <LeavePage organisation={organisation} venue={venue} />;
 }

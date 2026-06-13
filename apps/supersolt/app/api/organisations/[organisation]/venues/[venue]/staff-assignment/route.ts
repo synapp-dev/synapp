@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
+import { createSupabaseAdmin } from "@/utils/supabase/admin";
+
 import {
   venueStaffAssignmentService,
   VenueStaffAssignmentError,
@@ -10,52 +13,25 @@ type RouteParams = {
   venue: string;
 };
 
-async function getSessionUserId() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) {
-    return { supabase, userId: null as string | null };
-  }
-
-  return { supabase, userId: user.id };
-}
-
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getSessionUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue } = await context.params;
 
   try {
-    const data = await venueStaffAssignmentService.listOrgMembersForVenue(supabase, {
+    const data = await venueStaffAssignmentService.listOrgMembersForVenue(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
-      actorUserId: userId,
     });
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof VenueStaffAssignmentError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "staff-assignment");
   }
 }
 
@@ -68,12 +44,9 @@ export async function POST(
   request: Request,
   context: { params: Promise<RouteParams> }
 ) {
-  const { supabase, userId } = await getSessionUserId();
-  if (!userId) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   const { organisation, venue } = await context.params;
@@ -82,10 +55,7 @@ export async function POST(
   try {
     body = (await request.json()) as PostBody;
   } catch {
-    return NextResponse.json(
-      { data: null, error: { message: "Invalid JSON", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("Invalid JSON", 400);
   }
 
   const userOrganisationIds = Array.isArray(body.userOrganisationIds)
@@ -93,10 +63,9 @@ export async function POST(
     : [];
 
   try {
-    const data = await venueStaffAssignmentService.assignVenueAccess(supabase, {
+    const data = await venueStaffAssignmentService.assignVenueAccess(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
-      actorUserId: userId,
       userOrganisationIds,
       venueRoleSlug:
         body.venueRoleSlug === undefined
@@ -105,17 +74,8 @@ export async function POST(
             ? body.venueRoleSlug
             : null,
     });
-    return NextResponse.json({ data, error: null });
+    return jsonDataResponse(data);
   } catch (error) {
-    if (error instanceof VenueStaffAssignmentError) {
-      return NextResponse.json(
-        { data: null, error: { message: error.message, status: error.status } },
-        { status: error.status }
-      );
-    }
-    return NextResponse.json(
-      { data: null, error: { message: "Internal server error", status: 500 } },
-      { status: 500 }
-    );
+    return serviceErrorResponse(error, "staff-assignment");
   }
 }
