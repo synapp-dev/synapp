@@ -17,8 +17,10 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import type { TeamActionResult } from "./lib/action-types";
 import { isTeamLeader } from "./lib/leader";
 import { getTeamById, isTeamSlugTaken } from "./lib/queries";
-import { createTeamSchema, updateTeamSchema } from "./lib/schemas";
+import { createTeamSchema, setTeamAvatarSchema, updateTeamSchema } from "./lib/schemas";
 import { slugifyTeamName, validateTeamSlug } from "./lib/slug";
+import { assertTeamAvatarObjectPath } from "@/lib/media/team-avatar-path";
+import { validateMediaObjectPath } from "@/lib/media/storage-paths";
 
 async function requireLinkedSteam(): Promise<
   TeamActionResult<{ steamid64: string }>
@@ -62,8 +64,9 @@ export async function createTeamAction(input: {
   slug?: string;
   nickname?: string;
   description?: string;
-  avatarUrl?: string;
-}): Promise<TeamActionResult<{ slug: string }>> {
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+}): Promise<TeamActionResult<{ slug: string; teamId: string }>> {
   const gate = await requireLinkedSteam();
   if (!gate.ok) return gate;
 
@@ -76,7 +79,7 @@ export async function createTeamAction(input: {
     };
   }
 
-  const { name, slug: slugInput, nickname, description, avatarUrl } =
+  const { name, slug: slugInput, nickname, description, primaryColor, secondaryColor } =
     parsed.data;
 
   const baseSlug =
@@ -100,7 +103,9 @@ export async function createTeamAction(input: {
           slug: slugFinal,
           nickname: nickname ?? null,
           description: description ?? null,
-          avatar: avatarUrl ?? null,
+          primaryColor: primaryColor ?? null,
+          secondaryColor: secondaryColor ?? null,
+          avatar: null,
           leaderSteamid64: gate.data.steamid64,
           createdAt: now,
           updatedAt: now,
@@ -125,7 +130,7 @@ export async function createTeamAction(input: {
     revalidatePath(`/teams/${result.slug}`);
     await trackTeamEvent("team_created");
 
-    return { ok: true, data: { slug: result.slug } };
+    return { ok: true, data: { slug: result.slug, teamId: result.id } };
   } catch (err) {
     if (isPostgresUniqueViolation(err)) {
       return {
@@ -149,7 +154,8 @@ export async function updateTeamAction(input: {
   slug: string;
   nickname?: string | null;
   description?: string | null;
-  avatarUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 }): Promise<TeamActionResult<{ slug: string }>> {
   const gate = await requireLinkedSteam();
   if (!gate.ok) return gate;
@@ -197,7 +203,8 @@ export async function updateTeamAction(input: {
         slug: nextSlug,
         nickname: parsed.data.nickname ?? null,
         description: parsed.data.description ?? null,
-        avatar: parsed.data.avatarUrl ?? null,
+        primaryColor: parsed.data.primaryColor ?? null,
+        secondaryColor: parsed.data.secondaryColor ?? null,
         updatedAt: now,
       })
       .where(eq(teams.id, existing.id));
@@ -217,6 +224,71 @@ export async function updateTeamAction(input: {
       };
     }
     console.error("[teams] updateTeamAction", err);
+    return {
+      ok: false,
+      code: "UNKNOWN",
+      message: "Something went wrong. Try again.",
+    };
+  }
+}
+
+export async function setTeamAvatarAction(input: {
+  teamId: string;
+  objectPath: string | null;
+}): Promise<TeamActionResult<{ objectPath: string | null }>> {
+  const gate = await requireLinkedSteam();
+  if (!gate.ok) return gate;
+
+  const parsed = setTeamAvatarSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: formatZodActionError(parsed.error),
+    };
+  }
+
+  const existing = await getTeamById(parsed.data.teamId);
+  if (!existing) {
+    return { ok: false, code: "NOT_FOUND", message: "Team not found." };
+  }
+
+  if (!isTeamLeader(existing.leaderSteamid64, gate.data.steamid64)) {
+    return {
+      ok: false,
+      code: "FORBIDDEN",
+      message: "Only the team leader can update the team logo.",
+    };
+  }
+
+  let storedPath: string | null = parsed.data.objectPath;
+  if (storedPath) {
+    const mediaPath = validateMediaObjectPath(storedPath);
+    if (!mediaPath.ok) {
+      return { ok: false, code: "VALIDATION", message: mediaPath.error };
+    }
+    const teamPath = assertTeamAvatarObjectPath(mediaPath.path, existing.id);
+    if (!teamPath.ok) {
+      return { ok: false, code: "VALIDATION", message: teamPath.error };
+    }
+    storedPath = teamPath.path;
+  }
+
+  const now = new Date().toISOString();
+
+  try {
+    await db
+      .update(teams)
+      .set({ avatar: storedPath, updatedAt: now })
+      .where(eq(teams.id, existing.id));
+
+    revalidatePath("/teams");
+    revalidatePath(`/teams/${existing.slug}`);
+    await trackTeamEvent("team_updated");
+
+    return { ok: true, data: { objectPath: storedPath } };
+  } catch (err) {
+    console.error("[teams] setTeamAvatarAction", err);
     return {
       ok: false,
       code: "UNKNOWN",

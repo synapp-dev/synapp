@@ -1,6 +1,7 @@
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
 
 import { canonicalPath } from "@/entities/players/lib/resolve";
+import { resolveTeamAvatarUrl } from "@/entities/teams/lib/avatar-url";
 import { db } from "@/server/db/drizzle";
 import {
   playerTeams,
@@ -10,19 +11,28 @@ import {
   userProfiles,
 } from "@/server/db/schema";
 
-import type { TeamRosterMember, TeamRow, TeamSummary } from "../types";
+import type {
+  PlayerTeamMembership,
+  TeamRosterMember,
+  TeamRow,
+  TeamSummary,
+} from "../types";
 
 function mapTeamSummary(row: {
   id: string;
   name: string;
   slug: string;
   avatar: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
 }): TeamSummary {
   return {
     id: row.id,
     name: row.name,
     slug: row.slug,
-    avatar: row.avatar,
+    avatar: resolveTeamAvatarUrl(row.avatar),
+    primaryColor: row.primaryColor ?? null,
+    secondaryColor: row.secondaryColor ?? null,
   };
 }
 
@@ -32,7 +42,10 @@ function mapTeamRow(row: typeof teams.$inferSelect): TeamRow {
     slug: row.slug,
     name: row.name,
     nickname: row.nickname,
-    avatar: row.avatar,
+    avatar: resolveTeamAvatarUrl(row.avatar),
+    avatarObjectPath: row.avatar,
+    primaryColor: row.primaryColor,
+    secondaryColor: row.secondaryColor,
     description: row.description,
     coverImage: row.coverImage,
     leaderSteamid64: row.leaderSteamid64,
@@ -70,6 +83,35 @@ export async function isTeamSlugTaken(slug: string, excludeId?: string) {
   return row.length > 0;
 }
 
+/** Most recently joined team for a player profile header. */
+export async function getPlayerTeamForProfile(
+  steamid64: string,
+): Promise<PlayerTeamMembership | null> {
+  const rows = await db
+    .select({
+      id: teams.id,
+      name: teams.name,
+      slug: teams.slug,
+      avatar: teams.avatar,
+      primaryColor: teams.primaryColor,
+      secondaryColor: teams.secondaryColor,
+      role: playerTeams.role,
+    })
+    .from(playerTeams)
+    .innerJoin(teams, eq(playerTeams.teamId, teams.id))
+    .where(eq(playerTeams.steamid64, steamid64))
+    .orderBy(desc(playerTeams.joinedAt))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return null;
+
+  return {
+    team: mapTeamSummary(row),
+    role: row.role,
+  };
+}
+
 export async function getMyTeamsForUser(
   steamid64: string,
 ): Promise<TeamSummary[]> {
@@ -79,6 +121,8 @@ export async function getMyTeamsForUser(
       name: teams.name,
       slug: teams.slug,
       avatar: teams.avatar,
+      primaryColor: teams.primaryColor,
+      secondaryColor: teams.secondaryColor,
     })
     .from(playerTeams)
     .innerJoin(teams, eq(playerTeams.teamId, teams.id))

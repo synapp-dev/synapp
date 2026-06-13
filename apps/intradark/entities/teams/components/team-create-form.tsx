@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { createTeamAction } from "@/entities/teams/actions";
+import { createTeamAction, setTeamAvatarAction } from "@/entities/teams/actions";
+import { uploadTeamAvatarFile } from "@/entities/teams/lib/upload-team-avatar-client";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -16,7 +17,7 @@ export function TeamCreateForm() {
   const [slug, setSlug] = React.useState("");
   const [nickname, setNickname] = React.useState("");
   const [description, setDescription] = React.useState("");
-  const [avatarUrl, setAvatarUrl] = React.useState("");
+  const [avatarFile, setAvatarFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
 
@@ -29,12 +30,33 @@ export function TeamCreateForm() {
         slug: slug.trim() || undefined,
         nickname: nickname.trim() || undefined,
         description: description.trim() || undefined,
-        avatarUrl: avatarUrl.trim() || undefined,
       });
       if (!res.ok) {
         setError(res.message);
         return;
       }
+
+      if (avatarFile) {
+        const uploaded = await uploadTeamAvatarFile(res.data.teamId, avatarFile);
+        if (!uploaded.ok) {
+          setError(
+            `Team created, but logo upload failed: ${uploaded.message}. You can upload it from Admin.`,
+          );
+          router.push(`/teams/${res.data.slug}/home`);
+          router.refresh();
+          return;
+        }
+        const saved = await setTeamAvatarAction({
+          teamId: res.data.teamId,
+          objectPath: uploaded.objectPath,
+        });
+        if (!saved.ok) {
+          setError(
+            `Team created, but saving the logo failed: ${saved.message}. Try Admin.`,
+          );
+        }
+      }
+
       router.push(`/teams/${res.data.slug}/home`);
       router.refresh();
     });
@@ -90,15 +112,17 @@ export function TeamCreateForm() {
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="team-avatar">Avatar URL (optional)</Label>
+        <Label htmlFor="team-avatar-file">Team logo (optional)</Label>
         <Input
-          id="team-avatar"
-          type="url"
-          value={avatarUrl}
-          onChange={(e) => setAvatarUrl(e.target.value)}
-          placeholder="https://…"
-          autoComplete="off"
+          id="team-avatar-file"
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          disabled={pending}
+          onChange={(e) => setAvatarFile(e.target.files?.[0] ?? null)}
         />
+        <p className="text-muted-foreground text-xs">
+          Uploaded after the team is created. PNG, JPEG, WebP, or GIF.
+        </p>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>

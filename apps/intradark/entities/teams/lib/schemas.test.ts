@@ -17,14 +17,6 @@ describe("createTeamSchema", () => {
     const res = createTeamSchema.safeParse({ name: "X", slug: "admin" });
     expect(res.success).toBe(false);
   });
-
-  it("rejects invalid avatar URL", () => {
-    const res = createTeamSchema.safeParse({
-      name: "Team",
-      avatarUrl: "not-a-url",
-    });
-    expect(res.success).toBe(false);
-  });
 });
 
 describe("updateTeamSchema", () => {

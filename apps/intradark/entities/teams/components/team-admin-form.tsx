@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { updateTeamAction } from "@/entities/teams/actions";
+import { TeamAvatarUpload } from "@/entities/teams/components/team-avatar-upload";
 import type { TeamRow } from "@/entities/teams/types";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
@@ -17,7 +18,10 @@ export function TeamAdminForm({ team }: { team: TeamRow }) {
   const [slug, setSlug] = React.useState(team.slug);
   const [nickname, setNickname] = React.useState(team.nickname ?? "");
   const [description, setDescription] = React.useState(team.description ?? "");
-  const [avatarUrl, setAvatarUrl] = React.useState(team.avatar ?? "");
+  const [primaryColor, setPrimaryColor] = React.useState(team.primaryColor ?? "");
+  const [secondaryColor, setSecondaryColor] = React.useState(
+    team.secondaryColor ?? "",
+  );
   const [error, setError] = React.useState<string | null>(null);
   const [success, setSuccess] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
@@ -33,7 +37,8 @@ export function TeamAdminForm({ team }: { team: TeamRow }) {
         slug,
         nickname: nickname.trim() || null,
         description: description.trim() || null,
-        avatarUrl: avatarUrl.trim() || null,
+        primaryColor: primaryColor.trim() || null,
+        secondaryColor: secondaryColor.trim() || null,
       });
       if (!res.ok) {
         setError(res.message);
@@ -59,6 +64,13 @@ export function TeamAdminForm({ team }: { team: TeamRow }) {
           {success}
         </p>
       ) : null}
+
+      <TeamAvatarUpload
+        teamId={team.id}
+        initialAvatar={team.avatarObjectPath}
+        onUploaded={() => router.refresh()}
+      />
+
       <div className="space-y-2">
         <Label htmlFor="admin-team-name">Team name</Label>
         <Input
@@ -98,15 +110,53 @@ export function TeamAdminForm({ team }: { team: TeamRow }) {
           rows={4}
         />
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="admin-team-avatar">Avatar URL</Label>
-        <Input
-          id="admin-team-avatar"
-          type="url"
-          value={avatarUrl}
-          onChange={(e) => setAvatarUrl(e.target.value)}
-          placeholder="https://…"
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="admin-team-primary-color">Primary colour</Label>
+          <p className="text-muted-foreground text-xs">
+            Profile header glow for players on this team.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              id="admin-team-primary-color"
+              type="color"
+              value={primaryColor || "#00497d"}
+              onChange={(e) => setPrimaryColor(e.target.value)}
+              className="h-10 w-14 shrink-0 cursor-pointer p-1"
+            />
+            <Input
+              value={primaryColor}
+              onChange={(e) => setPrimaryColor(e.target.value)}
+              maxLength={7}
+              placeholder="#00497d"
+              pattern="^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$"
+              aria-label="Primary colour hex value"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="admin-team-secondary-color">Secondary colour</Label>
+          <p className="text-muted-foreground text-xs">
+            Profile header border and team name accent.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input
+              id="admin-team-secondary-color"
+              type="color"
+              value={secondaryColor || "#0483c8"}
+              onChange={(e) => setSecondaryColor(e.target.value)}
+              className="h-10 w-14 shrink-0 cursor-pointer p-1"
+            />
+            <Input
+              value={secondaryColor}
+              onChange={(e) => setSecondaryColor(e.target.value)}
+              maxLength={7}
+              placeholder="#0483c8"
+              pattern="^#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$"
+              aria-label="Secondary colour hex value"
+            />
+          </div>
+        </div>
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
