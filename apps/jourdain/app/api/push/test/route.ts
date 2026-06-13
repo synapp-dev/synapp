@@ -22,9 +22,11 @@ export async function POST() {
     );
   }
 
+  // "Jourdain" is already the iOS app-name header; keep the title as the message
+  // so the notification doesn't read "Jourdain / Jourdain / ...".
   const result = await sendPushToUser(user.id, {
-    title: "Jourdain",
-    body: "Push notifications are working. 🎉",
+    title: "Push notifications are working 🎉",
+    body: "",
     url: "/dashboard",
     tag: "test",
   });

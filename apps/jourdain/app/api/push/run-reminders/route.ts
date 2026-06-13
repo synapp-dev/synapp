@@ -60,9 +60,11 @@ async function runReminders() {
 
   const dueTasks = (dueData as DueTask[] | null) ?? [];
   for (const task of dueTasks) {
+    // iOS already shows "Jourdain" (the installed app's name) as the header, so
+    // the title carries the task itself — no redundant "Reminder"/app-name line.
     const result = await sendPushToUser(task.user_id, {
-      title: "Reminder",
-      body: task.title,
+      title: task.title,
+      body: "",
       url: `/tasks?task=${task.id}`,
       tag: `task-${task.id}`,
     });
