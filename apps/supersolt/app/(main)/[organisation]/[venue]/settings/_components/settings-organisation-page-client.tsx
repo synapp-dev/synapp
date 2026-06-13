@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Building2, Plus, Users } from "lucide-react";
 import { toast } from "sonner";
 import { useScopedSettingsAccess } from "@/entities/access/model/use-scoped-settings-access";
-import { useSettingsSectionRedirect } from "@/app/(main)/[organisation]/[venue]/settings/_components/use-settings-section-redirect";
+import { useSettingsSectionRedirect } from "@/entities/settings/lib/use-settings-section-redirect";
 import { buildScopedPath } from "@/lib/build-scoped-path";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";

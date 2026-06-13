@@ -12,8 +12,8 @@ import {
   HardHat,
   LayoutDashboard,
   LayoutGrid,
-  MapPin,
   NotebookPen,
+  Store,
   PackageCheck,
   Plane,
   Plug,
@@ -25,6 +25,7 @@ import {
   Trash2,
   TrendingUp,
   Truck,
+  Wrench,
   type LucideIcon,
   Users,
 } from "lucide-react";
@@ -62,9 +63,12 @@ export const APP_NAVIGATION_DESTINATION_ICONS = {
   operations_daybook: NotebookPen,
   settings: Settings,
   settings_permissions: Shield,
+  settings_inventory: Carrot,
   settings_organisation: Building2,
-  settings_venue: MapPin,
+  settings_venues: Store,
   settings_integrations: Plug,
+  settings_recipes: CookingPot,
+  settings_devkit: Wrench,
 } satisfies Record<AppNavigationDestinationKey, LucideIcon>;
 
 export function getAppNavigationDestinationIcon(

@@ -28,9 +28,12 @@ export const APP_NAVIGATION_DESTINATION_KEYS = [
   "operations_daybook",
   "settings",
   "settings_permissions",
+  "settings_inventory",
   "settings_organisation",
-  "settings_venue",
+  "settings_venues",
   "settings_integrations",
+  "settings_recipes",
+  "settings_devkit",
 ] as const;
 
 export type AppNavigationDestinationKey =
@@ -57,8 +60,7 @@ export const APP_NAVIGATION_CATALOG: Record<
     key: "dashboard",
     title: "Dashboard",
     description: "Workspace home with KPIs and venue overview.",
-    pathSuffix: "",
-    globalHref: "/dashboard",
+    pathSuffix: "/dashboard",
   },
   insights: {
     key: "insights",
@@ -100,7 +102,7 @@ export const APP_NAVIGATION_CATALOG: Record<
     key: "catalog_items",
     title: "Items",
     description: "Catalog items.",
-    pathSuffix: "/catalog/items",
+    pathSuffix: "/settings/inventory-setup/recipes",
   },
   catalog_menu: {
     key: "catalog_menu",
@@ -112,7 +114,7 @@ export const APP_NAVIGATION_CATALOG: Record<
     key: "ingredients",
     title: "Ingredients",
     description: "View and manage ingredients for this venue.",
-    pathSuffix: "/catalog/ingredients",
+    pathSuffix: "/settings/inventory-setup/master-inventory-list",
   },
   inventory: {
     key: "inventory",
@@ -130,32 +132,32 @@ export const APP_NAVIGATION_CATALOG: Record<
     key: "inventory_order_guide",
     title: "Order guide",
     description: "Order guide for purchasing.",
-    pathSuffix: "/inventory/order-guide",
+    pathSuffix: "/purchasing/orders",
   },
   inventory_purchase_orders: {
     key: "inventory_purchase_orders",
-    title: "Purchase orders",
-    pathSuffix: "/inventory/purchase-orders",
+    title: "Orders",
+    pathSuffix: "/purchasing/orders",
   },
   inventory_invoices: {
     key: "inventory_invoices",
     title: "Invoices",
-    pathSuffix: "/inventory/invoices",
+    pathSuffix: "/purchasing/invoices",
   },
   inventory_stock_counts: {
     key: "inventory_stock_counts",
     title: "Stock counts",
-    pathSuffix: "/inventory/stock-counts",
+    pathSuffix: "/stock-management/stock-counts",
   },
   inventory_waste: {
     key: "inventory_waste",
     title: "Waste",
-    pathSuffix: "/inventory/waste",
+    pathSuffix: "/stock-management/waste",
   },
   inventory_suppliers: {
     key: "inventory_suppliers",
     title: "Suppliers",
-    pathSuffix: "/inventory/suppliers",
+    pathSuffix: "/purchasing/suppliers",
   },
   workforce: {
     key: "workforce",
@@ -215,20 +217,35 @@ export const APP_NAVIGATION_CATALOG: Record<
     title: "Permissions",
     pathSuffix: "/settings/permissions",
   },
+  settings_inventory: {
+    key: "settings_inventory",
+    title: "Inventory",
+    pathSuffix: "/settings/inventory-setup",
+  },
   settings_organisation: {
     key: "settings_organisation",
     title: "Organisation settings",
     pathSuffix: "/settings/organisation",
   },
-  settings_venue: {
-    key: "settings_venue",
-    title: "Venue settings",
-    pathSuffix: "/settings/venue",
+  settings_venues: {
+    key: "settings_venues",
+    title: "Venues",
+    pathSuffix: "/settings/venues",
   },
   settings_integrations: {
     key: "settings_integrations",
     title: "Integrations",
     pathSuffix: "/settings/integrations",
+  },
+  settings_recipes: {
+    key: "settings_recipes",
+    title: "Recipes",
+    pathSuffix: "/settings/inventory-setup/recipes",
+  },
+  settings_devkit: {
+    key: "settings_devkit",
+    title: "DevKit",
+    pathSuffix: "/settings/devkit",
   },
 };
 

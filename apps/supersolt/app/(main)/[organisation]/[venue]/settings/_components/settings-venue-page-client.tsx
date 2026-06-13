@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { StorageLocationsSection } from "@/entities/stock-counts/components/storage-locations-section";
 import { useScopedSettingsAccess } from "@/entities/access/model/use-scoped-settings-access";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
-import { useSettingsSectionRedirect } from "@/app/(main)/[organisation]/[venue]/settings/_components/use-settings-section-redirect";
+import { useSettingsSectionRedirect } from "@/entities/settings/lib/use-settings-section-redirect";
 import { buildScopedPath } from "@/lib/build-scoped-path";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -413,6 +414,14 @@ export function SettingsVenuePageClient() {
             venue. Ask an org admin if you need someone added here.
           </CardContent>
         </Card>
+      ) : null}
+
+      {allowed && selectedVenueSlug ? (
+        <StorageLocationsSection
+          organisationSlug={access.organisationSlug}
+          venueSlug={selectedVenueSlug}
+          canEdit={Boolean(currentOrg?.grantsOrgAdmin)}
+        />
       ) : null}
     </div>
   );

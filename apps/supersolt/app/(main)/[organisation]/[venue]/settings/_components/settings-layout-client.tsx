@@ -19,6 +19,17 @@ function tabClassName(active: boolean) {
   );
 }
 
+function usesSettingsTabs(pathname: string): boolean {
+  return (
+    pathname.endsWith("/settings") ||
+    pathname.includes("/settings/permissions") ||
+    pathname.includes("/settings/organisation") ||
+    pathname.includes("/settings/venue") ||
+    pathname.includes("/settings/award-rates") ||
+    pathname.includes("/settings/integrations")
+  );
+}
+
 export function SettingsLayoutClient({
   children,
 }: {
@@ -55,13 +66,18 @@ export function SettingsLayoutClient({
     "settings/integrations",
   );
   const onIntegrations = pathname.includes("/settings/integrations");
+  const showSettingsTabs = usesSettingsTabs(pathname);
+
+  if (!showSettingsTabs) {
+    return <div className="flex min-h-0 flex-1 flex-col">{children}</div>;
+  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Permissions, organisation, venue, and integrations.
+          Permissions, organisation, venue, award rates, and integrations.
         </p>
       </div>
       <nav
@@ -90,6 +106,14 @@ export function SettingsLayoutClient({
             className={tabClassName(pathname.endsWith("/settings/venue"))}
           >
             Venue
+          </Link>
+        ) : null}
+        {access.canSeeAwardRates ? (
+          <Link
+            href={buildScopedPath(organisationSlug, venueSlug, "settings/award-rates")}
+            className={tabClassName(pathname.includes("/settings/award-rates"))}
+          >
+            Award rates
           </Link>
         ) : null}
         {access.canSeePermissions ? (

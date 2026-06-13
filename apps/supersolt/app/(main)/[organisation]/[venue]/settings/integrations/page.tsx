@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { Button } from "@workspace/ui/components/button";
-import { createServerClient } from "@/utils/supabase/server";
-import { createSupabaseAdmin } from "@/utils/supabase/admin";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
+import { getServerRequestAuthContext } from "@/server/auth/server-context";
+import { isOrganisationAdmin } from "@/server/auth/rbac";
+import { scopeRepo } from "@/server/db/scope.repo";
 import { getVenueSquareConnectionSummary } from "@/server/sales/sales-insights.service";
-import { userIsOrgAdmin } from "@/server/square/assert-org-admin";
+import { getXeroOAuthEnvConfig } from "@/server/xero/config";
+import { getVenueXeroConnectionSummary } from "@/server/xero/venue-xero-connection";
+import { ensureVenueEmailInboxForIntegrations } from "@/server/invoices/invoice-inbox.facade";
+import { CopyTextButton } from "./_components/copy-text-button";
 import { SquareCatalogLinksCard } from "../_components/square-catalog-links-card";
-
+import { SquareLocationPicker } from "@/entities/square/components/square-location-picker";
 /** Origin for absolute links on this request (localhost vs 127.0.0.1 comes from how you opened the page). */
 async function getRequestOrigin(): Promise<string> {
   const h = await headers();
@@ -40,6 +43,35 @@ function readSquareOauthSetup(): {
     redirectUri,
     applicationId,
   };
+}
+
+function xeroErrorHint(code: string): string | null {
+  const hints: Record<string, string> = {
+    config:
+      "Set XERO_CLIENT_ID, XERO_CLIENT_SECRET, and XERO_OAUTH_REDIRECT_URI in .env.local (see xero.env.example). Restart the dev server after editing.",
+    forbidden: "Your account needs org-admin access for this organisation.",
+    venue_not_found: "This venue slug may be wrong or the venue is inactive.",
+    missing_params: "Organisation or venue is missing from the connect link.",
+    token_exchange:
+      "Xero rejected the authorization code. Check that your redirect URI in the Xero developer app exactly matches XERO_OAUTH_REDIRECT_URI.",
+    session: "You were signed out before Xero sent you back. Stay logged into this app, then try Connect again.",
+    wrong_user:
+      "You completed Xero as a different user than the one that started Connect. Use one browser profile and one Supersolt account.",
+    missing_code:
+      "Xero did not return an authorization code — usually because access was denied on Xero’s side (check xero_error_detail for scope errors).",
+    no_tenant:
+      "No Xero organisation was linked. Authorise at least one organisation in Xero, then try again.",
+    save_failed:
+      "Could not save tokens to the database. Check that the venue_xero_connections migration is applied and you are still an org admin.",
+    connections: "Could not list Xero organisations after connecting.",
+    invalid_scope:
+      "Xero rejected the requested permissions. In developer.xero.com → your app → Configuration, enable: accounting.invoices, accounting.attachments, accounting.contacts, accounting.settings. Then reconnect.",
+  };
+  if (hints[code]) return hints[code];
+  if (code.startsWith("state_")) {
+    return "Return from Xero could not be validated. Click Connect Xero again; use the same hostname as in your redirect URL and complete the flow within a few minutes.";
+  }
+  return null;
 }
 
 function squareErrorHint(code: string): string | null {
@@ -80,12 +112,20 @@ export default async function SettingsIntegrationsPage({
   const squareError = firstParam(sp.square_error);
   const squareErrorDetail = firstParam(sp.square_error_detail);
 
+  const xero = firstParam(sp.xero);
+  const xeroError = firstParam(sp.xero_error);
+  const xeroErrorDetail = firstParam(sp.xero_error_detail);
+
+  const integrationsNext = `/${organisation}/${venue}/settings/integrations`;
+
   const connectQuery = new URLSearchParams({
     organisation,
     venue,
-    next: `/${organisation}/${venue}/settings/integrations`,
+    next: integrationsNext,
   });
   const connectHref = `/api/square/oauth/authorize?${connectQuery.toString()}`;
+
+  const xeroConnectHref = `/api/xero/oauth/authorize?${connectQuery.toString()}`;
   const requestOrigin = await getRequestOrigin();
   const absoluteConnectUrl = requestOrigin ? `${requestOrigin}${connectHref}` : "";
 
@@ -93,16 +133,14 @@ export default async function SettingsIntegrationsPage({
     (process.env.SQUARE_ENVIRONMENT ?? "sandbox").trim().toLowerCase() !== "production";
 
   const squareOauth = readSquareOauthSetup();
-  const errorHint = squareError ? squareErrorHint(squareError) : null;
+  const xeroOauth = getXeroOAuthEnvConfig();
+  const squareErrorHintText = squareError ? squareErrorHint(squareError) : null;
+  const xeroErrorHintText = xeroError ? xeroErrorHint(xeroError) : null;
 
-  const supabase = await createServerClient();
-  const {
-    data: { user: settingsUser },
-  } = await supabase.auth.getUser();
-  const admin = createSupabaseAdmin();
-  const squareSummary = settingsUser
-    ? await getVenueSquareConnectionSummary(supabase, admin, {
-        userId: settingsUser.id,
+  const authCtx = await getServerRequestAuthContext();
+
+  const squareSummary = authCtx
+    ? await getVenueSquareConnectionSummary(authCtx, {
         organisationSlug: organisation,
         venueSlug: venue,
       })
@@ -110,21 +148,40 @@ export default async function SettingsIntegrationsPage({
         connected: false,
         merchantId: null,
         environment: null,
+        locationConfigured: false,
+        squareLocationId: null,
+        updatedAt: null,
+      };
+
+  const xeroSummary = authCtx
+    ? await getVenueXeroConnectionSummary(authCtx, {
+        organisationSlug: organisation,
+        venueSlug: venue,
+      })
+    : {
+        connected: false,
+        tenantId: null,
+        tenantName: null,
         updatedAt: null,
       };
 
   let canManageSquareCatalogLinks = false;
-  if (settingsUser) {
-    const ctx = await ingredientsRepo.getVenueContextBySlugs(supabase, organisation, venue);
-    if (ctx) {
-      canManageSquareCatalogLinks = await userIsOrgAdmin(
-        supabase,
-        settingsUser.id,
-        ctx.organisationId
+  let invoiceInboxAddress: string | null = null;
+  if (authCtx) {
+    const venueScope = await authCtx.appDb.rls((tx) =>
+      scopeRepo.getVenueContextBySlugs(tx, organisation, venue),
+    );
+    if (venueScope) {
+      canManageSquareCatalogLinks = isOrganisationAdmin(
+        authCtx.tenantRoles,
+        venueScope.organisationId,
       );
+      if (isOrganisationAdmin(authCtx.tenantRoles, venueScope.organisationId)) {
+        const inbox = await ensureVenueEmailInboxForIntegrations(authCtx, organisation, venue);
+        invoiceInboxAddress = inbox?.address ?? null;
+      }
     }
   }
-
   return (
     <section className="space-y-6">
       <p className="text-muted-foreground text-sm">
@@ -175,9 +232,65 @@ export default async function SettingsIntegrationsPage({
           ) : (
             <p className="text-muted-foreground mt-1">Code: {squareError}</p>
           )}
-          {errorHint ? (
+          {squareErrorHintText ? (
             <p className="text-muted-foreground mt-2 border-t border-destructive/20 pt-2">
-              {errorHint}
+              {squareErrorHintText}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {xero === "connected" || xeroSummary.connected ? (
+        <div className="max-w-xl rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/35">
+          <p className="font-medium text-emerald-900 dark:text-emerald-100">
+            Xero is connected for this venue
+          </p>
+          {xeroSummary.tenantName ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Organisation{" "}
+              <span className="font-medium text-foreground">{xeroSummary.tenantName}</span>
+              {xeroSummary.tenantId ? (
+                <>
+                  {" "}
+                  ·{" "}
+                  <code className="rounded bg-background/80 px-1 py-0.5 text-xs">
+                    {xeroSummary.tenantId}
+                  </code>
+                </>
+              ) : null}
+              {xeroSummary.updatedAt ? (
+                <> · last updated {new Date(xeroSummary.updatedAt).toLocaleString()}</>
+              ) : null}
+            </p>
+          ) : xeroSummary.connected ? (
+            <p className="text-muted-foreground mt-1 text-xs">
+              Connected (tenant details not visible with your current login).
+            </p>
+          ) : null}
+          <p className="text-muted-foreground mt-2 text-xs">
+            View financials in{" "}
+            <Link
+              href={`/${organisation}/${venue}/insights/p-and-l`}
+              className="font-medium text-primary underline underline-offset-2"
+            >
+              P&amp;L insights
+            </Link>
+            .
+          </p>
+        </div>
+      ) : null}
+
+      {xeroError ? (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm">
+          <p className="font-medium text-destructive">Xero connection failed</p>
+          {xeroErrorDetail ? (
+            <p className="text-muted-foreground mt-1">{xeroErrorDetail}</p>
+          ) : (
+            <p className="text-muted-foreground mt-1">Code: {xeroError}</p>
+          )}
+          {xeroErrorHintText ? (
+            <p className="text-muted-foreground mt-2 border-t border-destructive/20 pt-2">
+              {xeroErrorHintText}
             </p>
           ) : null}
         </div>
@@ -269,6 +382,15 @@ export default async function SettingsIntegrationsPage({
         ) : null}
 
         {squareSummary.connected ? (
+          <SquareLocationPicker
+            organisationSlug={organisation}
+            venueSlug={venue}
+            canManage={canManageSquareCatalogLinks}
+            variant="card"
+          />
+        ) : null}
+
+        {squareSummary.connected ? (
           <SquareCatalogLinksCard
             organisation={organisation}
             venue={venue}
@@ -313,6 +435,96 @@ export default async function SettingsIntegrationsPage({
             ) : null}
           </div>
         ) : null}
+      </div>
+
+      <div className="space-y-3 border-t pt-6">
+        <h2 className="text-lg font-medium">Invoice email inbox</h2>
+        <p className="text-muted-foreground max-w-xl text-sm">
+          Forward supplier invoices to this venue address. Attachments are parsed automatically and
+          appear in{" "}
+          <Link
+            href={`/${organisation}/${venue}/purchasing/invoices`}
+            className="font-medium text-primary underline underline-offset-2"
+          >
+            Purchasing → Invoices
+          </Link>{" "}
+          under Pending Review.
+        </p>
+        {invoiceInboxAddress ? (
+          <div className="bg-muted/50 max-w-xl rounded-md border px-3 py-3 text-sm space-y-2">
+            <p className="font-medium">Venue inbox address</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="bg-background block flex-1 overflow-x-auto rounded border px-2 py-1.5 text-xs">
+                {invoiceInboxAddress}
+              </code>
+              <CopyTextButton value={invoiceInboxAddress} />
+            </div>
+            <p className="text-muted-foreground text-xs">
+              Configure Postmark inbound to route messages to this address to the webhook at{" "}
+              <code className="text-xs">/api/webhooks/inbound-email</code>.
+            </p>
+          </div>
+        ) : (
+          <p className="text-muted-foreground max-w-xl text-sm">
+            Org admins see the venue inbox address here after signing in.
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-3 border-t pt-6">
+        <h2 className="text-lg font-medium">Xero</h2>
+        <p className="text-muted-foreground max-w-xl text-sm">
+          Connect your Xero organisation (org admins only) to sync supplier invoices and power P&amp;L
+          insights. You will be redirected to Xero to approve access, then returned here.
+        </p>
+
+        {!xeroOauth.isConfigured ? (
+          <div className="bg-destructive/5 max-w-xl rounded-md border border-destructive/30 px-3 py-2 text-sm">
+            <p className="font-medium text-destructive">Xero OAuth is not configured</p>
+            <p className="text-muted-foreground mt-1">
+              Add credentials from{" "}
+              <a
+                className="text-primary underline underline-offset-2"
+                href="https://developer.xero.com/app/manage"
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                developer.xero.com
+              </a>{" "}
+              to <code className="text-xs">apps/supersolt/.env.local</code>. See{" "}
+              <code className="text-xs">xero.env.example</code> for variable names, then restart{" "}
+              <code className="text-xs">pnpm dev</code>.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-muted/50 max-w-xl rounded-md border px-3 py-2 text-sm space-y-2">
+            <p className="font-medium">Use this in your Xero app</p>
+            <p className="text-muted-foreground">
+              Redirect URI — must match character-for-character:
+            </p>
+            <code className="bg-background block w-full overflow-x-auto rounded border px-2 py-1.5 text-xs">
+              {xeroOauth.redirectUri}
+            </code>
+          </div>
+        )}
+
+        {xeroOauth.isConfigured ? (
+          <div className="flex flex-wrap gap-2">
+            {xeroSummary.connected ? (
+              <Button variant="outline" asChild>
+                <a href={xeroConnectHref}>Reconnect Xero</a>
+              </Button>
+            ) : (
+              <Button asChild>
+                <a href={xeroConnectHref}>Connect Xero</a>
+              </Button>
+            )}
+          </div>
+        ) : (
+          <Button type="button" disabled>
+            Connect Xero (configure env first)
+          </Button>
+        )}
       </div>
     </section>
   );

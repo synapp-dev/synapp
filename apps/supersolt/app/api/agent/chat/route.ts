@@ -25,7 +25,9 @@ import {
 import { APP_NAVIGATION_DESTINATION_KEYS } from "@/entities/ai-agent-chat/lib/app-navigation-catalog";
 import { suggestAppNavigationInputSchema } from "@/entities/ai-agent-chat/lib/app-navigation-tool-schema";
 import { loadAccessContextForUser } from "@/server/access/load-access-context-for-user";
-import { createServerClient } from "@/utils/supabase/server";
+import { buildRequestAuthContext } from "@/server/auth/context";
+import type { RequestAuthContext } from "@/server/auth/context";
+import { resolveRequestAuth } from "@/server/db/request-auth";
 
 import { buildTenantScopeSystemAppend } from "./build-tenant-scope-system-append";
 import { executeListAccessibleTenants } from "./execute-list-accessible-tenants";
@@ -34,8 +36,7 @@ import { executeSuggestAppNavigation } from "./execute-suggest-app-navigation";
 export const maxDuration = 60;
 
 function createAgentTools(context: {
-  supabase: Awaited<ReturnType<typeof createServerClient>>;
-  userId: string;
+  ctx: RequestAuthContext;
   requestId?: string | null;
 }) {
   return {
@@ -55,8 +56,8 @@ function createAgentTools(context: {
       inputSchema: z.object({}),
       execute: async () =>
         executeListAccessibleTenants({
-          supabase: context.supabase,
-          userId: context.userId,
+          appDb: context.ctx.appDb,
+          userId: context.ctx.userId,
           requestId: context.requestId,
         }),
     }),
@@ -69,8 +70,7 @@ function createAgentTools(context: {
       inputSchema: suggestAppNavigationInputSchema,
       execute: async (input) =>
         executeSuggestAppNavigation({
-          supabase: context.supabase,
-          userId: context.userId,
+          ctx: context.ctx,
           rawInput: input,
           requestId: context.requestId,
         }),
@@ -79,7 +79,7 @@ function createAgentTools(context: {
 }
 
 async function resolveAccessContextForPrompt(args: {
-  supabase: Awaited<ReturnType<typeof createServerClient>>;
+  appDb: RequestAuthContext["appDb"];
   userId: string;
   requestId: string | undefined;
   body: Record<string, unknown>;
@@ -100,7 +100,7 @@ async function resolveAccessContextForPrompt(args: {
     return { access: parsedSnapshot.value, source: "client_snapshot" };
   }
 
-  const server = await loadAccessContextForUser(args.supabase, args.userId);
+  const server = await loadAccessContextForUser(args.appDb, args.userId);
   if (server.error) {
     throw new Error(server.error.message);
   }
@@ -117,14 +117,11 @@ async function resolveAccessContextForPrompt(args: {
 }
 
 export async function POST(req: Request) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const auth = await resolveRequestAuth(req);
+  if (!auth) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const ctx = await buildRequestAuthContext(auth.userId, auth.appDb);
 
   if (!process.env.OPENAI_API_KEY) {
     return new Response("Missing OPENAI_API_KEY", { status: 500 });
@@ -162,8 +159,8 @@ export async function POST(req: Request) {
   let contextSource: "client_snapshot" | "server_load";
   try {
     const resolved = await resolveAccessContextForPrompt({
-      supabase,
-      userId: user.id,
+      appDb: ctx.appDb,
+      userId: ctx.userId,
       requestId: safeRequestId,
       body: bodyObj,
     });
@@ -214,8 +211,7 @@ export async function POST(req: Request) {
   }
 
   const agentTools = createAgentTools({
-    supabase,
-    userId: user.id,
+    ctx,
     requestId: safeRequestId,
   });
 
@@ -229,7 +225,7 @@ export async function POST(req: Request) {
       "When they want to open a part of the app for a named organisation and venue, " +
         "call suggestAppNavigation with organisationSlug, venueSlug, and destinationKeys. " +
         `Allowed destinationKeys values (match user language to the closest; up to 8 per call): ${APP_NAVIGATION_DESTINATION_KEYS.join(", ")}. ` +
-        "If they ask for the dashboard, home page, or KPI overview, use destination key `dashboard` (opens `/dashboard`). Use `insights` only for the venue Insights area.",
+        "If they ask for the dashboard, home page, or KPI overview, use destination key `dashboard` (opens the venue-scoped dashboard). Use `insights` only for the venue Insights area.",
       "After suggestAppNavigation returns one or more navigation cards, do not repeat destinations in prose, bullet lists, or long summaries—the UI already shows the cards and short on-screen guidance.",
       "Otherwise answer helpfully in plain language; do not invent data about venues or sales.",
       tenantScopeAppend,

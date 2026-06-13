@@ -133,7 +133,7 @@ export function AgentChatProvider({ children }: { children: React.ReactNode }) {
       }
       return pickFirstAccessibleVenue(organisations);
     });
-  }, [organisations]);
+  }, [organisations.length, resolvedScope?.organisationSlug, resolvedScope?.venueSlug]);
 
   useEffect(() => {
     if (!organisations.length || !resolvedScope) return;

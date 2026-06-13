@@ -5,6 +5,7 @@ export type ScopedSettingsAccess = {
   canSeePermissions: boolean;
   canSeeOrganisation: boolean;
   canSeeVenue: boolean;
+  canSeeAwardRates: boolean;
   /** First tab segment in display order: permissions → organisation → venue. */
   firstAllowedSegment: "permissions" | "organisation" | "venue" | null;
 };
@@ -14,6 +15,7 @@ const EMPTY: ScopedSettingsAccess = {
   canSeePermissions: false,
   canSeeOrganisation: false,
   canSeeVenue: false,
+  canSeeAwardRates: false,
   firstAllowedSegment: null,
 };
 
@@ -48,8 +50,9 @@ export function getScopedSettingsAccess(
   }
 
   const { org, venue } = ctx;
-  const canSeePermissions = org.grantsOrgAdmin;
+  const canSeePermissions = org.roleSlug === "owner";
   const canSeeOrganisation = org.roleSlug === "owner";
+  const canSeeAwardRates = org.grantsOrgAdmin;
   const canSeeVenue = org.grantsOrgAdmin || venue.roleSlug === "manager";
   const canSeeSettingsNav =
     org.grantsOrgAdmin || org.roleSlug === "owner" || venue.roleSlug === "manager";
@@ -74,6 +77,7 @@ export function getScopedSettingsAccess(
     canSeePermissions,
     canSeeOrganisation,
     canSeeVenue,
+    canSeeAwardRates,
     firstAllowedSegment,
   };
 }

@@ -1,490 +1,418 @@
-import { randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/utils/supabase/types";
+import type { RequestAuthContext } from "@/server/auth/context";
 import {
-  PLATFORM_ROLE_IDS,
-  type PlatformRoleSlug,
-} from "@/lib/roles/platform-role-ids";
+  assertOrganisationOwner,
+  resolveOrganisationIdBySlug,
+} from "@/server/auth/rbac";
+import { AuthError } from "@/server/auth/errors";
+import { PLATFORM_ROLE_IDS } from "@/lib/roles/platform-role-ids";
+import { onboardingRepo } from "@/server/onboarding/onboarding.repo";
+import { organisationMembersRepo } from "@/server/organisations/organisation-members.repo";
+import { membersWhitelistRepo } from "@/server/organisations/members-whitelist.repo";
+import { MembersServiceError } from "@/server/organisations/members-errors";
+import {
+  buildMembersList,
+  membersInviteService,
+} from "@/server/organisations/members-invite.service";
+import {
+  canArchiveMember,
+  canDemoteMember,
+  displayNameFromProfile,
+  normalizeAssignableRoleSlug,
+  normalizeInviteEmail,
+  OWNER_ROLE_ID,
+} from "@/server/organisations/members-policy";
+import { trackMembersEvent } from "@/server/organisations/members-telemetry";
 
-type Supabase = SupabaseClient<Database>;
+type AuthAdminClient = SupabaseClient<Database>;
 
-/** Service-role client for auth admin + global profile lookup (RLS-safe). */
-type ServiceSupabase = SupabaseClient<Database>;
+export class OrganisationMembersServiceError extends MembersServiceError {}
 
-const OWNER_ROLE_ID = PLATFORM_ROLE_IDS.owner;
-
-/** Org roles assignable by owner from organisation settings (excludes owner). */
-const ASSIGNABLE_ORG_ROLE_SLUGS = [
-  "admin",
-  "manager",
-  "supervisor",
-  "crew",
-] as const satisfies readonly PlatformRoleSlug[];
-
-export type AssignableOrgRoleSlug = (typeof ASSIGNABLE_ORG_ROLE_SLUGS)[number];
-
-export class OrganisationMembersServiceError extends Error {
-  status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
+function mapAuthError(error: unknown): never {
+  if (error instanceof AuthError) {
+    throw new MembersServiceError("permissions.forbidden", error.message, error.status);
   }
+  throw error;
 }
 
-function isAssignableOrgRoleSlug(value: string): value is AssignableOrgRoleSlug {
-  return (ASSIGNABLE_ORG_ROLE_SLUGS as readonly string[]).includes(value);
-}
-
-function normalizeAssignableRoleSlug(raw: string): AssignableOrgRoleSlug | null {
-  const normalized = raw.trim().toLowerCase();
-  return isAssignableOrgRoleSlug(normalized) ? normalized : null;
-}
-
-async function applyFirstLastNameToProfile(
-  admin: ServiceSupabase,
-  profileId: string,
-  firstName: string,
-  lastName: string
-): Promise<void> {
-  const fn = firstName.trim();
-  const ln = lastName.trim();
-  if (!fn || !ln) return;
-  const combined = `${fn} ${ln}`.trim();
-  const { error } = await admin
-    .from("user_profiles")
-    .update({
-      first_name: fn,
-      last_name: ln,
-      full_name: combined,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", profileId);
-
-  if (error) {
-    throw new OrganisationMembersServiceError(500, error.message);
-  }
-}
-
-/**
- * Resolves `user_profiles.id` by email, or creates a confirmed Auth user (random password;
- * user should use password reset to sign in). New users get a profile via `handle_new_auth_user`.
- */
-async function resolveOrCreateUserProfileId(
-  admin: ServiceSupabase,
-  email: string,
-  meta: { firstName?: string; lastName?: string; fullName?: string }
-): Promise<string> {
-  const { data: existing, error: existingError } = await admin
-    .from("user_profiles")
-    .select("id")
-    .eq("email", email)
-    .maybeSingle();
-
-  if (existingError) {
-    throw new OrganisationMembersServiceError(500, existingError.message);
-  }
-
-  const fn = meta.firstName?.trim() ?? "";
-  const ln = meta.lastName?.trim() ?? "";
-
-  if (existing?.id) {
-    await applyFirstLastNameToProfile(admin, existing.id, fn, ln);
-    return existing.id;
-  }
-
-  if (!fn || !ln) {
-    throw new OrganisationMembersServiceError(
-      400,
-      "First name and last name are required to create a new user"
-    );
-  }
-
-  let full = meta.fullName?.trim() ?? "";
-  if (!full && (fn || ln)) {
-    full = `${fn} ${ln}`.trim();
-  }
-
-  // Random password: user is email-confirmed but should set a password via "Forgot password".
-  const password = randomBytes(32).toString("base64url");
-  const { data: created, error: createError } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: {
-      ...(fn ? { first_name: fn } : {}),
-      ...(ln ? { last_name: ln } : {}),
-      ...(full ? { full_name: full } : {}),
-    },
-  });
-
-  if (!createError && created.user?.id) {
-    return created.user.id;
-  }
-
-  const msg = createError?.message.toLowerCase() ?? "";
-  if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
-    const { data: again, error: againError } = await admin
-      .from("user_profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (againError) {
-      throw new OrganisationMembersServiceError(500, againError.message);
-    }
-    if (again?.id) {
-      await applyFirstLastNameToProfile(admin, again.id, fn, ln);
-      return again.id;
-    }
-  }
-
-  throw new OrganisationMembersServiceError(
-    400,
-    createError?.message ?? "Could not create user"
-  );
-}
-
-function displayName(profile: {
-  full_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  email: string;
-}): string {
-  if (profile.full_name?.trim()) return profile.full_name.trim();
-  const first = profile.first_name?.trim() ?? "";
-  const last = profile.last_name?.trim() ?? "";
-  const combined = `${first} ${last}`.trim();
-  if (combined) return combined;
-  return profile.email;
-}
-
-async function getOrganisationIdBySlug(
-  supabase: Supabase,
-  organisationSlug: string
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("organisations")
-    .select("id")
-    .eq("slug", organisationSlug)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) {
-    throw new OrganisationMembersServiceError(500, error.message);
-  }
-  return data?.id ?? null;
-}
-
-/**
- * Resolves organisation id and ensures the user is an active organisation owner.
- */
-export async function assertOrganisationOwner(
-  supabase: Supabase,
-  userId: string,
-  organisationSlug: string
-): Promise<string> {
-  const orgId = await getOrganisationIdBySlug(supabase, organisationSlug);
+function assertOrganisationOwnerBySlug(
+  ctx: RequestAuthContext,
+  organisationSlug: string,
+): string {
+  const orgId = resolveOrganisationIdBySlug(ctx.tenantRoles, organisationSlug);
   if (!orgId) {
-    throw new OrganisationMembersServiceError(404, "Organisation not found");
+    throw new MembersServiceError("permissions.not_found", "Organisation not found", 404);
   }
-
-  const { data, error } = await supabase
-    .from("user_organisations")
-    .select("id")
-    .eq("user_profile_id", userId)
-    .eq("organisation_id", orgId)
-    .eq("role_id", OWNER_ROLE_ID)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) {
-    throw new OrganisationMembersServiceError(500, error.message);
-  }
-  if (!data) {
-    throw new OrganisationMembersServiceError(403, "Forbidden");
+  try {
+    assertOrganisationOwner(ctx.tenantRoles, orgId);
+  } catch (error) {
+    mapAuthError(error);
   }
   return orgId;
 }
 
-export type OrganisationMemberRow = {
-  userOrganisationId: string;
-  userProfileId: string;
-  name: string;
-  email: string;
-  roleSlug: string;
-  roleDisplayName: string;
-  grantsOrgAdmin: boolean;
-};
+async function assertVenueIdsBelongToOrg(
+  ctx: RequestAuthContext,
+  organisationId: string,
+  venueIds: string[],
+): Promise<void> {
+  if (venueIds.length === 0) {
+    throw new MembersServiceError(
+      "permissions.invalid_venues",
+      "Select at least one venue",
+    );
+  }
+  const venues = await ctx.appDb.rls((tx) =>
+    onboardingRepo.listVenuesForOrganisation(tx, organisationId),
+  );
+  const allowed = new Set(venues.map((v) => v.id));
+  for (const id of venueIds) {
+    if (!allowed.has(id)) {
+      throw new MembersServiceError("permissions.invalid_venues", "Invalid venue selection");
+    }
+  }
+}
 
 export const organisationMembersService = {
-  /**
-   * Whether a profile already exists for this email (any org). Used for add-member wizard step 1.
-   */
   async checkMemberEmail(
-    supabase: Supabase,
-    admin: ServiceSupabase,
-    args: { organisationSlug: string; actorUserId: string; email: string }
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string; email: string },
   ): Promise<{ exists: boolean }> {
-    await assertOrganisationOwner(supabase, args.actorUserId, args.organisationSlug);
-
-    const email = args.email.trim().toLowerCase();
-    if (!email.includes("@")) {
-      throw new OrganisationMembersServiceError(400, "Valid email is required");
-    }
-
-    const { data, error } = await admin
-      .from("user_profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (error) {
-      throw new OrganisationMembersServiceError(500, error.message);
-    }
-
-    return { exists: Boolean(data?.id) };
+    assertOrganisationOwnerBySlug(ctx, args.organisationSlug);
+    const email = normalizeInviteEmail(args.email);
+    const profileId = await organisationMembersRepo.findProfileIdByEmail(
+      ctx.appDb,
+      email,
+    );
+    return { exists: Boolean(profileId) };
   },
 
   async listMembers(
-    supabase: Supabase,
-    args: { organisationSlug: string; actorUserId: string }
-  ): Promise<{ members: OrganisationMemberRow[] }> {
-    const orgId = await assertOrganisationOwner(
-      supabase,
-      args.actorUserId,
-      args.organisationSlug
-    );
-
-    const { data: uoRows, error: uoError } = await supabase
-      .from("user_organisations")
-      .select("id, user_profile_id, role_id")
-      .eq("organisation_id", orgId)
-      .eq("is_active", true)
-      .is("archived_at", null);
-
-    if (uoError) {
-      throw new OrganisationMembersServiceError(500, uoError.message);
-    }
-
-    const rows = uoRows ?? [];
-    if (rows.length === 0) {
-      return { members: [] };
-    }
-
-    const profileIds = [...new Set(rows.map((r) => r.user_profile_id))];
-    const roleIds = [...new Set(rows.map((r) => r.role_id))];
-
-    const { data: profiles, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("id, email, first_name, last_name, full_name")
-      .in("id", profileIds);
-
-    if (profileError) {
-      throw new OrganisationMembersServiceError(500, profileError.message);
-    }
-
-    const { data: roleRows, error: rolesError } = await supabase
-      .from("roles")
-      .select("id, slug, display_name, grants_org_admin")
-      .in("id", roleIds);
-
-    if (rolesError) {
-      throw new OrganisationMembersServiceError(500, rolesError.message);
-    }
-
-    const profileById = new Map((profiles ?? []).map((p) => [p.id, p]));
-    const roleById = new Map(
-      (roleRows ?? []).map((r) => [
-        r.id,
-        {
-          slug: r.slug,
-          display_name: r.display_name,
-          grants_org_admin: r.grants_org_admin,
-        },
-      ])
-    );
-
-    const members: OrganisationMemberRow[] = rows
-      .map((uo) => {
-        const profile = profileById.get(uo.user_profile_id);
-        const role = roleById.get(uo.role_id);
-        if (!profile || !role) {
-          return null;
-        }
-        return {
-          userOrganisationId: uo.id,
-          userProfileId: uo.user_profile_id,
-          name: displayName(profile),
-          email: profile.email,
-          roleSlug: role.slug,
-          roleDisplayName: role.display_name,
-          grantsOrgAdmin: role.grants_org_admin,
-        };
-      })
-      .filter((m): m is OrganisationMemberRow => m !== null);
-
-    members.sort((a, b) => a.name.localeCompare(b.name));
-    return { members };
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string },
+  ) {
+    const orgId = assertOrganisationOwnerBySlug(ctx, args.organisationSlug);
+    trackMembersEvent("permissions.viewed", { organisation_id: orgId });
+    return buildMembersList(ctx, orgId);
   },
 
-  async updateMemberRole(
-    supabase: Supabase,
-    args: {
-      organisationSlug: string;
-      actorUserId: string;
-      userOrganisationId: string;
-      roleSlug: string;
+  async getMember(
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string; userOrganisationId: string },
+  ) {
+    const orgId = assertOrganisationOwnerBySlug(ctx, args.organisationSlug);
+    const membership = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.getMembershipDetail(tx, args.userOrganisationId),
+    );
+    if (!membership || membership.organisationId !== orgId) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
     }
-  ): Promise<void> {
-    const orgId = await assertOrganisationOwner(
-      supabase,
-      args.actorUserId,
-      args.organisationSlug
+
+    const [profiles, roles, uvRows, venues] = await ctx.appDb.rls((tx) =>
+      Promise.all([
+        organisationMembersRepo.listProfilesByIds(tx, [membership.userProfileId]),
+        organisationMembersRepo.listRolesByIds(tx, [membership.roleId]),
+        organisationMembersRepo.listVenueAssignmentsForMembers(tx, {
+          organisationId: orgId,
+          userOrganisationIds: [membership.id],
+        }),
+        onboardingRepo.listVenuesForOrganisation(tx, orgId),
+      ]),
     );
 
-    const normalized = normalizeAssignableRoleSlug(args.roleSlug);
-    if (!normalized) {
-      throw new OrganisationMembersServiceError(400, "Invalid role");
-    }
-    const newRoleId = PLATFORM_ROLE_IDS[normalized];
-
-    const { data: target, error: targetError } = await supabase
-      .from("user_organisations")
-      .select("id, role_id, organisation_id")
-      .eq("id", args.userOrganisationId)
-      .maybeSingle();
-
-    if (targetError) {
-      throw new OrganisationMembersServiceError(500, targetError.message);
-    }
-    if (!target || target.organisation_id !== orgId) {
-      throw new OrganisationMembersServiceError(404, "Membership not found");
+    const profile = profiles[0];
+    const role = roles[0];
+    if (!profile || !role) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
     }
 
-    if (target.role_id === OWNER_ROLE_ID) {
-      const { count, error: countError } = await supabase
-        .from("user_organisations")
-        .select("id", { count: "exact", head: true })
-        .eq("organisation_id", orgId)
-        .eq("role_id", OWNER_ROLE_ID)
-        .eq("is_active", true)
-        .is("archived_at", null);
+    const venueIds = uvRows
+      .filter((uv) => uv.archivedAt == null && uv.isActive)
+      .map((uv) => uv.venueId);
 
-      if (countError) {
-        throw new OrganisationMembersServiceError(500, countError.message);
+    return {
+      userOrganisationId: membership.id,
+      userProfileId: membership.userProfileId,
+      name: displayNameFromProfile(profile),
+      email: profile.email,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      roleSlug: role.slug,
+      roleDisplayName: role.displayName,
+      venueIds,
+      status:
+        membership.archivedAt != null || !membership.isActive
+          ? ("archived" as const)
+          : ("active" as const),
+      venues: venues.map((v) => ({ id: v.id, name: v.name, slug: v.slug })),
+    };
+  },
+
+  async updateMember(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      userOrganisationId: string;
+      roleSlug?: string;
+      venueIds?: string[];
+      firstName?: string;
+      lastName?: string;
+    },
+  ): Promise<void> {
+    const orgId = assertOrganisationOwnerBySlug(ctx, args.organisationSlug);
+    const membership = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.getMembershipDetail(tx, args.userOrganisationId),
+    );
+    if (!membership || membership.organisationId !== orgId) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
+    }
+
+    const now = new Date().toISOString();
+
+    if (args.roleSlug != null) {
+      const normalized = normalizeAssignableRoleSlug(args.roleSlug);
+      if (!normalized) {
+        throw new MembersServiceError("permissions.invalid_role", "Invalid role");
       }
-      const ownerCount = count ?? 0;
-      if (ownerCount <= 1) {
-        throw new OrganisationMembersServiceError(
-          400,
-          "Cannot remove the last organisation owner"
+      const newRoleId = PLATFORM_ROLE_IDS[normalized];
+      const ownerCount = await ctx.appDb.rls((tx) =>
+        organisationMembersRepo.countActiveOwners(tx, {
+          organisationId: orgId,
+          ownerRoleId: OWNER_ROLE_ID,
+        }),
+      );
+      if (
+        !canDemoteMember({
+          currentRoleId: membership.roleId,
+          newRoleId,
+          ownerRoleId: OWNER_ROLE_ID,
+          activeOwnerCount: ownerCount,
+        })
+      ) {
+        throw new MembersServiceError(
+          "permissions.last_owner",
+          "Cannot remove the last organisation owner",
         );
       }
+      await ctx.appDb.rls((tx) =>
+        organisationMembersRepo.updateMembershipRole(tx, {
+          userOrganisationId: args.userOrganisationId,
+          organisationId: orgId,
+          roleId: newRoleId,
+          updatedAt: now,
+        }),
+      );
+      trackMembersEvent("permissions.role_changed", {
+        organisation_id: orgId,
+        from_slug: membership.roleId,
+        to_slug: normalized,
+      });
     }
 
-    const { error: updateError } = await supabase
-      .from("user_organisations")
-      .update({
-        role_id: newRoleId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", args.userOrganisationId)
-      .eq("organisation_id", orgId);
+    if (args.venueIds != null) {
+      await assertVenueIdsBelongToOrg(ctx, orgId, args.venueIds);
+      await ctx.appDb.rls((tx) =>
+        organisationMembersRepo.replaceVenueAssignments(tx, {
+          userOrganisationId: args.userOrganisationId,
+          organisationId: orgId,
+          venueIds: args.venueIds!,
+          updatedAt: now,
+        }),
+      );
+      trackMembersEvent("permissions.venues_changed", {
+        organisation_id: orgId,
+        venue_count: args.venueIds.length,
+      });
+    }
 
-    if (updateError) {
-      throw new OrganisationMembersServiceError(500, updateError.message);
+    const fn = args.firstName?.trim() ?? "";
+    const ln = args.lastName?.trim() ?? "";
+    if (fn || ln) {
+      const combined = `${fn} ${ln}`.trim();
+      await organisationMembersRepo.updateProfileNames(ctx.appDb, {
+        profileId: membership.userProfileId,
+        firstName: fn,
+        lastName: ln,
+        fullName: combined || `${fn} ${ln}`.trim(),
+        updatedAt: now,
+      });
     }
   },
 
-  async addMember(
-    supabase: Supabase,
-    admin: ServiceSupabase,
+  async archiveMember(
+    ctx: RequestAuthContext,
+    authAdmin: AuthAdminClient,
+    args: { organisationSlug: string; userOrganisationId: string },
+  ): Promise<void> {
+    const orgId = assertOrganisationOwnerBySlug(ctx, args.organisationSlug);
+    const membership = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.getMembershipDetail(tx, args.userOrganisationId),
+    );
+    if (!membership || membership.organisationId !== orgId) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
+    }
+
+    const ownerCount = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.countActiveOwners(tx, {
+        organisationId: orgId,
+        ownerRoleId: OWNER_ROLE_ID,
+      }),
+    );
+    if (
+      !canArchiveMember({
+        roleId: membership.roleId,
+        ownerRoleId: OWNER_ROLE_ID,
+        activeOwnerCount: ownerCount,
+      })
+    ) {
+      throw new MembersServiceError(
+        "permissions.last_owner",
+        "Cannot archive the last organisation owner",
+      );
+    }
+
+    const profiles = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.listProfilesByIds(tx, [membership.userProfileId]),
+    );
+    const profile = profiles[0];
+    if (!profile) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
+    }
+
+    const now = new Date().toISOString();
+    const email = normalizeInviteEmail(profile.email);
+
+    await ctx.appDb.rls(async (tx) => {
+      await organisationMembersRepo.archiveMembership(tx, {
+        userOrganisationId: args.userOrganisationId,
+        organisationId: orgId,
+        updatedAt: now,
+      });
+      await organisationMembersRepo.archiveVenuesForMember(tx, {
+        userOrganisationId: args.userOrganisationId,
+        organisationId: orgId,
+        updatedAt: now,
+      });
+      await membersWhitelistRepo.revokeActive(tx, {
+        email,
+        organisationId: orgId,
+        now,
+      });
+    });
+
+    await authAdmin.auth.admin.signOut(membership.userProfileId, "global");
+
+    trackMembersEvent("permissions.member_archived", {
+      organisation_id: orgId,
+      user_organisation_id: args.userOrganisationId,
+    });
+  },
+
+  async reactivateMember(
+    ctx: RequestAuthContext,
     args: {
       organisationSlug: string;
-      actorUserId: string;
+      userOrganisationId: string;
+      venueIds: string[];
+      roleSlug?: string;
+    },
+  ): Promise<void> {
+    const orgId = assertOrganisationOwnerBySlug(ctx, args.organisationSlug);
+    await assertVenueIdsBelongToOrg(ctx, orgId, args.venueIds);
+
+    const membership = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.getMembershipDetail(tx, args.userOrganisationId),
+    );
+    if (!membership || membership.organisationId !== orgId) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
+    }
+
+    const roleSlug = args.roleSlug
+      ? normalizeAssignableRoleSlug(args.roleSlug)
+      : null;
+    const roleId = roleSlug ? PLATFORM_ROLE_IDS[roleSlug] : membership.roleId;
+    if (args.roleSlug && !roleSlug) {
+      throw new MembersServiceError("permissions.invalid_role", "Invalid role");
+    }
+
+    const profiles = await ctx.appDb.rls((tx) =>
+      organisationMembersRepo.listProfilesByIds(tx, [membership.userProfileId]),
+    );
+    const profile = profiles[0];
+    if (!profile) {
+      throw new MembersServiceError("permissions.not_found", "Member not found", 404);
+    }
+
+    const now = new Date().toISOString();
+    const email = normalizeInviteEmail(profile.email);
+
+    await ctx.appDb.rls(async (tx) => {
+      await organisationMembersRepo.reactivateMembership(tx, {
+        id: membership.id,
+        organisationId: orgId,
+        roleId,
+        joinedAt: now,
+        updatedAt: now,
+      });
+      await organisationMembersRepo.reactivateVenuesForMember(tx, {
+        userOrganisationId: membership.id,
+        organisationId: orgId,
+        venueIds: args.venueIds,
+        updatedAt: now,
+      });
+      await membersWhitelistRepo.upsertActive(tx, {
+        email,
+        organisationId: orgId,
+        addedBy: ctx.userId,
+        now,
+      });
+    });
+
+    trackMembersEvent("permissions.member_reactivated", {
+      organisation_id: orgId,
+      user_organisation_id: args.userOrganisationId,
+    });
+  },
+
+  /** @deprecated Use membersInviteService.createInvite */
+  async addMember(
+    ctx: RequestAuthContext,
+    authAdmin: AuthAdminClient,
+    args: {
+      organisationSlug: string;
       email: string;
       roleSlug: string;
       firstName?: string;
       lastName?: string;
       fullName?: string;
-    }
+      venueIds: string[];
+      redirectTo: string;
+    },
   ): Promise<void> {
-    const orgId = await assertOrganisationOwner(
-      supabase,
-      args.actorUserId,
-      args.organisationSlug
-    );
-
-    const roleSlug = normalizeAssignableRoleSlug(args.roleSlug);
-    if (!roleSlug) {
-      throw new OrganisationMembersServiceError(400, "Invalid role");
-    }
-    const roleId = PLATFORM_ROLE_IDS[roleSlug];
-
-    const email = args.email.trim().toLowerCase();
-    if (!email.includes("@")) {
-      throw new OrganisationMembersServiceError(400, "Valid email is required");
-    }
-
-    const userProfileId = await resolveOrCreateUserProfileId(admin, email, {
-      firstName: args.firstName,
-      lastName: args.lastName,
-      fullName: args.fullName,
+    await membersInviteService.createInvite(ctx, authAdmin, {
+      organisationSlug: args.organisationSlug,
+      email: args.email,
+      roleSlug: args.roleSlug,
+      venueIds: args.venueIds,
+      redirectTo: args.redirectTo,
     });
+  },
 
-    const { data: uoRows, error: uoLookupError } = await supabase
-      .from("user_organisations")
-      .select("id, archived_at, is_active")
-      .eq("user_profile_id", userProfileId)
-      .eq("organisation_id", orgId)
-      .order("updated_at", { ascending: false })
-      .limit(1);
-
-    if (uoLookupError) {
-      throw new OrganisationMembersServiceError(500, uoLookupError.message);
-    }
-
-    const existing = uoRows?.[0];
-    const isActiveMember =
-      existing != null && existing.archived_at == null && existing.is_active;
-
-    if (isActiveMember) {
-      throw new OrganisationMembersServiceError(409, "Already a member of this organisation");
-    }
-
-    const now = new Date().toISOString();
-
-    if (existing) {
-      const { error: updateError } = await supabase
-        .from("user_organisations")
-        .update({
-          archived_at: null,
-          is_active: true,
-          role_id: roleId,
-          joined_at: now,
-          updated_at: now,
-        })
-        .eq("id", existing.id)
-        .eq("organisation_id", orgId);
-
-      if (updateError) {
-        throw new OrganisationMembersServiceError(500, updateError.message);
-      }
-      return;
-    }
-
-    const { error: insertError } = await supabase.from("user_organisations").insert({
-      user_profile_id: userProfileId,
-      organisation_id: orgId,
-      role_id: roleId,
-      is_active: true,
-      joined_at: now,
+  async updateMemberRole(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      userOrganisationId: string;
+      roleSlug: string;
+    },
+  ): Promise<void> {
+    await organisationMembersService.updateMember(ctx, {
+      organisationSlug: args.organisationSlug,
+      userOrganisationId: args.userOrganisationId,
+      roleSlug: args.roleSlug,
     });
-
-    if (insertError) {
-      throw new OrganisationMembersServiceError(500, insertError.message);
-    }
   },
 };
+
+export { membersInviteService };

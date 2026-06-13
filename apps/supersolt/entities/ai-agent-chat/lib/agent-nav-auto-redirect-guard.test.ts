@@ -24,7 +24,7 @@ describe("normalizeAppNavHref", () => {
 
 describe("appNavPathsMatch", () => {
   it("matches pathname to href with slash normalization", () => {
-    expect(appNavPathsMatch("/org/venue/catalog/ingredients", "/org/venue/catalog/ingredients/")).toBe(
+    expect(appNavPathsMatch("/org/venue/settings/inventory", "/org/venue/settings/inventory/")).toBe(
       true,
     );
   });
@@ -33,19 +33,19 @@ describe("appNavPathsMatch", () => {
 describe("session marker", () => {
   it("round-trips within TTL", () => {
     clearAgentNavAutoRedirectMarker();
-    markAgentNavAutoRedirect("/org/venue/catalog/ingredients");
-    expect(readRecentAgentNavAutoRedirect("/org/venue/catalog/ingredients/")).toBe(true);
+    markAgentNavAutoRedirect("/org/venue/settings/inventory");
+    expect(readRecentAgentNavAutoRedirect("/org/venue/settings/inventory/")).toBe(true);
     clearAgentNavAutoRedirectMarker();
   });
 
   it("returns false after TTL", () => {
     clearAgentNavAutoRedirectMarker();
     const raw = JSON.stringify({
-      href: "/org/venue/catalog/ingredients",
+      href: "/org/venue/settings/inventory",
       at: Date.now() - AGENT_NAV_AUTO_REDIRECT_TTL_MS - 1,
     });
     sessionStorage.setItem(AGENT_NAV_AUTO_REDIRECT_STORAGE_KEY, raw);
-    expect(readRecentAgentNavAutoRedirect("/org/venue/catalog/ingredients")).toBe(false);
+    expect(readRecentAgentNavAutoRedirect("/org/venue/settings/inventory")).toBe(false);
     clearAgentNavAutoRedirectMarker();
   });
 });

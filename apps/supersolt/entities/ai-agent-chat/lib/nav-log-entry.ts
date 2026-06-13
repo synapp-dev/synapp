@@ -1,4 +1,5 @@
 import { APP_NAVIGATION_CATALOG } from "./app-navigation-catalog";
+import { isReservedTopLevelSegment } from "@/lib/reserved-top-level-segments";
 
 export type NavLogEntry = {
   id: string;
@@ -7,19 +8,6 @@ export type NavLogEntry = {
   scopeLabel: string | null;
   timestamp: number;
 };
-
-const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
-  "auth",
-  "agent",
-  "dashboard",
-  "support",
-  "settings",
-  "setup",
-  "logout",
-  "api",
-  "_next",
-  "images",
-]);
 
 function formatSegmentLabel(segment: string): string {
   return segment
@@ -45,7 +33,7 @@ export function deriveNavLogLabel(pathname: string): {
   }
 
   const first = segments[0]!;
-  if (RESERVED_TOP_LEVEL_SEGMENTS.has(first)) {
+  if (isReservedTopLevelSegment(first)) {
     return { label: formatSegmentLabel(first), scopeLabel: null };
   }
 

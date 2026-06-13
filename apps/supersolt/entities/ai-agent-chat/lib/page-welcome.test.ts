@@ -3,22 +3,22 @@ import { describe, expect, it } from "vitest";
 import { buildPageWelcome } from "./page-welcome";
 
 describe("buildPageWelcome", () => {
-  it("returns dashboard headline and body for /dashboard", () => {
-    const w = buildPageWelcome("/dashboard");
+  it("returns dashboard welcome for scoped dashboard route", () => {
+    const w = buildPageWelcome("/acme/richmond/dashboard");
     expect(w).not.toBeNull();
-    expect(w!.headline).toBe("Welcome to the Dashboard");
-    expect(w!.body).toContain("high-level overview");
+    expect(w!.headline).toBe("Welcome to Dashboard");
+    expect(w!.body).toContain("KPIs");
     expect(w!.suggestions.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("returns agent-specific welcome for /agent", () => {
-    const w = buildPageWelcome("/agent");
+  it("returns agent-specific welcome for scoped agent route", () => {
+    const w = buildPageWelcome("/acme/richmond/agent");
     expect(w).not.toBeNull();
     expect(w!.headline).toBe("Welcome to Superbot");
   });
 
-  it("uses catalog title for scoped catalog route", () => {
-    const w = buildPageWelcome("/acme-cafe/richmond/catalog/items");
+  it("uses catalog title for scoped recipes route", () => {
+    const w = buildPageWelcome("/acme-cafe/richmond/settings/recipes");
     expect(w).not.toBeNull();
     expect(w!.headline).toBe("Welcome to Items");
     expect(w!.body).toContain("Catalog items");

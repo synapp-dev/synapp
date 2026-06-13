@@ -82,7 +82,7 @@ describe("app-navigation-tool-schema", () => {
         {
           title: "Ingredients",
           description: "View and manage ingredients for this venue.",
-          href: "/acme/richmond/catalog/ingredients",
+          href: "/acme/richmond/settings/inventory",
           destinationKey: "ingredients",
           organisationName: "Acme",
           venueName: "Richmond",

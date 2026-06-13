@@ -11,6 +11,9 @@ import {
   type SetStateAction,
 } from "react";
 
+import { isReservedTopLevelSegment } from "@/lib/reserved-top-level-segments";
+import { setVenueScopeCookieClient } from "@/lib/venue-scope-cookie";
+
 export type ScopedContext = {
   organisationSlug: string;
   venueSlug: string;
@@ -29,17 +32,7 @@ export function getScopedContextFromPathname(
   }
 
   const [first, second] = segments;
-  if (
-    !first ||
-    !second ||
-    first === "auth" ||
-    first === "agent" ||
-    first === "dashboard" ||
-    first === "support" ||
-    first === "settings" ||
-    first === "logout" ||
-    first === "setup"
-  ) {
+  if (!first || !second || isReservedTopLevelSegment(first)) {
     return null;
   }
 
@@ -73,6 +66,7 @@ export function ScopedNavigationProvider({
 
   useEffect(() => {
     if (!activeScopedContext) {
+      setSelectedScopedContext(null);
       return;
     }
 
@@ -86,6 +80,14 @@ export function ScopedNavigationProvider({
 
       return activeScopedContext;
     });
+  }, [activeScopedContext?.organisationSlug, activeScopedContext?.venueSlug]);
+
+  useEffect(() => {
+    if (!activeScopedContext) {
+      return;
+    }
+
+    setVenueScopeCookieClient(activeScopedContext);
   }, [activeScopedContext?.organisationSlug, activeScopedContext?.venueSlug]);
 
   const resolvedScope = selectedScopedContext ?? activeScopedContext;

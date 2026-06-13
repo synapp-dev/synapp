@@ -45,7 +45,7 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@/lib/ui/staggered-animation";
 import { AgentChatAssistantText } from "@/entities/ai-agent-chat/components/agent-chat-assistant-text";
 import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
 import { AgentNavDestinationCards } from "@/entities/ai-agent-chat/components/agent-nav-destination-cards";

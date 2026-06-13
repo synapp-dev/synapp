@@ -1,40 +1,58 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-import { assertUserHasVenueAccess, VenueAccessError } from "@/server/access/venue-access";
-import { ingredientsRepo } from "@/server/ingredients/ingredients.repo";
+import type { RequestAuthContext } from "@/server/auth/context";
+import type { UserTenantRoles } from "@/server/auth/rbac";
+import { resolveAgentVenueScopeForNavigation } from "@/server/agent/agent-tool-scope";
 
 import { executeSuggestAppNavigation } from "./execute-suggest-app-navigation";
 
-vi.mock("@/server/ingredients/ingredients.repo", () => ({
-  ingredientsRepo: {
-    getVenueContextBySlugs: vi.fn(),
-  },
+vi.mock("@/server/agent/agent-tool-scope", () => ({
+  resolveAgentVenueScopeForNavigation: vi.fn(),
 }));
 
-vi.mock("@/server/access/venue-access", async () => {
-  const actual = await vi.importActual<typeof import("@/server/access/venue-access")>(
-    "@/server/access/venue-access"
-  );
-  return {
-    ...actual,
-    assertUserHasVenueAccess: vi.fn(),
-  };
-});
+const resolveVenueScope = vi.mocked(resolveAgentVenueScopeForNavigation);
 
-const getVenueContextBySlugs = vi.mocked(ingredientsRepo.getVenueContextBySlugs);
-const assertAccess = vi.mocked(assertUserHasVenueAccess);
+const memberRoles: UserTenantRoles = {
+  organisations: [
+    {
+      organisationId: "org-1",
+      organisationSlug: "acme",
+      membershipId: "m-1",
+      roleSlug: "owner",
+      roleDisplayName: "Owner",
+      grantsOrgAdmin: true,
+      venues: [
+        {
+          venueId: "venue-1",
+          venueSlug: "richmond",
+          roleSlug: "manager",
+          roleDisplayName: "Manager",
+          grantsOrgAdmin: false,
+        },
+      ],
+    },
+  ],
+};
+
+function createMockCtx(tenantRoles: UserTenantRoles = memberRoles): RequestAuthContext {
+  return {
+    userId: "user-1",
+    appDb: {
+      rls: async (fn) => fn({} as never),
+      admin: {} as never,
+    },
+    tenantRoles,
+  };
+}
 
 describe("executeSuggestAppNavigation", () => {
-  const supabase = {} as never;
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("returns INVALID_INPUT for malformed tool args", async () => {
     const out = await executeSuggestAppNavigation({
-      supabase,
-      userId: "user-1",
+      ctx: createMockCtx(),
       rawInput: { organisationSlug: "", venueSlug: "x", destinationKeys: ["ingredients"] },
     });
     expect(out).toMatchObject({
@@ -45,10 +63,9 @@ describe("executeSuggestAppNavigation", () => {
   });
 
   it("returns ACCESS_DENIED when venue context is missing", async () => {
-    getVenueContextBySlugs.mockResolvedValue(null);
+    resolveVenueScope.mockResolvedValue({ denied: true, reason: "venue_not_found" });
     const out = await executeSuggestAppNavigation({
-      supabase,
-      userId: "user-1",
+      ctx: createMockCtx(),
       rawInput: {
         organisationSlug: "acme",
         venueSlug: "nope",
@@ -60,22 +77,13 @@ describe("executeSuggestAppNavigation", () => {
         code: "ACCESS_DENIED",
       },
     });
-    expect(assertAccess).not.toHaveBeenCalled();
   });
 
   it("returns ACCESS_DENIED when venue membership check fails", async () => {
-    getVenueContextBySlugs.mockResolvedValue({
-      organisationId: "org-1",
-      venueId: "venue-1",
-      timezone: "UTC",
-      organisationName: "Acme",
-      venueName: "Richmond",
-    });
-    assertAccess.mockRejectedValue(new VenueAccessError(403, "Forbidden"));
+    resolveVenueScope.mockResolvedValue({ denied: true, reason: "access_denied" });
 
     const out = await executeSuggestAppNavigation({
-      supabase,
-      userId: "user-1",
+      ctx: createMockCtx({ organisations: [] }),
       rawInput: {
         organisationSlug: "acme",
         venueSlug: "richmond",
@@ -86,18 +94,16 @@ describe("executeSuggestAppNavigation", () => {
   });
 
   it("returns navigation cards on success", async () => {
-    getVenueContextBySlugs.mockResolvedValue({
+    resolveVenueScope.mockResolvedValue({
       organisationId: "org-1",
       venueId: "venue-1",
       timezone: "UTC",
       organisationName: "Acme",
       venueName: "Richmond",
     });
-    assertAccess.mockResolvedValue(undefined);
 
     const out = await executeSuggestAppNavigation({
-      supabase,
-      userId: "user-1",
+      ctx: createMockCtx(),
       rawInput: {
         organisationSlug: "acme",
         venueSlug: "richmond",
@@ -109,7 +115,7 @@ describe("executeSuggestAppNavigation", () => {
         {
           title: "Ingredients",
           description: "View and manage ingredients for this venue.",
-          href: "/acme/richmond/catalog/ingredients",
+          href: "/acme/richmond/settings/inventory",
           destinationKey: "ingredients",
           organisationName: "Acme",
           venueName: "Richmond",

@@ -5,21 +5,28 @@ import { useTheme } from "next-themes";
 
 import { cn } from "@workspace/ui/lib/utils";
 
+export type AgentBotVideoAppearance = "match-app" | "inverted";
+
 export type AgentBotAvatarVideoProps = Omit<
   React.ComponentPropsWithoutRef<"video">,
   "children"
->;
+> & {
+  /** `inverted` uses the dark bot on a dark panel in light mode (and vice versa). */
+  appearance?: AgentBotVideoAppearance;
+};
 
 export function AgentBotAvatarVideo({
   className,
+  appearance = "match-app",
   ...videoProps
 }: AgentBotAvatarVideoProps) {
   const { resolvedTheme } = useTheme();
-  const assistantVideoTheme = resolvedTheme === "dark" ? "dark" : "light";
-  const src =
-    assistantVideoTheme === "dark"
-      ? "/images/supersolt-bot-dark.webm"
-      : "/images/supersolt-bot-light.webm";
+  const appIsDark = resolvedTheme === "dark";
+  const useDarkBot =
+    appearance === "inverted" ? !appIsDark : appIsDark;
+  const src = useDarkBot
+    ? "/images/supersolt-bot-dark.webm"
+    : "/images/supersolt-bot-light.webm";
 
   return (
     <video

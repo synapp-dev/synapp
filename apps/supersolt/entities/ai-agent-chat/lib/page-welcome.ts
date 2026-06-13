@@ -16,18 +16,7 @@ export type PageWelcome = {
   suggestions: PageWelcomeSuggestion[];
 };
 
-const RESERVED_TOP_LEVEL = new Set([
-  "auth",
-  "agent",
-  "dashboard",
-  "support",
-  "settings",
-  "setup",
-  "logout",
-  "api",
-  "_next",
-  "images",
-]);
+import { isReservedTopLevelSegment } from "@/lib/reserved-top-level-segments";
 
 function newId(pathname: string): string {
   const rand =
@@ -42,7 +31,7 @@ function matchCatalogEntry(pathname: string): AppNavigationCatalogEntry | null {
   const segments = pathname.split("/").filter(Boolean);
   if (segments.length < 2) return null;
   const first = segments[0];
-  if (!first || RESERVED_TOP_LEVEL.has(first)) return null;
+  if (!first || isReservedTopLevelSegment(first)) return null;
   const suffix = `/${segments.slice(2).join("/")}`;
   if (suffix === "/") return null;
   for (const entry of Object.values(APP_NAVIGATION_CATALOG)) {
@@ -81,6 +70,16 @@ function welcomeForReservedTopLevel(
   segment: string,
 ): PageWelcome | null {
   const { label } = deriveNavLogLabel(pathname);
+  if (segment === "about") {
+    return {
+      id: newId(pathname),
+      pathname,
+      headline: "About Supersolt",
+      body:
+        "Learn about Supersolt, the platform, and how we help venue operators run day-to-day operations.",
+      suggestions: defaultSuggestions("About"),
+    };
+  }
   if (segment === "dashboard") {
     return {
       id: newId(pathname),
@@ -157,7 +156,7 @@ export function buildPageWelcome(pathname: string): PageWelcome | null {
     };
   }
 
-  if (RESERVED_TOP_LEVEL.has(first) && segments.length === 1) {
+  if (isReservedTopLevelSegment(first) && segments.length === 1) {
     return welcomeForReservedTopLevel(pathname, first);
   }
 
@@ -177,7 +176,11 @@ export function buildPageWelcome(pathname: string): PageWelcome | null {
     };
   }
 
-  if (!RESERVED_TOP_LEVEL.has(first) && segments.length >= 2) {
+  if (!isReservedTopLevelSegment(first) && segments[2] === "agent") {
+    return welcomeForReservedTopLevel(pathname, "agent");
+  }
+
+  if (!isReservedTopLevelSegment(first) && segments.length >= 2) {
     const { label, scopeLabel } = deriveNavLogLabel(pathname);
     const scopeNote = scopeLabel ? ` You're scoped to ${scopeLabel}.` : "";
     return {

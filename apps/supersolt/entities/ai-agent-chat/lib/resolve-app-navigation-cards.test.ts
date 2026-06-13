@@ -15,7 +15,7 @@ describe("resolveAppNavigationCards", () => {
       {
         title: "Ingredients",
         description: "View and manage ingredients for this venue.",
-        href: "/acme/richmond/catalog/ingredients",
+        href: "/acme/richmond/settings/inventory",
         destinationKey: "ingredients",
         organisationName: "Acme Co",
         venueName: "Richmond",
@@ -34,7 +34,7 @@ describe("resolveAppNavigationCards", () => {
     expect(cards).toHaveLength(1);
   });
 
-  it("uses /dashboard for the dashboard destination (not org/venue prefix)", () => {
+  it("builds scoped dashboard href from org and venue slugs", () => {
     const cards = resolveAppNavigationCards({
       organisationSlug: "acme",
       venueSlug: "richmond",
@@ -46,7 +46,7 @@ describe("resolveAppNavigationCards", () => {
       {
         title: "Dashboard",
         description: "Workspace home with KPIs and venue overview.",
-        href: "/dashboard",
+        href: "/acme/richmond/dashboard",
         destinationKey: "dashboard",
         organisationName: "Acme Co",
         venueName: "Richmond",

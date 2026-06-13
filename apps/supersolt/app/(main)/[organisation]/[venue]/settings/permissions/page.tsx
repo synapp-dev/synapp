@@ -1,5 +1,5 @@
-import { SettingsPermissionsPageClient } from "@/app/(main)/[organisation]/[venue]/settings/_components/settings-permissions-page-client";
+import { MembersListPage } from "@/entities/organisations/members/components/members-list-page";
 
 export default function SettingsPermissionsPage() {
-  return <SettingsPermissionsPageClient />;
+  return <MembersListPage />;
 }

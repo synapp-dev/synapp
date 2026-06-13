@@ -16,9 +16,9 @@ describe("app-navigation-catalog", () => {
     );
   });
 
-  it("maps ingredients to the same path as the sidebar Catalog item", () => {
+  it("maps ingredients to the same path as the sidebar Settings inventory item", () => {
     expect(APP_NAVIGATION_CATALOG.ingredients.pathSuffix).toBe(
-      "/catalog/ingredients",
+      "/settings/inventory",
     );
     expect(APP_NAVIGATION_CATALOG.ingredients.title.length).toBeGreaterThan(0);
   });

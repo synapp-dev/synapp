@@ -23,13 +23,13 @@ describe("deriveNavLogLabel", () => {
 
   it("looks up known venue routes from the navigation catalog", () => {
     expect(
-      deriveNavLogLabel("/piccolo-panini-bar/hawthorn/catalog/ingredients"),
+      deriveNavLogLabel("/piccolo-panini-bar/hawthorn/settings/inventory"),
     ).toEqual({
       label: "Ingredients",
       scopeLabel: "Piccolo Panini Bar · Hawthorn",
     });
     expect(
-      deriveNavLogLabel("/piccolo-panini-bar/hawthorn/inventory/order-guide"),
+      deriveNavLogLabel("/piccolo-panini-bar/hawthorn/purchasing/orders"),
     ).toEqual({
       label: "Order guide",
       scopeLabel: "Piccolo Panini Bar · Hawthorn",
