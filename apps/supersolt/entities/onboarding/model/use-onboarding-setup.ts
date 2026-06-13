@@ -4,6 +4,7 @@ import type {
   OnboardingOrganisationDto,
   OnboardingStateResult,
   OnboardingVenueDto,
+  OrganisationSetupProgress,
 } from "@/entities/onboarding/model/types";
 import { onboardingKeys } from "@/entities/onboarding/model/keys";
 
@@ -68,6 +69,7 @@ export function useSaveOnboardingVenueMutation() {
       name: string;
       addressLine1?: string | null;
       timezone?: string;
+      dataStartsFrom?: string;
     }) => {
       const res = await onboardingApi.postVenue(body);
       if (res.error) {
@@ -92,6 +94,25 @@ export function useFinalizeOnboardingMutation() {
       if (res.error) {
         throw new Error(res.error.message);
       }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: onboardingKeys.state() });
+    },
+  });
+}
+
+export function usePatchOnboardingProgressMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: OrganisationSetupProgress) => {
+      const res = await onboardingApi.patchProgress(body);
+      if (res.error) {
+        throw new Error(res.error.message);
+      }
+      if (!res.data) {
+        throw new Error("Missing progress payload");
+      }
+      return res.data.setupProgress;
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: onboardingKeys.state() });

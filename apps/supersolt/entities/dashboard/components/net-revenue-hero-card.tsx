@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+import { SquareWordmark } from "@/components/branding/square-wordmark";
 import { DashboardCountUp } from "@/entities/dashboard/components/dashboard-count-up";
 import {
   ChartContainer,
@@ -45,12 +46,18 @@ const currency = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 0,
 });
 
+/** Stable ids — avoid `useId()` so SSR/hydration matches after layout hook changes. */
+const NET_REVENUE_CHART_ID = "net-revenue-hero";
+const FILL_REVENUE_ID = "fillRevenue-net-revenue-hero";
+const FILL_EXPENSES_ID = "fillExpenses-net-revenue-hero";
+
 /** Area draw duration (ms) = headline `DashboardCountUp` `duration` (s). */
 const HERO_VALUE_ANIMATION_MS = 1750;
 
 type NetRevenueHeroCardProps = {
   hero: DashboardHeroData;
   series: DashboardNetRevenuePoint[];
+  dataSource?: "square" | "demo";
 };
 
 type HeroChartPoint = DashboardNetRevenuePoint & { isPad?: boolean };
@@ -67,11 +74,11 @@ function withStartPadding(
   return [padStart, ...points];
 }
 
-export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
-  const id = React.useId().replace(/:/g, "");
-  const fillRevenue = `fillRevenue-${id}`;
-  const fillExpenses = `fillExpenses-${id}`;
-
+export function NetRevenueHeroCard({
+  hero,
+  series,
+  dataSource = "demo",
+}: NetRevenueHeroCardProps) {
   const chartData = React.useMemo(() => withStartPadding(series), [series]);
 
   const [deltaBadgeVisible, setDeltaBadgeVisible] = React.useState(false);
@@ -98,9 +105,26 @@ export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
       />
       <CardContent className="relative z-10 grid min-h-[156px] grid-cols-1 p-0 px-0 md:min-h-[200px] md:grid-cols-5 md:items-stretch">
         <div className="flex min-h-0 flex-col justify-between gap-4 px-6 py-4 md:col-span-2 md:h-full md:py-5">
-          <CardDescription className="text-xs uppercase tracking-wider text-emerald-200/90 dark:text-slate-600">
-            {hero.metricLabel} · {hero.periodLabel}
-          </CardDescription>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardDescription className="text-xs uppercase tracking-wider text-emerald-200/90 dark:text-slate-600">
+              {hero.metricLabel} · {hero.periodLabel}
+            </CardDescription>
+            {dataSource === "square" ? (
+              <Badge
+                variant="secondary"
+                className="border-emerald-400/45 bg-emerald-500/15 px-2 py-0.5 dark:border-emerald-600/50 dark:bg-emerald-600/15"
+              >
+                <SquareWordmark tone="inverted" className="h-2.5" decorative />
+              </Badge>
+            ) : (
+              <Badge
+                variant="outline"
+                className="border-emerald-400/30 text-[10px] font-normal text-emerald-200/75 dark:border-slate-900/20 dark:text-slate-600"
+              >
+                Demo
+              </Badge>
+            )}
+          </div>
           <div className="flex min-w-0 flex-wrap items-start gap-3">
             <CardTitle className="text-6xl leading-none tracking-tight min-w-0 shrink text-white dark:text-slate-950 animate-slide-up-fade-in-slowest">
               <DashboardCountUp
@@ -142,6 +166,7 @@ export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
 
         <div className="relative flex min-h-[121px] min-w-0 border-t border-white/10 dark:border-slate-900/10 md:col-span-3 md:h-full md:min-h-0 md:border-t-0">
           <ChartContainer
+            id={NET_REVENUE_CHART_ID}
             config={chartConfig}
             className="aspect-auto h-full min-h-[121px] w-full max-w-none flex-1 [&_.recharts-responsive-container]:!h-full"
           >
@@ -152,7 +177,7 @@ export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
             >
               <XAxis dataKey="label" type="category" hide />
               <defs>
-                <linearGradient id={fillExpenses} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={FILL_EXPENSES_ID} x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="5%"
                     stopColor="var(--color-expenses)"
@@ -164,7 +189,7 @@ export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
                     stopOpacity={0.1}
                   />
                 </linearGradient>
-                <linearGradient id={fillRevenue} x1="0" y1="0" x2="0" y2="1">
+                <linearGradient id={FILL_REVENUE_ID} x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="5%"
                     stopColor="var(--color-revenue)"
@@ -219,7 +244,7 @@ export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
               <Area
                 dataKey="expenses"
                 type="natural"
-                fill={`url(#${fillExpenses})`}
+                fill={`url(#${FILL_EXPENSES_ID})`}
                 fillOpacity={0.4}
                 stroke="var(--color-expenses)"
                 strokeWidth={2}
@@ -229,7 +254,7 @@ export function NetRevenueHeroCard({ hero, series }: NetRevenueHeroCardProps) {
               <Area
                 dataKey="revenue"
                 type="natural"
-                fill={`url(#${fillRevenue})`}
+                fill={`url(#${FILL_REVENUE_ID})`}
                 fillOpacity={0.4}
                 stroke="var(--color-revenue)"
                 strokeWidth={2}

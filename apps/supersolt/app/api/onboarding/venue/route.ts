@@ -1,5 +1,8 @@
-import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import {
+  jsonDataResponse,
+  validationErrorResponse,
+} from "@/lib/api/service-error-response";
 import {
   errorDetailsFromUnknown,
   onboardingLogVenueError,
@@ -11,57 +14,42 @@ type Body = {
   name?: string;
   addressLine1?: string | null;
   timezone?: string;
+  dataStartsFrom?: string;
 };
 
 export async function POST(request: Request) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
   let body: Body;
   try {
     body = (await request.json()) as Body;
   } catch {
-    return NextResponse.json(
-      { data: null, error: { message: "Invalid JSON", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("Invalid JSON");
   }
 
   if (!body.organisationId?.trim()) {
-    return NextResponse.json(
-      { data: null, error: { message: "organisationId is required", status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse("organisationId is required");
   }
 
   try {
-    const venue = await createOnboardingVenue(supabase, user.id, {
+    const venue = await createOnboardingVenue(ctx, {
       organisationId: body.organisationId.trim(),
       name: body.name ?? "",
       addressLine1: body.addressLine1,
       timezone: body.timezone,
+      dataStartsFrom: body.dataStartsFrom,
     });
-    return NextResponse.json({ data: { venue }, error: null });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Unknown error";
+    return jsonDataResponse({ venue });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     onboardingLogVenueError("create_failed", {
-      userId: user.id,
+      userId: ctx.userId,
       organisationId: body.organisationId?.trim() ?? "",
-      ...errorDetailsFromUnknown(e),
+      ...errorDetailsFromUnknown(error),
     });
-    return NextResponse.json(
-      { data: null, error: { message, status: 400 } },
-      { status: 400 }
-    );
+    return validationErrorResponse(message, 400);
   }
 }

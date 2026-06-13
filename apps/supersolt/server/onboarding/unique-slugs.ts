@@ -1,27 +1,23 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/utils/supabase/types";
+import { and, eq } from "drizzle-orm";
+
+import type { AppDb } from "@/server/db/create-app-db";
+import { organisations, venues } from "@/server/db/schema";
 import { slugifyBase } from "@/server/onboarding/slug";
 
-type Client = SupabaseClient<Database>;
-
 export async function ensureUniqueOrganisationSlug(
-  supabase: Client,
-  name: string
+  appDb: AppDb,
+  name: string,
 ): Promise<string> {
   const base = slugifyBase(name);
   for (let i = 0; i < 50; i += 1) {
     const candidate = i === 0 ? base : `${base}-${i + 1}`;
-    const { data, error } = await supabase
-      .from("organisations")
-      .select("id")
-      .eq("slug", candidate)
-      .maybeSingle();
+    const existing = await appDb.admin
+      .select({ id: organisations.id })
+      .from(organisations)
+      .where(eq(organisations.slug, candidate))
+      .limit(1);
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (!data) {
+    if (existing.length === 0) {
       return candidate;
     }
   }
@@ -30,25 +26,27 @@ export async function ensureUniqueOrganisationSlug(
 }
 
 export async function ensureUniqueVenueSlug(
-  supabase: Client,
+  appDb: AppDb,
   organisationId: string,
-  name: string
+  name: string,
 ): Promise<string> {
   const base = slugifyBase(name);
   for (let i = 0; i < 50; i += 1) {
     const candidate = i === 0 ? base : `${base}-${i + 1}`;
-    const { data, error } = await supabase
-      .from("venues")
-      .select("id")
-      .eq("organisation_id", organisationId)
-      .eq("slug", candidate)
-      .maybeSingle();
+    const existing = await appDb.rls((tx) =>
+      tx
+        .select({ id: venues.id })
+        .from(venues)
+        .where(
+          and(
+            eq(venues.organisationId, organisationId),
+            eq(venues.slug, candidate),
+          ),
+        )
+        .limit(1),
+    );
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    if (!data) {
+    if (existing.length === 0) {
       return candidate;
     }
   }

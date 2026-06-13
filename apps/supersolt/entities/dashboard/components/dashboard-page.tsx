@@ -2,16 +2,19 @@
 
 import * as React from "react";
 
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@/lib/ui/staggered-animation";
 import type { ScopedContext } from "@/entities/access/scoped-navigation-context";
 import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
 import type { DashboardKpiLabourContext } from "@/entities/ai-agent-chat/lib/agent-chat-dashboard-kpi-labour-context";
 import { DashboardKpiCard } from "@/entities/dashboard/components/dashboard-kpi-card";
 import { NetRevenueHeroCard } from "@/entities/dashboard/components/net-revenue-hero-card";
 import { SuperbotSuggestionsCard } from "@/entities/dashboard/components/superbot-suggestions-card";
-import { dummyDashboardData } from "@/entities/dashboard/model/dummy-dashboard-data";
+import { useDashboardSuperbotSuggestions } from "@/entities/dashboard/model/use-dashboard-superbot-suggestions";
+import type { DashboardLiveSalesSlice } from "@/lib/dashboard/build-dashboard-sales-snapshot";
+import { mergeDashboardWithLiveSales } from "@/entities/dashboard/lib/merge-dashboard-data";
 import type { DashboardKpiData } from "@/entities/dashboard/model/dummy-dashboard-data";
 import type { DashboardPreferencesRow } from "@/entities/dashboard/model/dashboard-preferences-types";
+import { useDashboardSalesQuery } from "@/entities/dashboard/model/use-dashboard-sales-query";
 import { Separator } from "@workspace/ui/components/separator";
 import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider";
 
@@ -43,24 +46,43 @@ function dashboardCardDelay(slotAfterPause: number): number {
   return PAUSE_AFTER_HERO_S + STAGGER_STEP_S * slotAfterPause;
 }
 
-const KPI_COUNT = dummyDashboardData.kpis.length;
-
 export type DashboardPageClientProps = {
   organisationName: string;
   organisationSlug: string;
   defaultVenueId: string | null;
+  venueTimezone: string;
+  initialLiveSales: DashboardLiveSalesSlice | null;
   linkScope: ScopedContext | null;
   initialPreferences: DashboardPreferencesRow;
 };
 
-export function DashboardPageClient({ linkScope }: DashboardPageClientProps) {
+export function DashboardPageClient({
+  linkScope,
+  organisationSlug,
+  venueTimezone,
+  initialLiveSales,
+}: DashboardPageClientProps) {
+  const liveSalesQuery = useDashboardSalesQuery({
+    organisationSlug: linkScope?.organisationSlug ?? organisationSlug,
+    venueSlug: linkScope?.venueSlug ?? "",
+    venueTimezone,
+    enabled: Boolean(linkScope?.venueSlug),
+    initialData: initialLiveSales,
+  });
+
+  const dashboardView = React.useMemo(
+    () => mergeDashboardWithLiveSales(liveSalesQuery.data ?? initialLiveSales),
+    [initialLiveSales, liveSalesQuery.data]
+  );
+
+  const KPI_COUNT = dashboardView.kpis.length;
   const { sendMessage, status, scopeReady } = useAgentChat();
   const { setOpen, setOpenMobile } = useRightSidebar();
   const busy = status === "submitted" || status === "streaming";
 
   const labourKpi = React.useMemo(
-    () => dummyDashboardData.kpis.find((k) => k.id === "labour"),
-    [],
+    () => dashboardView.kpis.find((k) => k.id === "labour"),
+    [dashboardView.kpis]
   );
 
   const handleLabourKpiSuperbot = React.useCallback(() => {
@@ -77,17 +99,24 @@ export function DashboardPageClient({ linkScope }: DashboardPageClientProps) {
     );
   }, [busy, labourKpi, scopeReady, sendMessage, setOpen, setOpenMobile]);
 
+  const { suggestions: superbotSuggestions } = useDashboardSuperbotSuggestions({
+    organisationSlug: linkScope?.organisationSlug ?? organisationSlug,
+    venueSlug: linkScope?.venueSlug,
+    enabled: Boolean(linkScope?.venueSlug),
+  });
+
   return (
     <section className="space-y-6">
       <StaggeredAnimation index={0} delaySeconds={0.08} fadeDirection="up">
         <NetRevenueHeroCard
-          hero={dummyDashboardData.hero}
-          series={dummyDashboardData.netRevenueSeries}
+          hero={dashboardView.hero}
+          series={dashboardView.netRevenueSeries}
+          dataSource={dashboardView.dataSource}
         />
       </StaggeredAnimation>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {dummyDashboardData.kpis.map((kpi, i) => (
+        {dashboardView.kpis.map((kpi, i) => (
           <StaggeredAnimation
             key={kpi.id}
             index={i}
@@ -119,6 +148,7 @@ export function DashboardPageClient({ linkScope }: DashboardPageClientProps) {
         fadeDirection="left"
       >
         <SuperbotSuggestionsCard
+          suggestions={superbotSuggestions}
           linkScope={linkScope}
           onSuggestionHandoff={() => {
             setOpen(true);

@@ -1,40 +1,47 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   OnboardingOrganisationDto,
   OnboardingStateResult,
   OnboardingVenueDto,
+  OrganisationSetupProgress,
 } from "@/entities/onboarding/model/types";
-import type { Database } from "@/utils/supabase/types";
+import type { RequestAuthContext } from "@/server/auth/context";
 import {
   PLATFORM_CREW_ROLE_ID,
   PLATFORM_MANAGER_ROLE_ID,
   PLATFORM_OWNER_ROLE_ID,
 } from "@/server/onboarding/constants";
-import { ensureUniqueOrganisationSlug, ensureUniqueVenueSlug } from "@/server/onboarding/unique-slugs";
+import { onboardingRepo } from "@/server/onboarding/onboarding.repo";
+import {
+  ensureUniqueOrganisationSlug,
+  ensureUniqueVenueSlug,
+} from "@/server/onboarding/unique-slugs";
+import { squareConnectionsRepo } from "@/server/square/square-connections.repo";
+import { seedDefaultLeaveTypes } from "@/server/workforce/leave-seed";
+import { earlyOnboardingUnlockedSuffixes } from "@/server/onboarding/module-gates";
 
-type Client = SupabaseClient<Database>;
+export type { OnboardingOrganisationDto, OnboardingStateResult, OnboardingVenueDto };
 
-async function requireOwnerOrganisationMembership(
-  supabase: Client,
-  userId: string,
-  organisationId: string,
-): Promise<void> {
-  const { data, error } = await supabase
-    .from("user_organisations")
-    .select("id")
-    .eq("user_profile_id", userId)
-    .eq("organisation_id", organisationId)
-    .eq("role_id", PLATFORM_OWNER_ROLE_ID)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
-
-  if (error) {
-    throw new Error(error.message);
+function parseSetupProgress(raw: unknown): OrganisationSetupProgress {
+  if (!raw || typeof raw !== "object") {
+    return {};
   }
-  if (!data) {
-    throw new Error("Organisation not found for this user");
-  }
+  return raw as OrganisationSetupProgress;
+}
+
+function isSquareRequiredForFinalize(): boolean {
+  return process.env.ONBOARDING_REQUIRE_SQUARE !== "false";
+}
+
+async function venueHasSquareConnection(
+  ctx: RequestAuthContext,
+  venueId: string,
+): Promise<boolean> {
+  const conn = await squareConnectionsRepo.loadConnectionForVenue(
+    ctx.appDb,
+    venueId,
+    true,
+  );
+  return conn !== null;
 }
 
 function normalizeAbn(input: string | undefined): string | null {
@@ -48,91 +55,73 @@ function normalizeAbn(input: string | undefined): string | null {
   return digits;
 }
 
-export type { OnboardingOrganisationDto, OnboardingStateResult, OnboardingVenueDto };
-
 export async function getOnboardingState(
-  supabase: Client,
-  userId: string
+  ctx: RequestAuthContext,
 ): Promise<OnboardingStateResult> {
-  const { data: profile, error: profileError } = await supabase
-    .from("user_profiles")
-    .select("setup_completed_at")
-    .eq("id", userId)
-    .maybeSingle();
+  const setupCompletedAt = await ctx.appDb.rls((tx) =>
+    onboardingRepo.getProfileSetupCompletedAt(tx, ctx.userId),
+  );
 
-  if (profileError) {
-    throw new Error(profileError.message);
-  }
-
-  if (profile?.setup_completed_at) {
+  if (setupCompletedAt) {
     return { completed: true };
   }
 
-  const { data: memberships, error: memError } = await supabase
-    .from("user_organisations")
-    .select("id, organisation_id")
-    .eq("user_profile_id", userId)
-    .eq("role_id", PLATFORM_OWNER_ROLE_ID)
-    .eq("is_active", true)
-    .is("archived_at", null);
+  const memberships = await ctx.appDb.rls((tx) =>
+    onboardingRepo.listOwnerMemberships(tx, ctx.userId),
+  );
 
-  if (memError) {
-    throw new Error(memError.message);
-  }
-
-  const typed = memberships ?? [];
-  if (typed.length === 0) {
+  if (memberships.length === 0) {
     return {
       completed: false,
       organisation: null,
       venues: [],
       userOrganisationId: null,
+      squareConnected: false,
+      unlockedRouteSuffixes: [],
+      organisationSlug: null,
+      primaryVenueSlug: null,
     };
   }
 
-  const orgIds = [...new Set(typed.map((m) => m.organisation_id))];
-  const { data: orgRows, error: orgError } = await supabase
-    .from("organisations")
-    .select("id, name, slug, abn, is_gst_registered, created_at")
-    .in("id", orgIds)
-    .is("archived_at", null)
-    .order("created_at", { ascending: false });
+  const orgIds = [...new Set(memberships.map((m) => m.organisationId))];
+  const orgRows = await ctx.appDb.rls((tx) =>
+    onboardingRepo.listOrganisationsByIds(tx, orgIds),
+  );
 
-  if (orgError) {
-    throw new Error(orgError.message);
-  }
-
-  const org = orgRows?.[0];
+  const org = orgRows[0];
   if (!org) {
     return {
       completed: false,
       organisation: null,
       venues: [],
       userOrganisationId: null,
+      squareConnected: false,
+      unlockedRouteSuffixes: [],
+      organisationSlug: null,
+      primaryVenueSlug: null,
     };
   }
 
   const userOrganisationId =
-    typed.find((m) => m.organisation_id === org.id)?.id ?? null;
+    memberships.find((m) => m.organisationId === org.id)?.id ?? null;
 
-  const { data: venueRows, error: venueError } = await supabase
-    .from("venues")
-    .select("id, name, slug, timezone")
-    .eq("organisation_id", org.id)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .order("created_at", { ascending: true });
+  const venueRows = await ctx.appDb.rls((tx) =>
+    onboardingRepo.listVenuesForOrganisation(tx, org.id),
+  );
 
-  if (venueError) {
-    throw new Error(venueError.message);
-  }
-
-  const venues: OnboardingVenueDto[] = (venueRows ?? []).map((v) => ({
+  const venues: OnboardingVenueDto[] = venueRows.map((v) => ({
     id: v.id,
     name: v.name,
     slug: v.slug,
     timezone: v.timezone,
+    dataStartsFrom: v.dataStartsFrom ?? null,
   }));
+
+  const primaryVenue = venues[0] ?? null;
+  const squareConnected = primaryVenue
+    ? await venueHasSquareConnection(ctx, primaryVenue.id)
+    : false;
+  const unlockedRouteSuffixes = earlyOnboardingUnlockedSuffixes(squareConnected);
 
   return {
     completed: false,
@@ -141,25 +130,28 @@ export async function getOnboardingState(
       name: org.name,
       slug: org.slug,
       abn: org.abn,
-      isGstRegistered: org.is_gst_registered,
+      isGstRegistered: org.isGstRegistered,
+      setupProgress: parseSetupProgress(org.setupProgress),
     },
     venues,
     userOrganisationId,
+    squareConnected,
+    unlockedRouteSuffixes,
+    organisationSlug: org.slug,
+    primaryVenueSlug: primaryVenue?.slug ?? null,
   };
 }
 
 export async function upsertOnboardingOrganisation(
-  supabase: Client,
-  userId: string,
+  ctx: RequestAuthContext,
   input: {
     name: string;
     abn?: string | null;
     isGstRegistered?: boolean;
-    /** When set, must match an org the user owns as platform owner — always update that row (no second org). */
     organisationId?: string | null;
   },
 ): Promise<OnboardingOrganisationDto> {
-  const state = await getOnboardingState(supabase, userId);
+  const state = await getOnboardingState(ctx);
   if (state.completed) {
     throw new Error("Setup already completed");
   }
@@ -175,27 +167,29 @@ export async function upsertOnboardingOrganisation(
   const requestedOrgId = input.organisationId?.trim() || null;
   let updateOrganisationId: string | null = null;
   if (requestedOrgId) {
-    await requireOwnerOrganisationMembership(supabase, userId, requestedOrgId);
+    const membership = await ctx.appDb.rls((tx) =>
+      onboardingRepo.requireOwnerMembership(tx, ctx.userId, requestedOrgId),
+    );
+    if (!membership) {
+      throw new Error("Organisation not found for this user");
+    }
     updateOrganisationId = requestedOrgId;
   } else if (state.organisation) {
     updateOrganisationId = state.organisation.id;
   }
 
   if (updateOrganisationId) {
-    const { data: updated, error } = await supabase
-      .from("organisations")
-      .update({
+    const updated = await ctx.appDb.rls((tx) =>
+      onboardingRepo.updateOrganisation(tx, updateOrganisationId, {
         name,
         abn,
-        is_gst_registered: isGstRegistered,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", updateOrganisationId)
-      .select("id, name, slug, abn, is_gst_registered")
-      .single();
+        isGstRegistered,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
 
-    if (error || !updated) {
-      throw new Error(error?.message ?? "Failed to update organisation");
+    if (!updated) {
+      throw new Error("Failed to update organisation");
     }
 
     return {
@@ -203,57 +197,62 @@ export async function upsertOnboardingOrganisation(
       name: updated.name,
       slug: updated.slug,
       abn: updated.abn,
-      isGstRegistered: updated.is_gst_registered,
+      isGstRegistered: updated.isGstRegistered,
     };
   }
 
-  const slug = await ensureUniqueOrganisationSlug(supabase, name);
-  const { data: org, error: orgInsertError } = await supabase
-    .from("organisations")
-    .insert({
-      name,
-      slug,
-      abn,
-      is_gst_registered: isGstRegistered,
-    })
-    .select("id, name, slug, abn, is_gst_registered")
-    .single();
-
-  if (orgInsertError || !org) {
-    throw new Error(orgInsertError?.message ?? "Failed to create organisation");
-  }
-
-  const { error: uoError } = await supabase.from("user_organisations").insert({
-    user_profile_id: userId,
-    organisation_id: org.id,
-    role_id: PLATFORM_OWNER_ROLE_ID,
-    joined_at: new Date().toISOString(),
+  const slug = await ensureUniqueOrganisationSlug(ctx.appDb, name);
+  const org = await onboardingRepo.insertOrganisation(ctx.appDb, {
+    name,
+    slug,
+    abn,
+    isGstRegistered,
   });
 
-  if (uoError) {
-    throw new Error(uoError.message);
+  if (!org) {
+    throw new Error("Failed to create organisation");
   }
+
+  await onboardingRepo.insertUserOrganisation(ctx.appDb, {
+    userProfileId: ctx.userId,
+    organisationId: org.id,
+    roleId: PLATFORM_OWNER_ROLE_ID,
+    joinedAt: new Date().toISOString(),
+  });
+
+  await ctx.appDb.rls((tx) => seedDefaultLeaveTypes(tx, org.id));
 
   return {
     id: org.id,
     name: org.name,
     slug: org.slug,
     abn: org.abn,
-    isGstRegistered: org.is_gst_registered,
+    isGstRegistered: org.isGstRegistered,
   };
 }
 
+function normalizeDataStartsFrom(input: string | undefined): string | null {
+  if (!input?.trim()) {
+    return null;
+  }
+  const value = input.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new Error("dataStartsFrom must be YYYY-MM-DD");
+  }
+  return value;
+}
+
 export async function createOnboardingVenue(
-  supabase: Client,
-  userId: string,
+  ctx: RequestAuthContext,
   input: {
     organisationId: string;
     name: string;
     addressLine1?: string | null;
     timezone?: string;
-  }
+    dataStartsFrom?: string;
+  },
 ): Promise<OnboardingVenueDto> {
-  const state = await getOnboardingState(supabase, userId);
+  const state = await getOnboardingState(ctx);
   if (state.completed) {
     throw new Error("Setup already completed");
   }
@@ -269,49 +268,69 @@ export async function createOnboardingVenue(
     throw new Error("Venue name is required");
   }
 
-  const slug = await ensureUniqueVenueSlug(supabase, input.organisationId, venueName);
+  const slug = await ensureUniqueVenueSlug(
+    ctx.appDb,
+    input.organisationId,
+    venueName,
+  );
   const timezone = input.timezone?.trim() || "Australia/Melbourne";
+  const dataStartsFrom = normalizeDataStartsFrom(input.dataStartsFrom);
 
-  const { data: venue, error: vError } = await supabase
-    .from("venues")
-    .insert({
-      organisation_id: input.organisationId,
-      name: venueName,
-      slug,
-      address_line1: input.addressLine1?.trim() || null,
-      timezone,
-    })
-    .select("id, name, slug, timezone")
-    .single();
-
-  if (vError || !venue) {
-    throw new Error(vError?.message ?? "Failed to create venue");
-  }
-
-  const { error: uvError } = await supabase.from("user_venues").insert({
-    user_organisation_id: state.userOrganisationId,
-    organisation_id: input.organisationId,
-    venue_id: venue.id,
-    role_id: PLATFORM_OWNER_ROLE_ID,
+  const venue = await onboardingRepo.insertVenue(ctx.appDb, {
+    organisationId: input.organisationId,
+    name: venueName,
+    slug,
+    addressLine1: input.addressLine1?.trim() || null,
+    timezone,
+    dataStartsFrom,
   });
 
-  if (uvError) {
-    throw new Error(uvError.message);
+  if (!venue) {
+    throw new Error("Failed to create venue");
   }
+
+  await onboardingRepo.insertUserVenue(ctx.appDb, {
+    userOrganisationId: state.userOrganisationId,
+    organisationId: input.organisationId,
+    venueId: venue.id,
+    roleId: PLATFORM_OWNER_ROLE_ID,
+  });
 
   return {
     id: venue.id,
     name: venue.name,
     slug: venue.slug,
     timezone: venue.timezone,
+    dataStartsFrom,
   };
 }
 
-export async function finalizeOnboarding(
-  supabase: Client,
-  userId: string
-): Promise<void> {
-  const state = await getOnboardingState(supabase, userId);
+export async function patchOnboardingProgress(
+  ctx: RequestAuthContext,
+  patch: OrganisationSetupProgress,
+): Promise<OrganisationSetupProgress> {
+  const state = await getOnboardingState(ctx);
+  if (state.completed) {
+    throw new Error("Setup already completed");
+  }
+  if (!state.organisation) {
+    throw new Error("Create your organisation first");
+  }
+
+  const updatedAt = new Date().toISOString();
+  const merged = await ctx.appDb.rls((tx) =>
+    onboardingRepo.mergeSetupProgress(
+      tx,
+      state.organisation!.id,
+      patch as Record<string, unknown>,
+      updatedAt,
+    ),
+  );
+  return parseSetupProgress(merged);
+}
+
+export async function finalizeOnboarding(ctx: RequestAuthContext): Promise<void> {
+  const state = await getOnboardingState(ctx);
   if (state.completed) {
     throw new Error("Setup already completed");
   }
@@ -319,16 +338,24 @@ export async function finalizeOnboarding(
     throw new Error("Add business details and at least one venue before continuing");
   }
 
-  const { error } = await supabase
-    .from("user_profiles")
-    .update({
-      setup_completed_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", userId);
+  const primaryVenue = state.venues[0]!;
+  if (isSquareRequiredForFinalize()) {
+    const squareOk = await venueHasSquareConnection(ctx, primaryVenue.id);
+    if (!squareOk) {
+      throw new Error("Connect Square POS before going live");
+    }
+  }
 
-  if (error) {
-    throw new Error(error.message);
+  const completedAt = new Date().toISOString();
+  await onboardingRepo.markSetupCompleted(ctx.appDb, ctx.userId, completedAt);
+
+  const setupCompletedAt = await ctx.appDb.rls((tx) =>
+    onboardingRepo.getProfileSetupCompletedAt(tx, ctx.userId),
+  );
+  if (!setupCompletedAt) {
+    throw new Error(
+      "Could not mark setup as complete. Check that your user profile exists and is active.",
+    );
   }
 }
 

@@ -1,12 +1,10 @@
 import type { AccessContextPayloadDto } from "@/server/access/load-access-context-for-user";
+import {
+  canAccessOperatorDashboard,
+  OPERATOR_DASHBOARD_ROLE_SLUGS,
+} from "@/server/auth/capabilities";
 
-/** Roles that may use the operator dashboard (excludes `crew` — maps to Notion “Staff”). */
-const DASHBOARD_ROLE_SLUGS = new Set([
-  "owner",
-  "admin",
-  "manager",
-  "supervisor",
-]);
+export { OPERATOR_DASHBOARD_ROLE_SLUGS };
 
 export function userCanAccessDashboard(
   access: AccessContextPayloadDto | null | undefined,
@@ -15,17 +13,20 @@ export function userCanAccessDashboard(
     return false;
   }
   for (const org of access.organisations) {
-    if (DASHBOARD_ROLE_SLUGS.has(org.roleSlug)) {
+    if (OPERATOR_DASHBOARD_ROLE_SLUGS.has(org.roleSlug)) {
       return true;
     }
     for (const venue of org.venues) {
-      if (DASHBOARD_ROLE_SLUGS.has(venue.roleSlug)) {
+      if (OPERATOR_DASHBOARD_ROLE_SLUGS.has(venue.roleSlug)) {
         return true;
       }
     }
   }
   return false;
 }
+
+/** Re-export for callers that already have tenant roles loaded. */
+export { canAccessOperatorDashboard };
 
 /**
  * Silent redirect target for crew-only users (Notion: Staff lands on roster).

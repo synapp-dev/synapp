@@ -1,10 +1,10 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
-import {
-  getOnboardingState,
-  resolvePlatformRoleIdForSlug,
-} from "@/server/onboarding/onboarding.service";
+import { requireRequestAuth } from "@/lib/api/route-auth";
+import { createSupabaseAdmin } from "@/utils/supabase/admin";
+import { getOnboardingState } from "@/server/onboarding/onboarding.service";
+import { membersInviteService } from "@/server/organisations/organisation-members.service";
+import { onboardingRepo } from "@/server/onboarding/onboarding.repo";
+import { handleMembersRouteError } from "@/lib/api/service-error-response";
 
 type Body = {
   email?: string;
@@ -12,21 +12,13 @@ type Body = {
 };
 
 export async function POST(request: Request) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
+  const { ctx, errorResponse } = await requireRequestAuth(request);
+  if (errorResponse) {
+    return errorResponse;
   }
 
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!serviceKey) {
+  const admin = createSupabaseAdmin();
+  if (!admin) {
     return NextResponse.json({
       data: {
         invited: false,
@@ -44,7 +36,7 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json(
       { data: null, error: { message: "Invalid JSON", status: 400 } },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -52,15 +44,15 @@ export async function POST(request: Request) {
   if (!email?.includes("@")) {
     return NextResponse.json(
       { data: null, error: { message: "Valid email is required", status: 400 } },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const state = await getOnboardingState(supabase, user.id);
+  const state = await getOnboardingState(ctx);
   if (state.completed) {
     return NextResponse.json(
       { data: null, error: { message: "Setup already completed", status: 400 } },
-      { status: 400 }
+      { status: 400 },
     );
   }
   if (!state.organisation) {
@@ -69,45 +61,42 @@ export async function POST(request: Request) {
         data: null,
         error: { message: "Complete business details first", status: 400 },
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!url) {
+  const venues = await ctx.appDb.rls((tx) =>
+    onboardingRepo.listVenuesForOrganisation(tx, state.organisation!.id),
+  );
+  const firstVenueId = venues[0]?.id;
+  if (!firstVenueId) {
     return NextResponse.json(
-      { data: null, error: { message: "Server misconfiguration", status: 500 } },
-      { status: 500 }
+      {
+        data: null,
+        error: { message: "Add a venue before inviting team members", status: 400 },
+      },
+      { status: 400 },
     );
   }
-
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const origin = new URL(request.url).origin;
-  const roleId = resolvePlatformRoleIdForSlug(body.roleSlug ?? "crew");
-  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${origin}/auth`,
-    data: {
-      invited_organisation_id: state.organisation.id,
-      invited_organisation_slug: state.organisation.slug,
-      invited_role_id: roleId,
-    },
-  });
 
-  if (error) {
-    return NextResponse.json(
-      { data: null, error: { message: error.message, status: 400 } },
-      { status: 400 }
-    );
+  try {
+    const result = await membersInviteService.createInvite(ctx, admin, {
+      organisationSlug: state.organisation.slug,
+      email,
+      roleSlug: body.roleSlug ?? "crew",
+      venueIds: [firstVenueId],
+      redirectTo: `${origin}/auth/callback`,
+    });
+    return NextResponse.json({
+      data: {
+        invited: true,
+        inviteId: result.inviteId,
+      },
+      error: null,
+    });
+  } catch (error) {
+    return handleMembersRouteError(error);
   }
-
-  return NextResponse.json({
-    data: {
-      invited: true,
-      userId: data.user?.id ?? null,
-    },
-    error: null,
-  });
 }

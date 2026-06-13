@@ -50,7 +50,7 @@ export const dummySuperbotSuggestions: SuperbotSuggestion[] = [
     description:
       "Par levels for dairy and produce drifted after the long weekend. Refreshing the order guide now aligns incoming deliveries with projected covers.",
     ctaLabel: "Open order guide",
-    pathSuffix: "inventory/order-guide",
+    pathSuffix: "purchasing/orders",
     iconId: "clipboard-list",
     pageFollowUpQuestion:
       "Shall we walk through refreshing par levels for the categories called out on the dashboard?",

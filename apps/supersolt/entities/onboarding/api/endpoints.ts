@@ -3,6 +3,7 @@ import type {
   OnboardingOrganisationDto,
   OnboardingStateResult,
   OnboardingVenueDto,
+  OrganisationSetupProgress,
 } from "@/entities/onboarding/model/types";
 
 export type { OnboardingOrganisationDto, OnboardingVenueDto, OnboardingStateResult };
@@ -28,11 +29,20 @@ export const onboardingApi = {
     name: string;
     addressLine1?: string | null;
     timezone?: string;
+    dataStartsFrom?: string;
   }): Promise<ApiResult<{ venue: OnboardingVenueDto }>> {
     return apiFetch<{ venue: OnboardingVenueDto }>("/onboarding/venue", {
       method: "POST",
       body: JSON.stringify(body),
     });
+  },
+  patchProgress(
+    body: OrganisationSetupProgress,
+  ): Promise<ApiResult<{ setupProgress: OrganisationSetupProgress }>> {
+    return apiFetch<{ setupProgress: OrganisationSetupProgress }>(
+      "/onboarding/progress",
+      { method: "PATCH", body: JSON.stringify(body) },
+    );
   },
   postFinalize(): Promise<ApiResult<{ ok: boolean }>> {
     return apiFetch<{ ok: boolean }>("/onboarding/finalize", { method: "POST" });

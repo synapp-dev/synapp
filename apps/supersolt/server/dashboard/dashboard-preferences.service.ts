@@ -1,27 +1,30 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { and, eq, isNull } from "drizzle-orm";
 
-import type { Database } from "@/utils/supabase/types";
-
+import type { RequestAuthContext } from "@/server/auth/context";
+import type { AppDb } from "@/server/db/create-app-db";
+import {
+  dashboardUserPreferences,
+  organisations,
+  userOrganisations,
+} from "@/server/db/schema";
 import type { DashboardPreferencesRow } from "@/entities/dashboard/model/dashboard-preferences-types";
 import type { DashboardPreferencesPatch } from "@/server/dashboard/dashboard-preferences.schema";
 
-type Supabase = SupabaseClient<Database>;
-
 function rowFromDb(r: {
-  time_window: string;
-  venue_scope_mode: string;
-  selected_venue_ids: string[] | null;
-  custom_range_start: string | null;
-  custom_range_end: string | null;
-  updated_at: string;
+  timeWindow: string;
+  venueScopeMode: string;
+  selectedVenueIds: string[] | null;
+  customRangeStart: string | null;
+  customRangeEnd: string | null;
+  updatedAt: string;
 }): DashboardPreferencesRow {
   return {
-    timeWindow: r.time_window,
-    venueScopeMode: r.venue_scope_mode,
-    selectedVenueIds: r.selected_venue_ids,
-    customRangeStart: r.custom_range_start,
-    customRangeEnd: r.custom_range_end,
-    updatedAt: r.updated_at,
+    timeWindow: r.timeWindow,
+    venueScopeMode: r.venueScopeMode,
+    selectedVenueIds: r.selectedVenueIds,
+    customRangeStart: r.customRangeStart,
+    customRangeEnd: r.customRangeEnd,
+    updatedAt: r.updatedAt,
   };
 }
 
@@ -35,99 +38,128 @@ const DEFAULTS: DashboardPreferencesRow = {
 };
 
 export async function getDashboardPreferencesForUserOrg(
-  supabase: Supabase,
-  userId: string,
+  ctx: RequestAuthContext,
   organisationId: string,
 ): Promise<DashboardPreferencesRow> {
-  const { data, error } = await supabase
-    .from("dashboard_user_preferences")
-    .select(
-      "time_window, venue_scope_mode, selected_venue_ids, custom_range_start, custom_range_end, updated_at",
-    )
-    .eq("user_profile_id", userId)
-    .eq("organisation_id", organisationId)
-    .maybeSingle();
+  const row = await ctx.appDb.rls((tx) =>
+    tx
+      .select({
+        timeWindow: dashboardUserPreferences.timeWindow,
+        venueScopeMode: dashboardUserPreferences.venueScopeMode,
+        selectedVenueIds: dashboardUserPreferences.selectedVenueIds,
+        customRangeStart: dashboardUserPreferences.customRangeStart,
+        customRangeEnd: dashboardUserPreferences.customRangeEnd,
+        updatedAt: dashboardUserPreferences.updatedAt,
+      })
+      .from(dashboardUserPreferences)
+      .where(
+        and(
+          eq(dashboardUserPreferences.userProfileId, ctx.userId),
+          eq(dashboardUserPreferences.organisationId, organisationId),
+        ),
+      )
+      .limit(1),
+  );
 
-  if (error) {
-    throw new Error(error.message);
-  }
-  if (!data) {
+  if (!row[0]) {
     return DEFAULTS;
   }
-  return rowFromDb(data);
+  return rowFromDb(row[0]);
 }
 
 export async function upsertDashboardPreferencesForUserOrg(
-  supabase: Supabase,
-  userId: string,
+  ctx: RequestAuthContext,
   organisationId: string,
   patch: DashboardPreferencesPatch,
 ): Promise<DashboardPreferencesRow> {
   const payload = {
-    user_profile_id: userId,
-    organisation_id: organisationId,
-    time_window: patch.timeWindow,
-    venue_scope_mode: patch.venueScopeMode,
-    selected_venue_ids:
-      patch.venueScopeMode === "all"
-        ? null
-        : (patch.selectedVenueIds ?? null),
-    custom_range_start:
+    userProfileId: ctx.userId,
+    organisationId,
+    timeWindow: patch.timeWindow,
+    venueScopeMode: patch.venueScopeMode,
+    selectedVenueIds:
+      patch.venueScopeMode === "all" ? null : (patch.selectedVenueIds ?? null),
+    customRangeStart:
       patch.timeWindow === "custom" ? patch.customRangeStart : null,
-    custom_range_end:
-      patch.timeWindow === "custom" ? patch.customRangeEnd : null,
-    updated_at: new Date().toISOString(),
+    customRangeEnd: patch.timeWindow === "custom" ? patch.customRangeEnd : null,
+    updatedAt: new Date().toISOString(),
   };
 
-  const { data, error } = await supabase
-    .from("dashboard_user_preferences")
-    .upsert(payload, { onConflict: "user_profile_id,organisation_id" })
-    .select(
-      "time_window, venue_scope_mode, selected_venue_ids, custom_range_start, custom_range_end, updated_at",
-    )
-    .single();
+  const rows = await ctx.appDb.rls((tx) =>
+    tx
+      .insert(dashboardUserPreferences)
+      .values(payload)
+      .onConflictDoUpdate({
+        target: [
+          dashboardUserPreferences.userProfileId,
+          dashboardUserPreferences.organisationId,
+        ],
+        set: {
+          timeWindow: payload.timeWindow,
+          venueScopeMode: payload.venueScopeMode,
+          selectedVenueIds: payload.selectedVenueIds,
+          customRangeStart: payload.customRangeStart,
+          customRangeEnd: payload.customRangeEnd,
+          updatedAt: payload.updatedAt,
+        },
+      })
+      .returning({
+        timeWindow: dashboardUserPreferences.timeWindow,
+        venueScopeMode: dashboardUserPreferences.venueScopeMode,
+        selectedVenueIds: dashboardUserPreferences.selectedVenueIds,
+        customRangeStart: dashboardUserPreferences.customRangeStart,
+        customRangeEnd: dashboardUserPreferences.customRangeEnd,
+        updatedAt: dashboardUserPreferences.updatedAt,
+      }),
+  );
 
-  if (error) {
-    throw new Error(error.message);
+  const saved = rows[0];
+  if (!saved) {
+    throw new Error("Failed to save dashboard preferences");
   }
-  return rowFromDb(data);
+  return rowFromDb(saved);
 }
 
 export async function resolveOrganisationIdForMemberSlug(
-  supabase: Supabase,
+  appDb: AppDb,
   userId: string,
   organisationSlug: string,
 ): Promise<string | null> {
-  const { data: org, error: orgError } = await supabase
-    .from("organisations")
-    .select("id")
-    .eq("slug", organisationSlug)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
+  return appDb.rls(async (tx) => {
+    const orgRows = await tx
+      .select({ id: organisations.id })
+      .from(organisations)
+      .where(
+        and(
+          eq(organisations.slug, organisationSlug),
+          eq(organisations.isActive, true),
+          isNull(organisations.archivedAt),
+        ),
+      )
+      .limit(1);
 
-  if (orgError) {
-    throw new Error(orgError.message);
-  }
-  if (!org) {
-    return null;
-  }
+    const org = orgRows[0];
+    if (!org) {
+      return null;
+    }
 
-  const { data: membership, error: memError } = await supabase
-    .from("user_organisations")
-    .select("id")
-    .eq("user_profile_id", userId)
-    .eq("organisation_id", org.id)
-    .eq("is_active", true)
-    .is("archived_at", null)
-    .maybeSingle();
+    const membership = await tx
+      .select({ id: userOrganisations.id })
+      .from(userOrganisations)
+      .where(
+        and(
+          eq(userOrganisations.userProfileId, userId),
+          eq(userOrganisations.organisationId, org.id),
+          eq(userOrganisations.isActive, true),
+          isNull(userOrganisations.archivedAt),
+        ),
+      )
+      .limit(1);
 
-  if (memError) {
-    throw new Error(memError.message);
-  }
-  if (!membership) {
-    return null;
-  }
+    if (!membership[0]) {
+      return null;
+    }
 
-  return org.id;
+    return org.id;
+  });
 }
