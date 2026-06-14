@@ -17,38 +17,40 @@ const sharpPath = path.resolve(
 );
 const sharp = require(sharpPath);
 
-const source = fs.readFileSync("public/icon-orb.png");
+const sourceOpaque = fs.readFileSync("public/icon-orb.png");
+const sourceTransparent = fs.readFileSync("public/icon-orb-transparent.png");
 const out = "public/icons";
 fs.mkdirSync(out, { recursive: true });
 
-// The orb still sits on a solid background; use its dominant colour to fill any
-// padding so the inset border blends seamlessly.
-const { dominant } = await sharp(source).stats();
-
-// [name, size, pad] — pad is the inset fraction per edge. The padding/margin is
-// baked into the source still (public/icon-orb.png), so all icons are full-bleed
-// here; bump a pad value if a specific size needs extra breathing room.
+// [name, size, pad, source] — the favicon uses the transparent orb so it sits
+// cleanly on any browser-tab colour; the PWA + Apple icons use the opaque orb
+// (iOS/Android fill transparent areas with black anyway). pad insets the orb,
+// but the margin is baked into the source stills so all jobs are full-bleed.
 const jobs = [
-  ["favicon-32.png", 32, 0],
-  ["icon-192.png", 192, 0],
-  ["icon-512.png", 512, 0],
-  ["apple-touch-icon.png", 180, 0],
+  ["favicon-32.png", 32, 0, sourceTransparent],
+  ["icon-192.png", 192, 0, sourceOpaque],
+  ["icon-512.png", 512, 0, sourceOpaque],
+  ["apple-touch-icon.png", 180, 0, sourceOpaque],
 ];
 
-for (const [name, size, pad] of jobs) {
+for (const [name, size, pad, src] of jobs) {
   const border = Math.round(size * pad);
-  const image =
-    border > 0
-      ? sharp(source)
-          .resize(size - border * 2, size - border * 2)
-          .extend({
-            top: border,
-            bottom: border,
-            left: border,
-            right: border,
-            background: dominant,
-          })
-      : sharp(source).resize(size, size);
+  let image;
+  if (border > 0) {
+    // Fill the inset with the source's dominant colour for a seamless border.
+    const { dominant } = await sharp(src).stats();
+    image = sharp(src)
+      .resize(size - border * 2, size - border * 2)
+      .extend({
+        top: border,
+        bottom: border,
+        left: border,
+        right: border,
+        background: dominant,
+      });
+  } else {
+    image = sharp(src).resize(size, size);
+  }
   await image.png().toFile(path.join(out, name));
   console.log("wrote", name, size, border ? `(pad ${border}px)` : "");
 }
