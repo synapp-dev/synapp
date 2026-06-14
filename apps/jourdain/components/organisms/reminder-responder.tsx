@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, Clock, SkipForward } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { Check, Clock, GlassWater, SkipForward } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import {
   Dialog,
@@ -17,26 +18,27 @@ import {
   useRespondTask,
   type ReminderAction,
 } from "@/hooks/reminders/use-reminder";
+import { useAckPing, usePingRoutine } from "@/hooks/routines/use-routines";
 
 /**
- * Opens a Done / +5 min / Skip card when a reminder notification is tapped.
- * The push deep-links to `?respond=<taskId>`; this reads that param from
- * wherever the user lands and overlays the card.
+ * Opens when a reminder notification is tapped. Two modes:
+ *  - `?respond=<taskId>` → a one-off task: Done / +5 min / Skip
+ *  - `?ping=<routineId>` → a recurring ping (e.g. water): Got it / Dismiss
+ * Client-only so it stays out of hydration (it must not shift Radix IDs).
  */
 export function ReminderResponder() {
-  // Client-only: rendering nothing until mounted keeps this overlay out of the
-  // initial hydration, so it can't shift Radix's auto-generated IDs (which would
-  // break hydration for other components on the page).
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const taskId = searchParams.get("respond");
+  const pingId = searchParams.get("ping");
+  const isPing = pingId !== null;
 
-  const { data: task, isLoading, error } = useReminderTask(
-    mounted ? taskId : null
-  );
+  const taskQuery = useReminderTask(mounted && !isPing ? taskId : null);
+  const pingQuery = usePingRoutine(mounted && isPing ? pingId : null);
   const respond = useRespondTask();
+  const ackPing = useAckPing();
 
   useEffect(() => {
     setMounted(true);
@@ -45,19 +47,38 @@ export function ReminderResponder() {
   function close() {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("respond");
+    params.delete("ping");
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  function act(action: ReminderAction) {
+  function actTask(action: ReminderAction) {
     if (!taskId) return;
-    respond.mutate({ taskId, action }, { onSuccess: close });
+    // Dismiss instantly; the mutation runs optimistically in the background.
+    close();
+    respond.mutate({ taskId, action });
+  }
+
+  function actPing() {
+    if (!pingId) return;
+    close();
+    ackPing.mutate(pingId);
   }
 
   if (!mounted) return null;
 
-  const open = taskId !== null;
-  const resolved = task && task.status !== "open";
+  const open = taskId !== null || pingId !== null;
+  const data = isPing ? pingQuery.data : taskQuery.data;
+  const isLoading = isPing ? pingQuery.isLoading : taskQuery.isLoading;
+  const loadError = isPing ? pingQuery.error : taskQuery.error;
+  const pending = respond.isPending || ackPing.isPending;
+  const actionError = respond.error ?? ackPing.error;
+  const taskResolved =
+    !isPing && taskQuery.data && taskQuery.data.status !== "open";
+  const nextFire =
+    isPing && pingQuery.data?.nextFireAt
+      ? format(parseISO(pingQuery.data.nextFireAt), "h:mm a")
+      : null;
 
   return (
     <Dialog
@@ -68,9 +89,11 @@ export function ReminderResponder() {
     >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>{task?.title ?? "Reminder"}</DialogTitle>
-          {task?.notes ? (
-            <DialogDescription>{task.notes}</DialogDescription>
+          <DialogTitle>{data?.title ?? "Reminder"}</DialogTitle>
+          {isPing && nextFire ? (
+            <DialogDescription>Next reminder at {nextFire}</DialogDescription>
+          ) : !isPing && data?.notes ? (
+            <DialogDescription>{data.notes}</DialogDescription>
           ) : null}
         </DialogHeader>
 
@@ -78,19 +101,39 @@ export function ReminderResponder() {
           <div className="flex justify-center py-6">
             <Spinner />
           </div>
-        ) : error || !task ? (
+        ) : loadError || !data ? (
           <>
             <p className="text-sm text-muted-foreground">
-              {error?.message ?? "This task no longer exists."}
+              {loadError?.message ?? "This reminder no longer exists."}
             </p>
             <Button variant="outline" onClick={close}>
               Close
             </Button>
           </>
-        ) : resolved ? (
+        ) : isPing ? (
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Button
+              className="h-auto flex-col gap-1 py-3"
+              onClick={actPing}
+              disabled={pending}
+            >
+              <GlassWater className="h-4 w-4" />
+              Got it
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-auto flex-col gap-1 py-3 text-muted-foreground"
+              onClick={close}
+              disabled={pending}
+            >
+              <Clock className="h-4 w-4" />
+              Dismiss
+            </Button>
+          </div>
+        ) : taskResolved ? (
           <>
             <p className="text-sm text-muted-foreground">
-              Already marked {task.status}.
+              Already marked {taskQuery.data?.status}.
             </p>
             <Button variant="outline" onClick={close}>
               Close
@@ -100,8 +143,8 @@ export function ReminderResponder() {
           <div className="grid grid-cols-3 gap-2 pt-1">
             <Button
               className="h-auto flex-col gap-1 py-3"
-              onClick={() => act("done")}
-              disabled={respond.isPending}
+              onClick={() => actTask("done")}
+              disabled={pending}
             >
               <Check className="h-4 w-4" />
               Done
@@ -109,8 +152,8 @@ export function ReminderResponder() {
             <Button
               variant="outline"
               className="h-auto flex-col gap-1 py-3"
-              onClick={() => act("delay")}
-              disabled={respond.isPending}
+              onClick={() => actTask("delay")}
+              disabled={pending}
             >
               <Clock className="h-4 w-4" />
               +5 min
@@ -118,8 +161,8 @@ export function ReminderResponder() {
             <Button
               variant="ghost"
               className="h-auto flex-col gap-1 py-3 text-muted-foreground"
-              onClick={() => act("skip")}
-              disabled={respond.isPending}
+              onClick={() => actTask("skip")}
+              disabled={pending}
             >
               <SkipForward className="h-4 w-4" />
               Skip
@@ -127,8 +170,8 @@ export function ReminderResponder() {
           </div>
         )}
 
-        {respond.error ? (
-          <p className="text-sm text-destructive">{respond.error.message}</p>
+        {actionError ? (
+          <p className="text-sm text-destructive">{actionError.message}</p>
         ) : null}
       </DialogContent>
     </Dialog>

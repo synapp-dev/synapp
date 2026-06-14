@@ -10,7 +10,7 @@ export const ROUTINE_DOMAINS = [
 ] as const;
 export type RoutineDomain = (typeof ROUTINE_DOMAINS)[number];
 
-export const ROUTINE_FREQS = ["daily", "weekly", "monthly"] as const;
+export const ROUTINE_FREQS = ["daily", "weekly", "monthly", "interval"] as const;
 export type RoutineFreq = (typeof ROUTINE_FREQS)[number];
 
 export type Routine = {
@@ -20,14 +20,17 @@ export type Routine = {
   domain: RoutineDomain;
   priority: number;
   freq: RoutineFreq;
-  /** 0=Sun..6=Sat, used when freq is "weekly". */
   daysOfWeek: number[];
-  /** 1..31, used when freq is "monthly". */
   dayOfMonth: number | null;
-  /** Local reminder time as "HH:MM". */
   remindTime: string;
   timezone: string;
   active: boolean;
+  // Interval ("ping") fields.
+  intervalMinutes: number | null;
+  windowStart: string;
+  windowEnd: string;
+  nextFireAt: string | null;
+  lastAckedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -40,9 +43,12 @@ export type CreateRoutineInput = {
   freq: RoutineFreq;
   daysOfWeek?: number[];
   dayOfMonth?: number | null;
-  remindTime: string;
+  remindTime?: string;
   timezone?: string;
   active?: boolean;
+  intervalMinutes?: number | null;
+  windowStart?: string;
+  windowEnd?: string;
 };
 
 export type UpdateRoutineInput = Partial<CreateRoutineInput>;
@@ -59,12 +65,17 @@ type RoutineRow = {
   remind_time: string;
   timezone: string;
   active: boolean;
+  interval_minutes: number | null;
+  window_start: string;
+  window_end: string;
+  next_fire_at: string | null;
+  last_acked_at: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  "id, title, notes, domain, priority, freq, days_of_week, day_of_month, remind_time, timezone, active, created_at, updated_at";
+  "id, title, notes, domain, priority, freq, days_of_week, day_of_month, remind_time, timezone, active, interval_minutes, window_start, window_end, next_fire_at, last_acked_at, created_at, updated_at";
 
 function toRoutine(row: RoutineRow): Routine {
   return {
@@ -79,6 +90,11 @@ function toRoutine(row: RoutineRow): Routine {
     remindTime: row.remind_time.slice(0, 5),
     timezone: row.timezone,
     active: row.active,
+    intervalMinutes: row.interval_minutes,
+    windowStart: row.window_start.slice(0, 5),
+    windowEnd: row.window_end.slice(0, 5),
+    nextFireAt: row.next_fire_at,
+    lastAckedAt: row.last_acked_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -97,6 +113,19 @@ export async function listRoutines(
   return (data as RoutineRow[]).map(toRoutine);
 }
 
+export async function getRoutine(
+  supabase: SupabaseClient,
+  routineId: string
+): Promise<Routine | null> {
+  const { data, error } = await supabase
+    .from("routines")
+    .select(COLUMNS)
+    .eq("id", routineId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? toRoutine(data as RoutineRow) : null;
+}
+
 export async function createRoutine(
   supabase: SupabaseClient,
   userId: string,
@@ -113,14 +142,23 @@ export async function createRoutine(
       freq: input.freq,
       days_of_week: input.daysOfWeek ?? [],
       day_of_month: input.dayOfMonth ?? null,
-      remind_time: input.remindTime,
+      remind_time: input.remindTime ?? "08:00",
       timezone: input.timezone ?? "Australia/Sydney",
       active: input.active ?? true,
+      interval_minutes: input.intervalMinutes ?? null,
+      window_start: input.windowStart ?? "08:00",
+      window_end: input.windowEnd ?? "21:00",
     })
     .select(COLUMNS)
     .single();
   if (error) throw new Error(error.message);
-  return toRoutine(data as RoutineRow);
+  const routine = toRoutine(data as RoutineRow);
+
+  // Interval routines need their first fire time computed immediately.
+  if (routine.freq === "interval") {
+    routine.nextFireAt = await advancePing(routine.id);
+  }
+  return routine;
 }
 
 export async function updateRoutine(
@@ -139,6 +177,10 @@ export async function updateRoutine(
   if (input.remindTime !== undefined) patch.remind_time = input.remindTime;
   if (input.timezone !== undefined) patch.timezone = input.timezone;
   if (input.active !== undefined) patch.active = input.active;
+  if (input.intervalMinutes !== undefined)
+    patch.interval_minutes = input.intervalMinutes;
+  if (input.windowStart !== undefined) patch.window_start = input.windowStart;
+  if (input.windowEnd !== undefined) patch.window_end = input.windowEnd;
 
   const { data, error } = await supabase
     .from("routines")
@@ -147,15 +189,19 @@ export async function updateRoutine(
     .select(COLUMNS)
     .single();
   if (error) throw new Error(error.message);
-  return toRoutine(data as RoutineRow);
+  const routine = toRoutine(data as RoutineRow);
+
+  // Recompute the next fire after schedule changes to an interval routine.
+  if (routine.freq === "interval") {
+    routine.nextFireAt = await advancePing(routine.id);
+  }
+  return routine;
 }
 
 export async function deleteRoutine(
   supabase: SupabaseClient,
   routineId: string
 ): Promise<void> {
-  // Drop future, not-yet-completed occurrences; completed ones stay as history
-  // (their routine_id is nulled by the FK's ON DELETE SET NULL).
   await supabase
     .from("tasks")
     .delete()
@@ -165,7 +211,22 @@ export async function deleteRoutine(
   if (error) throw new Error(error.message);
 }
 
-/** Spawn today's due occurrences for the user (idempotent, tz-aware). */
+/** Record an acknowledgement of a ping ("Got it"). */
+export async function ackPing(
+  supabase: SupabaseClient,
+  routineId: string
+): Promise<Routine> {
+  const { data, error } = await supabase
+    .from("routines")
+    .update({ last_acked_at: new Date().toISOString() })
+    .eq("id", routineId)
+    .select(COLUMNS)
+    .single();
+  if (error) throw new Error(error.message);
+  return toRoutine(data as RoutineRow);
+}
+
+/** Spawn today's due (task-kind) occurrences for the user — tz-aware, idempotent. */
 export async function materializeForUser(userId: string): Promise<number> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("materialize_due_routines", {
@@ -173,4 +234,14 @@ export async function materializeForUser(userId: string): Promise<number> {
   });
   if (error) throw new Error(error.message);
   return (data as number) ?? 0;
+}
+
+/** Advance a ping routine to its next future slot; returns the new fire time. */
+export async function advancePing(routineId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("advance_ping", {
+    p_routine_id: routineId,
+  });
+  if (error) throw new Error(error.message);
+  return (data as string | null) ?? null;
 }

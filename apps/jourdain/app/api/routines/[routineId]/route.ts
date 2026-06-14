@@ -5,9 +5,12 @@ import {
   ROUTINE_DOMAINS,
   ROUTINE_FREQS,
   deleteRoutine,
+  getRoutine,
   materializeForUser,
   updateRoutine,
 } from "@/lib/routines/service";
+
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM");
 
 const updateRoutineSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),
@@ -19,9 +22,12 @@ const updateRoutineSchema = z.object({
   freq: z.enum(ROUTINE_FREQS).optional(),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).max(7).optional(),
   dayOfMonth: z.number().int().min(1).max(31).nullish(),
-  remindTime: z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM").optional(),
+  remindTime: hhmm.optional(),
   timezone: z.string().max(64).optional(),
   active: z.boolean().optional(),
+  intervalMinutes: z.number().int().min(1).max(1440).nullish(),
+  windowStart: hhmm.optional(),
+  windowEnd: hhmm.optional(),
 });
 
 function unauthorized() {
@@ -29,6 +35,40 @@ function unauthorized() {
     { data: null, error: { message: "Unauthorized", status: 401 } },
     { status: 401 }
   );
+}
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ routineId: string }> }
+) {
+  const { routineId } = await params;
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) return unauthorized();
+
+  try {
+    const routine = await getRoutine(supabase, routineId);
+    if (!routine) {
+      return NextResponse.json(
+        { data: null, error: { message: "Not found", status: 404 } },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ data: routine, error: null });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        data: null,
+        error: {
+          message: err instanceof Error ? err.message : "Failed to load routine",
+        },
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PATCH(

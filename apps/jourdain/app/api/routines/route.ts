@@ -9,20 +9,52 @@ import {
   materializeForUser,
 } from "@/lib/routines/service";
 
-const createRoutineSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  notes: z.string().trim().max(2000).nullish(),
-  domain: z.enum(ROUTINE_DOMAINS),
-  priority: z
-    .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
-    .optional(),
-  freq: z.enum(ROUTINE_FREQS),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).max(7).optional(),
-  dayOfMonth: z.number().int().min(1).max(31).nullish(),
-  remindTime: z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM"),
-  timezone: z.string().max(64).optional(),
-  active: z.boolean().optional(),
-});
+const hhmm = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM");
+
+const createRoutineSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200),
+    notes: z.string().trim().max(2000).nullish(),
+    domain: z.enum(ROUTINE_DOMAINS),
+    priority: z
+      .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+      .optional(),
+    freq: z.enum(ROUTINE_FREQS),
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).max(7).optional(),
+    dayOfMonth: z.number().int().min(1).max(31).nullish(),
+    remindTime: hhmm.optional(),
+    timezone: z.string().max(64).optional(),
+    active: z.boolean().optional(),
+    intervalMinutes: z.number().int().min(1).max(1440).nullish(),
+    windowStart: hhmm.optional(),
+    windowEnd: hhmm.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.freq === "interval") {
+      if (!value.intervalMinutes) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Set how often it repeats",
+          path: ["intervalMinutes"],
+        });
+      }
+    } else {
+      if (!value.remindTime) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Set a reminder time",
+          path: ["remindTime"],
+        });
+      }
+      if (value.freq === "weekly" && (value.daysOfWeek?.length ?? 0) === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Pick at least one day",
+          path: ["daysOfWeek"],
+        });
+      }
+    }
+  });
 
 function unauthorized() {
   return NextResponse.json(
@@ -78,8 +110,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const routine = await createRoutine(supabase, user.id, parsed.data);
-    // Spawn today's occurrence immediately if it's due, so the reminder fires
-    // today rather than waiting for the next day's materialization.
+    // Spawn today's task occurrence immediately if it's due (no-op for pings).
     await materializeForUser(user.id);
     return NextResponse.json({ data: routine, error: null }, { status: 201 });
   } catch (err) {

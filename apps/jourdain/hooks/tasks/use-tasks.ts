@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { tasksApi } from "@/entities/tasks/api/endpoints";
 import type {
   CreateTaskInput,
@@ -21,6 +22,22 @@ export function useTasks() {
   });
 }
 
+function applyTaskPatch(task: Task, input: UpdateTaskInput): Task {
+  const next: Task = { ...task };
+  if (input.title !== undefined) next.title = input.title;
+  if (input.notes !== undefined) next.notes = input.notes ?? null;
+  if (input.domains !== undefined) next.domains = input.domains;
+  if (input.priority !== undefined) next.priority = input.priority;
+  if (input.dueDate !== undefined) next.dueDate = input.dueDate ?? null;
+  if (input.remindAt !== undefined) next.remindAt = input.remindAt ?? null;
+  if (input.status !== undefined) {
+    next.status = input.status;
+    next.completedAt =
+      input.status === "done" ? new Date().toISOString() : null;
+  }
+  return next;
+}
+
 export function useCreateTask() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -29,7 +46,35 @@ export function useCreateTask() {
       if (result.error) throw new Error(result.error.message);
       return result.data;
     },
-    onSuccess: () => {
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: tasksQueryKey });
+      const previous = queryClient.getQueryData<Task[]>(tasksQueryKey);
+      const now = new Date().toISOString();
+      const optimistic: Task = {
+        id: `temp-${crypto.randomUUID()}`,
+        title: input.title,
+        notes: input.notes ?? null,
+        status: "open",
+        priority: input.priority ?? 4,
+        domains: input.domains ?? [],
+        dueDate: input.dueDate ?? null,
+        remindAt: input.remindAt ?? null,
+        completedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      queryClient.setQueryData<Task[]>(tasksQueryKey, (old) => [
+        optimistic,
+        ...(old ?? []),
+      ]);
+      return { previous };
+    },
+    onError: (err, _input, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(tasksQueryKey, context.previous);
+      toast.error(err instanceof Error ? err.message : "Couldn't add task");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: tasksQueryKey });
     },
   });
@@ -46,7 +91,22 @@ export function useUpdateTask() {
       if (result.error) throw new Error(result.error.message);
       return result.data;
     },
-    onSuccess: () => {
+    onMutate: async ({ taskId, input }) => {
+      await queryClient.cancelQueries({ queryKey: tasksQueryKey });
+      const previous = queryClient.getQueryData<Task[]>(tasksQueryKey);
+      queryClient.setQueryData<Task[]>(tasksQueryKey, (old) =>
+        (old ?? []).map((task) =>
+          task.id === taskId ? applyTaskPatch(task, input) : task
+        )
+      );
+      return { previous };
+    },
+    onError: (err, _args, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(tasksQueryKey, context.previous);
+      toast.error(err instanceof Error ? err.message : "Couldn't update task");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: tasksQueryKey });
     },
   });
@@ -59,7 +119,20 @@ export function useDeleteTask() {
       const result = await tasksApi.delete.remove(taskId);
       if (result.error) throw new Error(result.error.message);
     },
-    onSuccess: () => {
+    onMutate: async (taskId) => {
+      await queryClient.cancelQueries({ queryKey: tasksQueryKey });
+      const previous = queryClient.getQueryData<Task[]>(tasksQueryKey);
+      queryClient.setQueryData<Task[]>(tasksQueryKey, (old) =>
+        (old ?? []).filter((task) => task.id !== taskId)
+      );
+      return { previous };
+    },
+    onError: (err, _id, context) => {
+      if (context?.previous)
+        queryClient.setQueryData(tasksQueryKey, context.previous);
+      toast.error(err instanceof Error ? err.message : "Couldn't delete task");
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: tasksQueryKey });
     },
   });

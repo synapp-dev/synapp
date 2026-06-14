@@ -16,6 +16,7 @@ type DigestUser = {
 type DigestTask = { title: string };
 type StaleAccount = { user_id: string; updated_at: string };
 type BankReminder = { user_id: string; enabled: boolean; last_sent: string | null };
+type DuePing = { id: string; user_id: string; title: string };
 
 const BANK_STALE_DAYS = 7;
 
@@ -50,6 +51,9 @@ function isAuthorized(request: NextRequest): boolean {
 async function runReminders() {
   const admin = createAdminClient();
   const nowIso = new Date().toISOString();
+  // Only push reminders that came due recently — never blast stale ones (e.g. a
+  // routine created mid-day with an earlier time, or a backlog after downtime).
+  const reminderFloorIso = new Date(Date.now() - 30 * 60_000).toISOString();
   let taskReminders = 0;
   let digestsSent = 0;
 
@@ -75,6 +79,7 @@ async function runReminders() {
     .eq("status", "open")
     .not("remind_at", "is", null)
     .is("reminded_at", null)
+    .gte("remind_at", reminderFloorIso)
     .lte("remind_at", nowIso);
 
   const dueTasks = (dueData as DueTask[] | null) ?? [];
@@ -206,12 +211,35 @@ async function runReminders() {
     }
   }
 
+  // 4. Interval "ping" routines (e.g. drink water). Fire any that are due, then
+  // advance each to its next slot so it keeps pinging on schedule.
+  let pingsFired = 0;
+  const { data: pingData } = await admin
+    .from("routines")
+    .select("id, user_id, title")
+    .eq("freq", "interval")
+    .eq("active", true)
+    .not("next_fire_at", "is", null)
+    .lte("next_fire_at", nowIso);
+
+  for (const ping of (pingData as DuePing[] | null) ?? []) {
+    const result = await sendPushToUser(ping.user_id, {
+      title: ping.title,
+      body: "",
+      url: `/tasks?ping=${ping.id}`,
+      tag: `ping-${ping.id}`,
+    });
+    pingsFired += result.sent;
+    await admin.rpc("advance_ping", { p_routine_id: ping.id });
+  }
+
   return {
     taskReminders,
     digestsSent,
     dueTasks: dueTasks.length,
     bankNudges,
     routinesMaterialized,
+    pingsFired,
   };
 }
 
