@@ -14,6 +14,10 @@ type DigestUser = {
   last_digest_date: string | null;
 };
 type DigestTask = { title: string };
+type StaleAccount = { user_id: string; updated_at: string };
+type BankReminder = { user_id: string; enabled: boolean; last_sent: string | null };
+
+const BANK_STALE_DAYS = 7;
 
 /** Local calendar date + hour for a timezone, computed without extra deps. */
 function localDateHour(timezone: string): { date: string; hour: number } | null {
@@ -129,7 +133,65 @@ async function runReminders() {
       .eq("user_id", settings.user_id);
   }
 
-  return { taskReminders, digestsSent, dueTasks: dueTasks.length };
+  // 3. Bank import staleness nudges — one push per UTC day per user while any
+  // of their accounts hasn't been re-imported in BANK_STALE_DAYS days. Stops
+  // automatically once they import (which refreshes bank_accounts.updated_at).
+  let bankNudges = 0;
+  const todayUtc = nowIso.slice(0, 10);
+  const staleBefore = new Date(
+    Date.now() - BANK_STALE_DAYS * 86_400_000
+  ).toISOString();
+
+  const { data: staleData } = await admin
+    .from("bank_accounts")
+    .select("user_id, updated_at")
+    .lt("updated_at", staleBefore);
+
+  const oldestByUser = new Map<string, string>();
+  for (const row of (staleData as StaleAccount[] | null) ?? []) {
+    const current = oldestByUser.get(row.user_id);
+    if (!current || row.updated_at < current) {
+      oldestByUser.set(row.user_id, row.updated_at);
+    }
+  }
+
+  if (oldestByUser.size > 0) {
+    const userIds = [...oldestByUser.keys()];
+    const { data: reminderData } = await admin
+      .from("bank_import_reminders")
+      .select("user_id, enabled, last_sent")
+      .in("user_id", userIds);
+    const reminderByUser = new Map(
+      ((reminderData as BankReminder[] | null) ?? []).map((r) => [r.user_id, r])
+    );
+
+    for (const [userId, oldest] of oldestByUser) {
+      const reminder = reminderByUser.get(userId);
+      if (reminder?.enabled === false) continue; // user opted out
+      if (reminder?.last_sent === todayUtc) continue; // already nudged today
+
+      const days = Math.max(
+        1,
+        Math.floor((Date.now() - new Date(oldest).getTime()) / 86_400_000)
+      );
+      const result = await sendPushToUser(userId, {
+        title: "Bank data is out of date",
+        body: `Your accounts haven't been refreshed in ${days} days — tap to import a new export.`,
+        url: "/finance/accounts",
+        tag: "bank-import-stale",
+      });
+      bankNudges += result.sent;
+
+      await admin
+        .from("bank_import_reminders")
+        .upsert(
+          { user_id: userId, last_sent: todayUtc, updated_at: nowIso },
+          { onConflict: "user_id" }
+        );
+    }
+  }
+
+  return { taskReminders, digestsSent, dueTasks: dueTasks.length, bankNudges };
 }
 
 export async function GET(request: NextRequest) {
