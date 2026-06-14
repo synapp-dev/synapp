@@ -1,8 +1,10 @@
 "use client";
 
+import { Suspense } from "react";
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
 import { MeLoader } from "@/components/molecules/me-loader";
+import { ReminderResponder } from "@/components/organisms/reminder-responder";
 
 import {
   SidebarInset,
@@ -17,6 +19,9 @@ export default function MainLayout({
   return (
     <SidebarProvider className="flex h-svh max-h-svh min-h-0 w-full overflow-hidden">
       <MeLoader />
+      <Suspense fallback={null}>
+        <ReminderResponder />
+      </Suspense>
       <AppSidebar />
       <div className="mx-auto flex min-h-0 min-w-0 flex-1 max-w-7xl flex-col overflow-hidden">
         <AppHeader />

@@ -53,6 +53,21 @@ async function runReminders() {
   let taskReminders = 0;
   let digestsSent = 0;
 
+  // 0. Materialize routine occurrences due today (idempotent, tz-aware) so their
+  // reminders exist before we scan for due reminders below.
+  let routinesMaterialized = 0;
+  try {
+    const { data: created } = await admin.rpc("materialize_due_routines", {
+      p_user_id: null,
+    });
+    routinesMaterialized = (created as number) ?? 0;
+  } catch (err) {
+    console.warn(
+      "[run-reminders] routine materialization failed:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
   // 1. Per-task reminders that are due and not yet sent. ----------------------
   const { data: dueData } = await admin
     .from("tasks")
@@ -69,7 +84,7 @@ async function runReminders() {
     const result = await sendPushToUser(task.user_id, {
       title: task.title,
       body: "",
-      url: `/tasks?task=${task.id}`,
+      url: `/tasks?respond=${task.id}`,
       tag: `task-${task.id}`,
     });
     taskReminders += result.sent;
@@ -191,7 +206,13 @@ async function runReminders() {
     }
   }
 
-  return { taskReminders, digestsSent, dueTasks: dueTasks.length, bankNudges };
+  return {
+    taskReminders,
+    digestsSent,
+    dueTasks: dueTasks.length,
+    bankNudges,
+    routinesMaterialized,
+  };
 }
 
 export async function GET(request: NextRequest) {

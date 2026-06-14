@@ -89,6 +89,12 @@ const platformNavItems: NavMainItem[] = [
     exact: true,
   },
   {
+    title: "Routines",
+    url: "/routines",
+    icon: Repeat,
+    exact: true,
+  },
+  {
     title: "Calendar",
     url: "/calendar",
     icon: CalendarDays,

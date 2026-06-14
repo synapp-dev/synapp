@@ -127,3 +127,48 @@ export async function deleteTask(
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
   if (error) throw new Error(error.message);
 }
+
+export async function getTask(
+  supabase: SupabaseClient,
+  taskId: string
+): Promise<Task | null> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_COLUMNS)
+    .eq("id", taskId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? toTask(data as TaskRow) : null;
+}
+
+export type TaskResponse = "done" | "skip" | "delay";
+
+/** Apply a reminder-card response, recording when the user responded. */
+export async function respondToTask(
+  supabase: SupabaseClient,
+  taskId: string,
+  action: TaskResponse
+): Promise<Task> {
+  const nowIso = new Date().toISOString();
+  let patch: Record<string, unknown>;
+  if (action === "done") {
+    patch = { status: "done", completed_at: nowIso, responded_at: nowIso };
+  } else if (action === "skip") {
+    patch = { status: "skipped", completed_at: null, responded_at: nowIso };
+  } else {
+    // delay: bump the reminder 5 minutes and let the runner fire it again.
+    patch = {
+      remind_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+      reminded_at: null,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .update(patch)
+    .eq("id", taskId)
+    .select(TASK_COLUMNS)
+    .single();
+  if (error) throw new Error(error.message);
+  return toTask(data as TaskRow);
+}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerClient } from "@/utils/supabase/server";
-import { deleteTask, updateTask } from "@/lib/tasks/service";
+import { deleteTask, getTask, updateTask } from "@/lib/tasks/service";
 import {
   removeTaskCalendarEvent,
   syncTaskCalendarEvent,
@@ -30,6 +30,38 @@ function unauthorized() {
     { data: null, error: { message: "Unauthorized", status: 401 } },
     { status: 401 }
   );
+}
+
+export async function GET(
+  _request: NextRequest,
+  { params }: { params: Promise<{ taskId: string }> }
+) {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) return unauthorized();
+
+  const { taskId } = await params;
+  try {
+    const task = await getTask(supabase, taskId);
+    if (!task) {
+      return NextResponse.json(
+        { data: null, error: { message: "Not found", status: 404 } },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ data: task, error: null });
+  } catch (err) {
+    return NextResponse.json(
+      {
+        data: null,
+        error: { message: err instanceof Error ? err.message : "Failed to load task" },
+      },
+      { status: 500 }
+    );
+  }
 }
 
 export async function PATCH(

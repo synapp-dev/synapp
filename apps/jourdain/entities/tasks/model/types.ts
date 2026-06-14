@@ -1,4 +1,4 @@
-export type TaskStatus = "open" | "done";
+export type TaskStatus = "open" | "done" | "skipped";
 
 export const TASK_DOMAINS = [
   "identity",
