@@ -21,16 +21,34 @@ const source = fs.readFileSync("public/icon-orb.png");
 const out = "public/icons";
 fs.mkdirSync(out, { recursive: true });
 
+// The orb still sits on a solid background; use its dominant colour to fill any
+// padding so the inset border blends seamlessly.
+const { dominant } = await sharp(source).stats();
+
+// [name, size, pad] — pad is the inset fraction per edge. The padding/margin is
+// baked into the source still (public/icon-orb.png), so all icons are full-bleed
+// here; bump a pad value if a specific size needs extra breathing room.
 const jobs = [
-  ["favicon-32.png", 32],
-  ["icon-192.png", 192],
-  ["icon-512.png", 512],
-  ["apple-touch-icon.png", 180],
+  ["favicon-32.png", 32, 0],
+  ["icon-192.png", 192, 0],
+  ["icon-512.png", 512, 0],
+  ["apple-touch-icon.png", 180, 0],
 ];
 
-for (const [name, size] of jobs) {
-  // The orb still is already on a solid (opaque) black background, so no
-  // flatten is needed.
-  await sharp(source).resize(size, size).png().toFile(path.join(out, name));
-  console.log("wrote", name, size);
+for (const [name, size, pad] of jobs) {
+  const border = Math.round(size * pad);
+  const image =
+    border > 0
+      ? sharp(source)
+          .resize(size - border * 2, size - border * 2)
+          .extend({
+            top: border,
+            bottom: border,
+            left: border,
+            right: border,
+            background: dominant,
+          })
+      : sharp(source).resize(size, size);
+  await image.png().toFile(path.join(out, name));
+  console.log("wrote", name, size, border ? `(pad ${border}px)` : "");
 }
