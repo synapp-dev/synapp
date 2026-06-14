@@ -4,6 +4,7 @@ import { createServerClient } from "@/utils/supabase/server";
 import {
   ROUTINE_DOMAINS,
   ROUTINE_FREQS,
+  ROUTINE_TRIGGERS,
   createRoutine,
   listRoutines,
   materializeForUser,
@@ -28,9 +29,27 @@ const createRoutineSchema = z
     intervalMinutes: z.number().int().min(1).max(1440).nullish(),
     windowStart: hhmm.optional(),
     windowEnd: hhmm.optional(),
+    triggerType: z.enum(ROUTINE_TRIGGERS).optional(),
+    parentRoutineId: z.string().uuid().nullish(),
+    offsetMinutes: z.number().int().min(0).max(525600).nullish(),
   })
   .superRefine((value, ctx) => {
-    if (value.freq === "interval") {
+    if (value.triggerType === "on_complete") {
+      if (!value.parentRoutineId) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Pick a routine to trigger after",
+          path: ["parentRoutineId"],
+        });
+      }
+      if (value.offsetMinutes == null) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Set the delay",
+          path: ["offsetMinutes"],
+        });
+      }
+    } else if (value.freq === "interval") {
       if (!value.intervalMinutes) {
         ctx.addIssue({
           code: "custom",

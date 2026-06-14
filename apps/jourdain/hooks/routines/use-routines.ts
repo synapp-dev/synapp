@@ -12,6 +12,7 @@ export type RoutineDomain =
   | "social"
   | "finance";
 export type RoutineFreq = "daily" | "weekly" | "monthly" | "interval";
+export type RoutineTrigger = "schedule" | "on_complete";
 
 export type Routine = {
   id: string;
@@ -30,6 +31,9 @@ export type Routine = {
   windowEnd: string;
   nextFireAt: string | null;
   lastAckedAt: string | null;
+  triggerType: RoutineTrigger;
+  parentRoutineId: string | null;
+  offsetMinutes: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +52,9 @@ export type CreateRoutineInput = {
   intervalMinutes?: number | null;
   windowStart?: string;
   windowEnd?: string;
+  triggerType?: RoutineTrigger;
+  parentRoutineId?: string | null;
+  offsetMinutes?: number | null;
 };
 
 export type UpdateRoutineInput = Partial<CreateRoutineInput>;
@@ -73,6 +80,11 @@ function applyRoutinePatch(
     next.intervalMinutes = input.intervalMinutes ?? null;
   if (input.windowStart !== undefined) next.windowStart = input.windowStart;
   if (input.windowEnd !== undefined) next.windowEnd = input.windowEnd;
+  if (input.triggerType !== undefined) next.triggerType = input.triggerType;
+  if (input.parentRoutineId !== undefined)
+    next.parentRoutineId = input.parentRoutineId ?? null;
+  if (input.offsetMinutes !== undefined)
+    next.offsetMinutes = input.offsetMinutes ?? null;
   return next;
 }
 

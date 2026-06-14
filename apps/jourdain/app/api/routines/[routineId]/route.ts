@@ -4,6 +4,7 @@ import { createServerClient } from "@/utils/supabase/server";
 import {
   ROUTINE_DOMAINS,
   ROUTINE_FREQS,
+  ROUTINE_TRIGGERS,
   deleteRoutine,
   getRoutine,
   materializeForUser,
@@ -28,6 +29,9 @@ const updateRoutineSchema = z.object({
   intervalMinutes: z.number().int().min(1).max(1440).nullish(),
   windowStart: hhmm.optional(),
   windowEnd: hhmm.optional(),
+  triggerType: z.enum(ROUTINE_TRIGGERS).optional(),
+  parentRoutineId: z.string().uuid().nullish(),
+  offsetMinutes: z.number().int().min(0).max(525600).nullish(),
 });
 
 function unauthorized() {

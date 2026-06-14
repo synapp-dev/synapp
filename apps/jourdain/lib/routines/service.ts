@@ -13,6 +13,9 @@ export type RoutineDomain = (typeof ROUTINE_DOMAINS)[number];
 export const ROUTINE_FREQS = ["daily", "weekly", "monthly", "interval"] as const;
 export type RoutineFreq = (typeof ROUTINE_FREQS)[number];
 
+export const ROUTINE_TRIGGERS = ["schedule", "on_complete"] as const;
+export type RoutineTrigger = (typeof ROUTINE_TRIGGERS)[number];
+
 export type Routine = {
   id: string;
   title: string;
@@ -25,12 +28,15 @@ export type Routine = {
   remindTime: string;
   timezone: string;
   active: boolean;
-  // Interval ("ping") fields.
   intervalMinutes: number | null;
   windowStart: string;
   windowEnd: string;
   nextFireAt: string | null;
   lastAckedAt: string | null;
+  // Completion-trigger fields.
+  triggerType: RoutineTrigger;
+  parentRoutineId: string | null;
+  offsetMinutes: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -49,6 +55,9 @@ export type CreateRoutineInput = {
   intervalMinutes?: number | null;
   windowStart?: string;
   windowEnd?: string;
+  triggerType?: RoutineTrigger;
+  parentRoutineId?: string | null;
+  offsetMinutes?: number | null;
 };
 
 export type UpdateRoutineInput = Partial<CreateRoutineInput>;
@@ -70,12 +79,15 @@ type RoutineRow = {
   window_end: string;
   next_fire_at: string | null;
   last_acked_at: string | null;
+  trigger_type: RoutineTrigger;
+  parent_routine_id: string | null;
+  offset_minutes: number | null;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  "id, title, notes, domain, priority, freq, days_of_week, day_of_month, remind_time, timezone, active, interval_minutes, window_start, window_end, next_fire_at, last_acked_at, created_at, updated_at";
+  "id, title, notes, domain, priority, freq, days_of_week, day_of_month, remind_time, timezone, active, interval_minutes, window_start, window_end, next_fire_at, last_acked_at, trigger_type, parent_routine_id, offset_minutes, created_at, updated_at";
 
 function toRoutine(row: RoutineRow): Routine {
   return {
@@ -95,6 +107,9 @@ function toRoutine(row: RoutineRow): Routine {
     windowEnd: row.window_end.slice(0, 5),
     nextFireAt: row.next_fire_at,
     lastAckedAt: row.last_acked_at,
+    triggerType: row.trigger_type,
+    parentRoutineId: row.parent_routine_id,
+    offsetMinutes: row.offset_minutes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -148,14 +163,16 @@ export async function createRoutine(
       interval_minutes: input.intervalMinutes ?? null,
       window_start: input.windowStart ?? "08:00",
       window_end: input.windowEnd ?? "21:00",
+      trigger_type: input.triggerType ?? "schedule",
+      parent_routine_id: input.parentRoutineId ?? null,
+      offset_minutes: input.offsetMinutes ?? null,
     })
     .select(COLUMNS)
     .single();
   if (error) throw new Error(error.message);
   const routine = toRoutine(data as RoutineRow);
 
-  // Interval routines need their first fire time computed immediately.
-  if (routine.freq === "interval") {
+  if (routine.freq === "interval" && routine.triggerType === "schedule") {
     routine.nextFireAt = await advancePing(routine.id);
   }
   return routine;
@@ -181,6 +198,11 @@ export async function updateRoutine(
     patch.interval_minutes = input.intervalMinutes;
   if (input.windowStart !== undefined) patch.window_start = input.windowStart;
   if (input.windowEnd !== undefined) patch.window_end = input.windowEnd;
+  if (input.triggerType !== undefined) patch.trigger_type = input.triggerType;
+  if (input.parentRoutineId !== undefined)
+    patch.parent_routine_id = input.parentRoutineId;
+  if (input.offsetMinutes !== undefined)
+    patch.offset_minutes = input.offsetMinutes;
 
   const { data, error } = await supabase
     .from("routines")
@@ -191,8 +213,7 @@ export async function updateRoutine(
   if (error) throw new Error(error.message);
   const routine = toRoutine(data as RoutineRow);
 
-  // Recompute the next fire after schedule changes to an interval routine.
-  if (routine.freq === "interval") {
+  if (routine.freq === "interval" && routine.triggerType === "schedule") {
     routine.nextFireAt = await advancePing(routine.id);
   }
   return routine;
@@ -226,7 +247,7 @@ export async function ackPing(
   return toRoutine(data as RoutineRow);
 }
 
-/** Spawn today's due (task-kind) occurrences for the user — tz-aware, idempotent. */
+/** Spawn today's due (scheduled task-kind) occurrences — tz-aware, idempotent. */
 export async function materializeForUser(userId: string): Promise<number> {
   const admin = createAdminClient();
   const { data, error } = await admin.rpc("materialize_due_routines", {
