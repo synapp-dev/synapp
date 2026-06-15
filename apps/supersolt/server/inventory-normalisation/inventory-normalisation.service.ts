@@ -5,8 +5,12 @@ import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import { assertInventorySetupWriteAccess } from "@/server/inventory-setup/inventory-setup-auth";
 import { classifyRawItemBucket } from "@/server/inventory-normalisation/classify-raw-item-bucket";
-import { attachSimilarPendingItems } from "@/server/inventory-normalisation/find-similar-pending-raw-items";
+import {
+  attachSimilarPendingItems,
+  descriptionsLikelySameProduct,
+} from "@/server/inventory-normalisation/find-similar-pending-raw-items";
 import type { SimilarPendingRawItem } from "@/server/inventory-normalisation/find-similar-pending-raw-items";
+import { extractPackHint } from "@/server/inventory-normalisation/extract-pack-hint";
 import { computeCostPerBaseUnitCents } from "@/server/inventory-normalisation/compute-cost-per-base-unit";
 import {
   normaliseCommitBodySchema,
@@ -219,6 +223,27 @@ export const inventoryNormalisationService = {
       venueId: scope.venueId,
     });
 
+    // Gather this product's quantity variants so a pack size ("@160g") written
+    // on any one of them seeds the suggestion — even when normalising the bare
+    // product line that omits it.
+    const supplierItems = await ctx.appDb.rls((tx) =>
+      supplierRawItemsRepo.listForSupplier(tx, {
+        organisationId: scope.organisationId,
+        supplierId: rawItem.supplierId,
+      }),
+    );
+    const groupDescriptions = [
+      rawItem.rawDescription,
+      ...supplierItems
+        .filter(
+          (item) =>
+            item.id !== rawItem.id &&
+            descriptionsLikelySameProduct(item.rawDescription, rawItem.rawDescription),
+        )
+        .map((item) => item.rawDescription),
+    ];
+    const packHint = extractPackHint(groupDescriptions);
+
     try {
       const suggestion = await suggestNormalisationForRawItem({
         rawDescription: rawItem.rawDescription,
@@ -228,6 +253,7 @@ export const inventoryNormalisationService = {
         lastLineTotalCents: rawItem.lastLineTotalCents,
         lastQuantity:
           rawItem.lastQuantity != null ? Number(rawItem.lastQuantity) : null,
+        packHint,
       });
 
       console.info("[inventory-normalisation] suggest_completed", {

@@ -6,6 +6,7 @@ import {
   type NormalisationSuggestion,
 } from "@/server/inventory-normalisation/inventory-normalisation.schemas";
 import { classifyRawItemBucket } from "@/server/inventory-normalisation/classify-raw-item-bucket";
+import type { PackHint } from "@/server/inventory-normalisation/extract-pack-hint";
 
 export class SuggestUnavailableError extends Error {
   constructor(message: string) {
@@ -78,6 +79,8 @@ export async function suggestNormalisationForRawItem(args: {
   lastUnitPriceCents: number | null;
   lastLineTotalCents: number | null;
   lastQuantity: number | null;
+  /** Deterministic pack size extracted from the invoice wording (e.g. "@160g"). */
+  packHint?: PackHint | null;
 }): Promise<NormalisationSuggestion> {
   const keywordBucket = classifyRawItemBucket({
     rawDescription: args.rawDescription,
@@ -96,6 +99,17 @@ export async function suggestNormalisationForRawItem(args: {
       const likelyNonInventory =
         suggestion.likelyNonInventory || keywordBucket === "likely_non_inventory";
 
+      // A deterministic pack size from the invoice wording ("@160g") beats the
+      // LLM's guess for the pack fields — but never overrides a non-inventory line.
+      const packOverride =
+        args.packHint && !likelyNonInventory
+          ? {
+              packLabel: args.packHint.packLabel,
+              unitsPerPack: args.packHint.unitsPerPack,
+              packUnit: args.packHint.packUnit,
+            }
+          : {};
+
       return {
         ...suggestion,
         likelyNonInventory,
@@ -111,6 +125,7 @@ export async function suggestNormalisationForRawItem(args: {
           lastLineTotalCents: args.lastLineTotalCents,
           lastQuantity: args.lastQuantity,
         }),
+        ...packOverride,
       };
     } catch (error) {
       lastError = error;
