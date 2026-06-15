@@ -4,13 +4,15 @@ import { Check, Lock } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import type { InventorySetupStep } from "@/entities/inventory-setup/model/types";
 
-export function SetupStepperBanner({ steps }: { steps: InventorySetupStep[] }) {
+export function SetupStepperBanner({
+  steps,
+  className,
+}: {
+  steps: InventorySetupStep[];
+  className?: string;
+}) {
   return (
-    <div className="rounded-lg border bg-muted/30 px-4 py-3">
-      <p className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
-        Inventory setup
-      </p>
-      <ol className="flex flex-wrap items-center gap-2">
+    <ol className={cn("flex flex-wrap items-center gap-2", className)}>
         {steps.map((step, index) => (
           <li key={step.id} className="flex items-center gap-2">
             {index > 0 ? (
@@ -37,7 +39,6 @@ export function SetupStepperBanner({ steps }: { steps: InventorySetupStep[] }) {
             </span>
           </li>
         ))}
-      </ol>
-    </div>
+    </ol>
   );
 }

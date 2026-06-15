@@ -310,7 +310,9 @@ export const inventorySetupService = {
       const invoiceSync = await syncVenueXeroInvoices(ctx, {
         organisationSlug: args.organisationSlug,
         venueSlug: args.venueSlug,
-        daysBack: args.daysBack ?? 365,
+        // Only the last 8 weeks of bills — recent invoices are what matter for
+        // learning a supplier's items, and it keeps PDF parsing cheap.
+        daysBack: args.daysBack ?? 56,
         skipApiLineItems: true,
       });
       await tracker?.completeStep("invoices", `${invoiceSync.synced} invoices synced`);

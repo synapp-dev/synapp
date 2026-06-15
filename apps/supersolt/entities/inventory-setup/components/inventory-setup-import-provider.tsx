@@ -32,6 +32,12 @@ import { inventorySetupKeys } from "@/entities/inventory-setup/model/keys";
 import { useInventorySetupImportJobSubscription } from "@/entities/inventory-setup/model/useInventorySetupImportJobSubscription";
 import { suppliersKeys } from "@/entities/suppliers/model/keys";
 
+/** True once a Xero job step has finished (either completed or skipped). */
+function isXeroStepDone(job: ImportJobRow, stepId: string): boolean {
+  const step = job.steps.find((s) => s.id === stepId);
+  return step?.status === "complete" || step?.status === "skipped";
+}
+
 type InventorySetupImportContextValue = {
   activeJob: ImportJobRow | null;
   activeJobId: string | null;
@@ -58,6 +64,7 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
   const [isStarting, setIsStarting] = useState(false);
   const autoOpenedForJobRef = useRef<string | null>(null);
   const completionHandledForJobRef = useRef<string | null>(null);
+  const suppliersReadyHandledForJobRef = useRef<string | null>(null);
 
   const activeJob = useInventorySetupImportJobSubscription({
     organisationSlug: organisationSlug ?? "",
@@ -89,6 +96,7 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
     setActiveJobId(null);
     setIsStarting(false);
     autoOpenedForJobRef.current = null;
+    suppliersReadyHandledForJobRef.current = null;
     await invalidateAfterImport();
   }, [activeJobId, invalidateAfterImport, organisationSlug, venueSlug]);
 
@@ -177,6 +185,7 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
       clearImportJobDialogDismissed(job.id);
       autoOpenedForJobRef.current = null;
       completionHandledForJobRef.current = null;
+      suppliersReadyHandledForJobRef.current = null;
       setActiveJobId(job.id);
       setDialogOpen(true);
 
@@ -205,6 +214,27 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
     }
     setDialogOpen(false);
   }, [activeJob, activeJobId]);
+
+  // Once suppliers + invoices are synced, the supplier rows exist in the DB even
+  // though invoice PDFs are still parsing. Surface them in the table right away
+  // and drop the modal to the header progress pill, so the user can start editing
+  // supplier details without waiting for the (slow) parsing to finish.
+  useEffect(() => {
+    if (!activeJobId || !activeJob) return;
+    if (activeJob.jobType !== "xero") return;
+    if (!isImportJobInProgress(activeJob)) return;
+    if (suppliersReadyHandledForJobRef.current === activeJobId) return;
+    if (
+      !isXeroStepDone(activeJob, "suppliers") ||
+      !isXeroStepDone(activeJob, "invoices")
+    ) {
+      return;
+    }
+
+    suppliersReadyHandledForJobRef.current = activeJobId;
+    void invalidateAfterImport();
+    dismissDialog();
+  }, [activeJob, activeJobId, dismissDialog, invalidateAfterImport]);
 
   const value = useMemo<InventorySetupImportContextValue>(
     () => ({

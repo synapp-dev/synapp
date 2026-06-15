@@ -11,7 +11,6 @@ import { Input } from "@workspace/ui/components/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { buildScopedPath } from "@/lib/build-scoped-path";
 import { isInventorySetupSectionsUnlockedForDev } from "@/lib/inventory-setup/dev-unlock-all-sections";
-import { SetupStepperBanner } from "@/entities/inventory-setup/components/setup-stepper-banner";
 import { useInventorySetupProgressQuery } from "@/entities/inventory-setup/model/useInventorySetupProgressQuery";
 import { NormalisationWizardSheet } from "@/entities/inventory-normalisation/components/normalisation-wizard-sheet";
 import { useNormalisationQueueQuery } from "@/entities/inventory-normalisation/model/useNormalisationQueueQuery";
@@ -341,8 +340,6 @@ export function NormalisationQueuePage({ organisation, venue }: NormalisationQue
 
   return (
     <div className="space-y-5">
-      {progress ? <SetupStepperBanner steps={progress.steps} /> : null}
-
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Normalise supplier items</h2>

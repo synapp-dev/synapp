@@ -199,6 +199,17 @@ function xeroModifiedSinceHeader(daysBack: number): string | undefined {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T00:00:00`;
 }
 
+/** YYYY-MM-DD `daysBack` ago — used to filter Xero invoices by their invoice Date. */
+function xeroDateSinceFilter(daysBack: number): string | undefined {
+  if (daysBack <= 0) {
+    return undefined;
+  }
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() - daysBack);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+}
+
 export async function listVenueXeroInvoices(
   ctx: RequestAuthContext,
   args: {
@@ -312,11 +323,13 @@ export async function syncVenueXeroInvoices(
       : 90;
 
   const modifiedSince = xeroModifiedSinceHeader(daysBack);
+  const dateSince = xeroDateSinceFilter(daysBack);
 
   let listed = await listXeroAccpayInvoices({
     accessToken: token.accessToken,
     tenantId: connection.xeroTenantId,
     modifiedSince,
+    dateSince,
   });
 
   if (listed.ok && listed.invoices.length === 0 && modifiedSince) {
@@ -324,9 +337,11 @@ export async function syncVenueXeroInvoices(
       venueId: context.venueId,
       modifiedSince,
     });
+    // Keep the invoice-date window on the retry; only drop the update-time header.
     listed = await listXeroAccpayInvoices({
       accessToken: token.accessToken,
       tenantId: connection.xeroTenantId,
+      dateSince,
     });
   }
 

@@ -4,7 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Building2, Download, Loader2, Plus, Search, SlidersHorizontal, X } from "lucide-react";
+import {
+  Building2,
+  Download,
+  LayoutGrid,
+  List,
+  Loader2,
+  Plus,
+  Search,
+  SlidersHorizontal,
+  Upload,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -38,9 +49,8 @@ import { buildScopedPath } from "@/lib/build-scoped-path";
 import { xeroApi } from "@/entities/xero/api/endpoints";
 import { useVenueXeroConnectionQuery } from "@/entities/xero/model/use-venue-xero-connection";
 import { suppliersKeys } from "@/entities/suppliers/model/keys";
-import { useInventorySetupProgressQuery } from "@/entities/inventory-setup/model/useInventorySetupProgressQuery";
 import { useInventorySetupImport } from "@/entities/inventory-setup/components/inventory-setup-import-provider";
-import { SetupStepperBanner } from "@/entities/inventory-setup/components/setup-stepper-banner";
+import { InvoiceUploadDialog } from "@/entities/invoices/components/invoice-upload-dialog";
 
 type SuppliersPageClientProps = {
   organisation: string;
@@ -59,6 +69,11 @@ const CATEGORIES: Array<{ value: SupplierCategory; label: string }> = [
 ];
 
 const ORDER_METHODS = ["Email", "Phone", "WhatsApp", "Portal", "Other"] as const;
+
+const FIRST_RUN_CARD_CLASS =
+  "group flex flex-col items-center gap-2 rounded-xl border bg-card p-5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-60";
+const FIRST_RUN_ICON_CLASS =
+  "flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:text-foreground";
 
 function formatCurrency(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-AU", {
@@ -108,11 +123,6 @@ export function SuppliersPageClient({
     inventorySetupMode ? "settings/inventory-setup/suppliers" : "purchasing/suppliers",
   );
   const xeroConnection = useVenueXeroConnectionQuery(organisation, venue);
-  const setupProgressQuery = useInventorySetupProgressQuery({
-    organisationSlug: organisation,
-    venueSlug: venue,
-    enabled: inventorySetupMode,
-  });
   const inventorySetupImport = useInventorySetupImport();
   const isSetupImportRunning = inventorySetupMode
     ? inventorySetupImport.isImportInProgress
@@ -160,6 +170,7 @@ export function SuppliersPageClient({
   const sort = useSuppliersFilterStore((state) => state.sort);
   const page = useSuppliersFilterStore((state) => state.page);
   const pageSize = useSuppliersFilterStore((state) => state.pageSize);
+  const viewMode = useSuppliersFilterStore((state) => state.viewMode);
   const setSearch = useSuppliersFilterStore((state) => state.setSearch);
   const setCategory = useSuppliersFilterStore((state) => state.setCategory);
   const setStatus = useSuppliersFilterStore((state) => state.setStatus);
@@ -168,6 +179,7 @@ export function SuppliersPageClient({
   const setSort = useSuppliersFilterStore((state) => state.setSort);
   const setPage = useSuppliersFilterStore((state) => state.setPage);
   const setPageSize = useSuppliersFilterStore((state) => state.setPageSize);
+  const setViewMode = useSuppliersFilterStore((state) => state.setViewMode);
   const resetFilters = useSuppliersFilterStore((state) => state.reset);
 
   const suppliersQuery = useSuppliersQuery({
@@ -201,6 +213,18 @@ export function SuppliersPageClient({
     archived ||
     hasProducts !== "all" ||
     sort !== "name";
+
+  // Brand-new venue with no suppliers and nothing filtered out — show a guided
+  // "import your first supplier" empty state instead of the filters + table.
+  const isEmptyFirstRun =
+    !suppliersQuery.isLoading &&
+    !suppliersQuery.isError &&
+    totalItems === 0 &&
+    !hasActiveFilters;
+
+  // The persisted view preference only applies after hydration, so SSR/first
+  // paint always renders the table and avoids a hydration mismatch.
+  const effectiveView = isHydrated ? viewMode : "table";
 
   useEffect(() => {
     setIsHydrated(true);
@@ -285,10 +309,8 @@ export function SuppliersPageClient({
   return (
     <>
       <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
-        {inventorySetupMode && setupProgressQuery.data ? (
-          <SetupStepperBanner steps={setupProgressQuery.data.steps} />
-        ) : null}
         {hidePageHeader ? (
+          isEmptyFirstRun ? null : (
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="flex flex-wrap items-center gap-2">
               {xeroConnection.data?.connected ? (
@@ -319,6 +341,7 @@ export function SuppliersPageClient({
               )}
             </div>
           </div>
+          )
         ) : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -326,6 +349,7 @@ export function SuppliersPageClient({
                 <Building2 className="h-5 w-5 text-muted-foreground" />
                 Suppliers
               </h1>
+              {isEmptyFirstRun ? null : (
               <div className="flex flex-wrap items-center gap-2">
                 {xeroConnection.data?.connected ? (
                   <Button
@@ -356,11 +380,85 @@ export function SuppliersPageClient({
                   </Button>
                 )}
               </div>
+              )}
             </div>
             <Separator />
           </>
         )}
 
+        {isEmptyFirstRun ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-7 py-12">
+            <div className="text-center">
+              <h2 className="text-lg font-semibold">Import your first supplier</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pick how you'd like to get started.
+              </p>
+            </div>
+            <div className="grid w-full max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+              {xeroConnection.data?.connected ? (
+                <button
+                  type="button"
+                  className={FIRST_RUN_CARD_CLASS}
+                  disabled={inventorySetupMode ? isSetupImportRunning : xeroImport.isPending}
+                  onClick={() => void xeroImport.mutate()}
+                >
+                  <span className={FIRST_RUN_ICON_CLASS}>
+                    {(inventorySetupMode ? isSetupImportRunning : xeroImport.isPending) ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Download className="h-5 w-5" />
+                    )}
+                  </span>
+                  <span className="text-sm font-medium">Import from Xero</span>
+                  <span className="text-xs text-muted-foreground">
+                    Pull in your supplier contacts and invoices automatically.
+                  </span>
+                </button>
+              ) : (
+                <Link href={integrationsPath} className={FIRST_RUN_CARD_CLASS}>
+                  <span className={FIRST_RUN_ICON_CLASS}>
+                    <Download className="h-5 w-5" />
+                  </span>
+                  <span className="text-sm font-medium">Import from Xero</span>
+                  <span className="text-xs text-muted-foreground">
+                    Connect Xero to import your existing suppliers.
+                  </span>
+                </Link>
+              )}
+
+              <InvoiceUploadDialog
+                organisation={organisation}
+                venue={venue}
+                trigger={
+                  <button type="button" className={FIRST_RUN_CARD_CLASS}>
+                    <span className={FIRST_RUN_ICON_CLASS}>
+                      <Upload className="h-5 w-5" />
+                    </span>
+                    <span className="text-sm font-medium">Upload invoice</span>
+                    <span className="text-xs text-muted-foreground">
+                      We'll read it and pull out the supplier and items.
+                    </span>
+                  </button>
+                }
+              />
+
+              <button
+                type="button"
+                className={FIRST_RUN_CARD_CLASS}
+                onClick={openCreateSheet}
+              >
+                <span className={FIRST_RUN_ICON_CLASS}>
+                  <Plus className="h-5 w-5" />
+                </span>
+                <span className="text-sm font-medium">Add manually</span>
+                <span className="text-xs text-muted-foreground">
+                  Enter a supplier's contact and ordering details yourself.
+                </span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="relative">
             <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -462,10 +560,123 @@ export function SuppliersPageClient({
                   Clear
                 </Button>
               ) : null}
+
+              {isHydrated ? (
+                <div className="inline-flex items-center rounded-md border p-0.5">
+                  <Button
+                    type="button"
+                    variant={effectiveView === "table" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    aria-label="Table view"
+                    aria-pressed={effectiveView === "table"}
+                    onClick={() => setViewMode("table")}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={effectiveView === "cards" ? "secondary" : "ghost"}
+                    size="sm"
+                    className="h-7 w-7 p-0"
+                    aria-label="Card view"
+                    aria-pressed={effectiveView === "cards"}
+                    onClick={() => setViewMode("cards")}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
 
+        {effectiveView === "cards" ? (
+          <div className="min-h-0 flex-1 overflow-auto">
+            {suppliersQuery.isLoading ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Loading suppliers...
+              </p>
+            ) : suppliersQuery.isError ? (
+              <p className="py-10 text-center text-sm text-destructive">
+                {suppliersQuery.error.message}
+              </p>
+            ) : suppliers.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No suppliers match your filters.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={openCreateSheet}
+                  className="flex min-h-[160px] items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-4 text-sm font-medium text-primary transition-colors hover:bg-primary/10"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add new supplier
+                </button>
+
+                {suppliers.map((supplier) => (
+                  <button
+                    key={supplier.id}
+                    type="button"
+                    onClick={() => openSupplierDetailSheet(supplier.id)}
+                    className="group flex flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-teal-50 dark:bg-teal-900/20">
+                          <Building2 className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                        </div>
+                        <span className="truncate font-medium">{supplier.name}</span>
+                      </div>
+                      {supplier.active ? (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+                        </span>
+                      ) : (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
+                          <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> Inactive
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="w-fit rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                      {categoryLabel(supplier.category)}
+                    </span>
+
+                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                      <div className="min-w-0">
+                        <dt className="text-xs text-muted-foreground">Contact</dt>
+                        <dd className="truncate">
+                          {supplier.contactPerson || supplier.email || "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Last invoice</dt>
+                        <dd className="text-muted-foreground">
+                          {supplier.lastInvoiceDate ?? "—"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Products</dt>
+                        <dd className="tabular-nums">{supplier.productCount}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs text-muted-foreground">YTD spend</dt>
+                        <dd className="font-medium tabular-nums">
+                          {supplier.ytdSpendCents > 0
+                            ? formatCurrency(supplier.ytdSpendCents)
+                            : "—"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
         <Card className="flex-1 overflow-hidden gap-0 py-0">
           <CardContent className="flex h-full min-h-0 flex-col px-0 py-0">
             <div className="min-h-0 flex-1 overflow-auto">
@@ -599,6 +810,7 @@ export function SuppliersPageClient({
             </div>
           </CardContent>
         </Card>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-1">
           <p className="text-xs text-muted-foreground">
@@ -720,6 +932,8 @@ export function SuppliersPageClient({
             </Pagination>
           </div>
         </div>
+          </>
+        )}
       </section>
 
       <Sheet

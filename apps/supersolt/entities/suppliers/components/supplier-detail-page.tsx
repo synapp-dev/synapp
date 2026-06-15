@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,7 +31,6 @@ import { Card } from "@workspace/ui/components/card";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
-import { Separator } from "@workspace/ui/components/separator";
 import { Switch } from "@workspace/ui/components/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
@@ -286,16 +285,6 @@ export function SupplierDetailPageClient({
     }
   }
 
-  const spendMetrics = useMemo(
-    () => ({
-      orderCount: orders.length,
-      thisMonthCents: draft?.ytdSpendCents ?? 0,
-      lastMonthCents: 0,
-      allTimeCents: draft?.ytdSpendCents ?? 0,
-    }),
-    [orders.length, draft?.ytdSpendCents],
-  );
-
   if (supplierQuery.isLoading || !draft) {
     if (supplierQuery.isError) {
       const errorBody = (
@@ -344,35 +333,8 @@ export function SupplierDetailPageClient({
     </Button>
   );
 
-  const statsAndTabs = (
+  const tabsSection = (
     <>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground">Products</p>
-          <p className="text-2xl font-semibold tabular-nums">{productTotal}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground">Orders</p>
-          <p className="text-2xl font-semibold tabular-nums">{spendMetrics.orderCount}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-xs font-medium text-muted-foreground">This month</p>
-          <p className="text-2xl font-semibold tabular-nums">{formatCurrency(spendMetrics.thisMonthCents)}</p>
-        </Card>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="p-3">
-          <p className="text-xs text-muted-foreground">Last month</p>
-          <p className="text-lg font-medium tabular-nums">{formatCurrency(spendMetrics.lastMonthCents)}</p>
-        </Card>
-        <Card className="p-3">
-          <p className="text-xs text-muted-foreground">All time</p>
-          <p className="text-lg font-medium tabular-nums">{formatCurrency(spendMetrics.allTimeCents)}</p>
-        </Card>
-      </div>
-
-      <Separator />
-
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex h-auto flex-wrap gap-1">
           <TabsTrigger value="details" className="gap-1.5">
@@ -394,15 +356,15 @@ export function SupplierDetailPageClient({
               Products ({productTotal})
             </TabsTrigger>
           )}
+          <TabsTrigger value="invoices" className="gap-1.5">
+            <FileText className="h-4 w-4" />
+            Invoices ({invoices.length})
+          </TabsTrigger>
           {!inventorySetupMode ? (
             <>
               <TabsTrigger value="orders" className="gap-1.5">
                 <ShoppingCart className="h-4 w-4" />
                 Orders ({orders.length})
-              </TabsTrigger>
-              <TabsTrigger value="invoices" className="gap-1.5">
-                <FileText className="h-4 w-4" />
-                Invoices ({invoices.length})
               </TabsTrigger>
               <TabsTrigger value="prices" className="gap-1.5">
                 <TrendingUp className="h-4 w-4" />
@@ -1083,7 +1045,7 @@ export function SupplierDetailPageClient({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 md:px-5">
-          {statsAndTabs}
+          {tabsSection}
           <SupplierProductFormSheet
             open={productSheetOpen}
             onOpenChange={setProductSheetOpen}
@@ -1129,7 +1091,7 @@ export function SupplierDetailPageClient({
         </BreadcrumbList>
       </Breadcrumb>
 
-      {statsAndTabs}
+      {tabsSection}
       <SupplierProductFormSheet
         open={productSheetOpen}
         onOpenChange={setProductSheetOpen}

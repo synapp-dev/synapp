@@ -6,6 +6,7 @@ import {
   ReceiptText,
   Sandwich,
   ScanBarcode,
+  TrendingDown,
   TrendingUp,
   Warehouse,
   type LucideIcon,
@@ -39,13 +40,15 @@ export type TracebackStep = {
 };
 
 /**
- * Listed in reveal order (sandwich first). Rendered right-to-left so the sold
- * sandwich sits on the right and traces back — through the ingredients it uses
- * — to the supplier you ordered them from, with arrows pointing left.
+ * Listed in reveal order (sandwich first). Rendered bottom-to-top in a single
+ * column so the sold sandwich sits at the bottom and traces back — through the
+ * ingredients it uses and the stock running low — to the supplier you ordered
+ * them from, at the top, with arrows pointing up.
  */
 export const SUPPLIER_TRACEBACK: readonly TracebackStep[] = [
   { label: "Client buys a sandwich", icon: Sandwich },
   { label: "Ingredients get used", icon: Carrot },
+  { label: "Stock gets low", icon: TrendingDown },
   { label: "Order from supplier", icon: Building2 },
 ];
 

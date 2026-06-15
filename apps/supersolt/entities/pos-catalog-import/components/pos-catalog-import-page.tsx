@@ -6,8 +6,6 @@ import { toast } from "sonner";
 
 import { useScopedSettingsAccess } from "@/entities/access/model/use-scoped-settings-access";
 import { buildScopedPath } from "@/lib/build-scoped-path";
-import { SetupStepperBanner } from "@/entities/inventory-setup/components/setup-stepper-banner";
-import { useInventorySetupProgressQuery } from "@/entities/inventory-setup/model/useInventorySetupProgressQuery";
 import { usePosCatalogImport } from "@/entities/pos-catalog-import/components/pos-catalog-import-provider";
 import { PosItemModifiersCell } from "@/entities/pos-catalog-import/components/pos-item-modifiers-cell";
 import {
@@ -89,7 +87,6 @@ export function PosCatalogImportPage({
 }) {
   const access = useScopedSettingsAccess();
   const queryClient = useQueryClient();
-  const progressQuery = useInventorySetupProgressQuery({ organisationSlug, venueSlug });
   const listQuery = usePosCatalogImportQuery({ organisationSlug, venueSlug });
   const squareQuery = useVenueSquareConnectionQuery(organisationSlug, venueSlug);
   const recipesQuery = useRecipesQuery({
@@ -159,8 +156,6 @@ export function PosCatalogImportPage({
 
   return (
     <div className="space-y-4">
-      {progressQuery.data ? <SetupStepperBanner steps={progressQuery.data.steps} /> : null}
-
       {mappingBanner ? (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm">
           {mappingBanner}

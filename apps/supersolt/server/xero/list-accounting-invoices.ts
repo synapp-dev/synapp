@@ -10,6 +10,8 @@ export async function listXeroAccpayInvoices(args: {
   accessToken: string;
   tenantId: string;
   modifiedSince?: string;
+  /** YYYY-MM-DD — filters by invoice Date (Date >= dateSince), not update time. */
+  dateSince?: string;
   pageSize?: number;
 }): Promise<
   | { ok: true; invoices: XeroApiInvoice[]; httpStatuses: number[]; usedModifiedSince: boolean }
@@ -20,9 +22,17 @@ export async function listXeroAccpayInvoices(args: {
   const httpStatuses: number[] = [];
   let page = 1;
 
+  let where = 'Type=="ACCPAY"';
+  if (args.dateSince) {
+    const [y, m, d] = args.dateSince.split("-").map(Number);
+    if (y && m && d) {
+      where += ` AND Date >= DateTime(${y},${m},${d})`;
+    }
+  }
+
   for (;;) {
     const q = new URLSearchParams({
-      where: 'Type=="ACCPAY"',
+      where,
       order: "UpdatedDateUTC DESC",
       page: String(page),
       pageSize: String(pageSize),

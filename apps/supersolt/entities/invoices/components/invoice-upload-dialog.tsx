@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -21,9 +21,11 @@ import { invoiceKeys } from "@/entities/invoices/model/keys";
 type InvoiceUploadDialogProps = {
   organisation: string;
   venue: string;
+  /** Custom trigger element. Falls back to the default "Upload invoice" button. */
+  trigger?: ReactNode;
 };
 
-export function InvoiceUploadDialog({ organisation, venue }: InvoiceUploadDialogProps) {
+export function InvoiceUploadDialog({ organisation, venue, trigger }: InvoiceUploadDialogProps) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -54,10 +56,12 @@ export function InvoiceUploadDialog({ organisation, venue }: InvoiceUploadDialog
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <Upload className="mr-1.5 h-3.5 w-3.5" />
-          Upload invoice
-        </Button>
+        {trigger ?? (
+          <Button size="sm">
+            <Upload className="mr-1.5 h-3.5 w-3.5" />
+            Upload invoice
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

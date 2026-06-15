@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 
 import { cn } from "@workspace/ui/lib/utils";
 import { SUPPLIER_TRACEBACK } from "@/entities/inventory-setup/components/wizard/welcome/welcome-copy";
@@ -9,10 +9,10 @@ import { SUPPLIER_TRACEBACK } from "@/entities/inventory-setup/components/wizard
 const STEP_REVEAL_MS = 650;
 
 /**
- * Animated "everything traces back to the supplier" illustration. The sold
- * sandwich starts on the right and reveals right-to-left, with connecting
- * arrows pointing left: the sandwich → the ingredients it uses → the supplier
- * it all came from.
+ * Animated "everything traces back to the supplier" illustration. A single
+ * column that reveals bottom-to-top, with connecting arrows pointing up: the
+ * sold sandwich at the bottom → the ingredients it uses → the supplier it all
+ * came from, at the top.
  */
 export function SupplierTracebackIllustration({
   active,
@@ -41,14 +41,14 @@ export function SupplierTracebackIllustration({
   }, [active, reduceMotion, total]);
 
   return (
-    <div className="flex flex-row-reverse flex-wrap items-center justify-center gap-2 sm:gap-3">
+    <div className="flex flex-col-reverse items-center justify-center gap-2 sm:gap-3">
       {SUPPLIER_TRACEBACK.map((step, index) => {
         const shown = index < revealed;
         const Icon = step.icon;
         return (
           <React.Fragment key={step.label}>
             {index > 0 ? (
-              <ArrowLeft
+              <ArrowUp
                 className={cn(
                   "text-muted-foreground/60 h-5 w-5 shrink-0",
                   !reduceMotion && "transition-opacity duration-300",
@@ -59,7 +59,7 @@ export function SupplierTracebackIllustration({
             ) : null}
             <div
               className={cn(
-                "flex w-24 flex-col items-center gap-2 rounded-xl border p-3 text-center sm:w-28",
+                "flex w-52 flex-row items-center gap-2.5 rounded-xl border p-3 text-left",
                 "border-border bg-card",
                 !reduceMotion &&
                   "transition-all duration-500 ease-out motion-reduce:transition-none",
@@ -68,7 +68,7 @@ export function SupplierTracebackIllustration({
                   : "translate-y-2 opacity-0",
               )}
             >
-              <span className="bg-muted text-foreground/70 flex h-9 w-9 items-center justify-center rounded-full">
+              <span className="bg-muted text-foreground/70 flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
                 <Icon className="h-5 w-5" aria-hidden />
               </span>
               <span className="text-muted-foreground text-xs font-medium leading-tight">

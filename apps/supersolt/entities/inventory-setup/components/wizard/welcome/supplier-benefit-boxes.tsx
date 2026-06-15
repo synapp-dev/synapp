@@ -7,7 +7,7 @@ import { SUPPLIER_BENEFITS } from "@/entities/inventory-setup/components/wizard/
 
 const STEP_REVEAL_MS = 450;
 
-/** Three things the bot can do once suppliers are in — revealed in sequence. */
+/** Things the bot can do once suppliers are in — revealed top-to-bottom in sequence. */
 export function SupplierBenefitBoxes({
   active,
   reduceMotion,
@@ -35,7 +35,7 @@ export function SupplierBenefitBoxes({
   }, [active, reduceMotion, total]);
 
   return (
-    <div className="grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="flex w-full flex-col gap-3">
       {SUPPLIER_BENEFITS.map((benefit, index) => {
         const shown = index < revealed;
         const Icon = benefit.icon;
@@ -43,14 +43,14 @@ export function SupplierBenefitBoxes({
           <div
             key={benefit.label}
             className={cn(
-              "flex flex-col items-center gap-2 rounded-2xl border p-4 text-center",
+              "flex flex-row items-center gap-3 rounded-2xl border p-4 text-left",
               "border-border bg-card",
               !reduceMotion &&
                 "transition-all duration-500 ease-out motion-reduce:transition-none",
               shown ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
             )}
           >
-            <span className="bg-[var(--brand-supersolt-primary)]/12 text-[var(--brand-supersolt-primary)] flex h-10 w-10 items-center justify-center rounded-full">
+            <span className="bg-[var(--brand-supersolt-primary)]/12 text-[var(--brand-supersolt-primary)] flex h-10 w-10 shrink-0 items-center justify-center rounded-full">
               <Icon className="h-5 w-5" aria-hidden />
             </span>
             <span className="text-sm font-medium leading-tight">

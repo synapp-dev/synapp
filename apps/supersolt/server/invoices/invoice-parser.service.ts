@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 
@@ -8,11 +8,23 @@ const parsedLineSchema = z.object({
   unit: z.string().nullable(),
   unitPrice: z.number().nullable().describe("Unit price in dollars"),
   lineTotal: z.number().nullable().describe("Line total in dollars"),
+  isLikelyInventory: z
+    .boolean()
+    .describe(
+      "True if this row is a real purchasable product/ingredient we'd stock-count (e.g. 'Gourmet Tomato 10KG'). False for non-inventory lines like invoice references, due-date/summary rows, freight, surcharges, rounding, deposits, or totals.",
+    ),
 });
 
 const parsedInvoiceSchema = z.object({
   supplierName: z.string().nullable(),
   supplierAbn: z.string().nullable(),
+  supplierEmail: z.string().nullable().describe("Supplier's contact email, if shown"),
+  supplierPhone: z.string().nullable().describe("Supplier's phone number, if shown"),
+  supplierAddressLine1: z.string().nullable(),
+  supplierAddressLine2: z.string().nullable(),
+  supplierSuburb: z.string().nullable(),
+  supplierState: z.string().nullable().describe("Australian state, e.g. VIC, NSW"),
+  supplierPostcode: z.string().nullable(),
   invoiceNumber: z.string().nullable(),
   invoiceDate: z.string().nullable().describe("ISO date YYYY-MM-DD"),
   dueDate: z.string().nullable().describe("ISO date YYYY-MM-DD"),
@@ -65,9 +77,9 @@ export async function parseInvoiceDocument(args: {
   mimeType: string;
   bytes: Buffer;
 }): Promise<ParseInvoiceDocumentResult> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error("ANTHROPIC_API_KEY is not configured");
   }
 
   const isImage = args.mimeType.startsWith("image/");
@@ -83,7 +95,7 @@ export async function parseInvoiceDocument(args: {
     : `data:${args.mimeType};base64,${base64}`;
 
   const { object, usage } = await generateObject({
-    model: openai("gpt-4o"),
+    model: anthropic("claude-haiku-4-5"),
     schema: parsedInvoiceSchema,
     messages: [
       {
@@ -93,8 +105,10 @@ export async function parseInvoiceDocument(args: {
             type: "text",
             text:
               "Extract supplier invoice data from this Australian hospitality supplier bill. " +
-              "Return structured JSON with one lineItems entry per product row in the table. " +
+              "From the header capture the supplier's name, ABN, contact email, phone, and postal address (line 1/2, suburb, state, postcode) when shown. " +
+              "Return structured JSON with one lineItems entry per row in the table. " +
               "For each line capture description/item name, quantity, unit (if shown), unit price, and line total when present. " +
+              "Set isLikelyInventory true for real purchasable products/ingredients we'd stock-count, and false for non-inventory lines (invoice references, due-date or summary rows, freight, surcharges, rounding, deposits, totals). " +
               "Amounts in AUD dollars. Set confidence high only when all key fields are clearly readable.",
           },
           isImage
