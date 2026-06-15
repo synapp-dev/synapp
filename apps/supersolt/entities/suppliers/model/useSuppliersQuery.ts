@@ -13,6 +13,7 @@ type UseSuppliersQueryInput = {
   status?: string;
   archived?: boolean;
   hasProducts?: boolean;
+  inventorySource?: boolean;
   sort?: "name" | "last_invoice" | "ytd_spend";
   page?: number;
   pageSize?: number;
@@ -28,6 +29,7 @@ export function useSuppliersQuery(
       status: input.status,
       archived: input.archived,
       hasProducts: input.hasProducts,
+      inventorySource: input.inventorySource,
       sort: input.sort,
       page: input.page,
       pageSize: input.pageSize,

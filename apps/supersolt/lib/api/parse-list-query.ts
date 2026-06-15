@@ -44,6 +44,7 @@ export function parseSuppliersListQuery(searchParams: URLSearchParams) {
     status: parseOptionalFilter(searchParams, "status"),
     archived: searchParams.get("archived") === "true",
     hasProducts: parseOptionalBoolean(searchParams, "hasProducts"),
+    inventorySource: parseOptionalBoolean(searchParams, "inventorySource"),
     sort: sort ?? undefined,
   };
 }

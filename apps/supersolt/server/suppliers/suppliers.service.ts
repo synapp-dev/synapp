@@ -291,6 +291,7 @@ export const suppliersService = {
       status?: string;
       archived?: boolean;
       hasProducts?: boolean;
+      inventorySource?: boolean;
       sort?: "name" | "last_invoice" | "ytd_spend";
       page?: number;
       pageSize?: number;
@@ -318,6 +319,7 @@ export const suppliersService = {
         status: args.status,
         archived: args.archived,
         hasProducts: args.hasProducts,
+        inventorySource: args.inventorySource,
         sort: args.sort,
         page,
         pageSize,

@@ -42,6 +42,7 @@ export const suppliersRepo = {
       status?: string;
       archived?: boolean;
       hasProducts?: boolean;
+      inventorySource?: boolean;
       sort?: "name" | "last_invoice" | "ytd_spend";
       page: number;
       pageSize: number;
@@ -86,6 +87,10 @@ export const suppliersRepo = {
       conditions.push(eq(suppliers.active, true));
     } else if (args.status === "inactive") {
       conditions.push(eq(suppliers.active, false));
+    }
+
+    if (args.inventorySource !== undefined) {
+      conditions.push(eq(suppliers.isInventorySource, args.inventorySource));
     }
 
     const where = and(...conditions);

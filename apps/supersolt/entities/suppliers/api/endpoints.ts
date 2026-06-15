@@ -13,6 +13,7 @@ type ListSuppliersInput = {
   status?: string;
   archived?: boolean;
   hasProducts?: boolean;
+  inventorySource?: boolean;
   sort?: "name" | "last_invoice" | "ytd_spend";
   page?: number;
   pageSize?: number;
@@ -48,6 +49,11 @@ export const suppliersApi = {
         params.set("hasProducts", "true");
       } else if (input.hasProducts === false) {
         params.set("hasProducts", "false");
+      }
+      if (input.inventorySource === true) {
+        params.set("inventorySource", "true");
+      } else if (input.inventorySource === false) {
+        params.set("inventorySource", "false");
       }
       if (input.sort) {
         params.set("sort", input.sort);

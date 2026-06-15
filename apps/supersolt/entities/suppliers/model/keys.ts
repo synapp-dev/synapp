@@ -11,6 +11,7 @@ export const suppliersKeys = {
       status?: string;
       archived?: boolean;
       hasProducts?: boolean;
+      inventorySource?: boolean;
       sort?: string;
       page?: number;
       pageSize?: number;

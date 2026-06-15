@@ -204,6 +204,9 @@ export function SuppliersPageClient({
     archived,
     hasProducts:
       hasProducts === "yes" ? true : hasProducts === "no" ? false : undefined,
+    // In inventory setup, only show suppliers kept as inventory sources at the
+    // selection gate — the deselected (non-ingredient) ones are hidden here.
+    inventorySource: inventorySetupMode ? true : undefined,
     sort: sort as "name" | "last_invoice" | "ytd_spend",
     page,
     pageSize,

@@ -19,6 +19,7 @@ export async function GET(
   const fromDate = url.searchParams.get("from")?.trim() || undefined;
   const toDate = url.searchParams.get("to")?.trim() || undefined;
   const status = url.searchParams.get("status")?.trim() || undefined;
+  const supplierId = url.searchParams.get("supplierId")?.trim() || undefined;
 
   try {
     const data = await listVenueInvoices(ctx, {
@@ -28,6 +29,7 @@ export async function GET(
       fromDate,
       toDate,
       status,
+      supplierId,
     });
     return jsonDataResponse(data);
   } catch (error) {

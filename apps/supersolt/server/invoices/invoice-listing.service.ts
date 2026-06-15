@@ -21,6 +21,7 @@ export async function listVenueInvoices(
     fromDate?: string;
     toDate?: string;
     status?: string;
+    supplierId?: string;
   },
 ): Promise<InvoicesListPayload> {
   const context = await resolveInvoiceVenueScope(ctx, args.organisationSlug, args.venueSlug);
@@ -35,6 +36,7 @@ export async function listVenueInvoices(
   const rows = await ctx.appDb.rls((tx) =>
     invoicesRepo.listInvoices(tx, {
       venueId: context.venueId,
+      supplierId: args.supplierId,
       fromDate: args.fromDate,
       toDate: args.toDate,
       reviewStatus,

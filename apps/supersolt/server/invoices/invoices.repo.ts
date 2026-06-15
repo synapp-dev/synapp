@@ -38,12 +38,14 @@ export const invoicesRepo = {
     tx: RlsTx,
     args: {
       venueId: string;
+      supplierId?: string;
       fromDate?: string;
       toDate?: string;
       reviewStatus?: string | string[];
     },
   ): Promise<VenueInvoiceDbRow[]> {
     const conditions = [eq(venueInvoices.venueId, args.venueId)];
+    if (args.supplierId) conditions.push(eq(venueInvoices.supplierId, args.supplierId));
     if (args.fromDate) conditions.push(gte(venueInvoices.invoiceDate, args.fromDate));
     if (args.toDate) conditions.push(lte(venueInvoices.invoiceDate, args.toDate));
     if (args.reviewStatus) {
