@@ -58,6 +58,20 @@ export const inventorySetupApi = {
         },
       );
     },
+    parseSelectedSuppliers(
+      input: ScopedInput & { jobId: string; supplierIds: string[] },
+    ): Promise<ApiResult<ImportFromXeroAcceptedResponse>> {
+      return apiFetch<ImportFromXeroAcceptedResponse>(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/parse-selected`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            jobId: input.jobId,
+            supplierIds: input.supplierIds,
+          }),
+        },
+      );
+    },
     restart(input: ScopedInput): Promise<ApiResult<InventorySetupRestartResult>> {
       return apiFetch<InventorySetupRestartResult>(
         `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/restart`,

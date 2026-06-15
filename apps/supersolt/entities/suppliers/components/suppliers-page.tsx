@@ -37,6 +37,14 @@ import {
   SheetDescription,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
@@ -115,6 +123,11 @@ export function SuppliersPageClient({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
   const [form, setForm] = useState<UpsertSupplierInput>(createDefaultSupplier);
+  // Post-selection guided review: walk the kept suppliers one at a time while
+  // their invoices parse in the background.
+  const [review, setReview] = useState<{ id: string; name: string }[] | null>(null);
+  const [reviewIndex, setReviewIndex] = useState(0);
+  const [reviewPromptOpen, setReviewPromptOpen] = useState(false);
 
   const integrationsPath = buildScopedPath(organisation, venue, "settings/integrations");
   const suppliersListPath = buildScopedPath(
@@ -277,6 +290,47 @@ export function SuppliersPageClient({
   function openSupplierDetailSheet(supplierId: string) {
     setDetailSupplierId(supplierId);
   }
+
+  // When the user commits their supplier selection, enter the review walkthrough:
+  // flip to the card view and prompt to review each kept supplier in turn.
+  const pendingReview = inventorySetupMode ? inventorySetupImport.pendingReview : null;
+  const clearPendingReview = inventorySetupImport.clearPendingReview;
+  useEffect(() => {
+    if (!pendingReview || pendingReview.length === 0) return;
+    setReview(pendingReview);
+    setReviewIndex(0);
+    setReviewPromptOpen(true);
+    setViewMode("cards");
+    clearPendingReview();
+  }, [pendingReview, clearPendingReview, setViewMode]);
+
+  function endReview() {
+    setReview(null);
+    setReviewPromptOpen(false);
+    setReviewIndex(0);
+  }
+
+  function advanceReview() {
+    if (!review) return;
+    const next = reviewIndex + 1;
+    if (next >= review.length) {
+      endReview();
+      toast.success("All suppliers reviewed");
+      return;
+    }
+    setReviewIndex(next);
+    setReviewPromptOpen(true);
+  }
+
+  function handleDetailClose() {
+    setDetailSupplierId(null);
+    // Closing a supplier mid-review moves on to the next one.
+    if (review && !reviewPromptOpen) {
+      advanceReview();
+    }
+  }
+
+  const reviewSupplier = review?.[reviewIndex] ?? null;
 
   async function handleSave() {
     const payload: UpsertSupplierInput = {
@@ -940,7 +994,7 @@ export function SuppliersPageClient({
         open={detailSupplierId !== null}
         onOpenChange={(open) => {
           if (!open) {
-            setDetailSupplierId(null);
+            handleDetailClose();
           }
         }}
       >
@@ -960,11 +1014,52 @@ export function SuppliersPageClient({
               supplierId={detailSupplierId}
               variant="sheet"
               inventorySetupMode={inventorySetupMode}
-              onClose={() => setDetailSupplierId(null)}
+              onClose={handleDetailClose}
             />
           ) : null}
         </SheetContent>
       </Sheet>
+
+      <Dialog
+        open={reviewPromptOpen && reviewSupplier !== null}
+        onOpenChange={(open) => {
+          if (!open) endReview();
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {reviewIndex === 0 ? "Let's review your suppliers" : "Next supplier"}
+            </DialogTitle>
+            <DialogDescription>
+              We&apos;re reading {reviewSupplier?.name}&apos;s invoices in the background. While that
+              runs, let&apos;s make sure their details are right.
+              {review && review.length > 1
+                ? ` (${reviewIndex + 1} of ${review.length})`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <Button variant="ghost" onClick={endReview}>
+              Done
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={advanceReview}>
+                Skip
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!reviewSupplier) return;
+                  setReviewPromptOpen(false);
+                  openSupplierDetailSheet(reviewSupplier.id);
+                }}
+              >
+                Review {reviewSupplier?.name}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Sheet
         open={sheetOpen}

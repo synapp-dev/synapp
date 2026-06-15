@@ -6,15 +6,17 @@ import type { AppDb } from "@/server/db/create-app-db";
 
 import { inventorySetupImportJobs } from "@/server/db/schema";
 
-import type {
+import {
 
-  ImportJobRow,
+  IMPORT_JOB_SELECTION_GATE,
 
-  ImportJobStatus,
+  type ImportJobRow,
 
-  ImportJobStep,
+  type ImportJobStatus,
 
-  ImportJobType,
+  type ImportJobStep,
+
+  type ImportJobType,
 
 } from "@/server/inventory-setup/inventory-setup-import-job.types";
 
@@ -210,6 +212,30 @@ export const inventorySetupImportJobRepo = {
 
     return rows.length > 0;
 
+  },
+
+
+
+  /**
+   * Atomically leave the supplier-selection gate: only succeeds when the job is
+   * still parked (`status = running`, `currentStepId = awaiting_selection`).
+   * Moves to the first post-selection step (`invoices`). Guards against a
+   * double-submit kicking off the scoped invoice sync + parse twice.
+   */
+  async claimGate(appDb: AppDb, jobId: string): Promise<boolean> {
+    const now = new Date().toISOString();
+    const rows = await appDb.admin
+      .update(inventorySetupImportJobs)
+      .set({ currentStepId: "invoices", updatedAt: now })
+      .where(
+        and(
+          eq(inventorySetupImportJobs.id, jobId),
+          eq(inventorySetupImportJobs.status, "running"),
+          eq(inventorySetupImportJobs.currentStepId, IMPORT_JOB_SELECTION_GATE),
+        ),
+      )
+      .returning();
+    return rows.length > 0;
   },
 
 

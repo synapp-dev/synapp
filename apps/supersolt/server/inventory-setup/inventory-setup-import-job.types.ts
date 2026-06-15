@@ -34,6 +34,17 @@ export type XeroImportJobStepId =
 
 
 
+/**
+ * Sentinel `currentStepId` marking a Xero import that has finished syncing
+ * suppliers + invoices and is paused waiting for the user to choose which
+ * suppliers actually deliver inventory (Phase 2 selection gate). The job row
+ * stays `status = "running"` while parked here, so the existing CHECK
+ * constraint on `status` is untouched.
+ */
+export const IMPORT_JOB_SELECTION_GATE = "awaiting_selection";
+
+
+
 export type SquareCatalogImportStepId =
 
   | "verify_connection"

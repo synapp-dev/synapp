@@ -8,6 +8,14 @@ export type ImportJobType = "xero" | "square_catalog";
 
 
 
+/**
+ * Sentinel `currentStepId` for a Xero import paused at the supplier-selection
+ * gate (mirrors the server constant of the same name).
+ */
+export const IMPORT_JOB_SELECTION_GATE = "awaiting_selection";
+
+
+
 export type ImportJobStatus = "pending" | "running" | "completed" | "failed";
 
 

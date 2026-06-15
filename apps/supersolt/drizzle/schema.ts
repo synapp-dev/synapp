@@ -1029,6 +1029,8 @@ export const suppliers = pgTable("suppliers", {
 	minimumOrderCents: integer("minimum_order_cents").default(0).notNull(),
 	lateDeliveryGraceDays: integer("late_delivery_grace_days").default(1).notNull(),
 	xeroContactId: text("xero_contact_id"),
+	detailsSourceInvoiceDate: date("details_source_invoice_date"),
+	isInventorySource: boolean("is_inventory_source").default(true).notNull(),
 }, (table) => [
 	index("idx_suppliers_org_list").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
 	index("idx_suppliers_org_venue_list").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops"), table.venueId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
@@ -1606,6 +1608,7 @@ export const venueInvoiceLineItems = pgTable("venue_invoice_line_items", {
 	mappingMethod: text("mapping_method"),
 	sortOrder: integer("sort_order").default(0).notNull(),
 	notes: text(),
+	isLikelyInventory: boolean("is_likely_inventory"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -4101,6 +4104,7 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
 	lastInvoiceId: uuid("last_invoice_id"),
 	normalisationStatus: text("normalisation_status").default('pending').notNull(),
 	supplierProductId: uuid("supplier_product_id"),
+	isLikelyInventory: boolean("is_likely_inventory"),
 	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),

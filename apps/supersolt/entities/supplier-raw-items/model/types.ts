@@ -6,6 +6,7 @@ export type SupplierRawItemSummary = {
   lastQuantity: number | null;
   lastUnitPriceCents: number | null;
   lastLineTotalCents: number | null;
+  isLikelyInventory: boolean | null;
   source: string;
   normalisationStatus: string;
   firstSeenAt: string;
@@ -15,6 +16,19 @@ export type SupplierRawItemSummary = {
 
 export type SupplierRawItemListResponse = {
   items: SupplierRawItemSummary[];
+};
+
+/** One invoice a raw item appeared on, for the Items "Invoice (N)" source dialog. */
+export type SupplierRawItemSource = {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  parsed: boolean;
+};
+
+export type SupplierRawItemSourcesResponse = {
+  /** Keyed by raw item id → the distinct invoices it was seen on. */
+  sources: Record<string, SupplierRawItemSource[]>;
 };
 
 export type CreateSupplierRawItemInput = {

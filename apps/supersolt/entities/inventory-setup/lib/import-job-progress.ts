@@ -1,4 +1,7 @@
-import type { ImportJobRow } from "@/entities/inventory-setup/model/import-job-types";
+import {
+  IMPORT_JOB_SELECTION_GATE,
+  type ImportJobRow,
+} from "@/entities/inventory-setup/model/import-job-types";
 
 export function computeImportJobPercent(job: ImportJobRow | null): number {
   if (!job) return 0;
@@ -37,4 +40,15 @@ export function computeImportJobPercent(job: ImportJobRow | null): number {
 
 export function isImportJobInProgress(job: ImportJobRow | null): boolean {
   return job?.status === "pending" || job?.status === "running";
+}
+
+/**
+ * True when a Xero import has synced suppliers + invoices and is parked waiting
+ * for the user to choose which suppliers deliver inventory (Phase 2 gate).
+ */
+export function isImportJobAwaitingSelection(job: ImportJobRow | null): boolean {
+  return (
+    job?.status === "running" &&
+    job?.currentStepId === IMPORT_JOB_SELECTION_GATE
+  );
 }

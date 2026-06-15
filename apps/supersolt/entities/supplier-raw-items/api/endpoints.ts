@@ -2,6 +2,7 @@ import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type {
   CreateSupplierRawItemInput,
   SupplierRawItemListResponse,
+  SupplierRawItemSourcesResponse,
   SupplierRawItemSummary,
   UpdateSupplierRawItemInput,
 } from "@/entities/supplier-raw-items/model/types";
@@ -22,6 +23,13 @@ export const supplierRawItemsApi = {
       const qs = params.toString();
       const path = `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/raw-items`;
       return apiFetch<SupplierRawItemListResponse>(qs ? `${path}?${qs}` : path);
+    },
+    sources(
+      input: ScopedSupplierInput,
+    ): Promise<ApiResult<SupplierRawItemSourcesResponse>> {
+      return apiFetch<SupplierRawItemSourcesResponse>(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/raw-item-sources`,
+      );
     },
   },
   post: {

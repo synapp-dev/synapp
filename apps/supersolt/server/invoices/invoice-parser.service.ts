@@ -18,13 +18,17 @@ const parsedLineSchema = z.object({
 const parsedInvoiceSchema = z.object({
   supplierName: z.string().nullable(),
   supplierAbn: z.string().nullable(),
-  supplierEmail: z.string().nullable().describe("Supplier's contact email, if shown"),
-  supplierPhone: z.string().nullable().describe("Supplier's phone number, if shown"),
-  supplierAddressLine1: z.string().nullable(),
-  supplierAddressLine2: z.string().nullable(),
-  supplierSuburb: z.string().nullable(),
-  supplierState: z.string().nullable().describe("Australian state, e.g. VIC, NSW"),
-  supplierPostcode: z.string().nullable(),
+  // Supplier-header contact/address fields are `.optional()` rather than
+  // `.nullable()` on purpose: Anthropic structured output caps a schema at 16
+  // union-typed parameters, and every nullable field is a union. Optional
+  // fields are simply omitted when absent, so they don't count toward the cap.
+  supplierEmail: z.string().optional().describe("Supplier's contact email, if shown"),
+  supplierPhone: z.string().optional().describe("Supplier's phone number, if shown"),
+  supplierAddressLine1: z.string().optional(),
+  supplierAddressLine2: z.string().optional(),
+  supplierSuburb: z.string().optional(),
+  supplierState: z.string().optional().describe("Australian state, e.g. VIC, NSW"),
+  supplierPostcode: z.string().optional(),
   invoiceNumber: z.string().nullable(),
   invoiceDate: z.string().nullable().describe("ISO date YYYY-MM-DD"),
   dueDate: z.string().nullable().describe("ISO date YYYY-MM-DD"),
@@ -67,6 +71,7 @@ export function mapParsedInvoiceToLineInserts(
     isUnmapped: true,
     mappingMethod: null as string | null,
     sortOrder: index,
+    isLikelyInventory: line.isLikelyInventory,
     organisationId,
     venueId,
   }));

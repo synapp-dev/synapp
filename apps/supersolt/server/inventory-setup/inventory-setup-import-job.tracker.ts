@@ -2,15 +2,17 @@ import type { AppDb } from "@/server/db/create-app-db";
 
 import { inventorySetupImportJobRepo } from "@/server/inventory-setup/inventory-setup-import-job.repo";
 
-import type {
+import {
 
-  ImportJobStatus,
+  IMPORT_JOB_SELECTION_GATE,
 
-  ImportJobStep,
+  type ImportJobStatus,
 
-  ImportJobStepId,
+  type ImportJobStep,
 
-  ImportJobStepProgress,
+  type ImportJobStepId,
+
+  type ImportJobStepProgress,
 
 } from "@/server/inventory-setup/inventory-setup-import-job.types";
 
@@ -188,6 +190,20 @@ export class InventorySetupImportJobTracker {
 
     await this.persist({});
 
+  }
+
+
+
+  /**
+   * Park the job at the supplier-selection gate: suppliers + invoices are done,
+   * but parsing is deferred until the user picks inventory suppliers. The job
+   * stays `running`; only `currentStepId` + an interim `result` are persisted.
+   */
+  async pauseForSelection(result: Record<string, unknown>): Promise<void> {
+    await this.persist({
+      currentStepId: IMPORT_JOB_SELECTION_GATE,
+      result,
+    });
   }
 
 

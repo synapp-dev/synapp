@@ -84,6 +84,23 @@ export type InventorySetupProgress = {
   wizard: InventorySetupWizardModel;
 };
 
+/** Supplier shown in the import dialog's inventory-source picker. */
+export type SelectableSupplier = {
+  id: string;
+  name: string;
+  isInventorySource: boolean;
+};
+
+/**
+ * Interim job result while parked at the selection gate. Mirrors the server
+ * type; the picker reads `selectableSuppliers`.
+ */
+export type InventorySetupImportGateState = {
+  stage: "awaiting_selection";
+  suppliers: { created: number; updated: number; skipped: number; errors: string[] };
+  selectableSuppliers: SelectableSupplier[];
+};
+
 export type InventorySetupImportResult = {
   suppliers: {
     created: number;

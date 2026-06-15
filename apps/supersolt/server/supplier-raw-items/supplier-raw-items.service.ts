@@ -20,6 +20,7 @@ export type SupplierRawItemSummary = {
   lastQuantity: number | null;
   lastUnitPriceCents: number | null;
   lastLineTotalCents: number | null;
+  isLikelyInventory: boolean | null;
   source: string;
   normalisationStatus: string;
   firstSeenAt: string;
@@ -57,6 +58,7 @@ function mapRow(row: Awaited<ReturnType<typeof supplierRawItemsRepo.findById>>):
     lastQuantity: row.lastQuantity != null ? Number(row.lastQuantity) : null,
     lastUnitPriceCents: row.lastUnitPriceCents,
     lastLineTotalCents: row.lastLineTotalCents,
+    isLikelyInventory: row.isLikelyInventory,
     source: row.source,
     normalisationStatus: row.normalisationStatus,
     firstSeenAt: row.firstSeenAt,
@@ -100,7 +102,75 @@ async function assertSupplierInScope(
   }
 }
 
+/** One invoice a raw item was seen on (for the Items "Invoice (N)" source dialog). */
+export type SupplierRawItemSource = {
+  invoiceId: string;
+  invoiceNumber: string | null;
+  invoiceDate: string | null;
+  parsed: boolean;
+};
+
 export const supplierRawItemsService = {
+  /**
+   * For each raw item of a supplier, the distinct invoices whose parsed lines
+   * normalise to the same description — keyed by raw item id. Powers the Items
+   * step's "Invoice (N)" source button and its related-invoices dialog.
+   */
+  async listSources(
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string; venueSlug: string; supplierId: string },
+  ): Promise<{ sources: Record<string, SupplierRawItemSource[]> }> {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+    await assertSupplierInScope(ctx, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+      supplierId: args.supplierId,
+    });
+
+    const { rawItems, lines } = await ctx.appDb.rls(async (tx) => ({
+      rawItems: await supplierRawItemsRepo.listForSupplier(tx, {
+        organisationId: scope.organisationId,
+        supplierId: args.supplierId,
+      }),
+      lines: await supplierRawItemsRepo.listLinesForSupplierSources(tx, {
+        organisationId: scope.organisationId,
+        supplierId: args.supplierId,
+      }),
+    }));
+
+    // Group distinct invoices by the normalised line description.
+    const byNorm = new Map<string, Map<string, SupplierRawItemSource>>();
+    for (const line of lines) {
+      const desc = line.parsedDescription?.trim();
+      if (!desc) continue;
+      const norm = normalizeRawDescription(desc);
+      let invoices = byNorm.get(norm);
+      if (!invoices) {
+        invoices = new Map();
+        byNorm.set(norm, invoices);
+      }
+      if (!invoices.has(line.invoiceId)) {
+        invoices.set(line.invoiceId, {
+          invoiceId: line.invoiceId,
+          invoiceNumber: line.invoiceNumber,
+          invoiceDate: line.invoiceDate,
+          parsed: line.attachmentParsedAt != null,
+        });
+      }
+    }
+
+    const sources: Record<string, SupplierRawItemSource[]> = {};
+    for (const item of rawItems) {
+      const invoices = byNorm.get(item.rawDescriptionNormalized);
+      sources[item.id] = invoices
+        ? [...invoices.values()].sort((a, b) =>
+            (b.invoiceDate ?? "").localeCompare(a.invoiceDate ?? ""),
+          )
+        : [];
+    }
+    return { sources };
+  },
+
   async list(
     ctx: RequestAuthContext,
     args: {

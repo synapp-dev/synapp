@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import type { RequestAuthContext } from "@/server/auth/context";
 import { venueInvoices } from "@/server/db/schema";
@@ -37,6 +37,8 @@ export async function parseInvoiceAttachmentsForInventorySetup(
     venueSlug: string;
     organisationId: string;
     venueId: string;
+    /** When provided, only parse invoices belonging to these suppliers (selection gate). */
+    supplierIds?: string[];
     onProgress?: (progress: ImportJobStepProgress & { detail: string }) => Promise<void>;
   },
 ): Promise<InventorySetupInvoiceParseSummary> {
@@ -53,6 +55,9 @@ export async function parseInvoiceAttachmentsForInventorySetup(
           eq(venueInvoices.venueId, args.venueId),
           isNull(venueInvoices.archivedAt),
           isNotNull(venueInvoices.supplierId),
+          args.supplierIds
+            ? inArray(venueInvoices.supplierId, args.supplierIds)
+            : undefined,
         ),
       ),
   );

@@ -31,6 +31,7 @@ export type InvoiceLineForAggregation = {
   quantity: string | number | null;
   unitPriceCents: number | null;
   lineTotalCents: number | null;
+  isLikelyInventory: boolean | null;
   source: RawItemSource;
 };
 
@@ -287,6 +288,7 @@ export const supplierRawItemsRepo = {
         quantity: venueInvoiceLineItems.quantity,
         unitPriceCents: venueInvoiceLineItems.unitPriceCents,
         lineTotalCents: venueInvoiceLineItems.lineTotalCents,
+        isLikelyInventory: venueInvoiceLineItems.isLikelyInventory,
         attachmentParsedAt: venueInvoices.attachmentParsedAt,
       })
       .from(venueInvoiceLineItems)
@@ -309,8 +311,45 @@ export const supplierRawItemsRepo = {
         quantity: row.quantity,
         unitPriceCents: row.unitPriceCents,
         lineTotalCents: row.lineTotalCents,
+        isLikelyInventory: row.isLikelyInventory,
         source: row.attachmentParsedAt ? "invoice_parse" : "xero_api",
       }));
+  },
+
+  /**
+   * Every parsed invoice line for a supplier, with its invoice's identity and
+   * parse status. The service normalises each description and groups by it to
+   * derive, per raw item, the distinct invoices it was seen on ("Invoice (N)").
+   */
+  async listLinesForSupplierSources(
+    tx: RlsTx,
+    args: { organisationId: string; supplierId: string },
+  ): Promise<
+    Array<{
+      invoiceId: string;
+      invoiceNumber: string | null;
+      invoiceDate: string | null;
+      attachmentParsedAt: string | null;
+      parsedDescription: string | null;
+    }>
+  > {
+    return tx
+      .select({
+        invoiceId: venueInvoices.id,
+        invoiceNumber: venueInvoices.invoiceNumber,
+        invoiceDate: venueInvoices.invoiceDate,
+        attachmentParsedAt: venueInvoices.attachmentParsedAt,
+        parsedDescription: venueInvoiceLineItems.parsedDescription,
+      })
+      .from(venueInvoiceLineItems)
+      .innerJoin(venueInvoices, eq(venueInvoiceLineItems.invoiceId, venueInvoices.id))
+      .where(
+        and(
+          eq(venueInvoiceLineItems.organisationId, args.organisationId),
+          eq(venueInvoices.supplierId, args.supplierId),
+          isNull(venueInvoices.archivedAt),
+        ),
+      );
   },
 
   async upsertFromLine(
@@ -336,6 +375,12 @@ export const supplierRawItemsRepo = {
       args.line.quantity != null ? String(args.line.quantity) : null;
 
     if (existing) {
+      // "any contributing line was inventory" wins: true beats false/null.
+      const mergedIsLikelyInventory =
+        existing.isLikelyInventory === true || args.line.isLikelyInventory === true
+          ? true
+          : (args.line.isLikelyInventory ?? existing.isLikelyInventory);
+
       await supplierRawItemsRepo.update(tx, {
         rawItemId: existing.id,
         patch: {
@@ -344,6 +389,7 @@ export const supplierRawItemsRepo = {
           lastQuantity: quantity,
           lastUnitPriceCents: args.line.unitPriceCents ?? existing.lastUnitPriceCents,
           lastLineTotalCents: args.line.lineTotalCents ?? existing.lastLineTotalCents,
+          isLikelyInventory: mergedIsLikelyInventory,
           lastSeenAt: now,
           lastInvoiceId: args.line.invoiceId,
           source: args.line.source,
@@ -362,6 +408,7 @@ export const supplierRawItemsRepo = {
       lastQuantity: quantity,
       lastUnitPriceCents: args.line.unitPriceCents,
       lastLineTotalCents: args.line.lineTotalCents,
+      isLikelyInventory: args.line.isLikelyInventory,
       source: args.line.source,
       firstSeenAt: now,
       lastSeenAt: now,

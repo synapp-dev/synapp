@@ -11,6 +11,7 @@ import {
 } from "@/server/invoices/invoice-parser.service";
 import { downloadInvoiceAttachment, uploadInvoiceAttachment } from "@/server/invoices/invoice-storage";
 import { supplierProductsRepo } from "@/server/supplier-products/supplier-products.repo";
+import { suppliersRepo } from "@/server/suppliers/suppliers.repo";
 
 export type ParseableAttachment = {
   fingerprint: string;
@@ -342,6 +343,7 @@ export async function parseInvoiceAttachmentIfNeeded(
     }
 
     const now = new Date().toISOString();
+    const effectiveInvoiceDate = invoice.invoiceDate ?? parsed.invoiceDate;
     await ctx.appDb.rls(async (tx) => {
       await invoicesRepo.updateInvoice(tx, invoice.id, {
         parseConfidence: parsed.confidence,
@@ -349,7 +351,7 @@ export async function parseInvoiceAttachmentIfNeeded(
         attachmentParsedAt: now,
         attachmentParseError: null,
         invoiceNumber: invoice.invoiceNumber ?? parsed.invoiceNumber,
-        invoiceDate: invoice.invoiceDate ?? parsed.invoiceDate,
+        invoiceDate: effectiveInvoiceDate,
         dueDate: invoice.dueDate ?? parsed.dueDate,
         subtotalCents:
           invoice.subtotalCents ??
@@ -359,6 +361,25 @@ export async function parseInvoiceAttachmentIfNeeded(
           (parsed.gstTotal != null ? Math.round(parsed.gstTotal * 100) : null),
         updatedAt: now,
       });
+
+      // Enrich the supplier's contact/address from this invoice's header — most-recent invoice wins.
+      if (invoice.supplierId && effectiveInvoiceDate) {
+        await suppliersRepo.enrichDetailsFromInvoice(tx, {
+          organisationId: context.organisationId,
+          supplierId: invoice.supplierId,
+          invoiceDate: effectiveInvoiceDate,
+          details: {
+            abn: parsed.supplierAbn,
+            email: parsed.supplierEmail ?? null,
+            phone: parsed.supplierPhone ?? null,
+            addressLine1: parsed.supplierAddressLine1 ?? null,
+            addressLine2: parsed.supplierAddressLine2 ?? null,
+            suburb: parsed.supplierSuburb ?? null,
+            state: parsed.supplierState ?? null,
+            postcode: parsed.supplierPostcode ?? null,
+          },
+        });
+      }
       await invoicesRepo.insertAudit(tx, {
         invoiceId: invoice.id,
         eventType: "attachment_parsed",

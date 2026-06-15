@@ -8,6 +8,7 @@ import {
   isNotNull,
   isNull,
   max,
+  notInArray,
   or,
   sql,
   sum,
@@ -387,6 +388,123 @@ export const suppliersRepo = {
     }
 
     return linked;
+  },
+
+  /**
+   * Enrich a supplier's contact/address details from a parsed invoice header, but only
+   * when this invoice is at least as recent as the last one we sourced details from
+   * (so the most-recent invoice wins). Only non-null parsed values overwrite existing data.
+   */
+  async enrichDetailsFromInvoice(
+    tx: RlsTx,
+    args: {
+      organisationId: string;
+      supplierId: string;
+      invoiceDate: string;
+      details: {
+        abn: string | null;
+        email: string | null;
+        phone: string | null;
+        addressLine1: string | null;
+        addressLine2: string | null;
+        suburb: string | null;
+        state: string | null;
+        postcode: string | null;
+      };
+    },
+  ): Promise<boolean> {
+    const set: SupplierUpdate = {
+      detailsSourceInvoiceDate: args.invoiceDate,
+      updatedAt: new Date().toISOString(),
+    };
+    const { details } = args;
+    if (details.abn) set.abn = details.abn;
+    if (details.email) set.email = details.email;
+    if (details.phone) set.phone = details.phone;
+    if (details.addressLine1) set.addressLine1 = details.addressLine1;
+    if (details.addressLine2) set.addressLine2 = details.addressLine2;
+    if (details.suburb) set.suburb = details.suburb;
+    if (details.state) set.state = details.state;
+    if (details.postcode) set.postcode = details.postcode;
+
+    const updated = await tx
+      .update(suppliers)
+      .set(set)
+      .where(
+        and(
+          eq(suppliers.id, args.supplierId),
+          eq(suppliers.organisationId, args.organisationId),
+          isNull(suppliers.archivedAt),
+          or(
+            isNull(suppliers.detailsSourceInvoiceDate),
+            sql`${suppliers.detailsSourceInvoiceDate} <= ${args.invoiceDate}`,
+          )!,
+        ),
+      )
+      .returning({ id: suppliers.id });
+
+    return updated.length > 0;
+  },
+
+  /** Active suppliers visible to a venue, for the inventory-source selection gate. */
+  async listForVenueSelection(
+    tx: RlsTx,
+    args: { organisationId: string; venueId: string },
+  ): Promise<Array<{ id: string; name: string; isInventorySource: boolean }>> {
+    return tx
+      .select({
+        id: suppliers.id,
+        name: suppliers.name,
+        isInventorySource: suppliers.isInventorySource,
+      })
+      .from(suppliers)
+      .where(
+        and(
+          eq(suppliers.organisationId, args.organisationId),
+          venueScopeCondition(args.venueId),
+          isNull(suppliers.archivedAt),
+        ),
+      )
+      .orderBy(asc(suppliers.name));
+  },
+
+  /**
+   * Persist the inventory-source selection for a venue: the chosen suppliers
+   * become `is_inventory_source = true`, every other visible supplier `false`.
+   */
+  async setInventorySourceForVenue(
+    tx: RlsTx,
+    args: {
+      organisationId: string;
+      venueId: string;
+      selectedSupplierIds: string[];
+    },
+  ): Promise<void> {
+    const now = new Date().toISOString();
+    const scope = and(
+      eq(suppliers.organisationId, args.organisationId),
+      venueScopeCondition(args.venueId),
+      isNull(suppliers.archivedAt),
+    )!;
+
+    if (args.selectedSupplierIds.length > 0) {
+      await tx
+        .update(suppliers)
+        .set({ isInventorySource: true, updatedAt: now })
+        .where(and(scope, inArray(suppliers.id, args.selectedSupplierIds)));
+    }
+
+    await tx
+      .update(suppliers)
+      .set({ isInventorySource: false, updatedAt: now })
+      .where(
+        and(
+          scope,
+          args.selectedSupplierIds.length > 0
+            ? notInArray(suppliers.id, args.selectedSupplierIds)
+            : sql`true`,
+        ),
+      );
   },
 
   async markSupplierSyncSuccess(appDb: AppDb, venueId: string, syncedAt: string): Promise<void> {

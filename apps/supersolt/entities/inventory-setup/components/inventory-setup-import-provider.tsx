@@ -17,6 +17,7 @@ import { useScopedNavigation } from "@/entities/access/scoped-navigation-context
 import { inventorySetupApi } from "@/entities/inventory-setup/api/endpoints";
 import { ImportFromXeroProgressDialog } from "@/entities/inventory-setup/components/import-from-xero-progress-dialog";
 import {
+  isImportJobAwaitingSelection,
   isImportJobInProgress,
 } from "@/entities/inventory-setup/lib/import-job-progress";
 import {
@@ -28,6 +29,10 @@ import {
   readPersistedImportJobId,
 } from "@/entities/inventory-setup/lib/import-job-session";
 import type { ImportJobRow } from "@/entities/inventory-setup/model/import-job-types";
+import type { InventorySetupImportGateState } from "@/entities/inventory-setup/model/types";
+
+/** A supplier the user just kept, handed to the post-selection review walkthrough. */
+export type PendingReviewSupplier = { id: string; name: string };
 import { inventorySetupKeys } from "@/entities/inventory-setup/model/keys";
 import { useInventorySetupImportJobSubscription } from "@/entities/inventory-setup/model/useInventorySetupImportJobSubscription";
 import { suppliersKeys } from "@/entities/suppliers/model/keys";
@@ -44,7 +49,12 @@ type InventorySetupImportContextValue = {
   dialogOpen: boolean;
   isStarting: boolean;
   isImportInProgress: boolean;
+  isSubmittingSelection: boolean;
+  /** Set once when the user commits their supplier selection; consumed by the review walkthrough. */
+  pendingReview: PendingReviewSupplier[] | null;
+  clearPendingReview: () => void;
   startImport: () => Promise<void>;
+  submitSupplierSelection: (supplierIds: string[]) => Promise<void>;
   openDialog: () => void;
   dismissDialog: () => void;
   finishImport: () => Promise<void>;
@@ -62,6 +72,8 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [isSubmittingSelection, setIsSubmittingSelection] = useState(false);
+  const [pendingReview, setPendingReview] = useState<PendingReviewSupplier[] | null>(null);
   const autoOpenedForJobRef = useRef<string | null>(null);
   const completionHandledForJobRef = useRef<string | null>(null);
   const suppliersReadyHandledForJobRef = useRef<string | null>(null);
@@ -215,19 +227,25 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
     setDialogOpen(false);
   }, [activeJob, activeJobId]);
 
-  // Once suppliers + invoices are synced, the supplier rows exist in the DB even
-  // though invoice PDFs are still parsing. Surface them in the table right away
-  // and drop the modal to the header progress pill, so the user can start editing
-  // supplier details without waiting for the (slow) parsing to finish.
+  // Once the user has committed their supplier selection, the post-selection
+  // phase (invoice sync → PDF parse → …) begins in the background. The supplier
+  // rows already exist, so surface them in the table and drop the modal to the
+  // header progress pill. We deliberately do NOT drop to the pill while the job
+  // is parked at the selection gate — the dialog stays open showing the picker
+  // until the user commits their choice.
   useEffect(() => {
     if (!activeJobId || !activeJob) return;
     if (activeJob.jobType !== "xero") return;
     if (!isImportJobInProgress(activeJob)) return;
     if (suppliersReadyHandledForJobRef.current === activeJobId) return;
-    if (
-      !isXeroStepDone(activeJob, "suppliers") ||
-      !isXeroStepDone(activeJob, "invoices")
-    ) {
+    if (isImportJobAwaitingSelection(activeJob)) return;
+
+    const invoicesStep = activeJob.steps.find((s) => s.id === "invoices");
+    const postSelectionStarted =
+      invoicesStep?.status === "running" ||
+      invoicesStep?.status === "complete" ||
+      invoicesStep?.status === "skipped";
+    if (!isXeroStepDone(activeJob, "suppliers") || !postSelectionStarted) {
       return;
     }
 
@@ -236,6 +254,45 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
     dismissDialog();
   }, [activeJob, activeJobId, dismissDialog, invalidateAfterImport]);
 
+  const submitSupplierSelection = useCallback(
+    async (supplierIds: string[]) => {
+      if (!organisationSlug || !venueSlug || !activeJobId) return;
+      setIsSubmittingSelection(true);
+      try {
+        const { error } = await inventorySetupApi.post.parseSelectedSuppliers({
+          organisationSlug,
+          venueSlug,
+          jobId: activeJobId,
+          supplierIds,
+        });
+        if (error) throw new Error(error.message);
+
+        // Hand the kept suppliers to the review walkthrough (names from the gate state).
+        const gate = activeJob?.result
+          ? (activeJob.result as unknown as InventorySetupImportGateState)
+          : null;
+        const kept = (gate?.selectableSuppliers ?? [])
+          .filter((s) => supplierIds.includes(s.id))
+          .map((s) => ({ id: s.id, name: s.name }));
+        setPendingReview(kept.length > 0 ? kept : null);
+
+        // Suppliers exist already; let parsing run in the background and drop
+        // the dialog to the header pill so the user can edit the supplier table.
+        await invalidateAfterImport();
+        dismissDialog();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not start parsing",
+        );
+      } finally {
+        setIsSubmittingSelection(false);
+      }
+    },
+    [activeJob, activeJobId, dismissDialog, invalidateAfterImport, organisationSlug, venueSlug],
+  );
+
+  const clearPendingReview = useCallback(() => setPendingReview(null), []);
+
   const value = useMemo<InventorySetupImportContextValue>(
     () => ({
       activeJob,
@@ -243,7 +300,11 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
       dialogOpen,
       isStarting,
       isImportInProgress: isStarting || isImportJobInProgress(activeJob),
+      isSubmittingSelection,
+      pendingReview,
+      clearPendingReview,
       startImport,
+      submitSupplierSelection,
       openDialog,
       dismissDialog,
       finishImport,
@@ -251,12 +312,16 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
     [
       activeJob,
       activeJobId,
+      clearPendingReview,
+      pendingReview,
       dialogOpen,
       dismissDialog,
       finishImport,
       isStarting,
+      isSubmittingSelection,
       openDialog,
       startImport,
+      submitSupplierSelection,
     ],
   );
 
@@ -278,6 +343,8 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
             void finishImport();
           }}
           job={activeJob}
+          onSubmitSelection={submitSupplierSelection}
+          isSubmittingSelection={isSubmittingSelection}
           onFinished={() => {
             void finishImport();
           }}
