@@ -18,9 +18,14 @@ function prefersReducedMotion(): boolean {
  *
  * Resets and re-streams whenever `text` changes. When `enabled` is false the
  * length stays at 0; when the user prefers reduced motion the full text shows
- * immediately.
+ * immediately. Pass `delayMs` to hold at 0 before streaming begins — useful for
+ * syncing the typewriter with a staggered entrance animation.
  */
-export function useStreamingText(text: string, enabled: boolean): number {
+export function useStreamingText(
+  text: string,
+  enabled: boolean,
+  delayMs = 0
+): number {
   const [visibleLen, setVisibleLen] = useState(0);
 
   useEffect(() => {
@@ -35,14 +40,20 @@ export function useStreamingText(text: string, enabled: boolean): number {
 
     setVisibleLen(0);
     let n = 0;
-    const id = window.setInterval(() => {
-      n = Math.min(text.length, n + CHARS_PER_TICK);
-      setVisibleLen(n);
-      if (n >= text.length) window.clearInterval(id);
-    }, TICK_MS);
+    let interval = 0;
+    const timeout = window.setTimeout(() => {
+      interval = window.setInterval(() => {
+        n = Math.min(text.length, n + CHARS_PER_TICK);
+        setVisibleLen(n);
+        if (n >= text.length) window.clearInterval(interval);
+      }, TICK_MS);
+    }, delayMs);
 
-    return () => window.clearInterval(id);
-  }, [text, enabled]);
+    return () => {
+      window.clearTimeout(timeout);
+      window.clearInterval(interval);
+    };
+  }, [text, enabled, delayMs]);
 
   return visibleLen;
 }

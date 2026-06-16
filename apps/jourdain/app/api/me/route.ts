@@ -38,6 +38,10 @@ export async function GET() {
         : null,
     role:
       typeof user.app_metadata?.role === "string" ? user.app_metadata.role : null,
+    sex:
+      user.user_metadata?.sex === "male" || user.user_metadata?.sex === "female"
+        ? user.user_metadata.sex
+        : null,
     features: [],
   };
 

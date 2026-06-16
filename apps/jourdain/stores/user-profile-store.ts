@@ -42,6 +42,7 @@ export const useUserProfileStore = () => {
         fullName: legacyUser.name ?? null,
         avatarUrl: legacyUser.avatar_url ?? null,
         role: null,
+        sex: null,
         features: [],
       });
     },

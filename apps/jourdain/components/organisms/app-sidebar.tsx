@@ -160,6 +160,7 @@ const modulesNavItems: NavMainItem[] = [
     icon: HeartPulse,
     items: [
       { title: "Fitness", url: "/health/fitness", icon: Dumbbell },
+      { title: "Gym", url: "/health/gym/progress", icon: Dumbbell },
       { title: "Nutrition", url: "/health/nutrition", icon: Apple },
       { title: "Vitals", url: "/health/vitals", icon: Activity },
       { title: "Sleep", url: "/health/sleep", icon: Moon },

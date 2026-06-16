@@ -6,6 +6,8 @@ export type MeUser = {
   fullName: string | null;
   avatarUrl: string | null;
   role: string | null;
+  /** Biological sex, used for strength-standard benchmarks. From the user profile. */
+  sex: "male" | "female" | null;
   features: string[];
 };
 
