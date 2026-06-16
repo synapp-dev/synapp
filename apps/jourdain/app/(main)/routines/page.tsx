@@ -339,7 +339,7 @@ export default function RoutinesPage() {
           </DragOverlay>
         </DndContext>
       ) : (
-        <div className="mx-auto max-w-3xl space-y-5">
+        <div className="mx-auto w-full max-w-7xl space-y-5">
           {pings.length > 0 ? (
             <div className="space-y-2">
               <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

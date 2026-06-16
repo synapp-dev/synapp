@@ -57,7 +57,7 @@ export default function SocialRelationshipsPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-5xl space-y-6">
+    <section className="mx-auto w-full max-w-7xl space-y-6">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Relationships</h1>
         <p className="text-muted-foreground text-sm">

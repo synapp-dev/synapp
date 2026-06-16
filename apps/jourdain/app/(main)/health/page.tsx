@@ -72,7 +72,7 @@ export default function HealthPage() {
   const restingHr = latest(of(METRICS.resting_heart_rate.name));
 
   return (
-    <section className="mx-auto w-full max-w-4xl space-y-4">
+    <section className="mx-auto w-full max-w-7xl space-y-4">
       <h1 className="text-2xl font-semibold tracking-tight">Health</h1>
 
       <p className="text-sm text-muted-foreground">

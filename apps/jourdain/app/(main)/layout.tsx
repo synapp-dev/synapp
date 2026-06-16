@@ -16,17 +16,20 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // The document is the scroll container — the fixed sidebar stays put and the
+  // header sticks to the top while the page scrolls as a whole, rather than
+  // scrolling an inner pane within a viewport-locked shell.
   return (
-    <SidebarProvider className="flex h-svh max-h-svh min-h-0 w-full overflow-hidden">
+    <SidebarProvider className="flex min-h-svh w-full">
       <MeLoader />
       <Suspense fallback={null}>
         <ReminderResponder />
       </Suspense>
       <AppSidebar />
-      <div className="mx-auto flex min-h-0 min-w-0 flex-1 max-w-7xl flex-col overflow-hidden">
+      <div className="mx-auto flex min-w-0 flex-1 max-w-7xl flex-col">
         <AppHeader />
-        <SidebarInset className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-6 pb-[env(safe-area-inset-bottom)]">
+        <SidebarInset className="flex min-w-0 flex-1 flex-col">
+          <div className="flex min-w-0 flex-1 flex-col overflow-x-clip px-6 pb-[env(safe-area-inset-bottom)]">
             {children}
           </div>
         </SidebarInset>

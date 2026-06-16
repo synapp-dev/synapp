@@ -10,6 +10,7 @@ import {
 } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { TaskRow } from "@/components/molecules/task-row";
+import { WorkoutSessionCard } from "@/components/organisms/agent-workout-card";
 import { CIRCLE_CONFIG, personInitials } from "@/components/molecules/person-card";
 import type { AgentCard } from "@/entities/agent/model/types";
 import type { Person } from "@/entities/people/model/types";
@@ -18,6 +19,11 @@ import type { Task } from "@/entities/tasks/model/types";
 type AgentCardViewProps = {
   card: AgentCard;
   onToggleTask: (task: Task) => void;
+  /** When this card becomes visible (ms from render) — for staged reveals. */
+  revealDelayMs?: number;
+  /** When false, cards that choreograph their reveal render fully at rest —
+   *  used for turns that have settled into the transcript. */
+  animate?: boolean;
 };
 
 function PersonSummaryRow({ person }: { person: Person }) {
@@ -51,7 +57,12 @@ function PersonSummaryRow({ person }: { person: Person }) {
   );
 }
 
-export function AgentCardView({ card, onToggleTask }: AgentCardViewProps) {
+export function AgentCardView({
+  card,
+  onToggleTask,
+  revealDelayMs = 0,
+  animate = true,
+}: AgentCardViewProps) {
   if (card.type === "person_profile") {
     return (
       <Card className="max-w-2xl border-border/80">
@@ -87,6 +98,16 @@ export function AgentCardView({ card, onToggleTask }: AgentCardViewProps) {
           )}
         </CardContent>
       </Card>
+    );
+  }
+
+  if (card.type === "workout_session") {
+    return (
+      <WorkoutSessionCard
+        card={card}
+        revealDelayMs={revealDelayMs}
+        animate={animate}
+      />
     );
   }
 

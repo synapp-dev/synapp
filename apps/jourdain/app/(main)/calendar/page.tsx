@@ -142,7 +142,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-6xl space-y-4">
+    <section className="mx-auto w-full max-w-7xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">

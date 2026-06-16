@@ -15,6 +15,29 @@ import {
 import { syncTaskCalendarEvent } from "@/lib/google/task-sync";
 import { getGmailContext } from "@/lib/google/client";
 import { listPersonEmailThreads } from "@/lib/google/gmail";
+import {
+  getAllStandards,
+  getExerciseBests,
+  listBodyWeights,
+  listExercises,
+} from "@/lib/gym/service";
+import { G20_CATALOG } from "@/lib/gym/catalog";
+import { assessLift, STRENGTH_LEVEL_META } from "@/lib/gym/standards";
+import { STANDING_ORDER } from "@/lib/gym/strength-rating";
+import {
+  buildWorkout,
+  WORKOUT_FOCUSES,
+  WORKOUT_FOCUS_LABELS,
+  type WorkoutCandidate,
+  type WorkoutFocus,
+} from "@/lib/gym/workout";
+import {
+  MUSCLE_SUBGROUP_LABELS,
+  STATION_LABELS,
+  type MuscleSubgroup,
+  type Sex,
+} from "@/entities/gym/model/types";
+import type { AgentWorkoutExercise } from "@/entities/agent/model/types";
 import type { AgentCard, AgentReply } from "@/entities/agent/model/types";
 import type { PersonCircle } from "@/entities/people/model/types";
 
@@ -85,7 +108,7 @@ function buildSystemPrompt(): string {
   const today = format(now, "yyyy-MM-dd");
   const weekday = format(now, "EEEE");
 
-  return `You are Jourdain, the user's personal AI operating system. Right now you manage their tasks; more life domains (health, finance, social) are coming.
+  return `You are Jourdain, the user's personal AI operating system. You manage their tasks, their personal CRM, and their gym training; more life domains (finance, and more) are coming.
 
 Today's date is ${today} (${weekday}).
 
@@ -102,6 +125,9 @@ You also keep the user's personal CRM — people in their life, grouped into cir
 - list_people: when the user asks who's in a circle or about their relationships.
 - get_person_emails: when the user asks about email with someone — recent threads, what a contact said, or what they're waiting on. Call find_person first to get the id, then summarise the threads in a sentence or two; don't dump them verbatim.
 If the user shares a fact about someone who doesn't exist yet, create them first, then log the fact. Don't ask permission for this — capturing people-context silently is your job.
+
+You also help with the user's gym training:
+- build_workout: call this when the user asks for a workout, a gym session, or what to train. It builds a Push/Pull/Legs day — a few exercises across that day's muscle groups. If the user names a day ("push day", "leg session", "back and biceps"), pass the matching focus; otherwise omit focus and let it pick. The session renders as a card, so DON'T list the exercises, weights, or sets in your text — the card already shows them. Instead, open with one or two sentences explaining the THINKING: if "weakAreas" is non-empty, say you leaned the session toward those areas because they're lagging (name one or two naturally, e.g. "your chest and triceps are lagging so I've front-loaded those"); if "needs1rm" is non-empty, add that you'll need a fresh 1RM logged on those lift(s) to track real progress. If both are empty, just give a short, encouraging one-liner about the session.
 
 When creating tasks, always categorize:
 - priority: 1 = urgent/critical (words like "urgent", "asap", "must", deadlines with consequences), 2 = high, 3 = medium, 4 = default when nothing signals importance.
@@ -463,6 +489,190 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  const buildWorkoutTool = betaZodTool({
+    name: "build_workout",
+    description:
+      "Build a gym workout session for the user using a Push / Pull / Legs split — pick a few exercises across that day's muscle groups and return them as a session. Call this when the user asks for a workout, a gym session, or something to train today. The session renders as a card; don't list the exercises in your text.",
+    inputSchema: z.object({
+      focus: z
+        .enum(WORKOUT_FOCUSES)
+        .optional()
+        .describe(
+          'Which PPL day to build: "push" (chest, shoulders, triceps), "pull" (back, rear delts, biceps), or "legs". Omit to let the system pick one.'
+        ),
+    }),
+    run: async (input) => {
+      try {
+        // SIMULATION: when no focus is named, only ever auto-pick push or pull.
+        const focus: WorkoutFocus =
+          input.focus ?? (Math.random() < 0.5 ? "push" : "pull");
+
+        // Pull everything we need to both pick exercises and rate them: the
+        // user's library, the benchmark tables (with images), their logged
+        // bests, and their latest bodyweight.
+        const [owned, standardsList, bests, bodyWeights] = await Promise.all([
+          listExercises(supabase, user.id),
+          getAllStandards(supabase),
+          getExerciseBests(supabase, user.id),
+          listBodyWeights(supabase, user.id, 1),
+        ]);
+
+        const standardsBySlug = new Map(standardsList.map((s) => [s.slug, s]));
+        const bodyweight = bodyWeights[0]?.weightKg ?? null;
+        const sex: Sex =
+          user.user_metadata?.sex === "female" ? "female" : "male";
+
+        // The user's own exercises carry secondary muscles; map by id so we can
+        // show every muscle a movement hits, not just the block it was drawn for.
+        const secondaryById = new Map<string, MuscleSubgroup[]>(
+          owned.map((e) => [e.id, e.secondarySubgroups])
+        );
+
+        // Standings at or below "novice" read as "weak" — the areas we picked the
+        // session to bring up.
+        const WEAK_STANDINGS = new Set(["untrained", "beginner", "novice"]);
+        const weakAreas = new Set<string>();
+        const needs1rmNames: string[] = [];
+
+        // Prefer the user's own exercise library (real ids → startable, rateable);
+        // fall back to the starter catalog so a workout can still be built before
+        // they've seeded one.
+        const candidates: WorkoutCandidate[] =
+          owned.length > 0
+            ? owned.map((e) => ({
+                name: e.name,
+                subgroup: e.subgroup,
+                station: e.station,
+                exerciseId: e.id,
+                strengthLevelSlug: e.strengthLevelSlug,
+              }))
+            : G20_CATALOG.map((e) => ({
+                name: e.name,
+                subgroup: e.subgroup,
+                station: e.station,
+                exerciseId: null,
+                strengthLevelSlug: e.strengthLevelSlug ?? null,
+              }));
+
+        const workout = buildWorkout(candidates, focus);
+        if (!workout) {
+          return JSON.stringify({
+            ok: false,
+            error: `No exercises available for a ${focus} session.`,
+          });
+        }
+
+        const exercises: AgentWorkoutExercise[] = workout.exercises.map((ex) => {
+          const standards = ex.strengthLevelSlug
+            ? standardsBySlug.get(ex.strengthLevelSlug)
+            : undefined;
+          const best = ex.exerciseId ? (bests[ex.exerciseId] ?? null) : null;
+          const rows = standards ? standards[sex] : null;
+          const rateable = Boolean(bodyweight && rows);
+
+          // Primary subgroup first, then any secondaries the exercise tags.
+          const secondaries = ex.exerciseId
+            ? (secondaryById.get(ex.exerciseId) ?? [])
+            : [];
+          const muscles = [ex.subgroup, ...secondaries].map(
+            (m) => MUSCLE_SUBGROUP_LABELS[m]
+          );
+
+          let strength: AgentWorkoutExercise["strength"] = null;
+          if (rateable && best != null) {
+            // `rateable` already guarantees a bodyweight; assert it for the type.
+            const a = assessLift(rows, bodyweight!, best);
+            if (a) {
+              const idx = STANDING_ORDER.indexOf(a.standing);
+              const progress = a.standing === "elite" ? 0 : a.progressToNext;
+              strength = {
+                levelLabel: STRENGTH_LEVEL_META[a.standing].label,
+                color: STRENGTH_LEVEL_META[a.standing].color,
+                score: Math.round(((idx + progress) / 5) * 100),
+              };
+              if (WEAK_STANDINGS.has(a.standing)) weakAreas.add(ex.blockLabel);
+            }
+          }
+
+          // We can only chase progress on a rateable lift once there's a logged
+          // 1RM to measure against — flag the gap so the card can ask for one.
+          const needs1RM = ex.exerciseId != null && rateable && best == null;
+          if (needs1RM) needs1rmNames.push(ex.name);
+
+          // Suggested working weight: back the est-1RM off to the middle of the
+          // target rep range (Epley), rounded to the nearest 2.5kg plate jump.
+          let recommendedWeightKg: number | null = null;
+          if (best != null) {
+            const repsTarget = Math.round((ex.repMin + ex.repMax) / 2);
+            const working = best / (1 + repsTarget / 30);
+            recommendedWeightKg = Math.max(2.5, Math.round(working / 2.5) * 2.5);
+          }
+
+          return {
+            exerciseId: ex.exerciseId,
+            name: ex.name,
+            blockLabel: ex.blockLabel,
+            muscles,
+            stationLabel: STATION_LABELS[ex.station],
+            imageUrl: standards?.imageUrl ?? null,
+            sets: ex.sets,
+            repMin: ex.repMin,
+            repMax: ex.repMax,
+            recommendedWeightKg,
+            needs1RM,
+            strength,
+          };
+        });
+
+        // SIMULATION: force one card into the "log a 1RM" state so the prompt is
+        // always demoable. Prefer the second exercise (so a normal card shows
+        // first), falling back to the only one there is.
+        const FORCE_1RM_SIMULATION = true;
+        if (FORCE_1RM_SIMULATION && exercises.length > 0) {
+          const target = exercises[1] ?? exercises[0]!;
+          target.needs1RM = true;
+          target.strength = null;
+          target.recommendedWeightKg = null;
+          if (!needs1rmNames.includes(target.name)) {
+            needs1rmNames.push(target.name);
+          }
+        }
+
+        cards.push({
+          type: "workout_session",
+          title: workout.title,
+          focusLabel: WORKOUT_FOCUS_LABELS[focus],
+          exerciseIds: exercises
+            .map((ex) => ex.exerciseId)
+            .filter((id): id is string => id != null),
+          exercises,
+        });
+        return JSON.stringify({
+          ok: true,
+          focus,
+          // Weak areas this session targets, and lifts missing a fresh 1RM — so
+          // the reply can explain *why* these picks and what to log.
+          weakAreas: [...weakAreas],
+          needs1rm: needs1rmNames,
+          exercises: exercises.map((ex) => ({
+            name: ex.name,
+            block: ex.blockLabel,
+            muscles: ex.muscles,
+            sets: ex.sets,
+            reps: `${ex.repMin}-${ex.repMax}`,
+            level: ex.needs1RM ? "no 1RM logged" : ex.strength?.levelLabel ?? "unrated",
+            recommendedKg: ex.recommendedWeightKg,
+          })),
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "build workout failed",
+        });
+      }
+    },
+  });
+
   try {
     const anthropic = new Anthropic();
     const finalMessage = await anthropic.beta.messages.toolRunner({
@@ -479,6 +689,7 @@ export async function POST(request: NextRequest) {
         logPersonFactTool,
         listPeopleTool,
         getPersonEmailsTool,
+        buildWorkoutTool,
       ],
       messages: parsed.data.messages.map((message) => ({
         role: message.role,

@@ -75,7 +75,7 @@ export default function HealthFitnessPage() {
   const of = (name: string) => samples.filter((s) => s.name === name);
 
   return (
-    <section className="mx-auto w-full max-w-4xl space-y-4">
+    <section className="mx-auto w-full max-w-7xl space-y-4">
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Fitness</h1>
         {isFetching && samples.length === 0 ? (

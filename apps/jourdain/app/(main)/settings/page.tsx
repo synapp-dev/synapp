@@ -13,7 +13,7 @@ import { NotificationsCard } from "@/components/organisms/notifications-card";
 
 export default function Settings() {
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6 p-6">
+    <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
       <h1 className="text-3xl font-bold">Settings</h1>
 
       <NotificationsCard />
