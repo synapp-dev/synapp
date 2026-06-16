@@ -35,8 +35,20 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
+  SheetFooter,
+  SheetHeader,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+} from "@workspace/ui/components/field";
 import {
   Dialog,
   DialogContent,
@@ -78,6 +90,8 @@ const CATEGORIES: Array<{ value: SupplierCategory; label: string }> = [
 
 const ORDER_METHODS = ["Email", "Phone", "WhatsApp", "Portal", "Other"] as const;
 
+const AU_STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
+
 const FIRST_RUN_CARD_CLASS =
   "group flex flex-col items-center gap-2 rounded-xl border bg-card p-5 text-center transition-colors hover:border-primary/40 hover:bg-muted/40 disabled:pointer-events-none disabled:opacity-60";
 const FIRST_RUN_ICON_CLASS =
@@ -99,6 +113,7 @@ function createDefaultSupplier(): UpsertSupplierInput {
     name: "",
     contactPerson: "",
     email: "",
+    orderingEmail: "",
     phone: "",
     abn: "",
     category: "other",
@@ -107,8 +122,16 @@ function createDefaultSupplier(): UpsertSupplierInput {
     orderMethod: "Email",
     active: true,
     sharedAcrossVenues: false,
+    addressLine1: "",
+    addressLine2: "",
+    suburb: "",
+    state: "",
+    postcode: "",
+    country: "Australia",
   };
 }
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function SuppliersPageClient({
   organisation,
@@ -341,15 +364,31 @@ export function SuppliersPageClient({
       name: form.name.trim(),
       contactPerson: form.contactPerson?.trim() ?? "",
       email: form.email?.trim() ?? "",
+      orderingEmail: form.orderingEmail?.trim() ?? "",
       phone: form.phone?.trim() ?? "",
       abn: form.abn?.trim() ?? "",
       paymentTerms: form.paymentTerms?.trim() ?? "",
       deliveryDays: form.deliveryDays?.trim() ?? "",
       orderMethod: form.orderMethod?.trim() ?? "",
+      addressLine1: form.addressLine1?.trim() ?? "",
+      addressLine2: form.addressLine2?.trim() ?? "",
+      suburb: form.suburb?.trim() ?? "",
+      postcode: form.postcode?.trim() ?? "",
+      country: form.country?.trim() ?? "",
     };
 
     if (!payload.name) {
       toast.error("Supplier name is required");
+      return;
+    }
+
+    // Contact email is required — orders are emailed to the supplier automatically.
+    if (!payload.email) {
+      toast.error("A contact email is required so we can send orders to this supplier");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(payload.email)) {
+      toast.error("Enter a valid contact email address");
       return;
     }
 
@@ -1073,178 +1112,246 @@ export function SuppliersPageClient({
         <SheetContent
           side="top"
           className={cn(
-            "inset-x-1/2 right-auto top-0 bottom-14 flex w-full max-w-2xl -translate-x-1/2 flex-col overflow-hidden rounded-t-none rounded-b-xl border md:w-[50vw]"
+            "inset-x-1/2 right-auto top-0 bottom-14 flex w-full max-w-2xl -translate-x-1/2 flex-col gap-0 overflow-hidden rounded-t-none rounded-b-xl border md:w-[50vw]"
           )}
         >
-          <SheetTitle className="sr-only">Create supplier</SheetTitle>
-          <SheetDescription className="sr-only">Create a new supplier.</SheetDescription>
+          <SheetHeader className="border-b p-4 md:px-6 md:py-5">
+            <SheetTitle className="text-lg font-semibold">New supplier</SheetTitle>
+            <SheetDescription>
+              Add the supplier&apos;s details. A contact email is required — we use it to email orders
+              to the supplier automatically.
+            </SheetDescription>
+          </SheetHeader>
 
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b p-4 md:p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h2 className="text-lg font-semibold">New supplier</h2>
-                  <p className="text-xs text-muted-foreground">Add supplier contact and ordering details.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    size="sm"
-                    className="gap-1.5"
-                    onClick={() => void handleSave()}
-                    disabled={createSupplier.isPending}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">
-              <div className="space-y-4 rounded-lg border p-4">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-2 md:col-span-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-name">
-                      Name
-                    </label>
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 md:px-6">
+            <FieldGroup>
+              <FieldSet>
+                <FieldLegend variant="label">Identity</FieldLegend>
+                <FieldGroup>
+                  <Field>
+                    <FieldLabel htmlFor="supplier-name">Supplier name *</FieldLabel>
                     <Input
                       id="supplier-name"
+                      placeholder="e.g. Pacific Fresh Produce"
                       value={form.name}
                       onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                     />
+                  </Field>
+                  <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="supplier-category">Category</FieldLabel>
+                      <Select
+                        value={form.category}
+                        onValueChange={(value) =>
+                          setForm((current) => ({ ...current, category: value as SupplierCategory }))
+                        }
+                      >
+                        <SelectTrigger id="supplier-category" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-abn">ABN</FieldLabel>
+                      <Input
+                        id="supplier-abn"
+                        inputMode="numeric"
+                        placeholder="11 digit ABN"
+                        value={form.abn ?? ""}
+                        onChange={(event) => setForm((current) => ({ ...current, abn: event.target.value }))}
+                      />
+                      <FieldDescription>Helps us match incoming invoices to this supplier.</FieldDescription>
+                    </Field>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-contact">
-                      Contact person
-                    </label>
-                    <Input
-                      id="supplier-contact"
-                      value={form.contactPerson ?? ""}
-                      onChange={(event) =>
-                        setForm((current) => ({ ...current, contactPerson: event.target.value }))
-                      }
-                    />
+                </FieldGroup>
+              </FieldSet>
+
+              <FieldSeparator />
+
+              <FieldSet>
+                <FieldLegend variant="label">Contact &amp; address</FieldLegend>
+                <FieldGroup>
+                  <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="supplier-contact">Contact person</FieldLabel>
+                      <Input
+                        id="supplier-contact"
+                        value={form.contactPerson ?? ""}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, contactPerson: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-phone">Phone</FieldLabel>
+                      <Input
+                        id="supplier-phone"
+                        type="tel"
+                        value={form.phone ?? ""}
+                        onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
+                      />
+                    </Field>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-category">
-                      Category
-                    </label>
-                    <Select
-                      value={form.category}
-                      onValueChange={(value) =>
-                        setForm((current) => ({ ...current, category: value as SupplierCategory }))
-                      }
-                    >
-                      <SelectTrigger id="supplier-category">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CATEGORIES.map((cat) => (
-                          <SelectItem key={cat.value} value={cat.value}>
-                            {cat.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-email">
-                      Email
-                    </label>
+                  <Field>
+                    <FieldLabel htmlFor="supplier-email">Contact email *</FieldLabel>
                     <Input
                       id="supplier-email"
                       type="email"
+                      placeholder="orders@supplier.com"
                       value={form.email ?? ""}
                       onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-phone">
-                      Phone
-                    </label>
+                    <FieldDescription>
+                      Purchase orders are emailed here. You can set a separate ordering address later.
+                    </FieldDescription>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="supplier-addr1">Address line 1</FieldLabel>
                     <Input
-                      id="supplier-phone"
-                      value={form.phone ?? ""}
-                      onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-abn">
-                      ABN
-                    </label>
-                    <Input
-                      id="supplier-abn"
-                      value={form.abn ?? ""}
-                      onChange={(event) => setForm((current) => ({ ...current, abn: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-payment">
-                      Payment terms
-                    </label>
-                    <Input
-                      id="supplier-payment"
-                      placeholder="e.g. Net 14"
-                      value={form.paymentTerms ?? ""}
+                      id="supplier-addr1"
+                      value={form.addressLine1 ?? ""}
                       onChange={(event) =>
-                        setForm((current) => ({ ...current, paymentTerms: event.target.value }))
+                        setForm((current) => ({ ...current, addressLine1: event.target.value }))
                       }
                     />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-delivery">
-                      Delivery days
-                    </label>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="supplier-addr2">Address line 2</FieldLabel>
                     <Input
-                      id="supplier-delivery"
-                      placeholder="e.g. Mon, Wed, Fri"
-                      value={form.deliveryDays ?? ""}
+                      id="supplier-addr2"
+                      value={form.addressLine2 ?? ""}
                       onChange={(event) =>
-                        setForm((current) => ({ ...current, deliveryDays: event.target.value }))
+                        setForm((current) => ({ ...current, addressLine2: event.target.value }))
                       }
                     />
+                  </Field>
+                  <div className="grid gap-x-4 gap-y-6 sm:grid-cols-3">
+                    <Field>
+                      <FieldLabel htmlFor="supplier-suburb">Suburb</FieldLabel>
+                      <Input
+                        id="supplier-suburb"
+                        value={form.suburb ?? ""}
+                        onChange={(event) => setForm((current) => ({ ...current, suburb: event.target.value }))}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-state">State</FieldLabel>
+                      <Select
+                        value={form.state || "_none"}
+                        onValueChange={(value) =>
+                          setForm((current) => ({ ...current, state: value === "_none" ? "" : value }))
+                        }
+                      >
+                        <SelectTrigger id="supplier-state" className="w-full">
+                          <SelectValue placeholder="State" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="_none">—</SelectItem>
+                          {AU_STATES.map((s) => (
+                            <SelectItem key={s} value={s}>
+                              {s}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-postcode">Postcode</FieldLabel>
+                      <Input
+                        id="supplier-postcode"
+                        inputMode="numeric"
+                        value={form.postcode ?? ""}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, postcode: event.target.value }))
+                        }
+                      />
+                    </Field>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-order-method">
-                      Order method
-                    </label>
-                    <Select
-                      value={form.orderMethod || "Email"}
-                      onValueChange={(value) =>
-                        setForm((current) => ({ ...current, orderMethod: value }))
-                      }
-                    >
-                      <SelectTrigger id="supplier-order-method">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ORDER_METHODS.map((m) => (
-                          <SelectItem key={m} value={m}>
-                            {m}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <Field>
+                    <FieldLabel htmlFor="supplier-country">Country</FieldLabel>
+                    <Input
+                      id="supplier-country"
+                      value={form.country ?? ""}
+                      onChange={(event) => setForm((current) => ({ ...current, country: event.target.value }))}
+                    />
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+
+              <FieldSeparator />
+
+              <FieldSet>
+                <FieldLegend variant="label">Ordering &amp; terms</FieldLegend>
+                <FieldGroup>
+                  <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="supplier-order-method">Order method</FieldLabel>
+                      <Select
+                        value={form.orderMethod || "Email"}
+                        onValueChange={(value) =>
+                          setForm((current) => ({ ...current, orderMethod: value }))
+                        }
+                      >
+                        <SelectTrigger id="supplier-order-method" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ORDER_METHODS.map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-payment">Payment terms</FieldLabel>
+                      <Input
+                        id="supplier-payment"
+                        placeholder="e.g. Net 14"
+                        value={form.paymentTerms ?? ""}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, paymentTerms: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-delivery">Delivery days</FieldLabel>
+                      <Input
+                        id="supplier-delivery"
+                        placeholder="e.g. Mon, Wed, Fri"
+                        value={form.deliveryDays ?? ""}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, deliveryDays: event.target.value }))
+                        }
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="supplier-status">Status</FieldLabel>
+                      <Select
+                        value={form.active ? "active" : "inactive"}
+                        onValueChange={(value) =>
+                          setForm((current) => ({ ...current, active: value === "active" }))
+                        }
+                      >
+                        <SelectTrigger id="supplier-status" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Field>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium" htmlFor="supplier-status">
-                      Status
-                    </label>
-                    <Select
-                      value={form.active ? "active" : "inactive"}
-                      onValueChange={(value) =>
-                        setForm((current) => ({ ...current, active: value === "active" }))
-                      }
-                    >
-                      <SelectTrigger id="supplier-status">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-start gap-3 space-y-0 md:col-span-2">
+                  <Field orientation="horizontal">
                     <Checkbox
                       id="supplier-shared"
                       checked={form.sharedAcrossVenues}
@@ -1255,19 +1362,37 @@ export function SuppliersPageClient({
                         }))
                       }
                     />
-                    <div className="grid gap-1.5 leading-none">
-                      <label htmlFor="supplier-shared" className="text-sm font-medium leading-none">
+                    <FieldContent>
+                      <FieldLabel htmlFor="supplier-shared">
                         Share with all venues in this organisation
-                      </label>
-                      <p className="text-xs text-muted-foreground">
+                      </FieldLabel>
+                      <FieldDescription>
                         When checked, this supplier appears for every venue under the organisation.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                      </FieldDescription>
+                    </FieldContent>
+                  </Field>
+                </FieldGroup>
+              </FieldSet>
+            </FieldGroup>
           </div>
+
+          <SheetFooter className="flex-row justify-end gap-2 border-t p-4 md:px-6">
+            <Button
+              variant="outline"
+              onClick={() => setSheetOpen(false)}
+              disabled={createSupplier.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="gap-1.5"
+              onClick={() => void handleSave()}
+              disabled={createSupplier.isPending}
+            >
+              {createSupplier.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+              Save supplier
+            </Button>
+          </SheetFooter>
         </SheetContent>
       </Sheet>
     </>
