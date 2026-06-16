@@ -279,6 +279,29 @@
   --animate-bg-top: bg-animate-top 0.7s ease-in-out forwards;
   --animate-bg-right: bg-animate-right 0.7s ease-in-out forwards;
   --animate-bg-bottom: bg-animate-bottom 0.7s ease-in-out forwards;
+  /* Agent welcome: a soft blue/silver sheen band sweeps across the title once
+     and fades itself out, leaving the solid foreground text underneath. */
+  --animate-text-sheen-pass: text-sheen-pass 1.5s ease-out both;
+  /* Agent welcome: the orb pops in fast, slightly overshoots, then settles. */
+  --animate-orb-grow-in: orb-grow-in 0.6s ease-out both;
+  /* Agent welcome: a soft blue glow blooms out from behind the orb in time with
+     the input revealing — expanding outward and fading to nothing. */
+  --animate-orb-glow-bloom: orb-glow-bloom 1.6s ease-out both;
+  /* Agent welcome: a seed circle scales in, pulses, then expands outward into the
+     input pill — with a temporary blue border/glow pulse riding along (fill: none
+     so the pill reverts to its resting border + shadow once it settles). */
+  --animate-seed-expand: seed-expand 0.7s cubic-bezier(0.22, 1, 0.36, 1) both,
+    seed-border-pulse 0.7s ease-in-out;
+  --animate-seed-content-reveal: seed-content-reveal 0.35s ease-out 0.42s both;
+  /* Agent thinking: each dot snaps up and drops back once, then holds still for
+     the rest of the cycle. Staggered delays make them fire one-at-a-time
+     (bang bang bang), and the long flat tail gives the pause before it loops. */
+  --animate-thinking-bounce: thinking-bounce 1.4s ease-in-out infinite;
+  /* Agent thinking: as the reply arrives, the thinking bubble eases down and
+     fades away, clearing the spot for the reply to rise into. */
+  --animate-thinking-out: thinking-fade-down-out 0.32s ease-in both;
+  /* Gym agent: a subtle "go heavier" lift on the progressive-overload chevron. */
+  --animate-overload-nudge: overload-nudge 1.6s ease-in-out infinite;
   @keyframes gradient-animation {
     0%,
     100% {
@@ -499,6 +522,141 @@
     100% {
       opacity: 1;
       transform: translateY(0);
+    }
+  }
+  /* Sheen band sweeps left→right once, fading in then out so the overlay leaves
+     no trace and the solid text underneath remains. */
+  @keyframes text-sheen-pass {
+    0% {
+      background-position: -40% center;
+      opacity: 0;
+    }
+    20% {
+      opacity: 1;
+    }
+    80% {
+      opacity: 1;
+    }
+    100% {
+      background-position: 140% center;
+      opacity: 0;
+    }
+  }
+  @keyframes orb-grow-in {
+    0% {
+      opacity: 0;
+      transform: scale(0.6);
+    }
+    55% {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes thinking-bounce {
+    0%,
+    40%,
+    100% {
+      transform: translateY(0);
+    }
+    20% {
+      transform: translateY(-0.3rem);
+    }
+  }
+  @keyframes thinking-fade-down-out {
+    0% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  /* Progressive-overload nudge: the double chevron lifts up and settles, then
+     rests before the next nudge. */
+  @keyframes overload-nudge {
+    0%,
+    55%,
+    100% {
+      transform: translateY(0);
+    }
+    25% {
+      transform: translateY(-3px);
+    }
+  }
+  @keyframes orb-glow-bloom {
+    0% {
+      opacity: 0;
+      transform: scale(0.45);
+    }
+    22% {
+      opacity: 0.8;
+    }
+    100% {
+      opacity: 0;
+      transform: scale(2.1);
+    }
+  }
+  /* Collapsed circle's width ≈ the pill height so it reads as a round seed,
+     then it pulses and expands to full width. Content is clipped while narrow. */
+  @keyframes seed-expand {
+    0% {
+      width: 0;
+      transform: scale(0.4);
+      opacity: 0;
+    }
+    14% {
+      width: 3rem;
+      transform: scale(1);
+      opacity: 1;
+    }
+    28% {
+      width: 3rem;
+      transform: scale(1.12);
+    }
+    42% {
+      width: 3rem;
+      transform: scale(1);
+    }
+    60% {
+      width: 3rem;
+      transform: scale(1);
+    }
+    100% {
+      width: 100%;
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  @keyframes seed-content-reveal {
+    0% {
+      opacity: 0;
+      transform: translateY(2px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  /* Temporary blue border + glow as the input seed comes in and expands; ends on
+     the resting border so the pill settles to normal (animation fill: none). */
+  @keyframes seed-border-pulse {
+    0%,
+    100% {
+      border-color: var(--border);
+      box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
+    }
+    35% {
+      border-color: rgba(56, 189, 248, 0.9);
+      box-shadow: 0 0 18px 1px rgba(56, 189, 248, 0.4);
+    }
+    70% {
+      border-color: rgba(56, 189, 248, 0.5);
+      box-shadow: 0 0 10px 0 rgba(56, 189, 248, 0.2);
     }
   }
   @keyframes slideUpFromBottom {
