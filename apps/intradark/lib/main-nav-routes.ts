@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   List,
   MapPin,
+  Medal,
   MessageSquare,
   Newspaper,
   Play,
@@ -36,6 +37,7 @@ export const MAIN_NAV_SEGMENT_META: Record<
   players: { label: "Players", icon: UserRound },
   scrims: { label: "Scrims", icon: Swords },
   tournaments: { label: "Tournaments", icon: CalendarDays },
+  leaderboards: { label: "Leaderboards", icon: Medal },
   news: { label: "News", icon: Newspaper },
   forums: { label: "Forums", icon: MessageSquare },
   media: { label: "Media", icon: Film },
@@ -84,6 +86,7 @@ export const navCompetitive: NavMainSidebarItem[] = [
   { title: "Players", url: "/players", icon: UserRound },
   { title: "Scrims", url: "/scrims", icon: Swords },
   { title: "Tournaments", url: "/tournaments", icon: CalendarDays },
+  { title: "Leaderboards", url: "/leaderboards/deathmatch", icon: Medal },
 ];
 
 export const navKnowledge: NavMainSidebarItem[] = [

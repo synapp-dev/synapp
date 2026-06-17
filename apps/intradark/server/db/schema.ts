@@ -1,6 +1,8 @@
 import {
   pgTable,
+  pgView,
   bigint,
+  numeric,
   uuid,
   varchar,
   text,
@@ -1086,3 +1088,73 @@ export const playerProfileCommentReports = pgTable(
     ),
   ],
 );
+
+/**
+ * dm_kill_events — raw deathmatch event firehose (one row per game event).
+ * Fully separate from MatchZy/PUG (own table/route/secret/plugin; see
+ * docs/cs2-stats-leaderboard.md). NOT FK'd to players: the DM server reports every
+ * connected steamid64 incl. untracked pubbers. Profiles join at read time via the
+ * `dm_player_stats` view. Public-read RLS; writes via service role only. Ingest
+ * dedupes on `event_id` (unique). `raw` keeps the full untrimmed payload.
+ */
+export const dmKillEvents = pgTable(
+  "dm_kill_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** Plugin-supplied stable id (e.g. "server_id:counter"); powers dedupe on retry. */
+    eventId: text("event_id").notNull(),
+    serverId: text("server_id").notNull(),
+    mapName: text("map_name"),
+    /** 'death' | 'hurt' | 'connect' | 'disconnect' | … (open; `raw` has the rest). */
+    eventType: text("event_type").notNull(),
+    attackerSteamid64: text("attacker_steamid64"),
+    victimSteamid64: text("victim_steamid64"),
+    assisterSteamid64: text("assister_steamid64"),
+    weapon: text("weapon"),
+    headshot: boolean("headshot"),
+    noscope: boolean("noscope"),
+    penetrated: boolean("penetrated"),
+    distance: doublePrecision("distance"),
+    attackerPos: jsonb("attacker_pos").$type<{ x: number; y: number; z: number }>(),
+    victimPos: jsonb("victim_pos").$type<{ x: number; y: number; z: number }>(),
+    raw: jsonb("raw").notNull(),
+    occurredAt: timestamp("occurred_at", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+    ingestedAt: timestamp("ingested_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("dm_kill_events_event_id_key").on(table.eventId),
+    index("idx_dm_kill_events_attacker").on(table.attackerSteamid64),
+    index("idx_dm_kill_events_victim").on(table.victimSteamid64),
+    index("idx_dm_kill_events_map").on(table.mapName),
+    index("idx_dm_kill_events_occurred_at").on(table.occurredAt),
+  ],
+);
+
+/**
+ * dm_player_stats — all-time deathmatch leaderboard rollup derived from
+ * dm_kill_events (see migration 0030). Declared `.existing()`: the migration owns
+ * the view DDL; this is just the typed shape for reads via `db`. Counts are bigint
+ * (number mode); `kd`/`hs_pct` are numeric (returned as strings). Profile columns
+ * are null for untracked pub players.
+ */
+export const dmPlayerStats = pgView("dm_player_stats", {
+  steamid64: text("steamid64"),
+  personaname: varchar("personaname", { length: 255 }),
+  avatarfull: varchar("avatarfull", { length: 500 }),
+  countryFlag: varchar("country_flag", { length: 2 }),
+  isTracked: boolean("is_tracked"),
+  kills: bigint("kills", { mode: "number" }),
+  deaths: bigint("deaths", { mode: "number" }),
+  assists: bigint("assists", { mode: "number" }),
+  headshotKills: bigint("headshot_kills", { mode: "number" }),
+  kd: numeric("kd"),
+  hsPct: numeric("hs_pct"),
+}).existing();
