@@ -22,6 +22,14 @@ public sealed class DmConfig : BasePluginConfig
     [JsonPropertyName("FreeForAll")]
     public bool FreeForAll { get; set; } = true;
 
+    /// <summary>
+    /// Teleport each respawn to a random point from spawns/&lt;map&gt;.json
+    /// instead of the map's CT/T spawns. Falls back to default spawns when no
+    /// spawn file exists for the current map.
+    /// </summary>
+    [JsonPropertyName("RandomSpawns")]
+    public bool RandomSpawns { get; set; } = true;
+
     /// <summary>Default primary weapon entity given on spawn (e.g. weapon_ak47).</summary>
     [JsonPropertyName("DefaultPrimary")]
     public string DefaultPrimary { get; set; } = "weapon_ak47";
@@ -38,6 +46,18 @@ public sealed class DmConfig : BasePluginConfig
     [JsonPropertyName("WelcomeMessage")]
     public bool WelcomeMessage { get; set; } = true;
 
+    /// <summary>Fill empty player slots with bots (they leave as humans join).</summary>
+    [JsonPropertyName("EnableBots")]
+    public bool EnableBots { get; set; } = true;
+
+    /// <summary>Total players (humans + bots) to fill to via bot_quota_mode fill.</summary>
+    [JsonPropertyName("BotQuota")]
+    public int BotQuota { get; set; } = 10;
+
+    /// <summary>Bot skill: 0 easy → 3 expert.</summary>
+    [JsonPropertyName("BotDifficulty")]
+    public int BotDifficulty { get; set; } = 2;
+
     /// <summary>Restore the killer to full health on a kill.</summary>
     [JsonPropertyName("HealOnKill")]
     public bool HealOnKill { get; set; } = true;
@@ -46,13 +66,13 @@ public sealed class DmConfig : BasePluginConfig
     [JsonPropertyName("ArmorOnKill")]
     public bool ArmorOnKill { get; set; } = true;
 
+    /// <summary>Refill clip + reserve ammo on all the killer's weapons on a kill.</summary>
+    [JsonPropertyName("RefillAmmoOnKill")]
+    public bool RefillAmmoOnKill { get; set; } = true;
+
     /// <summary>Show on-screen multi-kill banners (Double Kill → Godlike).</summary>
     [JsonPropertyName("MultiKillAnnouncer")]
     public bool MultiKillAnnouncer { get; set; } = true;
-
-    /// <summary>Seconds between kills that still counts toward the same multi-kill.</summary>
-    [JsonPropertyName("MultiKillWindowSeconds")]
-    public float MultiKillWindowSeconds { get; set; } = 3.5f;
 
     /// <summary>How long a multi-kill banner stays on screen (re-painted each tick).</summary>
     [JsonPropertyName("MultiKillBannerSeconds")]

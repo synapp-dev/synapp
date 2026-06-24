@@ -29,10 +29,11 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
 
     public DmConfig Config { get; set; } = new();
     private IntradarkApi? _api;
+    private readonly SpawnManager _spawns = new();
 
-    // Multi-kill tracking: consecutive kills within the time window, per slot.
+    // Multi-kill tracking: consecutive kills WITHOUT dying, per slot. Resets only
+    // when the player dies — no time window, so slow chains still count.
     private readonly Dictionary<int, int> _multiKill = new();
-    private readonly Dictionary<int, CounterStrikeSharp.API.Modules.Timers.Timer?> _multiKillTimers = new();
 
     // Center-banner hold: slot -> html to re-paint every tick until its hold timer
     // clears it. Re-painting is what keeps CS2 center text solid (a single
@@ -51,14 +52,21 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         RegisterEventHandler<EventPlayerConnectFull>(OnConnectFull);
         RegisterListener<Listeners.OnTick>(OnTick);
 
-        // Re-apply DM cvars on each map (they reset on map change) and right now,
-        // so loading mid-map (css_plugins load) takes effect immediately.
-        RegisterListener<Listeners.OnMapStart>(_ => AddTimer(2.0f, ApplyDmCvars));
+        // Re-apply DM cvars + reload spawns on each map (both reset on map change)
+        // and right now, so loading mid-map (css_plugins load) takes effect immediately.
+        RegisterListener<Listeners.OnMapStart>(mapName =>
+        {
+            AddTimer(2.0f, ApplyDmCvars);
+            AddTimer(2.5f, ApplyBotCvars); // after DM cvars + mp_restartgame
+            LoadSpawns(mapName);
+        });
         AddTimer(2.0f, ApplyDmCvars);
+        AddTimer(2.5f, ApplyBotCvars);
+        LoadSpawns(Server.MapName);
 
         Logger.LogInformation(
-            "IntradarkDeathmatch loaded (respawn {d}s, FFA={ffa}).",
-            Config.RespawnDelaySeconds, Config.FreeForAll);
+            "IntradarkDeathmatch loaded (respawn {d}s, FFA={ffa}, randomSpawns={rs}).",
+            Config.RespawnDelaySeconds, Config.FreeForAll, Config.RandomSpawns);
     }
 
     public override void Unload(bool hotReload) => _api?.Dispose();
@@ -104,6 +112,8 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         }
 
         var slot = player.Slot;
+        _multiKill.Remove(slot); // dying ends your kill streak
+
         AddTimer(Config.RespawnDelaySeconds, () =>
         {
             var p = Utilities.GetPlayerFromSlot(slot);
@@ -121,11 +131,12 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         if (player is null || !player.IsValid || player.IsHLTV) return HookResult.Continue;
 
         var slot = player.Slot;
-        // Slight delay so the pawn is fully set up before we hand out weapons.
+        // Slight delay so the pawn is fully set up before we move it / hand out weapons.
         AddTimer(0.2f, () =>
         {
             var p = Utilities.GetPlayerFromSlot(slot);
             if (p is null || !p.IsValid || !p.PawnIsAlive) return;
+            TeleportToRandomSpawn(p);
             GiveLoadout(p);
         });
         return HookResult.Continue;
@@ -158,20 +169,39 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         }
         if (Config.ArmorOnKill)
             killer.GiveNamedItem("item_assaultsuit");
+        if (Config.RefillAmmoOnKill)
+            RefillAmmo(killer);
     }
 
-    /// <summary>Track a kill in the multi-kill window and show the tier banner.</summary>
+    /// <summary>Top up clip + reserve ammo on every clip-based weapon the player holds.</summary>
+    private static void RefillAmmo(CCSPlayerController player)
+    {
+        var weapons = player.PlayerPawn?.Value?.WeaponServices?.MyWeapons;
+        if (weapons is null) return;
+
+        foreach (var handle in weapons)
+        {
+            var weapon = handle.Value;
+            if (weapon is null || !weapon.IsValid) continue;
+
+            var data = weapon.As<CCSWeaponBase>().VData;
+            if (data is null || data.MaxClip1 <= 0) continue; // skip knife / grenades
+
+            weapon.Clip1 = data.MaxClip1;
+            weapon.ReserveAmmo[0] = data.PrimaryReserveAmmoMax;
+            Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_iClip1");
+            Utilities.SetStateChanged(weapon, "CBasePlayerWeapon", "m_pReserveAmmo");
+        }
+    }
+
+    /// <summary>Bump the killer's no-death streak and announce the tier (2+).</summary>
     private void AnnounceMultiKill(CCSPlayerController killer)
     {
         var slot = killer.Slot;
         var n = _multiKill.TryGetValue(slot, out var c) ? c + 1 : 1;
         _multiKill[slot] = n;
 
-        // (Re)start the window: streak resets if no kill within MultiKillWindowSeconds.
-        if (_multiKillTimers.TryGetValue(slot, out var old)) old?.Kill();
-        _multiKillTimers[slot] = AddTimer(Config.MultiKillWindowSeconds, () => _multiKill[slot] = 0);
-
-        if (n < 2) return; // single kills don't get a banner
+        if (n < 2) return; // first kill of a life isn't a multi-kill
         var (label, color) = MultiKillTier(n);
 
         // Hold the banner: OnTick re-paints it so it stays solid; reset the
@@ -181,8 +211,9 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         _centerHoldTimers[slot] =
             AddTimer(Config.MultiKillBannerSeconds, () => _centerHold.Remove(slot));
 
+        // Chat line — sent only to the killer.
         if (Config.MultiKillChat)
-            killer.PrintToChat($"{Colorize(Config.ChatPrefix)} {ChatColors.Gold}{label}!");
+            killer.PrintToChat($"{Colorize(Config.ChatPrefix)} {ChatColors.Gold}{label}! {ChatColors.Default}({n} kills, no deaths)");
     }
 
     /// <summary>Re-paint held center banners every tick (keeps CS2 center text solid).</summary>
@@ -206,6 +237,26 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         6 => ("ULTRA KILL", "#ff00aa"),
         _ => ("GODLIKE", "#b400ff"),
     };
+
+    /// <summary>Load the current map's random-spawn points and log the count.</summary>
+    private void LoadSpawns(string mapName)
+    {
+        if (string.IsNullOrEmpty(mapName)) return;
+        var n = _spawns.Load(ModuleDirectory, mapName);
+        Logger.LogInformation("Loaded {n} random spawn(s) for {map}.", n, mapName);
+    }
+
+    /// <summary>Teleport a freshly-spawned player to a random spawn point (FFA, any team).</summary>
+    private void TeleportToRandomSpawn(CCSPlayerController p)
+    {
+        if (!Config.RandomSpawns) return;
+        var spawn = _spawns.Random();
+        if (spawn is null) return; // no spawn file for this map → keep default spawn
+
+        var pawn = p.PlayerPawn?.Value;
+        if (pawn is null) return;
+        pawn.Teleport(spawn.Value.Position, spawn.Value.Angle, new Vector(0, 0, 0));
+    }
 
     private void GiveLoadout(CCSPlayerController p)
     {
@@ -233,6 +284,8 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
             "mp_buytime 0",
             "mp_maxmoney 0",
             "mp_startmoney 0",
+            "mp_playercashawards 0", // no +$300 "Enemy Neutralized" money feed
+            "mp_teamcashawards 0",
             "mp_death_drop_gun 0",
             "mp_death_drop_grenade 0",
             "mp_death_drop_defuser 0",
@@ -245,6 +298,42 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         Server.ExecuteCommand(
             Config.FreeForAll ? "mp_teammates_are_enemies 1" : "mp_teammates_are_enemies 0");
         Server.ExecuteCommand("mp_restartgame 1");
+    }
+
+    /// <summary>
+    /// Auto-fill empty slots with roaming bots. `bot_quota_mode fill` keeps the
+    /// player count at BotQuota by adding bots and dropping them as humans join.
+    /// `bot_zombie 0` + `bot_stop 0` ensures they actually move and fight (they
+    /// still need a nav mesh — official maps have one; some workshop maps don't).
+    /// </summary>
+    private void ApplyBotCvars()
+    {
+        if (!Config.EnableBots)
+        {
+            Server.ExecuteCommand("bot_quota 0");
+            return;
+        }
+
+        string[] cvars =
+        {
+            "bot_zombie 0",
+            "bot_stop 0",
+            "bot_dont_shoot 0",
+            "bot_join_after_player 0",
+            "bot_join_team any",
+            $"bot_difficulty {Math.Clamp(Config.BotDifficulty, 0, 3)}",
+            "bot_allow_rifles 1",
+            "bot_allow_pistols 1",
+            "bot_allow_snipers 1",
+            "bot_allow_shotguns 1",
+            "bot_allow_machine_guns 1",
+            "bot_allow_grenades 1",
+            "bot_quota_mode fill",
+            $"bot_quota {Math.Max(0, Config.BotQuota)}",
+        };
+        foreach (var c in cvars) Server.ExecuteCommand(c);
+
+        Logger.LogInformation("Bots: fill to {q} (difficulty {d}).", Config.BotQuota, Config.BotDifficulty);
     }
 
     /// <summary>Send a prefixed, colorized chat line to one player.</summary>
