@@ -52,3 +52,7 @@ apps/intradark/cs2-gc-bot/.steam-session.json
 
 # Jourdain: raw 4K orb source video (150MB, exceeds GitHub limits) - the web asset is jourdain-orb-loop.mp4
 apps/jourdain/public/videos/jourdain-orb.mov
+
+# CS2 plugin packaging: download cache, staging tree, and output zips (do not commit)
+apps/intradark/.cache/
+apps/intradark/dist/
