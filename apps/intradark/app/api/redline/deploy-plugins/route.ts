@@ -18,13 +18,21 @@ export async function POST(request: Request) {
   if (denied) return denied;
 
   let plugins: string[] | undefined;
+  let resetConfig = false;
+  let reloadOnly = false;
+  let writeStatsConfig = false;
   try {
-    const body = (await request.json()) as { plugins?: unknown } | null;
+    const body = (await request.json()) as
+      | { plugins?: unknown; resetConfig?: unknown; reloadOnly?: unknown; writeStatsConfig?: unknown }
+      | null;
     if (Array.isArray(body?.plugins)) plugins = body.plugins.filter((p): p is string => typeof p === "string");
+    resetConfig = body?.resetConfig === true;
+    reloadOnly = body?.reloadOnly === true;
+    writeStatsConfig = body?.writeStatsConfig === true;
   } catch {
     /* no body → deploy both */
   }
 
-  const result = await deployPluginsToLive({ plugins });
+  const result = await deployPluginsToLive({ plugins, resetConfig, reloadOnly, writeStatsConfig });
   return NextResponse.json(result, { status: result.ok ? 200 : 502 });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Copy, Eraser, Plus, Send, Terminal, X } from "lucide-react";
+import { Copy, Eraser, Plus, RefreshCw, Send, Terminal, X } from "lucide-react";
 
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -131,6 +131,8 @@ export function RedlineTestConsole({ configured }: { configured: boolean }) {
   const [zipSel, setZipSel] = React.useState("");
   const [accounts, setAccounts] = React.useState<SteamAccount[]>([]);
   const [gsltSel, setGsltSel] = React.useState("");
+  const [resetConfig, setResetConfig] = React.useState(false);
+  const [writeStatsConfig, setWriteStatsConfig] = React.useState(false);
 
   // Lifecycle
   const [serverId, setServerId] = React.useState("");
@@ -346,10 +348,12 @@ export function RedlineTestConsole({ configured }: { configured: boolean }) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   disabled={disabled}
-                  onClick={() => void send("deploy:push", "POST", "/api/redline/deploy-plugins", {})}
+                  onClick={() =>
+                    void send("deploy:push", "POST", "/api/redline/deploy-plugins", { resetConfig, writeStatsConfig })
+                  }
                 >
                   <Send className="h-4 w-4" />
                   Push to live
@@ -361,13 +365,43 @@ export function RedlineTestConsole({ configured }: { configured: boolean }) {
                     size="sm"
                     disabled={disabled}
                     onClick={() =>
-                      void send(`deploy:${p}`, "POST", "/api/redline/deploy-plugins", { plugins: [p] })
+                      void send(`deploy:${p}`, "POST", "/api/redline/deploy-plugins", {
+                        plugins: [p],
+                        resetConfig,
+                        writeStatsConfig,
+                      })
                     }
                   >
                     {p.replace("Intradark", "")} only
                   </Button>
                 ))}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled={disabled}
+                  title="RCON css_plugins reload (no upload)"
+                  onClick={() => void send("reload", "POST", "/api/redline/deploy-plugins", { reloadOnly: true })}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Reload
+                </Button>
               </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={resetConfig}
+                  onChange={(e) => setResetConfig(e.target.checked)}
+                />
+                Reset deathmatch config to defaults on push (picks up new prefix / options; DmStats config is left alone)
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={writeStatsConfig}
+                  onChange={(e) => setWriteStatsConfig(e.target.checked)}
+                />
+                Write DmStats config (point at the leaderboard — ApiBaseUrl + secret from env, ServerId from the target)
+              </label>
               <DeployTargetsManager configured={configured} />
             </CardContent>
           </Card>
