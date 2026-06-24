@@ -1,10 +1,10 @@
-import { redirect } from "next/navigation";
+import { MatchRoom } from "@/entities/match-lobby";
 
-export default async function MatchIdIndexPage({
+export default async function MatchIdPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/match/${id}/draft`);
+  return <MatchRoom matchId={id} />;
 }

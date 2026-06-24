@@ -310,7 +310,7 @@ Foreign keys and RLS (e.g. Supabase) should enforce: users read own profile and 
 - Matches list/summary: `app/(main)/matches/page.tsx`
 - Scrims (relationship TBD): `app/(main)/scrims/page.tsx`
 - CS2 events: `app/api/cs2/events/route.ts`
-- Server dev harness: `app/(main)/server/page.tsx`
+- Server management (Redline lifecycle): `app/(main)/admin/servers/page.tsx`
 - Profile demo data to replace: `lib/player-profile-showcase-data.ts`
 
 ---

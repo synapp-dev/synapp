@@ -1,5 +1,10 @@
-import { ServerPhasePanel } from "@/entities/match-lobby";
+import { redirect } from "next/navigation";
 
-export default function MatchServerPhasePage() {
-  return <ServerPhasePanel />;
+export default async function MatchServerRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/match/${id}`);
 }

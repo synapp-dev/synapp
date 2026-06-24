@@ -13,6 +13,7 @@ export const updateArticleDraftSchema = z.object({
   title: z.string().trim().min(1).max(500),
   slug: z.string().trim().min(1).max(160),
   excerpt: z.string().max(4000).optional().nullable(),
+  coverImageUrl: z.string().trim().url().max(2048).optional().nullable(),
   bodyJson: z.unknown(),
 });
 

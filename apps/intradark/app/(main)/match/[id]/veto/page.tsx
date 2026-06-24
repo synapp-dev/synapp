@@ -1,5 +1,10 @@
-import { VetoPhasePanel } from "@/entities/match-lobby";
+import { redirect } from "next/navigation";
 
-export default function MatchVetoPhasePage() {
-  return <VetoPhasePanel />;
+export default async function MatchVetoRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/match/${id}`);
 }

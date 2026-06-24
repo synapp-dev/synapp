@@ -1,13 +1,12 @@
-import { MatchLobbyLayout } from "@/entities/match-lobby";
-
-export default async function MatchLobbyRouteLayout({
+/**
+ * Thin shell for the live match room. The real lobby UI (teams + phase panel) is
+ * rendered by `MatchRoom` at the index route; the mock sandbox playground lives
+ * separately under entities/match-lobby for the admin sandbox.
+ */
+export default function MatchLobbyRouteLayout({
   children,
-  params,
 }: {
   children: React.ReactNode;
-  params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
-
-  return <MatchLobbyLayout matchId={id}>{children}</MatchLobbyLayout>;
+  return <div className="mx-auto w-full max-w-5xl px-4 py-6">{children}</div>;
 }

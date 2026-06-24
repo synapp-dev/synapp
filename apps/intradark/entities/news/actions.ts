@@ -116,6 +116,7 @@ export async function updateNewsArticleDraftAction(input: {
   title: string;
   slug: string;
   excerpt?: string | null;
+  coverImageUrl?: string | null;
   bodyJson: unknown;
 }): Promise<NewsActionResult<{ slug: string }>> {
   const gate = await requireNewsEditor();
@@ -171,6 +172,7 @@ export async function updateNewsArticleDraftAction(input: {
         title: parsed.data.title,
         slug: parsed.data.slug,
         excerpt: parsed.data.excerpt ?? null,
+        coverImageUrl: parsed.data.coverImageUrl ?? null,
         bodyJson: body.value,
         updatedAt: now,
       })

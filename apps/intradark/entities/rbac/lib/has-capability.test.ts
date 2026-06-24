@@ -14,7 +14,7 @@ describe("hasCapability", () => {
   });
 
   it("developer implies any capability", () => {
-    expect(hasCapability([ROLE_DEVELOPER], NAV_SLUG.STATS)).toBe(true);
+    expect(hasCapability([ROLE_DEVELOPER], NAV_SLUG.DASHBOARD)).toBe(true);
     expect(hasCapability([ROLE_DEVELOPER], "future.capability")).toBe(true);
   });
 });

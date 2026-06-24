@@ -2,15 +2,17 @@
 
 import type { JSONContent } from "@tiptap/core";
 import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import Link from "next/link";
-import { useCallback, useState, useTransition } from "react";
+import { ImagePlus, Loader2, Trash2 } from "lucide-react";
+import { useCallback, useRef, useState, useTransition } from "react";
 
 import {
   publishNewsArticleAction,
   unpublishNewsArticleAction,
   updateNewsArticleDraftAction,
 } from "@/entities/news/actions";
+import { uploadNewsCoverFile } from "@/entities/news/lib/upload-cover-client";
+import { NEWS_TIPTAP_EXTENSIONS } from "@/entities/news/lib/tiptap-extensions";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
@@ -22,6 +24,7 @@ export function NewsEditorShell({
   initialTitle,
   initialSlug,
   initialExcerpt,
+  initialCoverImageUrl,
   initialBody,
   initialStatus,
 }: {
@@ -29,18 +32,24 @@ export function NewsEditorShell({
   initialTitle: string;
   initialSlug: string;
   initialExcerpt: string | null;
+  initialCoverImageUrl: string | null;
   initialBody: unknown;
   initialStatus: "draft" | "published";
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [slug, setSlug] = useState(initialSlug);
   const [excerpt, setExcerpt] = useState(initialExcerpt ?? "");
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(
+    initialCoverImageUrl,
+  );
+  const [coverUploading, setCoverUploading] = useState(false);
   const [status, setStatus] = useState<"draft" | "published">(initialStatus);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const coverInputRef = useRef<HTMLInputElement>(null);
 
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: NEWS_TIPTAP_EXTENSIONS,
     content: (initialBody ?? {}) as JSONContent,
     immediatelyRender: false,
     editorProps: {
@@ -51,22 +60,58 @@ export function NewsEditorShell({
     },
   });
 
-  const saveDraft = useCallback(async () => {
-    if (!editor) return false;
+  const saveDraft = useCallback(
+    async (overrides?: { coverImageUrl?: string | null }) => {
+      if (!editor) return false;
+      setError(null);
+      const nextCover =
+        overrides && "coverImageUrl" in overrides
+          ? overrides.coverImageUrl
+          : coverImageUrl;
+      const res = await updateNewsArticleDraftAction({
+        id: articleId,
+        title,
+        slug,
+        excerpt: excerpt || null,
+        coverImageUrl: nextCover ?? null,
+        bodyJson: editor.getJSON(),
+      });
+      if (!res.ok) {
+        setError(res.message);
+        return false;
+      }
+      return true;
+    },
+    [articleId, coverImageUrl, editor, excerpt, slug, title],
+  );
+
+  const onPickCover = () => coverInputRef.current?.click();
+
+  const onCoverSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
     setError(null);
-    const res = await updateNewsArticleDraftAction({
-      id: articleId,
-      title,
-      slug,
-      excerpt: excerpt || null,
-      bodyJson: editor.getJSON(),
+    setCoverUploading(true);
+    void (async () => {
+      const res = await uploadNewsCoverFile(articleId, file);
+      if (!res.ok) {
+        setError(res.message);
+        setCoverUploading(false);
+        return;
+      }
+      setCoverImageUrl(res.publicUrl);
+      await saveDraft({ coverImageUrl: res.publicUrl });
+      setCoverUploading(false);
+    })();
+  };
+
+  const onRemoveCover = () => {
+    setCoverImageUrl(null);
+    startTransition(() => {
+      void saveDraft({ coverImageUrl: null });
     });
-    if (!res.ok) {
-      setError(res.message);
-      return false;
-    }
-    return true;
-  }, [articleId, editor, excerpt, slug, title]);
+  };
 
   const onSaveDraft = () => {
     startTransition(() => {
@@ -160,6 +205,73 @@ export function NewsEditorShell({
             rows={3}
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Banner image</Label>
+        <input
+          ref={coverInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          className="hidden"
+          onChange={onCoverSelected}
+        />
+        {coverImageUrl ? (
+          <div className="space-y-2">
+            <div className="bg-muted relative aspect-[2/1] w-full max-w-xl overflow-hidden rounded-lg border">
+              {/* eslint-disable-next-line @next/next/no-img-element -- Supabase CDN media */}
+              <img
+                src={coverImageUrl}
+                alt="Article banner preview"
+                className="size-full object-cover"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onPickCover}
+                disabled={coverUploading || pending}
+              >
+                {coverUploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="size-4" />
+                )}
+                Replace
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={onRemoveCover}
+                disabled={coverUploading || pending}
+              >
+                <Trash2 className="size-4" />
+                Remove
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={onPickCover}
+            disabled={coverUploading}
+            className="border-border bg-background hover:bg-accent/40 text-muted-foreground flex aspect-[2/1] w-full max-w-xl flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-sm transition-colors disabled:opacity-60"
+          >
+            {coverUploading ? (
+              <Loader2 className="size-6 animate-spin" />
+            ) : (
+              <ImagePlus className="size-6" />
+            )}
+            {coverUploading ? "Uploading…" : "Add a banner image"}
+          </button>
+        )}
+        <p className="text-muted-foreground text-xs">
+          Shown at the top of the article and as the card image on /news. PNG,
+          JPEG, WebP, or GIF. Uploads save immediately.
+        </p>
       </div>
 
       <div className="space-y-2">

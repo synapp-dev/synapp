@@ -25,6 +25,7 @@ export default async function NewsAdminEditPage({
         initialTitle={article.title}
         initialSlug={article.slug}
         initialExcerpt={article.excerpt}
+        initialCoverImageUrl={article.coverImageUrl}
         initialBody={article.bodyJson}
         initialStatus={article.status as "draft" | "published"}
       />

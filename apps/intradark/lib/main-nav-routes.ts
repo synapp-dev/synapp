@@ -1,17 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import {
-  BarChart3,
   BookOpen,
   CalendarDays,
   Film,
   LayoutDashboard,
-  List,
   MapPin,
   Medal,
   MessageSquare,
   Newspaper,
   Play,
-  Server,
   Shield,
   SquareStack,
   Swords,
@@ -32,7 +29,6 @@ export const MAIN_NAV_SEGMENT_META: Record<
   match: { label: "Match", icon: Trophy },
   positions: { label: "Positions", icon: MapPin },
   crew: { label: "Crew", icon: Users },
-  server: { label: "Server", icon: Server },
   teams: { label: "Teams", icon: Users },
   players: { label: "Players", icon: UserRound },
   scrims: { label: "Scrims", icon: Swords },
@@ -43,8 +39,6 @@ export const MAIN_NAV_SEGMENT_META: Record<
   media: { label: "Media", icon: Film },
   theory: { label: "Theory", icon: BookOpen },
   utility: { label: "Utility", icon: Wrench },
-  stats: { label: "Stats", icon: BarChart3 },
-  watchlist: { label: "Watchlist", icon: List },
   admin: { label: "Admin", icon: Shield },
   sandbox: { label: "Sandbox", icon: SquareStack },
 };
@@ -71,7 +65,6 @@ export function getNavPlatformBase(): NavMainSidebarItem[] {
       url: "/dashboard",
       icon: LayoutDashboard,
     },
-    { title: "Server", url: "/server", icon: Server },
   ];
 }
 
@@ -92,11 +85,6 @@ export const navCompetitive: NavMainSidebarItem[] = [
 export const navKnowledge: NavMainSidebarItem[] = [
   { title: "Theory", url: "/theory", icon: BookOpen },
   { title: "Utility", url: "/utility", icon: Wrench },
-];
-
-export const navInsight: NavMainSidebarItem[] = [
-  { title: "Stats", url: "/stats", icon: BarChart3 },
-  { title: "Watchlist", url: "/watchlist", icon: List },
 ];
 
 export function formatSegment(segment: string): string {

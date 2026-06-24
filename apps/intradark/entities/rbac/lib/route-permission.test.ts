@@ -15,6 +15,6 @@ describe("hasRoutePermission", () => {
   });
 
   it("developer implies any checked slug", () => {
-    expect(hasRoutePermission([ROLE_DEVELOPER], NAV_SLUG.STATS)).toBe(true);
+    expect(hasRoutePermission([ROLE_DEVELOPER], NAV_SLUG.DASHBOARD)).toBe(true);
   });
 });

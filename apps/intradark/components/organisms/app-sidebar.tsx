@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Newspaper, Shield, SquareStack } from "lucide-react";
+import { Shield } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
 import { NavUser } from "@/components/molecules/nav-user";
@@ -23,14 +23,12 @@ import {
   ROLE_NEWS_EDITOR,
   ROLE_SANDBOX_ACCESS,
 } from "@/entities/admin/lib/rbac-constants";
-import { hasCapability } from "@/entities/admin/lib/role-slugs";
 import { applyNavRbacToItems } from "@/entities/rbac/lib/filter-nav-for-rbac";
 import { NAV_ANONYMOUS_SLUGS } from "@/entities/rbac/lib/nav-slugs";
 import {
   getNavPlatformBase,
   navCommunity,
   navCompetitive,
-  navInsight,
   navKnowledge,
   type NavMainSidebarItem,
 } from "@/lib/main-nav-routes";
@@ -51,31 +49,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           s as typeof ROLE_SANDBOX_ACCESS | typeof ROLE_NEWS_EDITOR,
         ),
       );
-    const showSandbox = slugs.includes(ROLE_SANDBOX_ACCESS);
-    const showNewsAdmin = hasCapability(slugs, ROLE_NEWS_EDITOR);
     const prefix: NavMainSidebarItem[] = [];
     if (showAdmin) {
-      const adminItems: NonNullable<NavMainSidebarItem["items"]> = [];
-      if (showSandbox) {
-        adminItems.push({
-          title: "Sandbox",
-          url: "/admin/sandbox",
-          icon: SquareStack,
-        });
-      }
-      if (showNewsAdmin) {
-        adminItems.push({
-          title: "News",
-          url: "/news/admin",
-          icon: Newspaper,
-        });
-      }
-      prefix.push({
-        title: "Admin",
-        url: "/admin",
-        icon: Shield,
-        ...(adminItems.length > 0 ? { items: adminItems } : {}),
-      });
+      prefix.push({ title: "Admin", url: "/admin", icon: Shield });
     }
     const platformFiltered = applyNavRbacToItems(getNavPlatformBase(), slugs);
     return [...prefix, ...platformFiltered];
@@ -105,12 +81,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         navKnowledge,
         user?.role_slugs ?? NAV_ANONYMOUS_SLUGS,
       ),
-    [user?.role_slugs],
-  );
-
-  const navInsightFiltered = React.useMemo(
-    () =>
-      applyNavRbacToItems(navInsight, user?.role_slugs ?? NAV_ANONYMOUS_SLUGS),
     [user?.role_slugs],
   );
 
@@ -154,7 +124,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <NavMain items={navCommunityFiltered} title="Community" />
           <NavMain items={navCompetitiveFiltered} title="Competitive" />
           <NavMain items={navKnowledgeFiltered} title="Knowledge" />
-          <NavMain items={navInsightFiltered} title="Insight" />
         </ScrollArea>
       </SidebarContent>
       <SidebarFooter>

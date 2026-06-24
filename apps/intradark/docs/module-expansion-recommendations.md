@@ -120,13 +120,12 @@ These modules block the end-to-end pickup-game experience described in [pug-syst
 
 ---
 
-### 3. CS2 events + match history (`/matches`, `/server`)
+### 3. CS2 events + match history (`/matches`)
 
 **Current:**
 
 - `app/api/cs2/events/route.ts` — logs JSON with `Bearer dev-secret`, no persistence.
 - `app/(main)/matches/page.tsx` — scaffold shell.
-- `app/(main)/server/page.tsx` — dev POST UI only.
 
 **Gap:** No durable match results, no post-lobby scoreboard, no feed for stats module.
 

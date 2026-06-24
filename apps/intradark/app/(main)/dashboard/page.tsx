@@ -10,6 +10,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
 import { DiscordLinkDialog } from "@/components/molecules/discord-link-dialog";
+import { IntradarkSpinner } from "@/components/atoms/intradark-spinner";
 import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 import { User, Gamepad2 } from "lucide-react";
 
@@ -68,6 +69,12 @@ export default async function DashboardPage() {
           Welcome back. Here is your profile information.
         </p>
       </div>
+
+      <Card>
+        <CardContent className="flex justify-center py-12">
+          <IntradarkSpinner size={180} speed={0.4} />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card>

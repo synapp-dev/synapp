@@ -65,6 +65,33 @@ export async function listForumThreadsForCategory(categoryId: string, limit = 50
     .limit(limit);
 }
 
+/** Most recently active threads across all categories (for the news landing widget). */
+export async function listRecentForumThreads(limit = 5) {
+  const replyCountSql = sql<number>`(
+    select count(*)::int from ${forumReplies} fr
+    where fr.thread_id = ${forumThreads.id} and fr.deleted_at is null
+  )`.mapWith(Number);
+
+  return db
+    .select({
+      id: forumThreads.id,
+      slug: forumThreads.slug,
+      title: forumThreads.title,
+      categorySlug: forumCategories.slug,
+      categoryLabel: forumCategories.label,
+      updatedAt: forumThreads.updatedAt,
+      replyCount: replyCountSql,
+      authorDisplayName: userProfiles.displayName,
+      authorUsername: userProfiles.username,
+    })
+    .from(forumThreads)
+    .innerJoin(forumCategories, eq(forumCategories.id, forumThreads.categoryId))
+    .leftJoin(userProfiles, eq(userProfiles.userId, forumThreads.authorUserId))
+    .where(isNull(forumThreads.deletedAt))
+    .orderBy(desc(forumThreads.updatedAt))
+    .limit(limit);
+}
+
 export async function getForumThreadBySlugs(
   categorySlug: string,
   threadSlug: string,

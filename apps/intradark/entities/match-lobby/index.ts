@@ -11,6 +11,7 @@ export { LobbyTeamColumn } from "./components/lobby-team-column";
 export { LobbyVetoColumnFooter } from "./components/lobby-veto-column-footer";
 export { MatchLobbyConcentricRings } from "./components/match-lobby-concentric-rings";
 export { MatchLobbyLayout } from "./components/match-lobby-layout";
+export { MatchRoom } from "./components/match-room";
 export {
   MatchLobbyMockProvider,
   useMatchLobbyMock,

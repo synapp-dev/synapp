@@ -1,5 +1,10 @@
-import { DiscordPhasePanel } from "@/entities/match-lobby";
+import { redirect } from "next/navigation";
 
-export default function MatchDiscordPhasePage() {
-  return <DiscordPhasePanel />;
+export default async function MatchDiscordRedirect({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  redirect(`/match/${id}`);
 }

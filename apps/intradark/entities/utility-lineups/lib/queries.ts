@@ -128,6 +128,59 @@ export async function listPublishedUtilityLineupsForMap(
     .where(and(...conditions));
 }
 
+export type RecentUtilityClip = {
+  id: string;
+  mapSlug: string;
+  mapDisplayName: string;
+  thumbnailUrl: string;
+  grenadeType: string;
+  throwLabel: string;
+  landLabel: string;
+  hasVideo: boolean;
+  createdAt: string;
+};
+
+/** Newest published lineups (for the news landing "Latest clips" media widget). */
+export async function listRecentUtilityClips(
+  limit = 4,
+): Promise<RecentUtilityClip[]> {
+  const rows = await db
+    .select({
+      id: utilityLineups.id,
+      grenadeType: utilityLineups.grenadeType,
+      throwLabel: utilityLineups.throwLabel,
+      landLabel: utilityLineups.landLabel,
+      youtubeUrl: utilityLineups.youtubeUrl,
+      videoObjectPath: utilityLineups.videoObjectPath,
+      lineupImageUrl: utilityLineups.lineupImageUrl,
+      createdAt: utilityLineups.createdAt,
+      mapSlug: maps.slug,
+      mapDisplayName: maps.displayName,
+      mapScreenshotUrl: maps.mapScreenshotUrl,
+      radarImageUrl: maps.radarImageUrl,
+    })
+    .from(utilityLineups)
+    .innerJoin(maps, eq(utilityLineups.mapId, maps.id))
+    .where(eq(utilityLineups.status, "published"))
+    .orderBy(desc(utilityLineups.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    id: r.id,
+    mapSlug: r.mapSlug,
+    mapDisplayName: r.mapDisplayName,
+    thumbnailUrl:
+      r.lineupImageUrl?.trim() ||
+      r.mapScreenshotUrl?.trim() ||
+      r.radarImageUrl,
+    grenadeType: r.grenadeType,
+    throwLabel: r.throwLabel,
+    landLabel: r.landLabel,
+    hasVideo: Boolean(r.youtubeUrl || r.videoObjectPath),
+    createdAt: r.createdAt,
+  }));
+}
+
 export async function listPendingUtilityLineupsForAdmin() {
   return db
     .select({

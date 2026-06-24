@@ -267,6 +267,11 @@ export const newsArticles = pgTable(
     slug: varchar({ length: 160 }).notNull(),
     title: varchar({ length: 500 }).notNull(),
     excerpt: text(),
+    coverImageUrl: text("cover_image_url"),
+    /** Provenance for auto-ingested articles, e.g. "steam_cs2"; null for hand-written. */
+    source: varchar({ length: 64 }),
+    /** Stable upstream id (Steam news gid) for dedupe; unique per source. */
+    externalId: varchar("external_id", { length: 128 }),
     bodyJson: jsonb("body_json")
       .notNull()
       .default(
@@ -305,6 +310,46 @@ export const newsArticles = pgTable(
       "news_articles_published_at_when_published",
       sql`((${table.status}) <> 'published') OR (${table.publishedAt} IS NOT NULL)`,
     ),
+    uniqueIndex("news_articles_source_external_id_key")
+      .on(table.source, table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
+  ],
+);
+
+/** News tag taxonomy (public filter + admin queue triage). */
+export const newsTags = pgTable(
+  "news_tags",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slug: varchar({ length: 64 }).notNull(),
+    label: varchar({ length: 255 }).notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("news_tags_slug_key").on(table.slug)],
+);
+
+/** Article <-> tag join. */
+export const newsArticleTags = pgTable(
+  "news_article_tags",
+  {
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => newsArticles.id, { onDelete: "cascade" }),
+    tagId: uuid("tag_id")
+      .notNull()
+      .references(() => newsTags.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({
+      name: "news_article_tags_pk",
+      columns: [table.articleId, table.tagId],
+    }),
+    index("news_article_tags_tag_id_idx").on(table.tagId),
   ],
 );
 
@@ -1158,3 +1203,336 @@ export const dmPlayerStats = pgView("dm_player_stats", {
   kd: numeric("kd"),
   hsPct: numeric("hs_pct"),
 }).existing();
+
+/* ───────────────────────────── PUG match & queue system ─────────────────────────
+ * Faceit-style competitive loop data layer (migration 0032; docs/pug-system-spec.md
+ * §1–§13). steamid64 is canonical identity (FK players). Writes via service role;
+ * pool/match/result tables are public-read so the client can subscribe via Realtime.
+ * gameServers + playerQueueCooldowns are service-role only (infra / penalty records).
+ */
+
+/** Internal ELO/MMR per player — drives §5 team auto-balance and queue banding. */
+export const playerRatings = pgTable("player_ratings", {
+  steamid64: text()
+    .primaryKey()
+    .references(() => players.steamid64, { onDelete: "cascade" }),
+  rating: integer().default(1000).notNull(),
+  peakRating: integer("peak_rating").default(1000).notNull(),
+  matchesPlayed: integer("matches_played").default(0).notNull(),
+  wins: integer().default(0).notNull(),
+  losses: integer().default(0).notNull(),
+  lastMatchAt: timestamp("last_match_at", { withTimezone: true, mode: "string" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+});
+
+/** CS2 server pool (§8). rconSecretRef is the ENV VAR NAME, never the secret itself. */
+export const gameServers = pgTable(
+  "game_servers",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    name: varchar({ length: 120 }).notNull(),
+    region: varchar({ length: 32 }),
+    host: text().notNull(),
+    port: integer().default(27015).notNull(),
+    gotvPort: integer("gotv_port"),
+    rconSecretRef: text("rcon_secret_ref"),
+    status: varchar({ length: 16 }).default("offline").notNull(),
+    // FK to matches(id) is declared in migration 0032 (ALTER, to break the circular
+    // ref with matches.serverId). Kept as a plain column here to avoid a TS type cycle.
+    currentMatchId: uuid("current_match_id"),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_game_servers_status").on(table.status),
+    check(
+      "game_servers_status_chk",
+      sql`${table.status} IN ('available','in_use','offline','maintenance')`,
+    ),
+  ],
+);
+
+/**
+ * One row per PUG. `status` IS the backend-owned phase state machine:
+ * pending_accept → accepted → staging(§6) → configuring(§8) → awaiting_connect(§9)
+ * → live(§10) → completed(§12); any → cancelled. `seq` powers /matches/<seq> URLs.
+ */
+export const matches = pgTable(
+  "matches",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
+    league: varchar({ length: 32 }).default("open").notNull(),
+    region: varchar({ length: 32 }),
+    status: varchar({ length: 24 }).default("pending_accept").notNull(),
+    map: varchar({ length: 64 }),
+    serverId: uuid("server_id").references(() => gameServers.id, {
+      onDelete: "set null",
+    }),
+    // §5 generated team names + §6 bot-created Discord voice channel ids.
+    team1Name: varchar("team1_name", { length: 64 }),
+    team2Name: varchar("team2_name", { length: 64 }),
+    discordTeam1ChannelId: text("discord_team1_channel_id"),
+    discordTeam2ChannelId: text("discord_team2_channel_id"),
+    acceptDeadline: timestamp("accept_deadline", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    stagingDeadline: timestamp("staging_deadline", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    connectDeadline: timestamp("connect_deadline", {
+      withTimezone: true,
+      mode: "string",
+    }),
+    cancelReason: text("cancel_reason"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "string" }),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    uniqueIndex("matches_seq_key").on(table.seq),
+    index("idx_matches_status").on(table.status),
+    index("idx_matches_created_at").on(table.createdAt),
+    check(
+      "matches_status_chk",
+      sql`${table.status} IN ('pending_accept','accepted','staging','configuring','awaiting_connect','live','completed','cancelled')`,
+    ),
+  ],
+);
+
+/** Roster + team allocation (§5) + accept (§4) + lobby/connect tracking (§6/§9). */
+export const matchPlayers = pgTable(
+  "match_players",
+  {
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    team: integer(),
+    ratingAtQueue: integer("rating_at_queue"),
+    acceptStatus: varchar("accept_status", { length: 12 })
+      .default("pending")
+      .notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "string" }),
+    discordJoined: boolean("discord_joined").default(false).notNull(),
+    connected: boolean().default(false).notNull(),
+    connectedAt: timestamp("connected_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.matchId, table.steamid64] }),
+    index("idx_match_players_steamid64").on(table.steamid64),
+    index("idx_match_players_match").on(table.matchId),
+    check("match_players_team_chk", sql`${table.team} IS NULL OR ${table.team} IN (1,2)`),
+    check(
+      "match_players_accept_chk",
+      sql`${table.acceptStatus} IN ('pending','accepted','declined','timeout')`,
+    ),
+  ],
+);
+
+/** The live queue pool (§2). One active ('searching') entry per player at a time. */
+export const queueEntries = pgTable(
+  "queue_entries",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    league: varchar({ length: 32 }).default("open").notNull(),
+    region: varchar({ length: 32 }),
+    partyId: uuid("party_id"),
+    status: varchar({ length: 12 }).default("searching").notNull(),
+    rating: integer(),
+    matchId: uuid("match_id").references(() => matches.id, {
+      onDelete: "set null",
+    }),
+    joinedAt: timestamp("joined_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("queue_entries_one_active_per_player")
+      .on(table.steamid64)
+      .where(sql`${table.status} = 'searching'`),
+    index("idx_queue_entries_league_status").on(table.league, table.status),
+    check(
+      "queue_entries_status_chk",
+      sql`${table.status} IN ('searching','matched','cancelled')`,
+    ),
+  ],
+);
+
+/** Penalty matrix (§4). Eligibility (§2) checks for an unexpired row. Service-role only. */
+export const playerQueueCooldowns = pgTable(
+  "player_queue_cooldowns",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    reason: varchar({ length: 32 }).notNull(),
+    matchId: uuid("match_id").references(() => matches.id, {
+      onDelete: "set null",
+    }),
+    strikes: integer().default(1).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("idx_queue_cooldowns_active").on(table.steamid64, table.expiresAt),
+  ],
+);
+
+/** Append-only raw MatchZy firehose (§11), correlated by match_id. */
+export const matchEvents = pgTable(
+  "match_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    eventId: text("event_id"),
+    eventType: text("event_type").notNull(),
+    round: integer(),
+    payload: jsonb(),
+    raw: jsonb().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "string" }),
+    ingestedAt: timestamp("ingested_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("match_events_event_id_key")
+      .on(table.eventId)
+      .where(sql`${table.eventId} IS NOT NULL`),
+    index("idx_match_events_match").on(table.matchId, table.occurredAt),
+  ],
+);
+
+/** Aggregated outcome (§12), one row per match. winnerTeam NULL = draw/cancelled. */
+export const matchResults = pgTable(
+  "match_results",
+  {
+    matchId: uuid("match_id")
+      .primaryKey()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    winnerTeam: integer("winner_team"),
+    scoreTeam1: integer("score_team1").default(0).notNull(),
+    scoreTeam2: integer("score_team2").default(0).notNull(),
+    map: varchar({ length: 64 }),
+    durationSeconds: integer("duration_seconds"),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    check(
+      "match_results_winner_chk",
+      sql`${table.winnerTeam} IS NULL OR ${table.winnerTeam} IN (1,2)`,
+    ),
+  ],
+);
+
+/** Per-player post-match line (§13). ratingDelta = ELO change applied this match. */
+export const matchPlayerStats = pgTable(
+  "match_player_stats",
+  {
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    team: integer(),
+    kills: integer().default(0).notNull(),
+    deaths: integer().default(0).notNull(),
+    assists: integer().default(0).notNull(),
+    headshotKills: integer("headshot_kills").default(0).notNull(),
+    damage: integer().default(0).notNull(),
+    mvps: integer().default(0).notNull(),
+    ratingDelta: integer("rating_delta"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.matchId, table.steamid64] }),
+    index("idx_match_player_stats_steamid64").on(table.steamid64),
+    check(
+      "match_player_stats_team_chk",
+      sql`${table.team} IS NULL OR ${table.team} IN (1,2)`,
+    ),
+  ],
+);
+
+/**
+ * Player roles/positions (rifler, AWPer, IGL, …). `matchId` NULL = the player's
+ * DEFAULT/declared role (read by the /play card); `matchId` set = a per-match
+ * override (post-MVP roster role). `position` CHECK mirrors POSITION_IDS in
+ * entities/players/lib/positions.ts. Migration 0033.
+ */
+export const teamPositions = pgTable(
+  "team_positions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    matchId: uuid("match_id").references(() => matches.id, {
+      onDelete: "cascade",
+    }),
+    position: varchar({ length: 16 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("team_positions_default_uq")
+      .on(table.steamid64)
+      .where(sql`${table.matchId} IS NULL`),
+    uniqueIndex("team_positions_match_uq")
+      .on(table.matchId, table.steamid64)
+      .where(sql`${table.matchId} IS NOT NULL`),
+    index("idx_team_positions_match")
+      .on(table.matchId)
+      .where(sql`${table.matchId} IS NOT NULL`),
+    check(
+      "team_positions_position_chk",
+      sql`${table.position} IN ('igl','awper','entry','rifler','support','lurker')`,
+    ),
+  ],
+);

@@ -1,7 +1,14 @@
-import { and, desc, eq, isNotNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { db } from "@/server/db/drizzle";
-import { newsArticles } from "@/server/db/schema";
+import {
+  newsArticleTags,
+  newsArticles,
+  newsTags,
+  userProfiles,
+} from "@/server/db/schema";
+
+export type ArticleTag = { slug: string; label: string };
 
 export async function listPublishedNewsArticles() {
   return db
@@ -18,8 +25,14 @@ export async function listPublishedNewsArticles() {
 
 export async function getPublishedArticleBySlug(slug: string) {
   const rows = await db
-    .select()
+    .select({
+      article: newsArticles,
+      authorDisplayName: userProfiles.displayName,
+      authorUsername: userProfiles.username,
+      authorAvatarUrl: userProfiles.avatarUrl,
+    })
     .from(newsArticles)
+    .leftJoin(userProfiles, eq(userProfiles.userId, newsArticles.authorUserId))
     .where(
       and(
         eq(newsArticles.slug, slug),
@@ -28,7 +41,45 @@ export async function getPublishedArticleBySlug(slug: string) {
       ),
     )
     .limit(1);
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+  return {
+    ...row.article,
+    authorDisplayName: row.authorDisplayName,
+    authorUsername: row.authorUsername,
+    authorAvatarUrl: row.authorAvatarUrl,
+  };
+}
+
+export async function listNewsTags(): Promise<ArticleTag[]> {
+  return db
+    .select({ slug: newsTags.slug, label: newsTags.label })
+    .from(newsTags)
+    .orderBy(asc(newsTags.label));
+}
+
+/** Map of articleId -> its tags, for a set of articles. */
+export async function getTagsForArticleIds(
+  ids: string[],
+): Promise<Map<string, ArticleTag[]>> {
+  const map = new Map<string, ArticleTag[]>();
+  if (ids.length === 0) return map;
+  const rows = await db
+    .select({
+      articleId: newsArticleTags.articleId,
+      slug: newsTags.slug,
+      label: newsTags.label,
+    })
+    .from(newsArticleTags)
+    .innerJoin(newsTags, eq(newsTags.id, newsArticleTags.tagId))
+    .where(inArray(newsArticleTags.articleId, ids))
+    .orderBy(asc(newsTags.label));
+  for (const r of rows) {
+    const arr = map.get(r.articleId) ?? [];
+    arr.push({ slug: r.slug, label: r.label });
+    map.set(r.articleId, arr);
+  }
+  return map;
 }
 
 export async function listAllNewsArticlesForAdmin() {

@@ -3,16 +3,21 @@
 import * as React from "react";
 import Image from "next/image";
 import * as SelectPrimitive from "@radix-ui/react-select";
-import {
-  Check,
-  ChevronDown,
-  History,
-  Plus,
-  ShieldCheck,
-  Users,
-} from "lucide-react";
+import { Check, ChevronDown, Plus, ShieldCheck } from "lucide-react";
+import CountUp from "react-countup";
 
-import { FaceitLevelBadge } from "@/components/atoms/faceit-level-badge";
+import { toast } from "sonner";
+
+import {
+  useJoinQueue,
+  useLeaveQueue,
+  useQueueStatus,
+} from "@/entities/match-queue/hooks/use-queue";
+import { useSimController } from "@/entities/match-queue/hooks/use-sim";
+import type { QueueLeague } from "@/entities/match-queue/lib/leagues";
+import { positionLabel } from "@/entities/players/lib/positions";
+import { AcceptMatchDialog } from "@/components/organisms/accept-match-dialog";
+import { PugSimPanel } from "@/components/organisms/pug-sim-panel";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
@@ -24,63 +29,32 @@ import {
 } from "@workspace/ui/components/select";
 import { cn } from "@workspace/ui/lib/utils";
 
-/** Logged-in mock profile (party captain). */
-const DUMMY_USER = {
-  nickname: "donk",
-  elo: 2876,
-  level: 10,
+/**
+ * The signed-in player's Play-card data — resolved server-side in
+ * app/(main)/play/page.tsx (persona/avatar from steam_profiles, ELO from
+ * player_ratings, role from team_positions default row). `null` when signed out.
+ */
+export type PlayCardMe = {
+  steamid64: string;
+  name: string;
+  /** Transparent full-body character render (football-card portrait), if one exists. */
+  portraitUrl: string | null;
+  /** Steam avatar — fallback portrait when there's no character render. */
+  avatarUrl: string | null;
+  countryCode: string | null;
+  rating: number;
+  /** Global account/leaderboard rank shown top-left (placeholder until ranking lands). */
+  rank: number | null;
+  position: string | null;
+  /** Most-recent team (name + resolved logo URL + brand color) for the "@ team" line. */
+  teamName: string | null;
+  teamLogoUrl: string | null;
+  teamColor: string | null;
 };
-
-const DUMMY_PARTY = [
-  {
-    id: "1",
-    label: "donk",
-    displayName: "donk",
-    imageSrc: "/images/players/donk-headshot.png",
-    initials: "DK",
-    captain: false,
-    role: "Rifler",
-    rating: 1,
-    team: "Spirit",
-  },
-  {
-    id: "2",
-    label: "s1mple",
-    displayName: "s1mple",
-    imageSrc: "/images/players/s1mple-headshot.png",
-    initials: "S1",
-    captain: false,
-    role: "AWP",
-    rating: 437,
-    team: "BC.GAME",
-  },
-  {
-    id: "3",
-    label: "m0NESY",
-    displayName: "m0NESY",
-    imageSrc: "/images/players/m0nesy-headshot.png",
-    initials: "M0",
-    captain: false,
-    role: "AWP",
-    rating: 7,
-    team: "Falcons",
-  },
-  {
-    id: "4",
-    label: "ZywOo",
-    displayName: "ZywOo",
-    imageSrc: "/images/players/zywoo-headshot.png",
-    initials: "ZY",
-    captain: false,
-    role: "AWP",
-    rating: 95,
-    team: "Vitality",
-  },
-] as const;
 
 const PARTY_SLOTS = 5;
 
-/** Center slot index (0-based): wider grid track + `emphasis` styling. */
+/** Center slot index (0-based): wider grid track + `emphasis` styling. The logged-in player. */
 const PARTY_CENTER_INDEX = 2;
 
 /** Five columns fill parent width; middle column 1.25× each outer slot. */
@@ -90,16 +64,8 @@ const PARTY_GRID_TEMPLATE =
 /** Slightly taller than 5×7 trading stock — closer to classic portrait “football” cards. */
 const PARTY_CARD_ASPECT = "aspect-[2/3]";
 
-/** Leaderboard ranks 1–3 get premium gold card treatment (`member.rating` is rank index). */
-const TOP_LEADERBOARD_RANK = 3;
-
-function isTopLeaderboardRank(rank: number): boolean {
-  const r = Math.trunc(rank);
-  return r >= 1 && r <= TOP_LEADERBOARD_RANK;
-}
-
-/** Fade team mark behind portrait — matches `player-profile-mock` treatment. */
-const PARTY_CARD_TEAM_LOGO_MASK: React.CSSProperties = {
+/** Fade the backdrop watermark behind the portrait (top solid → transparent bottom). */
+const PARTY_CARD_BACKDROP_MASK: React.CSSProperties = {
   WebkitMaskImage:
     "linear-gradient(to bottom, #000 0%, #000 12%, rgba(0,0,0,0.75) 38%, rgba(0,0,0,0.25) 68%, transparent 100%)",
   maskImage:
@@ -108,16 +74,6 @@ const PARTY_CARD_TEAM_LOGO_MASK: React.CSSProperties = {
   maskSize: "100% 100%",
   WebkitMaskRepeat: "no-repeat",
   maskRepeat: "no-repeat",
-};
-
-type PartyMemberId = (typeof DUMMY_PARTY)[number]["id"];
-
-/** Watermark behind portrait — keyed by party slot / player (not org label text). */
-const PARTY_CARD_PORTRAIT_LOGO_SRC: Record<PartyMemberId, string> = {
-  "1": "/images/teams/spirit-logo.png",
-  "2": "/images/teams/bcgame-logo.png",
-  "3": "/images/teams/falcons-logo.png",
-  "4": "/images/teams/vitality-logo.png",
 };
 
 /** Queue class / tier (highest → lowest): Champions → Stellaris → Genesis → Open */
@@ -135,7 +91,7 @@ const LEAGUE_STAR_SRC: Record<(typeof LEAGUE_OPTIONS)[number]["id"], string> = {
   open: "/images/logos/intradark-symbol-blue.svg",
 };
 
-/** Rank badge art behind the numeric rating on party cards (Open has no asset — pill fallback). */
+/** Rank badge art behind the numeric rating on the player card (Open has no asset — pill fallback). */
 const LEAGUE_RANK_SRC: Partial<
   Record<(typeof LEAGUE_OPTIONS)[number]["id"], string>
 > = {
@@ -232,18 +188,12 @@ function LeagueSelectItem({ value, title }: { value: string; title: string }) {
   );
 }
 
-/** 3D flip shell + faces — perspective on outer `group`, transitions on each face (see classic Y-flip pattern). */
-const partyCardFlipFaceClass =
-  "absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-white/10 bg-transparent backface-hidden [transform-style:preserve-3d] will-change-transform transition-transform duration-1000 ease-out";
-
-/** Keep off the perspective wrapper — shadow there causes a square compositor layer during Y-flip. */
-function partyCardFaceElevationShadow(isTopThree: boolean): string {
-  return isTopThree
-    ? "shadow-[0_14px_44px_-6px_rgba(245,158,11,0.35)]"
-    : "shadow-[0_12px_40px_-8px_rgba(0,0,0,0.85)]";
+/** Keep off the perspective wrapper — shadow there causes a square compositor layer. */
+function partyCardFaceElevationShadow(): string {
+  return "shadow-[0_12px_40px_-8px_rgba(0,0,0,0.85)]";
 }
 
-/** 4+ digits use the same sizing as 3 (fits badge width). */
+/** 4+ digits use the same sizing as 3 (fits badge width). ELO is typically 3–4 digits. */
 function partyCardRankDigitBucket(rank: number): 1 | 2 | 3 {
   const n = String(Math.abs(Math.trunc(rank))).length;
   if (n <= 1) return 1;
@@ -281,21 +231,35 @@ function partyCardRankPillTextClass(
   return "text-3xl";
 }
 
-function PartyCardRatingBadge({
+/** ELO badge: league rank art with the player's rating overlaid (pill fallback for Open). */
+function PlayerCardRatingBadge({
   rating,
   leagueId,
   emphasis,
+  delay = 0.35,
 }: {
   rating: number;
   leagueId: string;
   emphasis: boolean;
+  /** Seconds before the count-up begins (synced with the card fade-in). */
+  delay?: number;
 }) {
   const rankSrc =
     LEAGUE_RANK_SRC[leagueId as keyof typeof LEAGUE_RANK_SRC] ?? undefined;
 
   const corner = emphasis ? "right-7 top-7" : "right-5 top-5";
-  const rankDisplay = Math.trunc(rating);
-  const digitBucket = partyCardRankDigitBucket(rankDisplay);
+  const ratingDisplay = Math.trunc(rating);
+  const digitBucket = partyCardRankDigitBucket(ratingDisplay);
+  const count = (
+    <CountUp
+      start={0}
+      end={ratingDisplay}
+      duration={1.6}
+      delay={delay}
+      separator=","
+      useEasing
+    />
+  );
 
   if (!rankSrc) {
     return (
@@ -305,18 +269,15 @@ function PartyCardRatingBadge({
           corner,
           partyCardRankPillTextClass(digitBucket, emphasis),
         )}
-        aria-label={`Rank ${rankDisplay}`}
+        aria-label={`Rating ${ratingDisplay}`}
       >
-        {rankDisplay}
+        {count}
       </span>
     );
   }
 
   return (
-    <div
-      className={cn("absolute z-[6]", corner)}
-      aria-label={`Rank ${rankDisplay}`}
-    >
+    <div className={cn("absolute z-[6]", corner)} aria-label={`Rating ${ratingDisplay}`}>
       <div
         className={cn(
           "relative shrink-0 drop-shadow-lg",
@@ -336,228 +297,187 @@ function PartyCardRatingBadge({
             partyCardRankOverlayTextClass(digitBucket, emphasis),
           )}
         >
-          {rankDisplay}
+          {count}
         </span>
       </div>
     </div>
   );
 }
 
-function PartyTradingCard({
-  member,
+/** The signed-in player's trading card (center slot): Steam avatar + name + role + ELO. */
+function MyPlayerCard({
+  me,
   leagueId,
   emphasis = false,
 }: {
-  member: (typeof DUMMY_PARTY)[number];
+  me: PlayCardMe;
   leagueId: string;
   emphasis?: boolean;
 }) {
-  const teamLogoSrc = PARTY_CARD_PORTRAIT_LOGO_SRC[member.id];
-  const isTopThree = isTopLeaderboardRank(member.rating);
+  const role = positionLabel(me.position);
+  const initials = me.name.slice(0, 2).toUpperCase();
+  // Team crest behind the render when the player has a team; else the league mark.
+  const backdropSrc =
+    me.teamLogoUrl ??
+    LEAGUE_STAR_SRC[leagueId as keyof typeof LEAGUE_STAR_SRC] ??
+    LEAGUE_STAR_SRC.open;
+  const backdropOpacity = me.teamLogoUrl ? "opacity-[0.18]" : "opacity-[0.12]";
 
   return (
     <div
       className={cn(
         "group relative min-w-0 w-full max-w-full overflow-visible",
         PARTY_CARD_ASPECT,
-        "[perspective:900px]",
       )}
     >
-      <div className="absolute inset-0 bg-transparent [transform-style:preserve-3d]">
-        {/* Front */}
-        <div
-          className={cn(
-            partyCardFlipFaceClass,
-            "isolate rotate-y-0 group-hover:rotate-y-180",
-            partyCardFaceElevationShadow(isTopThree),
-            isTopThree &&
-              "bg-gradient-to-br from-amber-100/40 via-amber-500/35 to-amber-950/80 ring-1 ring-amber-400/55",
-          )}
-        >
+      <div
+        className={cn(
+          "absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-transparent",
+          partyCardFaceElevationShadow(),
+        )}
+      >
+        <div className="pointer-events-none absolute inset-0 z-0 rounded-2xl bg-gradient-to-br from-white/[0.15] via-transparent to-transparent" />
+        {me.teamColor ? (
           <div
-            className={cn(
-              "pointer-events-none absolute inset-0 z-0 rounded-2xl",
-              isTopThree
-                ? "bg-gradient-to-br from-white/15 via-transparent to-amber-950/30"
-                : "bg-gradient-to-br from-white/[0.15] via-transparent to-transparent",
-            )}
+            className="pointer-events-none absolute inset-0 z-0 rounded-2xl"
+            style={{
+              background: `radial-gradient(120% 80% at 50% 0%, ${me.teamColor}24, transparent 62%)`,
+            }}
+            aria-hidden
           />
-          {member.captain ? (
-            <Badge
-              className={cn(
-                "absolute z-[5] border-amber-400/60 bg-amber-500 font-black text-black hover:bg-amber-500",
-                emphasis
-                  ? "left-2 top-3 h-6 px-1.5 text-[10px]"
-                  : "left-1 top-2 h-5 px-1 text-[9px]",
-              )}
-            >
-              C
-            </Badge>
-          ) : null}
-          <PartyCardRatingBadge
-            rating={member.rating}
-            leagueId={leagueId}
-            emphasis={emphasis}
-          />
-          {/*
-            Portrait fills the face; bottom-half footer is absolutely positioned with
-            its own backdrop above the image stack (z-[10] vs z-[1]).
-          */}
-          <div className="absolute inset-0 z-[1] overflow-hidden rounded-2xl">
-            <div className="absolute inset-x-0 bottom-0 -top-[10%] overflow-hidden rounded-t-2xl">
+        ) : null}
+
+        <PlayerCardRatingBadge
+          rating={me.rank ?? me.rating}
+          leagueId={leagueId}
+          emphasis={emphasis}
+        />
+
+        {/* Portrait — transparent character render (football-card style), else Steam avatar. */}
+        <div className="absolute inset-0 z-[1] overflow-hidden rounded-2xl">
+          {me.portraitUrl ? (
+            <>
+              {/* Faint league-mark backdrop behind the cut-out render. */}
               <div
-                className={cn(
-                  "pointer-events-none absolute bottom-0 left-0 top-10 z-0",
-                  emphasis
-                    ? "w-[min(300%,28rem)] -translate-x-[18%] sm:-translate-x-[14%]"
-                    : "w-[min(340%,24rem)] -translate-x-[22%] sm:-translate-x-[18%]",
-                )}
+                className="pointer-events-none absolute inset-x-0 bottom-1/3 top-2 z-0"
+                style={PARTY_CARD_BACKDROP_MASK}
                 aria-hidden
-                style={PARTY_CARD_TEAM_LOGO_MASK}
               >
                 <Image
-                  src={teamLogoSrc}
+                  src={backdropSrc}
                   alt=""
                   fill
-                  className="object-contain object-center opacity-[0.48]"
-                  sizes={
-                    emphasis
-                      ? "(max-width:768px) 240px, 300px"
-                      : "(max-width:768px) 200px, 260px"
-                  }
+                  className={cn("object-contain object-top", backdropOpacity)}
+                  sizes={emphasis ? "240px" : "200px"}
                 />
               </div>
+              {/*
+                Frame the full-body render like a sports card: zoomed so the full head
+                shows with a little top padding, weighted left (≈⅓ cropped off the left
+                edge), torso running to the bottom behind the nameplate.
+              */}
               <Image
-                src={member.imageSrc}
+                src={me.portraitUrl}
                 alt=""
                 fill
-                className={cn(
-                  "relative z-[1] object-contain object-left",
-                  emphasis
-                    ? "pt-10 pr-14 scale-[1.6]"
-                    : "pt-8 pr-12 [scale:1.6]",
-                )}
-                priority={member.captain}
+                className="relative z-[1] object-cover object-top"
+                style={{
+                  transform: "scale(1.6) translate(-10%, 1%)",
+                  transformOrigin: "center top",
+                }}
+                sizes={emphasis ? "(max-width:768px) 240px, 300px" : "(max-width:768px) 200px, 260px"}
+                priority
               />
-            </div>
-          </div>
-          <div
-            className={cn(
-              "absolute inset-x-0 bottom-0 top-1/3 z-[10] flex flex-col justify-end overflow-hidden rounded-b-2xl",
-              emphasis ? "px-2.5 pb-3 pt-2" : "px-2 pb-2.5 pt-2",
-            )}
-          >
-            <div
-              className="pointer-events-none absolute inset-0 rounded-b-2xl bg-gradient-to-t from-black via-black/75 to-transparent"
-              aria-hidden
+            </>
+          ) : me.avatarUrl ? (
+            <Image
+              src={me.avatarUrl}
+              alt=""
+              fill
+              className="object-cover object-top"
+              sizes={emphasis ? "(max-width:768px) 240px, 300px" : "(max-width:768px) 200px, 260px"}
+              priority
             />
-
-            <div
-              className={cn(
-                "relative z-[2] flex min-w-0 flex-col gap-0.5 p-2",
-                emphasis ? "gap-1" : "gap-1",
-              )}
-            >
-              <p
-                className={cn(
-                  "min-w-0 truncate font-semibold leading-none tracking-tight text-white",
-                  emphasis ? "text-3xl" : "text-2xl",
-                )}
-              >
-                {member.displayName}
-              </p>
-              <div
-                className={cn(
-                  "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-white/90",
-                  emphasis
-                    ? "text-[11px] sm:text-xs"
-                    : "text-[10px] sm:text-[11px]",
-                )}
-              >
-                <span className="font-normal">{member.role}</span>
-                <span className="leading-none text-primary/50">@</span>
-                <div className="inline-flex min-w-0 max-w-full items-center gap-1">
-                  <Image
-                    src={teamLogoSrc}
-                    alt=""
-                    width={40}
-                    height={16}
-                    className={cn(
-                      "h-3 w-auto shrink-0 object-contain opacity-95",
-                      emphasis && "h-3.5 sm:h-4",
-                    )}
-                    sizes="40px"
-                  />
-                  <span className="truncate font-semibold text-emerald-300/95">
-                    {member.team}
-                  </span>
-                </div>
-              </div>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-b from-zinc-800 to-black">
+              <span className="text-5xl font-black tracking-tighter text-white/25">
+                {initials}
+              </span>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* Back — starts at 180°; on hover both faces complete a full Y spin so the back reads upright */}
         <div
           className={cn(
-            partyCardFlipFaceClass,
-            "rotate-y-180 group-hover:rotate-y-[360deg]",
-            partyCardFaceElevationShadow(isTopThree),
-            isTopThree
-              ? "bg-gradient-to-br from-amber-200/25 via-amber-900/25 to-zinc-950/50 ring-1 ring-amber-400/35"
-              : "bg-gradient-to-br from-white/[0.07] via-zinc-900/20 to-zinc-950/45",
+            "absolute inset-x-0 bottom-0 top-1/3 z-[10] flex flex-col justify-end overflow-hidden rounded-b-2xl",
+            emphasis ? "px-2.5 pb-3 pt-2" : "px-2 pb-2.5 pt-2",
           )}
-          aria-hidden
         >
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.12]"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(-12deg, transparent, transparent 6px, rgba(255,255,255,0.04) 6px, rgba(255,255,255,0.04) 7px)",
-            }}
+            className="pointer-events-none absolute inset-0 rounded-b-2xl bg-gradient-to-t from-black via-black/75 to-transparent"
+            aria-hidden
           />
-          <div
-            className="pointer-events-none absolute inset-0 opacity-25"
-            style={{
-              backgroundImage:
-                "radial-gradient(ellipse at 50% 35%, var(--sidebar-primary), transparent 55%)",
-            }}
-          />
-          <div className="relative flex h-full min-h-0 flex-col items-center justify-center gap-3 p-4">
+
+          <div className="relative z-[2] flex min-w-0 flex-col gap-1 p-2">
+            <p
+              className={cn(
+                "min-w-0 truncate font-semibold leading-none tracking-tight text-white",
+                emphasis ? "text-3xl" : "text-2xl",
+              )}
+            >
+              {me.name}
+            </p>
             <div
               className={cn(
-                "relative shrink-0 opacity-95",
-                emphasis
-                  ? "h-14 w-28 sm:h-16 sm:w-32"
-                  : "h-11 w-24 sm:h-12 sm:w-28",
+                "flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-white/90",
+                emphasis ? "text-[11px] sm:text-xs" : "text-[10px] sm:text-[11px]",
               )}
             >
-              <Image
-                src={teamLogoSrc}
-                alt=""
-                fill
-                className="object-contain object-center"
-                sizes={emphasis ? "128px" : "112px"}
-              />
+              {role ? (
+                <span className="inline-flex items-center gap-1">
+                  <Image
+                    src="/images/icons/ak47-icon-white.svg"
+                    alt=""
+                    width={32}
+                    height={12}
+                    className={cn(
+                      "w-auto shrink-0 opacity-90",
+                      emphasis ? "h-2" : "h-1.5",
+                    )}
+                    sizes="32px"
+                  />
+                  <span className="font-normal">{role}</span>
+                </span>
+              ) : (
+                <span className="font-normal text-white/45">No role set</span>
+              )}
+              {me.teamName ? (
+                <>
+                  <span className="leading-none text-primary/50">@</span>
+                  <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+                    {me.teamLogoUrl ? (
+                      <Image
+                        src={me.teamLogoUrl}
+                        alt=""
+                        width={40}
+                        height={16}
+                        className={cn(
+                          "h-3 w-auto shrink-0 object-contain opacity-95",
+                          emphasis && "h-3.5 sm:h-4",
+                        )}
+                        sizes="40px"
+                      />
+                    ) : null}
+                    <span
+                      className="truncate font-semibold"
+                      style={me.teamColor ? { color: me.teamColor } : undefined}
+                    >
+                      {me.teamName}
+                    </span>
+                  </span>
+                </>
+              ) : null}
             </div>
-            <p
-              className={cn(
-                "font-black tracking-tighter text-white/90",
-                emphasis ? "text-4xl sm:text-5xl" : "text-3xl sm:text-4xl",
-              )}
-            >
-              {member.initials}
-            </p>
-            <p
-              className={cn(
-                "max-w-full truncate text-center font-semibold uppercase tracking-[0.2em] text-white/35",
-                emphasis
-                  ? "text-[10px] sm:text-xs"
-                  : "text-[9px] sm:text-[10px]",
-              )}
-            >
-              Party
-            </p>
           </div>
         </div>
       </div>
@@ -565,44 +485,35 @@ function PartyTradingCard({
   );
 }
 
-function PartySlotEmpty({
-  index,
-  emphasis = false,
-}: {
-  index: number;
-  emphasis?: boolean;
-}) {
+/** Outer slot — teammates fill via matchmaking (solo queue), not party invites. */
+function PartySlotEmpty({ emphasis = false }: { emphasis?: boolean }) {
   return (
-    <button
-      type="button"
-      aria-label="Invite player"
+    <div
+      aria-hidden
       className={cn(
-        "flex min-w-0 w-full max-w-full flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-gradient-to-b from-zinc-900/60 to-black/50 text-muted-foreground transition",
+        "flex min-w-0 w-full max-w-full flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-gradient-to-b from-zinc-900/60 to-black/50 text-muted-foreground",
         PARTY_CARD_ASPECT,
         emphasis ? "gap-2" : "gap-1",
-        "hover:border-white/30 hover:bg-zinc-900/40 hover:text-sidebar-primary",
       )}
     >
       <Plus
         className={
-          emphasis
-            ? "size-8 opacity-70 sm:size-9"
-            : "size-6 opacity-70 sm:size-7"
+          emphasis ? "size-8 opacity-40 sm:size-9" : "size-6 opacity-40 sm:size-7"
         }
       />
       <span
         className={cn(
-          "px-1.5 text-center font-semibold uppercase tracking-wide",
+          "px-1.5 text-center font-semibold uppercase tracking-wide opacity-70",
           emphasis ? "text-[11px]" : "text-[10px]",
         )}
       >
-        Invite Player
+        Open Slot
       </span>
-    </button>
+    </div>
   );
 }
 
-export function FaceitPlayMock() {
+export function FaceitPlayMock({ me = null }: { me?: PlayCardMe | null }) {
   const [leagueSelectMounted, setLeagueSelectMounted] = React.useState(false);
   React.useEffect(() => {
     setLeagueSelectMounted(true);
@@ -610,7 +521,59 @@ export function FaceitPlayMock() {
 
   const [selectedLeague, setSelectedLeague] =
     React.useState<string>("champions");
-  const [queueSearching, setQueueSearching] = React.useState(false);
+
+  const { data: queueStatus, refetch: refetchQueue } = useQueueStatus({
+    refetchInterval: 2000,
+  });
+  const joinQueue = useJoinQueue();
+  const leaveQueue = useLeaveQueue();
+  const sim = useSimController();
+
+  const isDev = process.env.NODE_ENV !== "production";
+
+  // Open the ready-check when the server reports a forming match (matched), or the
+  // moment the simulator forms one (before the 2s poll catches up).
+  const activeMatchId =
+    (queueStatus?.you?.status === "matched"
+      ? queueStatus.you.matchId
+      : null) ?? sim.matchId;
+
+  const handleMatchClosed = React.useCallback(() => {
+    // Dismiss (not full reset) so a dodge cooldown survives for you to observe it
+    // blocking the next FIND MATCH.
+    sim.dismiss();
+    refetchQueue();
+  }, [sim, refetchQueue]);
+
+  // Server-owned truth (optimistic while a join is in flight).
+  const queueSearching =
+    queueStatus?.you?.status === "searching" || joinQueue.isPending;
+  const eligibility = queueStatus?.eligibility;
+  const poolCount = queueStatus?.pool?.[selectedLeague as QueueLeague] ?? 0;
+
+  const handleFindMatch = () => {
+    if (eligibility && !eligibility.eligible) {
+      toast.error(eligibility.reason ?? "You can't queue right now.");
+      return;
+    }
+    joinQueue.mutate(
+      { league: selectedLeague as QueueLeague },
+      {
+        onError: (e) => toast.error(e.message),
+        onSuccess: (data) => {
+          if (data.matchId) {
+            toast.success("Match found — heading to the lobby…");
+          }
+        },
+      },
+    );
+  };
+
+  const handleCancelQueue = () => {
+    leaveQueue.mutate(undefined, {
+      onError: (e) => toast.error(e.message),
+    });
+  };
 
   const selectedLeagueTitle =
     LEAGUE_OPTIONS.find((o) => o.id === selectedLeague)?.title ?? "Champions";
@@ -714,7 +677,7 @@ export function FaceitPlayMock() {
                     Searching for a match…
                   </p>
                   <p className="text-xs text-sky-200/70">
-                    Est. wait ~2:40 · Skill level {DUMMY_USER.level}
+                    {poolCount} in {selectedLeagueTitle} queue · solo
                   </p>
                 </div>
                 <Button
@@ -722,7 +685,8 @@ export function FaceitPlayMock() {
                   variant="secondary"
                   size="sm"
                   className="ml-auto shrink-0"
-                  onClick={() => setQueueSearching(false)}
+                  disabled={leaveQueue.isPending}
+                  onClick={handleCancelQueue}
                 >
                   Cancel
                 </Button>
@@ -730,40 +694,31 @@ export function FaceitPlayMock() {
             ) : null}
 
             <section className="flex w-full flex-col items-center gap-5">
-              {/* <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <Users className="size-3.5" />
-                Party
-                <Badge
-                  variant="secondary"
-                  className="h-5 text-[10px] font-normal"
-                >
-                  {DUMMY_PARTY.length} / {PARTY_SLOTS}
-                </Badge>
-              </div> */}
               <div className={cn(PARTY_GRID_TEMPLATE, "pb-1 pt-6 sm:pt-8")}>
                 {Array.from({ length: PARTY_SLOTS }).map((_, slotIndex) => {
-                  const emphasis = slotIndex === PARTY_CENTER_INDEX;
-                  const member = DUMMY_PARTY[slotIndex];
-                  if (member) {
-                    return (
-                      <div key={member.id} className="min-w-0">
-                        <PartyTradingCard
-                          member={member}
-                          leagueId={selectedLeague}
-                          emphasis={emphasis}
-                        />
-                      </div>
-                    );
-                  }
-                  const emptyIndex = slotIndex - DUMMY_PARTY.length;
+                  const isCenter = slotIndex === PARTY_CENTER_INDEX;
+                  // Ripple the entrance outward from the player's card.
+                  const animationDelay = `${Math.abs(slotIndex - PARTY_CENTER_INDEX) * 110}ms`;
                   return (
-                    <div key={`slot-${emptyIndex}`} className="min-w-0">
-                      <PartySlotEmpty index={emptyIndex} emphasis={emphasis} />
+                    <div
+                      key={isCenter ? "me" : `slot-${slotIndex}`}
+                      className="min-w-0 animate-in fade-in slide-in-from-bottom-6 fill-mode-backwards duration-700 ease-out"
+                      style={{ animationDelay }}
+                    >
+                      {isCenter && me ? (
+                        <MyPlayerCard
+                          me={me}
+                          leagueId={selectedLeague}
+                          emphasis
+                        />
+                      ) : (
+                        <PartySlotEmpty emphasis={isCenter} />
+                      )}
                     </div>
                   );
                 })}
               </div>
-              {/* <div className="flex w-full justify-center px-1">
+              <div className="flex w-full justify-center px-1">
                 <Button
                   type="button"
                   disabled={queueSearching}
@@ -773,7 +728,7 @@ export function FaceitPlayMock() {
                       ? "group inline-flex items-center justify-center gap-2 bg-gradient-to-br from-[#ffd86f] via-[#c19b33] to-[#7b5c24] px-5 text-sm tracking-wide text-white hover:brightness-[0.94] active:brightness-[0.88] sm:px-6 sm:text-base"
                       : "bg-sidebar-primary text-base tracking-wide text-sidebar-primary-foreground hover:bg-sidebar-primary/90",
                   )}
-                  onClick={() => setQueueSearching(true)}
+                  onClick={handleFindMatch}
                 >
                   {selectedLeague === "champions" ? (
                     <>
@@ -800,11 +755,17 @@ export function FaceitPlayMock() {
                     "PLAY"
                   )}
                 </Button>
-              </div> */}
+              </div>
             </section>
           </div>
         </div>
       </div>
+
+      {isDev ? (
+        <PugSimPanel league={selectedLeague as QueueLeague} controller={sim} />
+      ) : null}
+
+      <AcceptMatchDialog matchId={activeMatchId} onClose={handleMatchClosed} />
     </div>
   );
 }
