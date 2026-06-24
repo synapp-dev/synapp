@@ -10,9 +10,13 @@ namespace IntradarkDeathmatch;
 /// </summary>
 public sealed class DmConfig : BasePluginConfig
 {
-    /// <summary>Chat prefix shown before plugin messages (supports CS2 color tags).</summary>
+    /// <summary>
+    /// Chat prefix shown before plugin messages (supports CS2 color tags).
+    /// NOTE: CS2 eats a color tag that's the very FIRST character of a chat line,
+    /// so the prefix must start with a literal char (the "[") — colors go after.
+    /// </summary>
     [JsonPropertyName("ChatPrefix")]
-    public string ChatPrefix { get; set; } = "{blue}[ ★ intradark]{default}";
+    public string ChatPrefix { get; set; } = "[ {white}★ {blue}intradark{default}]";
 
     /// <summary>Seconds between death and respawn.</summary>
     [JsonPropertyName("RespawnDelaySeconds")]
