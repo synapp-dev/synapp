@@ -24,6 +24,8 @@ import {
 } from "@/entities/redline/lib/problem-details";
 import type { RedlineProblemDetails } from "@/entities/redline/lib/types";
 
+import { DeployTargetsManager } from "./deploy-targets-manager";
+
 /**
  * Redline test console — a by-hand dashboard over our `/api/redline/*` proxy
  * routes. Every call (quick action, provision, lifecycle, or a free-form custom
@@ -329,6 +331,44 @@ export function RedlineTestConsole({ configured }: { configured: boolean }) {
               >
                 List servers
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* Push to live */}
+          <Card className="border-primary/40">
+            <CardHeader>
+              <CardTitle className="text-base">Push plugins to live</CardTitle>
+              <CardDescription>
+                SFTP the locally-built DLLs (from{" "}
+                <code className="text-xs">pnpm deploy:cs2-local</code>) to the{" "}
+                <strong>active deploy target</strong>, then{" "}
+                <code className="text-xs">css_plugins reload</code>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  disabled={disabled}
+                  onClick={() => void send("deploy:push", "POST", "/api/redline/deploy-plugins", {})}
+                >
+                  <Send className="h-4 w-4" />
+                  Push to live
+                </Button>
+                {["IntradarkDeathmatch", "IntradarkDmStats"].map((p) => (
+                  <Button
+                    key={p}
+                    variant="outline"
+                    size="sm"
+                    disabled={disabled}
+                    onClick={() =>
+                      void send(`deploy:${p}`, "POST", "/api/redline/deploy-plugins", { plugins: [p] })
+                    }
+                  >
+                    {p.replace("Intradark", "")} only
+                  </Button>
+                ))}
+              </div>
+              <DeployTargetsManager configured={configured} />
             </CardContent>
           </Card>
 

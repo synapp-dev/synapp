@@ -24,6 +24,7 @@
     "backfill:players": "dotenv -e .env.local -- tsx scripts/backfill-players.ts",
     "seed:news-bot": "dotenv -e .env.local -- tsx scripts/seed-news-bot.ts",
     "package:cs2-plugins": "dotenv -e .env.local -- node scripts/package-cs2-plugins.mjs",
+    "deploy:cs2-local": "dotenv -e .env.local -- node scripts/deploy-cs2-local.mjs",
     "seed:news-csv": "dotenv -e .env.local -- tsx scripts/seed-news-from-csv.ts",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
@@ -68,6 +69,7 @@
     "react-zoom-pan-pinch": "^4.0.3",
     "recharts": "2.15.4",
     "sonner": "^2.0.6",
+    "ssh2-sftp-client": "^12.1.1",
     "steam-totp": "^2.1.2",
     "steam-user": "^5.3.0",
     "three": "^0.180.0",
@@ -84,6 +86,7 @@
     "@types/openid": "^2.0.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "catalog:",
     "@workspace/eslint-config": "workspace:^",
