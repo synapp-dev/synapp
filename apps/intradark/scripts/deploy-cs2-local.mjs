@@ -1,8 +1,12 @@
 /**
- * Build the plugin DLLs and deploy them into the local CS2 server for testing.
+ * Build the plugin DLLs, deploy them into the local CS2 server for testing, AND
+ * rebundle + upload the overlay zips (so a freshly-provisioned server gets this
+ * same build).
  *   build (dotnet publish) → copy into CS2_LOCAL_SERVER_DIR's plugins folder
+ *   → package-cs2-plugins.mjs --upload --prune  (skip with --local-only)
  *
- * Run: pnpm deploy:cs2-local            (both plugins)
+ * Run: pnpm deploy:cs2-local                     (both plugins + rebundle/upload)
+ *      pnpm deploy:cs2-local -- --local-only     (local copy only, no zip upload)
  *      pnpm deploy:cs2-local -- --only IntradarkDeathmatch
  *
  * CounterStrikeSharp hot-reloads on file change. On Windows a loaded DLL can be
@@ -25,6 +29,9 @@ const PLUGINS = [
 const argv = process.argv.slice(2);
 const onlyIdx = argv.indexOf("--only");
 const ONLY = onlyIdx >= 0 ? argv[onlyIdx + 1] : null;
+// By default we also rebundle + upload the zips (so a freshly-provisioned server
+// gets this build). Pass --local-only to skip that for a fast local-only loop.
+const LOCAL_ONLY = argv.includes("--local-only");
 
 function sh(cmd, args, cwd) {
   const r = spawnSync(cmd, args, { cwd, stdio: "inherit", shell: process.platform === "win32" });
@@ -56,6 +63,15 @@ async function main() {
 
   console.log("\n✔ deployed to local server. In the server console, reload:");
   for (const p of targets) console.log(`    css_plugins reload ${p.name}`);
+
+  // Also rebundle + upload the overlay zips (and prune old) so the provision
+  // dropdown / a new server gets this exact build. Inherits env from dotenv.
+  if (!LOCAL_ONLY) {
+    console.log("\n▶ rebundling + uploading zips (for launching new servers)…");
+    sh("node", [path.join(APP_DIR, "scripts", "package-cs2-plugins.mjs"), "--upload", "--prune"], APP_DIR);
+  } else {
+    console.log("\n(skipped zip rebundle — --local-only)");
+  }
 }
 
 main().catch((err) => {

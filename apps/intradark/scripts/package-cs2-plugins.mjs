@@ -75,6 +75,7 @@ const ROOT_LABEL = ROOT_PREFIX || "(zip root → server's game/csgo)";
 const ONLY = opt("only", null); // "deathmatch" | "pug" | null (both)
 const SKIP_GAMEINFO = flag("no-gameinfo");
 const DO_UPLOAD = flag("upload");
+const DO_PRUNE = flag("prune"); // after upload, delete older bucket zips (keep this version)
 const VERSION = opt("version", stamp());
 
 function stamp() {
@@ -270,6 +271,28 @@ async function upload(zipPath) {
   return `${supaUrl.replace(/\/$/, "")}/storage/v1/object/public/${BUCKET}/${name}`;
 }
 
+/** Delete every .zip in the bucket whose name doesn't contain `keepVersion`. */
+async function pruneOldZips(keepVersion) {
+  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_ADMIN_KEY;
+  if (!supaUrl || !key) return;
+  const base = supaUrl.replace(/\/$/, "");
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+
+  const listRes = await fetch(`${base}/storage/v1/object/list/${BUCKET}`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ prefix: "", limit: 100 }),
+  });
+  if (!listRes.ok) return;
+  const objects = await listRes.json();
+  for (const o of objects) {
+    if (!o.name.endsWith(".zip") || o.name.includes(keepVersion)) continue;
+    const del = await fetch(`${base}/storage/v1/object/${BUCKET}/${o.name}`, { method: "DELETE", headers });
+    console.log(`  pruned ${o.name} [${del.status}]`);
+  }
+}
+
 // ── main ───────────────────────────────────────────────────────────────────
 async function main() {
   const targets = ONLY ? [ONLY] : ["deathmatch", "pug"];
@@ -292,6 +315,10 @@ async function main() {
     for (const z of zips) {
       const url = await upload(z);
       console.log(`  ✔ ${url}`);
+    }
+    if (DO_PRUNE) {
+      console.log("▶ pruning older bucket zips…");
+      await pruneOldZips(VERSION);
     }
     console.log("\nSet these as ZIP_URL when provisioning (deathmatch vs pug).");
   } else {
