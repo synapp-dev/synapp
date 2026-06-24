@@ -12,7 +12,7 @@ public sealed class DmConfig : BasePluginConfig
 {
     /// <summary>Chat prefix shown before plugin messages (supports CS2 color tags).</summary>
     [JsonPropertyName("ChatPrefix")]
-    public string ChatPrefix { get; set; } = "{purple}[INTRADARK]{default}";
+    public string ChatPrefix { get; set; } = "{blue}[ ★ intradark]{default}";
 
     /// <summary>Seconds between death and respawn.</summary>
     [JsonPropertyName("RespawnDelaySeconds")]
@@ -70,6 +70,10 @@ public sealed class DmConfig : BasePluginConfig
     [JsonPropertyName("RefillAmmoOnKill")]
     public bool RefillAmmoOnKill { get; set; } = true;
 
+    /// <summary>Each player sees only killfeed entries involving themselves (hides everyone else's).</summary>
+    [JsonPropertyName("PersonalKillfeed")]
+    public bool PersonalKillfeed { get; set; } = true;
+
     /// <summary>Show on-screen multi-kill banners (Double Kill → Godlike).</summary>
     [JsonPropertyName("MultiKillAnnouncer")]
     public bool MultiKillAnnouncer { get; set; } = true;
@@ -78,9 +82,21 @@ public sealed class DmConfig : BasePluginConfig
     [JsonPropertyName("MultiKillBannerSeconds")]
     public float MultiKillBannerSeconds { get; set; } = 2.5f;
 
+    /// <summary>Push the multi-kill banner down the HUD by this many lines (0 = default, higher = lower).</summary>
+    [JsonPropertyName("MultiKillBannerOffsetLines")]
+    public int MultiKillBannerOffsetLines { get; set; } = 3;
+
     /// <summary>Also send each multi-kill as a chat line to the killer (persistent log).</summary>
     [JsonPropertyName("MultiKillChat")]
     public bool MultiKillChat { get; set; } = true;
+
+    /// <summary>Streak length (kills without dying) that gets announced to the whole server.</summary>
+    [JsonPropertyName("ServerAnnounceThreshold")]
+    public int ServerAnnounceThreshold { get; set; } = 5;
+
+    /// <summary>On death, show both players a damage report (dealt / taken, with hits).</summary>
+    [JsonPropertyName("DamageReportOnDeath")]
+    public bool DamageReportOnDeath { get; set; } = true;
 
     /// <summary>
     /// Base URL of the Intradark site. Reserved for Phase 4 website integration

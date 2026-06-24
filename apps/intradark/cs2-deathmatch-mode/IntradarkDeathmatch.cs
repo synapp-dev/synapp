@@ -35,6 +35,10 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
     // when the player dies — no time window, so slow chains still count.
     private readonly Dictionary<int, int> _multiKill = new();
 
+    // Damage dealt this life, keyed by (attacker slot, victim slot) → (hp damage, hits).
+    // Cleared for a player when they die (fresh on respawn).
+    private readonly Dictionary<(int attacker, int victim), (int dmg, int hits)> _damage = new();
+
     // Center-banner hold: slot -> html to re-paint every tick until its hold timer
     // clears it. Re-painting is what keeps CS2 center text solid (a single
     // PrintToCenterHtml fades almost instantly).
@@ -48,6 +52,7 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         _api = new IntradarkApi(Config.ApiBaseUrl); // wired for Phase 4; inert now
 
         RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
+        RegisterEventHandler<EventPlayerHurt>(OnPlayerHurt);
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerConnectFull>(OnConnectFull);
         RegisterListener<Listeners.OnTick>(OnTick);
@@ -111,8 +116,12 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
             if (Config.MultiKillAnnouncer) AnnounceMultiKill(attacker);
         }
 
+        // Damage report (uses this-life damage), then clear the victim's totals.
+        if (Config.DamageReportOnDeath) ShowDamageReport(player, attacker);
+
         var slot = player.Slot;
-        _multiKill.Remove(slot); // dying ends your kill streak
+        _multiKill.Remove(slot);       // dying ends your kill streak
+        ClearDamageFor(slot);          // and resets this-life damage totals
 
         AddTimer(Config.RespawnDelaySeconds, () =>
         {
@@ -122,6 +131,30 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
             if (p.PawnIsAlive) return;               // already respawned
             p.Respawn();
         });
+
+        // Personal killfeed: drop the global death notice and re-send it only to
+        // the humans involved, so each player sees just their own entries.
+        if (Config.PersonalKillfeed)
+        {
+            info.DontBroadcast = true;
+            if (!player.IsBot) ev.FireEventToClient(player);
+            if (attacker is not null && attacker.IsValid && !attacker.IsBot && attacker.Slot != slot)
+                ev.FireEventToClient(attacker);
+        }
+        return HookResult.Continue;
+    }
+
+    private HookResult OnPlayerHurt(EventPlayerHurt ev, GameEventInfo info)
+    {
+        var attacker = ev.Attacker;
+        var victim = ev.Userid;
+        if (attacker is null || victim is null || !attacker.IsValid || !victim.IsValid)
+            return HookResult.Continue;
+        if (attacker.Slot == victim.Slot) return HookResult.Continue; // ignore self-damage
+
+        var key = (attacker.Slot, victim.Slot);
+        var cur = _damage.TryGetValue(key, out var d) ? d : (dmg: 0, hits: 0);
+        _damage[key] = (cur.dmg + ev.DmgHealth, cur.hits + 1);
         return HookResult.Continue;
     }
 
@@ -130,13 +163,25 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         var player = ev.Userid;
         if (player is null || !player.IsValid || player.IsHLTV) return HookResult.Continue;
 
+        // Pick the random spawn ONCE so the same-tick and next-frame teleports
+        // land on the exact same spot: same-tick kills the base-spawn flicker
+        // (it runs before this tick's snapshot is networked), next-frame re-asserts
+        // it in case the engine re-places the pawn just after spawn.
+        var spawn = Config.RandomSpawns ? _spawns.Random() : null;
+        if (spawn is not null) ApplySpawn(player, spawn.Value);
+
         var slot = player.Slot;
-        // Slight delay so the pawn is fully set up before we move it / hand out weapons.
+        Server.NextFrame(() =>
+        {
+            var p = Utilities.GetPlayerFromSlot(slot);
+            if (p is not null && p.IsValid && p.PawnIsAlive && spawn is not null)
+                ApplySpawn(p, spawn.Value);
+        });
+        // Loadout after a short beat so the pawn is fully ready for weapon give.
         AddTimer(0.2f, () =>
         {
             var p = Utilities.GetPlayerFromSlot(slot);
             if (p is null || !p.IsValid || !p.PawnIsAlive) return;
-            TeleportToRandomSpawn(p);
             GiveLoadout(p);
         });
         return HookResult.Continue;
@@ -202,19 +247,63 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         _multiKill[slot] = n;
 
         if (n < 2) return; // first kill of a life isn't a multi-kill
-        var (label, color) = MultiKillTier(n);
+        var (label, html, chat) = MultiKillTier(n);
 
-        // Hold the banner: OnTick re-paints it so it stays solid; reset the
-        // clear timer so chaining kills keeps (and escalates) the banner.
-        _centerHold[slot] = $"<font color='{color}'>{label}</font>";
+        // Hold the center banner: OnTick re-paints it so it stays solid; reset the
+        // clear timer so chaining kills keeps (and escalates) the banner. Leading
+        // <br> lines push it lower on the HUD (CS2 center text anchors near the top).
+        var drop = string.Concat(Enumerable.Repeat("<br>", Math.Max(0, Config.MultiKillBannerOffsetLines)));
+        _centerHold[slot] = $"{drop}<font color='{html}'>{label}</font>";
         if (_centerHoldTimers.TryGetValue(slot, out var oldHold)) oldHold?.Kill();
         _centerHoldTimers[slot] =
             AddTimer(Config.MultiKillBannerSeconds, () => _centerHold.Remove(slot));
 
-        // Chat line — sent only to the killer.
-        if (Config.MultiKillChat)
-            killer.PrintToChat($"{Colorize(Config.ChatPrefix)} {ChatColors.Gold}{label}! {ChatColors.Default}({n} kills, no deaths)");
+        // [Intradark] >> name got a Double Kill!
+        var line = $"{Colorize(Config.ChatPrefix)} {ChatColors.Grey}>> {TeamColor(killer.Team)}{killer.PlayerName} " +
+                   $"{ChatColors.Default}got a {chat}{label}{ChatColors.Default}!";
+
+        // Big streaks broadcast to everyone; smaller ones only to the killer.
+        if (n >= Config.ServerAnnounceThreshold)
+            Server.PrintToChatAll(line);
+        else if (Config.MultiKillChat)
+            killer.PrintToChat(line);
     }
+
+    /// <summary>Show both players a damage report for the kill, then clear the victim's totals.</summary>
+    private void ShowDamageReport(CCSPlayerController victim, CCSPlayerController? killer)
+    {
+        if (killer is null || !killer.IsValid || killer.Slot == victim.Slot) return; // suicide/world
+
+        var dealt = _damage.TryGetValue((victim.Slot, killer.Slot), out var a) ? a : (dmg: 0, hits: 0);
+        var taken = _damage.TryGetValue((killer.Slot, victim.Slot), out var b) ? b : (dmg: 0, hits: 0);
+
+        // Victim's view: dealt = what they did to the killer, taken = what killed them.
+        victim.PrintToChat(
+            $"{Colorize(Config.ChatPrefix)} {ChatColors.Default}Killed by {TeamColor(killer.Team)}{killer.PlayerName} " +
+            $"{ChatColors.Default}— dealt {ChatColors.Green}{dealt.dmg}{ChatColors.Default} ({dealt.hits} hits), " +
+            $"took {ChatColors.LightRed}{taken.dmg}{ChatColors.Default} ({taken.hits} hits)");
+
+        // Killer's view is the mirror image.
+        killer.PrintToChat(
+            $"{Colorize(Config.ChatPrefix)} {ChatColors.Default}Killed {TeamColor(victim.Team)}{victim.PlayerName} " +
+            $"{ChatColors.Default}— dealt {ChatColors.Green}{taken.dmg}{ChatColors.Default} ({taken.hits} hits), " +
+            $"took {ChatColors.LightRed}{dealt.dmg}{ChatColors.Default} ({dealt.hits} hits)");
+    }
+
+    /// <summary>Drop all damage pairs that involve a slot (called on death → fresh next life).</summary>
+    private void ClearDamageFor(int slot)
+    {
+        foreach (var key in _damage.Keys.Where(k => k.attacker == slot || k.victim == slot).ToList())
+            _damage.Remove(key);
+    }
+
+    /// <summary>CS2 chat color for a team's name (CT blue, T yellow).</summary>
+    private static char TeamColor(CsTeam team) => team switch
+    {
+        CsTeam.CounterTerrorist => ChatColors.Blue,
+        CsTeam.Terrorist => ChatColors.Yellow,
+        _ => ChatColors.White,
+    };
 
     /// <summary>Re-paint held center banners every tick (keeps CS2 center text solid).</summary>
     private void OnTick()
@@ -228,14 +317,15 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         }
     }
 
-    private static (string Label, string Color) MultiKillTier(int n) => n switch
+    // Label, center-banner HTML color, and chat color (char) per streak tier.
+    private static (string Label, string Html, char Chat) MultiKillTier(int n) => n switch
     {
-        2 => ("DOUBLE KILL", "#ffd200"),
-        3 => ("TRIPLE KILL", "#ff9a00"),
-        4 => ("MULTI KILL", "#ff5a00"),
-        5 => ("MEGA KILL", "#ff2a00"),
-        6 => ("ULTRA KILL", "#ff00aa"),
-        _ => ("GODLIKE", "#b400ff"),
+        2 => ("Double Kill", "#ffd200", ChatColors.Yellow),
+        3 => ("Triple Kill", "#ff9a00", ChatColors.Gold),
+        4 => ("Multi Kill", "#ff5a00", ChatColors.LightRed),
+        5 => ("Mega Kill", "#ff2a00", ChatColors.Red),
+        6 => ("Ultra Kill", "#ff00aa", ChatColors.Purple),
+        _ => ("Godlike", "#b400ff", ChatColors.Purple),
     };
 
     /// <summary>Load the current map's random-spawn points and log the count.</summary>
@@ -246,16 +336,12 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         Logger.LogInformation("Loaded {n} random spawn(s) for {map}.", n, mapName);
     }
 
-    /// <summary>Teleport a freshly-spawned player to a random spawn point (FFA, any team).</summary>
-    private void TeleportToRandomSpawn(CCSPlayerController p)
+    /// <summary>Teleport a player to a specific spawn point, zeroing velocity.</summary>
+    private static void ApplySpawn(CCSPlayerController p, SpawnPoint spawn)
     {
-        if (!Config.RandomSpawns) return;
-        var spawn = _spawns.Random();
-        if (spawn is null) return; // no spawn file for this map → keep default spawn
-
         var pawn = p.PlayerPawn?.Value;
         if (pawn is null) return;
-        pawn.Teleport(spawn.Value.Position, spawn.Value.Angle, new Vector(0, 0, 0));
+        pawn.Teleport(spawn.Position, spawn.Angle, new Vector(0, 0, 0));
     }
 
     private void GiveLoadout(CCSPlayerController p)
