@@ -83,13 +83,20 @@ function buildTetra(
   const normal = new THREE.Vector3();
 
   for (const [i, j, k] of FACES) {
-    a.subVectors(v[j], v[i]);
-    b.subVectors(v[k], v[i]);
+    const vi = v[i];
+    const vj = v[j];
+    const vk = v[k];
+    if (!vi || !vj || !vk) continue;
+    a.subVectors(vj, vi);
+    b.subVectors(vk, vi);
     normal.crossVectors(a, b).normalize();
     const ci = (shadeIndex(normal.x, normal.y, normal.z) + colorOffset) % PALETTE.length;
     const color = PALETTE[ci];
+    if (!color) continue;
     for (const idx of [i, j, k]) {
-      positions.push(v[idx].x, v[idx].y, v[idx].z);
+      const vert = v[idx];
+      if (!vert) continue;
+      positions.push(vert.x, vert.y, vert.z);
       colors.push(color.r, color.g, color.b);
     }
   }

@@ -30,7 +30,6 @@ import {
 import { RightSidebar } from "@workspace/ui/components/right-sidebar";
 import {
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
   SidebarInput,
 } from "@workspace/ui/components/sidebar";

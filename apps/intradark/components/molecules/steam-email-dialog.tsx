@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -36,7 +35,6 @@ export function SteamEmailDialog({
   sandbox = false,
   onSandboxComplete,
 }: SteamEmailDialogProps) {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);

@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
 /**
  * Get pending Steam auth data from cookie
  * GET /api/auth/steam/pending-data
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const cookieStore = await cookies();
     const steamCookie = cookieStore.get("steam_pending_auth");

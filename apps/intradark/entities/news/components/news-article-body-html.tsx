@@ -16,7 +16,7 @@ export function NewsArticleBodyHtml({ doc }: { doc: unknown }) {
   return (
     <div
       className="prose prose-lg prose-neutral dark:prose-invert max-w-none text-foreground [&_a]:text-primary [&_a]:underline [&_img]:rounded-lg [&_img]:border [&_[data-youtube-video]]:my-6 [&_iframe]:aspect-video [&_iframe]:w-full [&_iframe]:rounded-lg [&_iframe]:border"
-      // eslint-disable-next-line react/no-danger -- trusted staff-authored TipTap JSON only
+       
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

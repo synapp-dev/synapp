@@ -39,7 +39,9 @@ async function tryConnect(label, extra) {
     console.log(`✗ ${label}: ${e.message}`);
     try {
       await sftp.end();
-    } catch {}
+    } catch {
+      // ignore errors while closing a failed connection
+    }
     return false;
   }
 }

@@ -54,7 +54,11 @@ function buildTetra(corners: [number, number, number][]): THREE.BufferGeometry {
   const positions: number[] = [];
   const v = corners.map((c) => new THREE.Vector3(...c));
   for (const [i, j, k] of FACES) {
-    positions.push(...v[i].toArray(), ...v[j].toArray(), ...v[k].toArray());
+    const a = v[i];
+    const b = v[j];
+    const c = v[k];
+    if (!a || !b || !c) continue;
+    positions.push(...a.toArray(), ...b.toArray(), ...c.toArray());
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
@@ -72,7 +76,9 @@ const _faceColor = new THREE.Color();
 function applyFaceColors(geo: THREE.BufferGeometry, faces: readonly string[]) {
   const attr = geo.getAttribute("color") as THREE.BufferAttribute;
   for (let f = 0; f < 4; f++) {
-    _faceColor.set(faces[f]);
+    const faceColor = faces[f];
+    if (faceColor === undefined) continue;
+    _faceColor.set(faceColor);
     for (let v = 0; v < 3; v++) {
       attr.setXYZ(f * 3 + v, _faceColor.r, _faceColor.g, _faceColor.b);
     }
@@ -108,6 +114,7 @@ function buildSpikes(): THREE.BufferGeometry {
       const a = sp.apex;
       let b1 = sp.base[i];
       let b2 = sp.base[(i + 1) % 3];
+      if (!b1 || !b2) continue;
       // wind so the normal points outward (away from the origin)
       n.crossVectors(ab.subVectors(b1, a), ac.subVectors(b2, a));
       c.copy(a).add(b1).add(b2);
@@ -300,8 +307,8 @@ function MerkabaCanvas({
     const star = new THREE.Group();
     const geoA = buildTetra(TET_A);
     const geoB = buildTetra(TET_B);
-    const tetA = new THREE.Mesh(geoA, litMat);
-    const tetB = new THREE.Mesh(geoB, litMat);
+    const tetA: THREE.Mesh = new THREE.Mesh(geoA, litMat);
+    const tetB: THREE.Mesh = new THREE.Mesh(geoB, litMat);
     tetA.castShadow = true;
     tetB.castShadow = true;
     const edgesA = new THREE.EdgesGeometry(geoA);
@@ -326,7 +333,7 @@ function MerkabaCanvas({
     // Alternative geometry: 8 spike-tetrahedra (octahedron + spikes). Same shape,
     // 24 individually-colourable outer faces. Toggled via geomMode.
     const spikeGeo = buildSpikes();
-    const spikeMesh = new THREE.Mesh(spikeGeo, litMat);
+    const spikeMesh: THREE.Mesh = new THREE.Mesh(spikeGeo, litMat);
     spikeMesh.castShadow = true;
     const spikeEdges = new THREE.EdgesGeometry(spikeGeo);
     const spikeLine = new THREE.LineSegments(spikeEdges, edgeMaterial);
@@ -398,14 +405,15 @@ function MerkabaCanvas({
         spikeOn ? [spikeMesh] : [tetA, tetB],
         false,
       );
-      const fi = hits[0]?.faceIndex;
-      if (fi == null) return;
+      const hit = hits[0];
+      const fi = hit?.faceIndex;
+      if (hit == null || fi == null) return;
       if (spikeOn) {
         cbRef.current?.({ kind: "spike", spike: Math.floor(fi / 3), face: fi % 3 });
       } else {
         cbRef.current?.({
           kind: "tet",
-          tet: hits[0].object === tetA ? "A" : "B",
+          tet: hit.object === tetA ? "A" : "B",
           face: fi,
         });
       }
@@ -513,10 +521,12 @@ function MerkabaCanvas({
         ambient.intensity = p.ambientIntensity;
         for (let i = 0; i < 3; i++) {
           const l = p.lights[i];
-          dirLights[i].color.set(l.color);
-          dirLights[i].intensity = l.enabled ? l.intensity : 0;
+          const dirLight = dirLights[i];
+          if (!l || !dirLight) continue;
+          dirLight.color.set(l.color);
+          dirLight.intensity = l.enabled ? l.intensity : 0;
           const [dx, dy, dz] = dirFromAzEl(l.az, l.el);
-          dirLights[i].position.set(dx, dy, dz);
+          dirLight.position.set(dx, dy, dz);
         }
 
         // geometry mode: 2 tetrahedra vs 8 spikes
@@ -762,7 +772,9 @@ function Control({
           min={min}
           max={max}
           step={step}
-          onValueChange={(v) => onChange(v[0])}
+          onValueChange={(v) => {
+            if (v[0] !== undefined) onChange(v[0]);
+          }}
         />
       </div>
     </div>
@@ -996,7 +1008,7 @@ function ReferenceArt({
     if (d[3] === 0) return; // transparent → ignore
     const hex =
       "#" +
-      [d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, "0")).join("");
+      [d[0], d[1], d[2]].map((v) => (v ?? 0).toString(16).padStart(2, "0")).join("");
     onPick(hex);
   };
 
@@ -1019,7 +1031,7 @@ function ReferenceArt({
 
 const rand = (min: number, max: number) => min + Math.random() * (max - min);
 function choose<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(Math.random() * arr.length)] as T;
 }
 
 // Randomise everything EXCEPT colours (face/light/ambient/stroke colours kept)
@@ -1164,7 +1176,8 @@ export default function SpinnerPlaygroundPage() {
   const setLight = (i: number, patch: Partial<Light>) =>
     setP((prev) => {
       const lights = [...prev.lights] as [Light, Light, Light];
-      lights[i] = { ...lights[i], ...patch };
+      const current = lights[i];
+      if (current) lights[i] = { ...current, ...patch };
       return { ...prev, lights };
     });
   const setFace = (tet: "A" | "B", f: number, color: string) =>
@@ -1386,7 +1399,7 @@ export default function SpinnerPlaygroundPage() {
                 max={180}
                 step={1}
                 onValueChange={(v) => {
-                  setOrbitY(v[0]);
+                  if (v[0] !== undefined) setOrbitY(v[0]);
                   setPaused(true);
                 }}
                 className="h-[460px]"
@@ -1408,7 +1421,7 @@ export default function SpinnerPlaygroundPage() {
               max={180}
               step={1}
               onValueChange={(v) => {
-                setOrbitX(v[0]);
+                if (v[0] !== undefined) setOrbitX(v[0]);
                 setPaused(true);
               }}
               className="flex-1"
@@ -1566,20 +1579,23 @@ export default function SpinnerPlaygroundPage() {
               <Control label="zoom" value={p.frustum} def={D.frustum} min={1.2} max={3.5} step={0.05} onChange={(v) => set({ frustum: v })} lockKey="frustum" />
             </Section>
 
-            {p.lights.map((l, i) => (
+            {p.lights.map((l, i) => {
+              const dl = D.lights[i] ?? l;
+              return (
               <Section key={i} value={`light-${i}`} title={`Light ${i + 1}`}>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs text-muted-foreground">enabled</Label>
                   <Switch checked={l.enabled} onCheckedChange={(c) => setLight(i, { enabled: c })} />
                 </div>
                 <div className={cn("flex flex-col gap-3", !l.enabled && "pointer-events-none opacity-40")}>
-                  <ColorControl label="color" value={l.color} def={D.lights[i].color} onChange={(v) => setLight(i, { color: v })} />
-                  <Control label="intensity" value={l.intensity} def={D.lights[i].intensity} min={0} max={6} step={0.1} onChange={(v) => setLight(i, { intensity: v })} lockKey={`light-${i}-intensity`} />
-                  <Control label="azimuth°" value={l.az} def={D.lights[i].az} min={-180} max={180} step={1} onChange={(v) => setLight(i, { az: v })} lockKey={`light-${i}-az`} />
-                  <Control label="elevation°" value={l.el} def={D.lights[i].el} min={-90} max={90} step={1} onChange={(v) => setLight(i, { el: v })} lockKey={`light-${i}-el`} />
+                  <ColorControl label="color" value={l.color} def={dl.color} onChange={(v) => setLight(i, { color: v })} />
+                  <Control label="intensity" value={l.intensity} def={dl.intensity} min={0} max={6} step={0.1} onChange={(v) => setLight(i, { intensity: v })} lockKey={`light-${i}-intensity`} />
+                  <Control label="azimuth°" value={l.az} def={dl.az} min={-180} max={180} step={1} onChange={(v) => setLight(i, { az: v })} lockKey={`light-${i}-az`} />
+                  <Control label="elevation°" value={l.el} def={dl.el} min={-90} max={90} step={1} onChange={(v) => setLight(i, { el: v })} lockKey={`light-${i}-el`} />
                 </div>
               </Section>
-            ))}
+              );
+            })}
 
             <Section value="faces" title="Tet faces">
               <LockRow lockKey="flatFaces">
@@ -1657,7 +1673,7 @@ export default function SpinnerPlaygroundPage() {
                     >
                       <ColorControl
                         label={`spike ${lbl}`}
-                        value={p.spikeFaces[s * 3]}
+                        value={p.spikeFaces[s * 3] ?? "#ffffff"}
                         def="#ffffff"
                         onChange={(v) => setSpikeGroup(s, v)}
                       />
@@ -1674,7 +1690,7 @@ export default function SpinnerPlaygroundPage() {
                         >
                           <ColorControl
                             label={`· face ${f + 1}`}
-                            value={p.spikeFaces[s * 3 + f]}
+                            value={p.spikeFaces[s * 3 + f] ?? "#ffffff"}
                             def="#ffffff"
                             onChange={(v) => setSpikeFace(s, f, v)}
                           />

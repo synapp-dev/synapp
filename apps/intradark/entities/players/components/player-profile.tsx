@@ -16,14 +16,10 @@ import {
   useGetSteamProfile,
   useGetLeetifyProfile,
 } from "@/entities/players/hooks/queries";
-import { RefreshButton } from "@/entities/players/components/refresh-button";
 import { PlayerHeader } from "@/entities/players/components/player-header";
 import { LeetifyRatingsCard } from "@/entities/players/components/leetify-ratings-card";
 import { FaceitRatingsCard } from "@/entities/players/components/faceit-ratings-card";
 import { SteamCard } from "@/entities/players/components/steam-card";
-import { SteamPanel } from "@/entities/players/components/panels/steam-panel";
-import { FaceitPanel } from "@/entities/players/components/panels/faceit-panel";
-import { LeetifyPanel } from "@/entities/players/components/panels/leetify-panel";
 import { PlayerProfileMatchesPanel } from "@/components/organisms/player-profile/player-profile-matches-panel";
 import { PlayerProfileMediaPanel } from "@/components/organisms/player-profile/player-profile-media-panel";
 import { ProfileCommentsCard } from "@/entities/players/components/profile-comments-card";

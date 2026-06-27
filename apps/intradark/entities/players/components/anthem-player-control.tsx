@@ -14,10 +14,6 @@ const ANTHEM_INTRO_MS = 5_000;
 const ANTHEM_INTRO_DELAY_MS = 3_000;
 /** Keep expanded briefly after manual play when the pointer leaves. */
 const ANTHEM_MANUAL_PLAY_LINGER_MS = 2_000;
-const CHIP_EXPAND_IN_MS = 400;
-/** Collapse runs slower than expand for a softer tuck-in. */
-const CHIP_EXPAND_OUT_MS = 1_200;
-
 const chipExpandEase =
   "ease-[cubic-bezier(0.16,1,0.3,1)] motion-reduce:transition-none";
 

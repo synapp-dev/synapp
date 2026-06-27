@@ -29,7 +29,7 @@ import { cn } from "@workspace/ui/lib/utils";
 
 import { createBrowserClient } from "@/utils/supabase/client";
 
-import type { ScrimMap, Tier } from "../types";
+import type { Tier } from "../types";
 import { isTierWorthy, tierColor, tierRank } from "../lib/helpers";
 import {
   fetchAllListings,

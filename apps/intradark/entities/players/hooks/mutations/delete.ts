@@ -7,7 +7,7 @@ export function useDeletePlayerMutation() {
     Error,
     string // steamId64
   >({
-    mutationFn: async (steamId64) => {
+    mutationFn: async () => {
       // This would typically be a DELETE request to remove a player record
       // For now, we'll just return success
       return {

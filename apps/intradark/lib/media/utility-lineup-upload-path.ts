@@ -1,13 +1,11 @@
 const GRENADE_DB_VALUES = ["smoke", "molotov", "flashbang", "he"] as const;
 export type UtilityLineupGrenadeDb = (typeof GRENADE_DB_VALUES)[number];
 
-const GRENADE_STORAGE_FOLDERS = [
-  "smoke",
-  "molotov",
-  "flashbang",
-  "hegrenade",
-] as const;
-export type UtilityLineupGrenadeFolder = (typeof GRENADE_STORAGE_FOLDERS)[number];
+export type UtilityLineupGrenadeFolder =
+  | "smoke"
+  | "molotov"
+  | "flashbang"
+  | "hegrenade";
 
 const DB_TO_FOLDER: Record<UtilityLineupGrenadeDb, UtilityLineupGrenadeFolder> = {
   smoke: "smoke",

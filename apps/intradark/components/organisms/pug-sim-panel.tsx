@@ -9,7 +9,6 @@ import {
 } from "@/entities/match-queue/hooks/use-sim";
 import type { QueueLeague } from "@/entities/match-queue/lib/leagues";
 import { Button } from "@workspace/ui/components/button";
-import { Label } from "@workspace/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group";
 import { cn } from "@workspace/ui/lib/utils";
 

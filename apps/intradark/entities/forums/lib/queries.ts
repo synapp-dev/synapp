@@ -6,7 +6,6 @@ import {
   forumReplies,
   forumTags,
   forumThreads,
-  forumThreadTags,
   userProfiles,
 } from "@/server/db/schema";
 

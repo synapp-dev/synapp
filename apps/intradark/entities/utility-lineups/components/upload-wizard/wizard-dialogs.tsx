@@ -19,7 +19,6 @@ import {
   UtilityLineupVideoTimelineScrubber,
 } from "@/entities/utility-lineups/components/utility-lineup-video-timeline-scrubber";
 
-import { LAND_STILL_SLOTS, THROW_STILL_SLOTS } from "./constants";
 import {
   landRadarThrowLineStroke,
   landRadarTravelPulseStroke,

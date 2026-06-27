@@ -59,10 +59,7 @@ import {
   type ProfileTrustSignal,
 } from "@/entities/players/lib/profile-comments/constants";
 import type { ProfileCommentEligibility } from "@/entities/players/lib/profile-comments/eligibility";
-import type {
-  ProfileCommentsPage,
-  ProfileTrustCounts,
-} from "@/entities/players/lib/profile-comments/queries";
+import type { ProfileCommentsPage } from "@/entities/players/lib/profile-comments/queries";
 
 const QUICK_EMOJIS = ["😀", "😂", "🔥", "👍", "👎", "💀", "🎯", "❤️", "🤡"];
 

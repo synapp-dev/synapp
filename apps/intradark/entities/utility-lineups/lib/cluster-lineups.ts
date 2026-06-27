@@ -39,12 +39,6 @@ function landDist2(
   return dx * dx + dy * dy;
 }
 
-function landCoordKey(x: number, y: number): string {
-  const rx = Math.round(x * 1e6) / 1e6;
-  const ry = Math.round(y * 1e6) / 1e6;
-  return `${rx},${ry}`;
-}
-
 function clusterKeyFrom(lineupIds: string[], cx: number, cy: number): string {
   const sorted = [...lineupIds].sort();
   const rx = Math.round(cx * 1e6) / 1e6;

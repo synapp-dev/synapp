@@ -58,7 +58,6 @@ import {
   useUtilityLineupPreviewKeys,
 } from "@/entities/utility-lineups/lib/use-shift-held";
 import {
-  formatUtilityLineupMarginLabel,
   utilityLineupMovementTechniqueChainParts,
 } from "@/entities/utility-lineups/lib/utility-lineup-throw-meta-labels";
 import {

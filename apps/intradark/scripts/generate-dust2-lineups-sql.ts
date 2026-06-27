@@ -61,6 +61,7 @@ const vals = raw.map((row) => {
     "00000000-0000-0000-0000-000000000000",
     row,
   );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- omit mapId from the spread
   const { mapId: _omitMapId, ...r } = full;
   return `(${[
     mapIdSql,

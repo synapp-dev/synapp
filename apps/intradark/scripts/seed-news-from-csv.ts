@@ -98,6 +98,7 @@ function parseCsv(text: string): string[][] {
 
 function rowsToObjects(rows: string[][]): Record<string, string>[] {
   const [header, ...body] = rows;
+  if (!header) return [];
   return body
     .filter((r) => r.some((c) => c.trim().length > 0))
     .map((r) => {
@@ -132,7 +133,7 @@ async function resolveUserIdByUsername(
 }
 
 /** Create (idempotently) the Michael "ap0c" Aliferis user, return its auth id. */
-async function ensureMikeUser(admin: ReturnType<typeof createClient>): Promise<string> {
+async function ensureMikeUser(admin: ReturnType<typeof createClient<any>>): Promise<string> {
   const existing = await resolveUserIdByUsername(MIKE.username);
   if (existing) {
     console.log(`✓ Mike user already exists (${existing}).`);
@@ -247,7 +248,7 @@ async function main() {
 
     const slug = await allocateSlug(title);
     const isPublished = r.public?.trim().toLowerCase() === "true";
-    const createdAt = new Date(r.created_at).toISOString();
+    const createdAt = new Date(r.created_at ?? Date.now()).toISOString();
     const bodyJson = htmlToTiptap(r.content ?? "");
 
     await db.insert(newsArticles).values({
@@ -258,7 +259,7 @@ async function main() {
       bodyJson,
       status: isPublished ? "published" : "draft",
       publishedAt: isPublished ? createdAt : null,
-      authorUserId: authorFor(r.creator?.trim()),
+      authorUserId: authorFor(r.creator?.trim() ?? ""),
       createdAt,
       updatedAt: createdAt,
     });

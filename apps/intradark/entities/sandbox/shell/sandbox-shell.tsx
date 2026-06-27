@@ -83,7 +83,7 @@ export function SandboxShell({
 
   React.useEffect(() => {
     if (process.env.NODE_ENV === "development") {
-      // eslint-disable-next-line no-console -- sandbox dev aid only
+       
       console.debug("[sandbox]", title, {
         ...(scenarioList.length > 0 ? { scenario: api.scenarioId } : {}),
         step: api.stepIndex,

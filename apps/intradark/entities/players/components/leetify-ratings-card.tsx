@@ -12,7 +12,6 @@ import {
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
-import { cn } from "@workspace/ui/lib/utils";
 
 import { useGetLeetifyProfile } from "@/entities/players/hooks/queries";
 import { AnimatedStat } from "@/components/organisms/animated-stat";

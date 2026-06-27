@@ -59,7 +59,7 @@ export const ThreeDCard: React.FC<ThreeDCardProps> = ({
   const [rootSize, setRootSize] = useState({ width: 350, height: 200 });
   const [isOnHover, setIsOnHover] = useState(false);
   const [containerStyle, setContainerStyle] = useState<CSSProperties>({});
-  const [shineStyle, setShineStyle] = useState<CSSProperties>({});
+  const [, setShineStyle] = useState<CSSProperties>({});
   const [layersTransform, setLayersTransform] = useState<CSSProperties[]>([]);
   const [dynamicShineOverlayStyle, setDynamicShineOverlayStyle] =
     useState<CSSProperties>({});
@@ -175,13 +175,6 @@ export const ThreeDCard: React.FC<ThreeDCardProps> = ({
     }
     return child;
   });
-
-  // Map brand to CSS variable
-  const brandVar = {
-    steam: "var(--brand-steam)",
-    leetify: "var(--brand-leetify)",
-    faceit: "var(--brand-faceit)",
-  }[brand];
 
   return (
     <div className="flex transition-all duration-200 ease-out">

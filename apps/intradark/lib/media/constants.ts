@@ -13,7 +13,7 @@ export const ALLOWED_UPLOAD_MIME_TYPES = [
 /** Matches `0007_media_maps_storage.sql` `file_size_limit` on the bucket (images). */
 export const MAX_UPLOAD_BYTES = 52_428_800;
 
-/** 250 MiB (250 × 1024² bytes) — file-size megabytes, not megabits; matches lineup bucket migration. */
+/** 250 MiB (250 × 1024² bytes) — file-size megabytes, not megabits; matches lineup bucket migration. */
 export const DEFAULT_MAX_UTILITY_LINEUP_VIDEO_BYTES = 262_144_000;
 
 /**
@@ -22,7 +22,7 @@ export const DEFAULT_MAX_UTILITY_LINEUP_VIDEO_BYTES = 262_144_000;
  * Defaults to {@link DEFAULT_MAX_UTILITY_LINEUP_VIDEO_BYTES}. Override with
  * `NEXT_PUBLIC_MAX_UTILITY_LINEUP_VIDEO_BYTES` when your Supabase **global** Storage limit,
  * **per-bucket** `file_size_limit`, or local `supabase/config.toml` `[storage] file_size_limit`
- * differ (e.g. Free tier: set to `52428800` so the UI matches a 50 MiB cap).
+ * differ (e.g. Free tier: set to `52428800` so the UI matches a 50 MiB cap).
  *
  * @see https://supabase.com/docs/guides/storage/uploads/file-limits
  */

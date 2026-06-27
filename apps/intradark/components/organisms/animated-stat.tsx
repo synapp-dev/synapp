@@ -66,10 +66,8 @@ function easeInOut(t: number, b: number, c: number, d: number): number {
 export function AnimatedStat({
   label,
   value,
-  colorClass,
   progressMax,
   decimals = 1,
-  prefix = "",
   suffix = "",
   progressTransform,
   duration = 4, // default to 4 seconds

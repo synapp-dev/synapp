@@ -14,11 +14,7 @@ export function FaceitCard() {
   const { selectedPlayer } = usePlayerStore();
   const steamId64 = selectedPlayer?.steamId64;
 
-  const {
-    profile: faceitProfile,
-    isLoading: faceitLoading,
-    error: faceitError,
-  } = useFaceitProfile(steamId64 || "");
+  const { profile: faceitProfile } = useFaceitProfile(steamId64 || "");
 
   return (
     <Card className="relative group/faceit-card w-full h-full">

@@ -119,7 +119,7 @@ export const FaceitLevelBadge: React.FC<FaceitLevelBadgeProps> = ({
   const segments = Array.from({ length: SEGMENTS }, (_, i) => {
     const startAngle = arcStart + i * segmentAngle + gapAngle / 2;
     const endAngle = startAngle + arcAngle;
-    const { x1, y1, x2, y2 } = getSegmentCoords(
+    const { x1, y1 } = getSegmentCoords(
       center,
       center,
       radius,
