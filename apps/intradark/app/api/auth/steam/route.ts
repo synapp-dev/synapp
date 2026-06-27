@@ -9,7 +9,7 @@ const STEAM_OPENID_URL = "https://steamcommunity.com/openid/";
  */
 export async function GET(request: NextRequest) {
   try {
-    const baseUrl = 'http://localhost:3004';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
     const returnUrl = `${baseUrl}/api/auth/steam/callback`;
 
     // Create OpenID relying party
