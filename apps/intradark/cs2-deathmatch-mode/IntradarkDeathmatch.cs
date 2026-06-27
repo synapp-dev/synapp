@@ -258,9 +258,8 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         _centerHoldTimers[slot] =
             AddTimer(Config.MultiKillBannerSeconds, () => _centerHold.Remove(slot));
 
-        // [Intradark] >> name got a Double Kill!
-        var line = $"{Colorize(Config.ChatPrefix)} {ChatColors.Grey}>> {TeamColor(killer.Team)}{killer.PlayerName} " +
-                   $"{ChatColors.Default}got a {chat}{label}{ChatColors.Default}!";
+        // *intradark » name got a Double Kill!
+        var line = $"{Tag()}{ChatColors.Yellow}{killer.PlayerName} {ChatColors.Default}got a {chat}{label}{ChatColors.Default}!";
 
         // Big streaks broadcast to everyone; smaller ones only to the killer.
         if (n >= Config.ServerAnnounceThreshold)
@@ -277,17 +276,17 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         var dealt = _damage.TryGetValue((victim.Slot, killer.Slot), out var a) ? a : (dmg: 0, hits: 0);
         var taken = _damage.TryGetValue((killer.Slot, victim.Slot), out var b) ? b : (dmg: 0, hits: 0);
 
-        // Victim's view: dealt = what they did to the killer, taken = what killed them.
+        // Victim's view: dealt = what they did to the killer (green +), taken = what killed them (red -).
         victim.PrintToChat(
-            $"{Colorize(Config.ChatPrefix)} {ChatColors.Default}Killed by {TeamColor(killer.Team)}{killer.PlayerName} " +
-            $"{ChatColors.Default}— dealt {ChatColors.Green}{dealt.dmg}{ChatColors.Default} ({dealt.hits} hits), " +
-            $"took {ChatColors.LightRed}{taken.dmg}{ChatColors.Default} ({taken.hits} hits)");
+            $"{Tag()}Killed by {ChatColors.Yellow}{killer.PlayerName}{ChatColors.Default} - " +
+            $"{ChatColors.Green}+{dealt.dmg} ({dealt.hits}){ChatColors.Default} {ChatColors.Grey}¤{ChatColors.Default} " +
+            $"{ChatColors.Red}-{taken.dmg} ({taken.hits})");
 
         // Killer's view is the mirror image.
         killer.PrintToChat(
-            $"{Colorize(Config.ChatPrefix)} {ChatColors.Default}Killed {TeamColor(victim.Team)}{victim.PlayerName} " +
-            $"{ChatColors.Default}— dealt {ChatColors.Green}{taken.dmg}{ChatColors.Default} ({taken.hits} hits), " +
-            $"took {ChatColors.LightRed}{dealt.dmg}{ChatColors.Default} ({dealt.hits} hits)");
+            $"{Tag()}Killed {ChatColors.Yellow}{victim.PlayerName}{ChatColors.Default} - " +
+            $"{ChatColors.Green}+{taken.dmg} ({taken.hits}){ChatColors.Default} {ChatColors.Grey}¤{ChatColors.Default} " +
+            $"{ChatColors.Red}-{dealt.dmg} ({dealt.hits})");
     }
 
     /// <summary>Drop all damage pairs that involve a slot (called on death → fresh next life).</summary>
@@ -297,13 +296,6 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
             _damage.Remove(key);
     }
 
-    /// <summary>CS2 chat color for a team's name (CT blue, T yellow).</summary>
-    private static char TeamColor(CsTeam team) => team switch
-    {
-        CsTeam.CounterTerrorist => ChatColors.Blue,
-        CsTeam.Terrorist => ChatColors.Yellow,
-        _ => ChatColors.White,
-    };
 
     /// <summary>Re-paint held center banners every tick (keeps CS2 center text solid).</summary>
     private void OnTick()
@@ -422,9 +414,12 @@ public sealed class IntradarkDeathmatch : BasePlugin, IPluginConfig<DmConfig>
         Logger.LogInformation("Bots: fill to {q} (difficulty {d}).", Config.BotQuota, Config.BotDifficulty);
     }
 
+    /// <summary>Prefix + "»" separator, reused by every chat line (e.g. "*intradark » ").</summary>
+    private string Tag() => $"{Colorize(Config.ChatPrefix)} {ChatColors.Grey}»{ChatColors.Default} ";
+
     /// <summary>Send a prefixed, colorized chat line to one player.</summary>
     private void Msg(CCSPlayerController player, string text) =>
-        player.PrintToChat($"{Colorize(Config.ChatPrefix)} {Colorize(text)}");
+        player.PrintToChat($"{Tag()}{Colorize(text)}");
 
     /// <summary>Replace {tag} placeholders with CS2 chat color characters.</summary>
     private static string Colorize(string s) => s

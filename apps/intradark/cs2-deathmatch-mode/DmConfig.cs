@@ -16,7 +16,7 @@ public sealed class DmConfig : BasePluginConfig
     /// so the prefix must start with a literal char (the "[") — colors go after.
     /// </summary>
     [JsonPropertyName("ChatPrefix")]
-    public string ChatPrefix { get; set; } = "[ {white}★ {blue}intradark{default}]";
+    public string ChatPrefix { get; set; } = "*{blue}intradark{default}";
 
     /// <summary>Seconds between death and respawn.</summary>
     [JsonPropertyName("RespawnDelaySeconds")]
