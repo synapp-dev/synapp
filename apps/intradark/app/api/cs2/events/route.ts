@@ -1,14 +1,20 @@
+import { checkBearer } from "@/lib/cs2-ingest-auth";
+
 /**
- * CS2 Game State Integration (GSI) ingest endpoint.
- * Kept as a future live-state sink (not the badge source — badges come from the
- * Game Coordinator bot worker). Authorized via CS2_EVENTS_SECRET.
+ * CS2 Game State Integration (GSI) / MatchZy ingest endpoint.
+ * Currently a live-state sink stub; promoted to the real MatchZy event handler in P5
+ * (zod, idempotent, per-match token — see docs/pug-match-loop-build-decisions.md §5/§5.1).
+ *
+ * Auth: `Authorization: Bearer ${CS2_EVENTS_SECRET}`. Fails closed if the secret is unset
+ * (no `dev-secret` fallback) and compares in constant time.
  */
 export async function POST(req: Request) {
-  const auth = req.headers.get("authorization");
-  const secret = process.env.CS2_EVENTS_SECRET ?? "dev-secret";
-
-  if (auth !== `Bearer ${secret}`) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = checkBearer(
+    req.headers.get("authorization"),
+    process.env.CS2_EVENTS_SECRET,
+  );
+  if (!auth.ok) {
+    return Response.json({ error: auth.error }, { status: auth.status });
   }
 
   const body = await req.json();

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { checkBearer } from "@/lib/cs2-ingest-auth";
 import { db } from "@/server/db/drizzle";
 import { dmKillEvents } from "@/server/db/schema";
 
@@ -52,10 +53,15 @@ const bodySchema = z.object({
 });
 
 export async function POST(request: Request) {
-  const secret = process.env.CS2_DM_EVENTS_SECRET ?? "dev-secret";
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  const auth = checkBearer(
+    request.headers.get("authorization"),
+    process.env.CS2_DM_EVENTS_SECRET,
+  );
+  if (!auth.ok) {
+    return NextResponse.json(
+      { ok: false, error: auth.error },
+      { status: auth.status },
+    );
   }
 
   let json: unknown;
