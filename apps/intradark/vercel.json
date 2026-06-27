@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/ingest-cs2-news",
       "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/resolve",
+      "schedule": "* * * * *"
     }
   ]
 }

@@ -920,6 +920,8 @@ export const teams = pgTable(
     leaderSteamid64: text("leader_steamid64").references(() => players.steamid64, {
       onDelete: "set null",
     }),
+    tierId: uuid("tier_id"),
+    regionId: uuid("region_id"),
     chatRoomId: text("chat_room_id"),
     faceitUrl: text("faceit_url"),
     facebook: text(),
@@ -1535,4 +1537,210 @@ export const teamPositions = pgTable(
       sql`${table.position} IN ('igl','awper','entry','rifler','support','lurker')`,
     ),
   ],
+);
+
+// ============================================================================
+// Scrim finder (tiers, regions, listings, challenges, scrims, servers, chat)
+// ============================================================================
+
+export const tiers = pgTable(
+  "tiers",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    rank: integer().notNull(),
+    slug: varchar({ length: 64 }).notNull(),
+    name: varchar({ length: 64 }).notNull(),
+    color: varchar({ length: 7 }),
+    logo: text(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("tiers_rank_key").on(table.rank),
+    uniqueIndex("tiers_slug_key").on(table.slug),
+  ],
+);
+
+export const scrimRegions = pgTable(
+  "scrim_regions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slug: varchar({ length: 64 }).notNull(),
+    name: varchar({ length: 64 }).notNull(),
+    timezone: text().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("scrim_regions_slug_key").on(table.slug)],
+);
+
+export const scrimListings = pgTable(
+  "scrim_listings",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    timeslot: timestamp({ withTimezone: true, mode: "string" }).notNull(),
+    minTierId: uuid("min_tier_id").references(() => tiers.id, {
+      onDelete: "set null",
+    }),
+    regionId: uuid("region_id").references(() => scrimRegions.id, {
+      onDelete: "set null",
+    }),
+    active: boolean().default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("scrim_listings_active_timeslot_idx").on(table.active, table.timeslot),
+    index("scrim_listings_team_id_idx").on(table.teamId),
+    uniqueIndex("scrim_listings_team_timeslot_active_key")
+      .on(table.teamId, table.timeslot)
+      .where(sql`${table.active}`),
+  ],
+);
+
+export const scrimListingMaps = pgTable(
+  "scrim_listing_maps",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    scrimListingId: uuid("scrim_listing_id")
+      .notNull()
+      .references(() => scrimListings.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => maps.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("scrim_listing_maps_listing_map_key").on(
+      table.scrimListingId,
+      table.mapId,
+    ),
+  ],
+);
+
+export const scrimChallenges = pgTable(
+  "scrim_challenges",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    scrimListingId: uuid("scrim_listing_id")
+      .notNull()
+      .references(() => scrimListings.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    active: boolean().default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("scrim_challenges_listing_id_idx").on(table.scrimListingId),
+    uniqueIndex("scrim_challenges_listing_team_active_key")
+      .on(table.scrimListingId, table.teamId)
+      .where(sql`${table.active}`),
+  ],
+);
+
+export const scrimChallengeMaps = pgTable(
+  "scrim_challenge_maps",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    scrimChallengeId: uuid("scrim_challenge_id")
+      .notNull()
+      .references(() => scrimChallenges.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id")
+      .notNull()
+      .references(() => maps.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    uniqueIndex("scrim_challenge_maps_challenge_map_key").on(
+      table.scrimChallengeId,
+      table.mapId,
+    ),
+  ],
+);
+
+export const scrims = pgTable(
+  "scrims",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    scrimListingId: uuid("scrim_listing_id").references(() => scrimListings.id, {
+      onDelete: "set null",
+    }),
+    scrimChallengeId: uuid("scrim_challenge_id").references(
+      () => scrimChallenges.id,
+      { onDelete: "set null" },
+    ),
+    homeTeamId: uuid("home_team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    awayTeamId: uuid("away_team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    mapId: uuid("map_id").references(() => maps.id, { onDelete: "set null" }),
+    matchTime: timestamp("match_time", { withTimezone: true, mode: "string" }).notNull(),
+    active: boolean().default(true).notNull(),
+    scrimCancelId: uuid("scrim_cancel_id"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("scrims_active_match_time_idx").on(table.active, table.matchTime),
+    index("scrims_home_team_id_idx").on(table.homeTeamId),
+    index("scrims_away_team_id_idx").on(table.awayTeamId),
+  ],
+);
+
+export const teamServers = pgTable(
+  "team_servers",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    label: varchar({ length: 120 }),
+    ip: text().notNull(),
+    port: integer().notNull(),
+    password: text(),
+    status: varchar({ length: 32 }).default("active").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("team_servers_team_id_idx").on(table.teamId)],
+);
+
+export const scrimChatMessages = pgTable(
+  "scrim_chat_messages",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    scrimId: uuid("scrim_id")
+      .notNull()
+      .references(() => scrims.id, { onDelete: "cascade" }),
+    channel: varchar({ length: 32 }).default("global").notNull(),
+    userId: uuid("user_id").notNull(),
+    message: text().notNull(),
+    timestamp: timestamp({ withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [index("scrim_chat_messages_scrim_ts_idx").on(table.scrimId, table.timestamp)],
 );
