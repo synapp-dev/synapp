@@ -46,7 +46,7 @@ const CS2_ENV_VARS: Array<{ env: string; hint: string }> = [
   { env: "CS2_MAPGROUP", hint: "mg_active" },
   { env: "STEAM_ACC", hint: "GSLT token (public listing)" },
   { env: "SRCDS_HOSTNAME", hint: "Intradark Test" },
-  { env: "SRCDS_RCONPW", hint: "rcon password" },
+  { env: "SRCDS_RCONPW", hint: "auto-injected from REDLINE_RCON_PASSWORD (server-side)" },
   { env: "SRCDS_PW", hint: "join password" },
   { env: "ZIP_URL", hint: "plugins/overlay zip URL" },
 ];

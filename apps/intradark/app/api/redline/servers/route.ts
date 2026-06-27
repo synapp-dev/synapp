@@ -5,6 +5,7 @@ import { redline } from "@/entities/redline/lib/client";
 import { guardRedlineRoute, redlineErrorResponse } from "@/entities/redline/lib/guard";
 import { buildCreateInput } from "@/entities/redline/lib/provisioning";
 import { resolveGsltToken } from "@/entities/redline/lib/gslt";
+import { getRconPasswordFromEnv, RCON_PW_ENV_KEY } from "@/entities/redline/lib/rcon-secret";
 import { redactEnvironment } from "@/entities/redline/lib/redact";
 
 /**
@@ -67,6 +68,12 @@ export async function POST(request: Request) {
     }
     environment.STEAM_ACC = token;
   }
+
+  // Always set the server's RCON password from env (single source of truth) so
+  // every spun-up server matches push-to-live's RCON auth. Overrides any value
+  // the client sent — the real password never travels through the browser.
+  const rconPw = getRconPasswordFromEnv();
+  if (rconPw) environment[RCON_PW_ENV_KEY] = rconPw;
 
   try {
     const input = buildCreateInput({ ...rest, environment });

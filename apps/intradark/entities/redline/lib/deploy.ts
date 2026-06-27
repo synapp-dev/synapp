@@ -4,6 +4,7 @@ import path from "node:path";
 import SftpClient from "ssh2-sftp-client";
 
 import { rconExec } from "./rcon";
+import { getRconPasswordFromEnv } from "./rcon-secret";
 import { getActiveDeployTarget, type DeployTarget } from "./deploy-targets";
 
 /**
@@ -144,11 +145,13 @@ export async function deployPluginsToLive(opts?: DeployOptions): Promise<DeployR
   }
 
   // ── RCON hot-reload ──────────────────────────────────────────────────────
+  // RCON password comes from env (single source of truth, same value baked into
+  // every server at spin-up); fall back to the DB target only if env is unset.
   try {
     const output = await rconExec({
       host: target.rcon_host,
       port: target.rcon_port,
-      password: target.rcon_password,
+      password: getRconPasswordFromEnv() ?? target.rcon_password,
       commands: plugins.map((n) => `css_plugins reload ${n}`),
     });
     steps.push({ step: "RCON reload", ok: true, detail: output || "(reloaded; no console output)" });

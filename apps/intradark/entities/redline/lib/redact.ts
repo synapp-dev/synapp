@@ -6,7 +6,7 @@
  */
 
 /** Env keys whose values are secrets and must never be shown to the client. */
-export const SECRET_ENV_KEYS = new Set(["STEAM_ACC"]);
+export const SECRET_ENV_KEYS = new Set(["STEAM_ACC", "SRCDS_RCONPW", "SRCDS_PW"]);
 
 const REDACTED = "***redacted***";
 
