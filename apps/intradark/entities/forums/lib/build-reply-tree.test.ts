@@ -10,6 +10,9 @@ const base = (r: Partial<ForumReplyFlat> & Pick<ForumReplyFlat, "id">): ForumRep
   createdAt: "2026-01-01T00:00:00.000Z",
   authorDisplayName: null,
   authorUsername: null,
+  authorAvatar: null,
+  authorCountryFlag: null,
+  authorSteamid64: null,
   ...r,
 });
 

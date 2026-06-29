@@ -8,7 +8,16 @@ import {
   getForumThreadBySlugs,
   listForumRepliesForThread,
 } from "@/entities/forums/lib/queries";
+import {
+  getReactionsForTarget,
+  getReactionsForTargets,
+} from "@/entities/reactions/lib/queries";
+import { ReactionBar } from "@/entities/reactions/components/reaction-bar";
+import { UserHoverCard } from "@/entities/reactions/components/user-hover-card";
+import { viewerAuthorFromProfiles } from "@/entities/reactions/lib/viewer";
+import type { ReactionAuthor } from "@/entities/reactions/lib/types";
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
+import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 import { MainSectionShell } from "@/components/organisms/main-section-shell";
 import { Button } from "@workspace/ui/components/button";
 
@@ -21,8 +30,9 @@ export const dynamic = "force-dynamic";
 export default async function ForumThreadPage({ params }: PageProps) {
   await connection();
   const { categorySlug, threadSlug } = await params;
-  const [userId, { category, thread }] = await Promise.all([
+  const [userId, viewer, { category, thread }] = await Promise.all([
     getSessionUserId(),
+    getCurrentUserProfiles(),
     getForumThreadBySlugs(categorySlug, threadSlug),
   ]);
 
@@ -31,10 +41,27 @@ export default async function ForumThreadPage({ params }: PageProps) {
   const replies = await listForumRepliesForThread(thread.id);
   const isAuthor = userId != null && thread.authorUserId === userId;
 
+  const replyIds = replies.map((r) => r.id);
+  const [reactionsMap, threadReactions] = await Promise.all([
+    getReactionsForTargets("forum_reply", replyIds),
+    getReactionsForTarget("forum_thread", thread.id),
+  ]);
+  const reactionsByReply = Object.fromEntries(reactionsMap);
+  const viewerAuthor = viewerAuthorFromProfiles(viewer);
+
   const authorName =
     thread.authorDisplayName?.trim() ||
     thread.authorUsername?.trim() ||
     "Player";
+
+  const threadAuthor: ReactionAuthor = {
+    userId: thread.authorUserId,
+    username: thread.authorUsername,
+    displayName: thread.authorDisplayName,
+    avatarUrl: thread.authorAvatar,
+    countryFlag: thread.authorCountryFlag,
+    steamid64: thread.authorSteamid64,
+  };
 
   return (
     <MainSectionShell title={thread.title} description={category.label}>
@@ -53,7 +80,12 @@ export default async function ForumThreadPage({ params }: PageProps) {
             {thread.title}
           </h1>
           <p className="text-muted-foreground mt-2 text-sm">
-            {authorName} ·{" "}
+            <UserHoverCard author={threadAuthor}>
+              <span className="animated-underline-1 cursor-default font-medium text-muted-foreground transition-colors hover:text-foreground">
+                {authorName}
+              </span>
+            </UserHoverCard>{" "}
+            ·{" "}
             {new Date(thread.createdAt).toLocaleString(undefined, {
               dateStyle: "medium",
               timeStyle: "short",
@@ -64,6 +96,18 @@ export default async function ForumThreadPage({ params }: PageProps) {
           <p className="whitespace-pre-wrap text-sm leading-relaxed md:text-base">
             {thread.body}
           </p>
+        </div>
+        <div className="mt-4">
+          <ReactionBar
+            size="md"
+            targetType="forum_thread"
+            targetId={thread.id}
+            initialReactions={threadReactions}
+            viewerUserId={userId}
+            viewerAuthor={viewerAuthor}
+            canReact={Boolean(userId)}
+            emptyPrompt="React to this thread!"
+          />
         </div>
         {isAuthor ? (
           <div className="mt-6 flex justify-end border-t pt-4">
@@ -81,6 +125,8 @@ export default async function ForumThreadPage({ params }: PageProps) {
           flatReplies={replies}
           signedIn={Boolean(userId)}
           currentUserId={userId}
+          reactionsByReply={reactionsByReply}
+          viewerAuthor={viewerAuthor}
         />
       </div>
     </MainSectionShell>

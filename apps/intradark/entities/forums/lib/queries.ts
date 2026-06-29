@@ -6,6 +6,8 @@ import {
   forumReplies,
   forumTags,
   forumThreads,
+  players,
+  steamProfiles,
   userProfiles,
 } from "@/server/db/schema";
 
@@ -103,10 +105,20 @@ export async function getForumThreadBySlugs(
       thread: forumThreads,
       authorDisplayName: userProfiles.displayName,
       authorUsername: userProfiles.username,
+      authorAvatar: sql<
+        string | null
+      >`coalesce(${steamProfiles.avatarfull}, ${userProfiles.avatarUrl})`,
+      authorCountryFlag: players.countryFlag,
+      authorSteamid64: userProfiles.steamProfileId,
     })
     .from(forumThreads)
     .innerJoin(forumCategories, eq(forumCategories.id, forumThreads.categoryId))
     .leftJoin(userProfiles, eq(userProfiles.userId, forumThreads.authorUserId))
+    .leftJoin(
+      steamProfiles,
+      eq(steamProfiles.steamid64, userProfiles.steamProfileId),
+    )
+    .leftJoin(players, eq(players.steamid64, userProfiles.steamProfileId))
     .where(
       and(
         eq(forumCategories.slug, categorySlug),
@@ -125,6 +137,9 @@ export async function getForumThreadBySlugs(
       ...row.thread,
       authorDisplayName: row.authorDisplayName,
       authorUsername: row.authorUsername,
+      authorAvatar: row.authorAvatar,
+      authorCountryFlag: row.authorCountryFlag,
+      authorSteamid64: row.authorSteamid64,
     },
   };
 }
@@ -140,9 +155,19 @@ export async function listForumRepliesForThread(threadId: string) {
       createdAt: forumReplies.createdAt,
       authorDisplayName: userProfiles.displayName,
       authorUsername: userProfiles.username,
+      authorAvatar: sql<
+        string | null
+      >`coalesce(${steamProfiles.avatarfull}, ${userProfiles.avatarUrl})`,
+      authorCountryFlag: players.countryFlag,
+      authorSteamid64: userProfiles.steamProfileId,
     })
     .from(forumReplies)
     .leftJoin(userProfiles, eq(userProfiles.userId, forumReplies.authorUserId))
+    .leftJoin(
+      steamProfiles,
+      eq(steamProfiles.steamid64, userProfiles.steamProfileId),
+    )
+    .leftJoin(players, eq(players.steamid64, userProfiles.steamProfileId))
     .where(
       and(eq(forumReplies.threadId, threadId), isNull(forumReplies.deletedAt)),
     )

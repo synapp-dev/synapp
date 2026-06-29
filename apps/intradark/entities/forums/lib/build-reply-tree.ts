@@ -8,6 +8,10 @@ export type ForumReplyFlat = {
   /** Display name from profile join; may be null. */
   authorDisplayName: string | null;
   authorUsername: string | null;
+  /** Avatar (steam avatarfull → user_profiles.avatar_url); may be null. */
+  authorAvatar: string | null;
+  authorCountryFlag: string | null;
+  authorSteamid64: string | null;
 };
 
 export type ForumReplyTreeNode = ForumReplyFlat & {
