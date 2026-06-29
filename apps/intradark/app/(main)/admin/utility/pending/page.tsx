@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
-import { hasRoleSlug } from "@/entities/admin/lib/role-slugs";
-import { ROLE_DEVELOPER } from "@/entities/admin/lib/rbac-constants";
+import { hasUtilityEditorRole } from "@/entities/utility-lineups/lib/roles";
 import { PendingUtilityLineupsAdminClient } from "@/entities/utility-lineups/components/pending-utility-lineups-admin-client";
 import { listPendingUtilityLineupsForAdmin } from "@/entities/utility-lineups/lib/queries";
 
@@ -12,7 +11,7 @@ export default async function AdminUtilityPendingPage() {
   const userId = await getSessionUserId();
   if (!userId) notFound();
   const slugs = await getEffectiveRoleSlugsForUser(userId);
-  if (!hasRoleSlug(slugs, ROLE_DEVELOPER)) notFound();
+  if (!hasUtilityEditorRole(slugs)) notFound();
 
   const rows = await listPendingUtilityLineupsForAdmin();
 
@@ -26,8 +25,8 @@ export default async function AdminUtilityPendingPage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Pending utility lineups</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Review community uploads and publish them to the public utility map. Requires{" "}
-          <span className="font-medium">developer</span> role.
+          Review community uploads and publish them to the public utility map. Requires the{" "}
+          <span className="font-medium">utility editor</span> role.
         </p>
       </div>
       <PendingUtilityLineupsAdminClient

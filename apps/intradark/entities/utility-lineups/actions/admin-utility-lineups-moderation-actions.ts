@@ -7,8 +7,7 @@ import { z } from "zod";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
-import { hasRoleSlug } from "@/entities/admin/lib/role-slugs";
-import { ROLE_DEVELOPER } from "@/entities/admin/lib/rbac-constants";
+import { hasUtilityEditorRole } from "@/entities/utility-lineups/lib/roles";
 import { formatZodErrorForClient } from "@/entities/utility-lineups/lib/format-zod-error";
 import {
   optionalUtilityLineupMarkerMs,
@@ -25,14 +24,18 @@ export type AdminUtilityModerationResult =
       message: string;
     };
 
-async function requireDeveloper(): Promise<AdminUtilityModerationResult | { ok: true }> {
+async function requireUtilityEditor(): Promise<AdminUtilityModerationResult | { ok: true }> {
   const userId = await getSessionUserId();
   if (!userId) {
     return { ok: false, code: "UNAUTHORIZED", message: "Sign in required." };
   }
   const slugs = await getEffectiveRoleSlugsForUser(userId);
-  if (!hasRoleSlug(slugs, ROLE_DEVELOPER)) {
-    return { ok: false, code: "FORBIDDEN", message: "Developer role required." };
+  if (!hasUtilityEditorRole(slugs)) {
+    return {
+      ok: false,
+      code: "FORBIDDEN",
+      message: "Utility editor role required.",
+    };
   }
   return { ok: true };
 }
@@ -81,7 +84,7 @@ const updateTimelineSchema = z
 export async function publishPendingUtilityLineupAction(
   raw: unknown,
 ): Promise<AdminUtilityModerationResult> {
-  const gate = await requireDeveloper();
+  const gate = await requireUtilityEditor();
   if (!gate.ok) return gate;
 
   const parsed = publishSchema.safeParse(raw);
@@ -142,11 +145,11 @@ export async function publishPendingUtilityLineupAction(
   }
 }
 
-/** Developer-only: update stored throw / land normalized coords for a lineup on a map. */
+/** Utility-editor only: update stored throw / land normalized coords for a lineup on a map. */
 export async function updateUtilityLineupSpotsAction(
   raw: unknown,
 ): Promise<AdminUtilityModerationResult> {
-  const gate = await requireDeveloper();
+  const gate = await requireUtilityEditor();
   if (!gate.ok) return gate;
 
   const parsed = updateSpotsSchema.safeParse(raw);
@@ -206,11 +209,11 @@ export async function updateUtilityLineupSpotsAction(
   }
 }
 
-/** Developer-only: playback trim + editorial / event timestamps (ms). */
+/** Utility-editor only: playback trim + editorial / event timestamps (ms). */
 export async function updateUtilityLineupTimelineAction(
   raw: unknown,
 ): Promise<AdminUtilityModerationResult> {
-  const gate = await requireDeveloper();
+  const gate = await requireUtilityEditor();
   if (!gate.ok) return gate;
 
   const parsed = updateTimelineSchema.safeParse(raw);
