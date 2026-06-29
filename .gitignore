@@ -50,6 +50,9 @@ apps/supersolt/reference/
 # CS2 GC bot: persisted Steam refresh token (secret)
 apps/intradark/cs2-gc-bot/.steam-session.json
 
+# Steam friends bot: persisted Steam refresh token (secret)
+apps/intradark/steam-friends-bot/.steam-session.json
+
 # Jourdain: raw 4K orb source video (150MB, exceeds GitHub limits) - the web asset is jourdain-orb-loop.mp4
 apps/jourdain/public/videos/jourdain-orb.mov
 
