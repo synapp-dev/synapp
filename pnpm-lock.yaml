@@ -292,6 +292,9 @@ importers:
 
   apps/intradark:
     dependencies:
+      '@laihoe/demoparser2':
+        specifier: ^0.41.3
+        version: 0.41.3
       '@radix-ui/react-select':
         specifier: ^2.2.5
         version: 2.2.5(@types/react-dom@19.0.4(@types/react@19.0.10))(@types/react@19.0.10)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
@@ -732,7 +735,7 @@ importers:
         version: 19.0.4(@types/react@19.0.10)
       '@vitejs/plugin-react':
         specifier: 'catalog:'
-        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
+        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
       '@workspace/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
@@ -756,7 +759,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
+        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
 
   apps/supersolt:
     dependencies:
@@ -974,7 +977,7 @@ importers:
         version: 19.0.4(@types/react@19.0.10)
       '@vitejs/plugin-react':
         specifier: 'catalog:'
-        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
+        version: 6.0.1(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
       '@workspace/eslint-config':
         specifier: workspace:^
         version: link:../../packages/eslint-config
@@ -998,7 +1001,7 @@ importers:
         version: 5.7.3
       vitest:
         specifier: 'catalog:'
-        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.10)(jiti@2.4.2)(tsx@4.20.6))
+        version: 4.1.5(@opentelemetry/api@1.9.0)(@types/node@20.19.33)(happy-dom@20.9.0)(jsdom@29.1.1)(vite@8.0.10(@types/node@20.19.33)(esbuild@0.25.6)(jiti@2.4.2)(tsx@4.20.6))
 
   apps/web:
     dependencies:
@@ -2338,6 +2341,74 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@laihoe/demoparser2-android-arm-eabi@0.41.3':
+    resolution: {integrity: sha512-pSF1BrhJdkZ7IqP/rA0L3DdafqRIxKKxAwlTzWriztxqtvNl6QL/2Zxpb4eLAZFiS0hOQ0NL9/qEB4BzteFvEQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [android]
+
+  '@laihoe/demoparser2-android-arm64@0.41.3':
+    resolution: {integrity: sha512-6qcazTd9yxe9RmsX0hqEVgkDRoeNh58rJcSmTtwOL52dmluw9L9MHbf2KeEZ+XN8u6TMF6uIemYvUwrF9EJjHg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [android]
+
+  '@laihoe/demoparser2-darwin-arm64@0.41.3':
+    resolution: {integrity: sha512-nOUCqfPwUvmZxwF2TYJmUMsXUSnSU/I6zfNK6nEwzT+yUPXTvQIKZoa+vrTgOApDYfuEJbVc2T1Eg4mr6orC0A==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@laihoe/demoparser2-linux-arm-gnueabihf@0.41.3':
+    resolution: {integrity: sha512-cinTOS1l7B6WUJSZ4JtoB9TPVJ4ys1RVacYehCxvn8nttRHCGqAc1jpxHP1Po25i1y/9fS+XeeDOpKMaBHmfSQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm]
+    os: [linux]
+
+  '@laihoe/demoparser2-linux-arm64-gnu@0.41.3':
+    resolution: {integrity: sha512-wfrOosaZZ3kHTiE9RRQPKpgEWCXsVxpiiwkrtzKugteYrZqOgf6PimSZDHpBnU2Rem85uB6cb64Bfwn2TW/POg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  '@laihoe/demoparser2-linux-arm64-musl@0.41.3':
+    resolution: {integrity: sha512-8OfGSSikqt5eRJEpDN60En5+d1BKT+8XHZFAO1jtOK44smpadPZI/9UK/DPDrEFPV3St70vuOyhGnojht+zSAw==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [musl]
+
+  '@laihoe/demoparser2-linux-x64-gnu@0.41.3':
+    resolution: {integrity: sha512-1H//sLH5xZx6cXM7irS2PCTd+h+wbf3xDBOs9naBWFyT0yHE5OtRGBS3fckQ62EowiM0qJDeoueHk+0MCacARg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  '@laihoe/demoparser2-linux-x64-musl@0.41.3':
+    resolution: {integrity: sha512-WYyJG8r25xD4YxP9PVhlC51LqSDYHMDmwBfF4YDlBEft0ifQSDjNLN0fJDeIdyyaKiKqfd2oOqTdJwWHV4JRqg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [musl]
+
+  '@laihoe/demoparser2-win32-arm64-msvc@0.41.3':
+    resolution: {integrity: sha512-zbuezU2UUEjvMkmnrS3cLd6ZODmixpG3i+QD1Wtk2jhyt0iv2G2+gkvn8wHg9yTASWFGe0Uu/EbpNZdSHWwIoQ==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@laihoe/demoparser2-win32-x64-msvc@0.41.3':
+    resolution: {integrity: sha512-9HFpNy3rX0xDn+BXtThu5m/VRguI7gDf6twI1PONTEmJDKnYJdFaWBBAYdzSgHXrV2hnc8bw1yRh+YeTYXMTDg==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  '@laihoe/demoparser2@0.41.3':
+    resolution: {integrity: sha512-xra7p7p4Kdgn2FIOfA70cO/idXtQxLY6Uz/AQbCgi1y6js5bDAtuvegju2d6wZIXJoX3xOyte/3Sv0VX/Pb1Nw==}
+    engines: {node: '>= 10'}
 
   '@mermaid-js/mermaid-cli@11.12.0':
     resolution: {integrity: sha512-a0swOS6PByXKi0dZnLQQIhbtUEu7ubc6bojmIqXqvUPq7mIJukCNEvVBTv6IAbuEWqB3Ti8QntupoGdz3ej+kg==}
@@ -9463,6 +9534,49 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.0
+
+  '@laihoe/demoparser2-android-arm-eabi@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-android-arm64@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-darwin-arm64@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-linux-arm-gnueabihf@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-linux-arm64-gnu@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-linux-arm64-musl@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-linux-x64-gnu@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-linux-x64-musl@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-win32-arm64-msvc@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2-win32-x64-msvc@0.41.3':
+    optional: true
+
+  '@laihoe/demoparser2@0.41.3':
+    optionalDependencies:
+      '@laihoe/demoparser2-android-arm-eabi': 0.41.3
+      '@laihoe/demoparser2-android-arm64': 0.41.3
+      '@laihoe/demoparser2-darwin-arm64': 0.41.3
+      '@laihoe/demoparser2-linux-arm-gnueabihf': 0.41.3
+      '@laihoe/demoparser2-linux-arm64-gnu': 0.41.3
+      '@laihoe/demoparser2-linux-arm64-musl': 0.41.3
+      '@laihoe/demoparser2-linux-x64-gnu': 0.41.3
+      '@laihoe/demoparser2-linux-x64-musl': 0.41.3
+      '@laihoe/demoparser2-win32-arm64-msvc': 0.41.3
+      '@laihoe/demoparser2-win32-x64-msvc': 0.41.3
 
   '@mermaid-js/mermaid-cli@11.12.0(@types/react@19.0.10)(puppeteer@23.11.1(typescript@5.7.3))(tsx@4.20.6)':
     dependencies:
