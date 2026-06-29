@@ -6,8 +6,8 @@ import { Swords } from "lucide-react";
 
 import { cn } from "@workspace/ui/lib/utils";
 
-import type { ScrimMap } from "../types";
-import { FALLBACK_TEAM_AVATAR, mapById } from "../lib/helpers";
+import type { ScrimMap, Tier } from "../types";
+import { FALLBACK_TEAM_AVATAR, mapById, tierById, tierStar } from "../lib/helpers";
 import type { TimeslotItem } from "../lib/client";
 import { formatInZone } from "../lib/tz";
 
@@ -24,6 +24,8 @@ export function ScrimDayCard({
   selected,
   selectedMaps,
   maps,
+  tiers,
+  minTier,
   selectedTeamId,
   index = 0,
   onToggle,
@@ -34,6 +36,8 @@ export function ScrimDayCard({
   selected: boolean;
   selectedMaps: ScrimMap[];
   maps: ScrimMap[];
+  tiers: Tier[];
+  minTier: Tier | null;
   selectedTeamId: string;
   index?: number;
   onToggle: (slot: HourSlot) => void;
@@ -59,6 +63,26 @@ export function ScrimDayCard({
       : null;
   const listingMapIds = isListing ? item.scrim_listing_maps?.map((m) => m.map_id) ?? [] : [];
 
+  // Tier emblem: opponent's tier for a scrim, the listing's min tier for a
+  // listing, or the tier you're about to list at while booking.
+  const slotTier = isScrim
+    ? tierById(tiers, opponent?.tier_id)
+    : isListing
+      ? tierById(tiers, item.min_tier_id)
+      : selected && bookingMode
+        ? minTier
+        : null;
+  const tierIcon = tierStar(slotTier);
+  const tierEmblem = tierIcon ? (
+    <img
+      src={tierIcon}
+      alt={slotTier?.name ?? ""}
+      title={slotTier?.name ?? ""}
+      style={{ animationDuration: "8s" }}
+      className="size-5 shrink-0 animate-spin-slow object-contain"
+    />
+  ) : null;
+
   const handleClick = () => {
     if (slot.type === "closed") return;
     if (isScrim && item) {
@@ -80,7 +104,7 @@ export function ScrimDayCard({
           : {}),
       }}
       className={cn(
-        "relative flex h-28 flex-col justify-between overflow-hidden rounded-lg border bg-cover bg-center p-3 text-left transition-all animate-slide-down-fade-in hover:scale-[1.015]",
+        "relative flex h-full min-h-28 flex-col justify-between overflow-hidden rounded-lg border bg-cover bg-center p-3 text-left transition-all animate-slide-down-fade-in hover:scale-[1.015]",
         slot.type === "closed" && "cursor-not-allowed border-border/40 opacity-50",
         slot.type === "open" && "border-border hover:border-foreground/40",
         isListing && "border-orange-500/70 bg-orange-500/5",
@@ -88,12 +112,17 @@ export function ScrimDayCard({
         selected && bookingMode && "border-blue-500 bg-blue-500/10",
       )}
     >
-      {isScrim ? <span className="absolute inset-0 -z-0 bg-black/70" /> : null}
+      {/* Top-down fade: map art stays visible up top, content sits over solid bg below. */}
+      <span className="pointer-events-none absolute inset-0 -z-0 bg-gradient-to-b from-background/45 to-black" />
 
-      <div className="relative z-10 flex items-center justify-between">
+      <div className="relative z-10 flex items-start justify-between">
         <span className="text-xs font-bold text-muted-foreground">{time}</span>
         {scrimMap?.badge ? (
-          <img src={scrimMap.badge} alt="" className="h-5 w-auto object-contain" />
+          <img
+            src={scrimMap.badge}
+            alt=""
+            className="h-[3.75rem] w-auto object-contain drop-shadow-[0_3px_5px_rgba(0,0,0,0.65)]"
+          />
         ) : null}
       </div>
 
@@ -104,19 +133,24 @@ export function ScrimDayCard({
               <img
                 src={opponent?.avatar || FALLBACK_TEAM_AVATAR}
                 alt=""
-                className="size-4 shrink-0 rounded-full object-cover"
+                className="size-6 shrink-0 object-contain"
               />
-              <span className="truncate text-lg font-black">
+              <span className="truncate text-2xl font-black">
                 {opponent?.name ?? "Opponent"}
               </span>
+              {tierEmblem}
             </div>
           ) : isListing ? (
             <div className="flex items-center gap-2">
-              <Swords className="size-4 text-orange-400" />
-              <span className="text-lg font-black">Listed</span>
+              <Swords className="size-6 text-orange-400" />
+              <span className="text-2xl font-black">Listed</span>
+              {tierEmblem}
             </div>
           ) : selected && bookingMode ? (
-            <span className="text-xs font-semibold text-blue-300">Selected</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-blue-300">Selected</span>
+              {tierEmblem}
+            </div>
           ) : slot.type === "open" ? (
             <span className="text-xs text-muted-foreground">Open</span>
           ) : null}

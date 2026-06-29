@@ -29,7 +29,7 @@ export function ScrimsShell({
 
   return (
     <ScrimDataProvider bootstrap={bootstrap}>
-      <div className="flex flex-col gap-4">
+      <div className="flex min-h-[calc(100svh-5.5rem)] flex-col gap-4 pb-12">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
           <ScrimTabs />
           {hasTeams ? <ScrimTeamPicker /> : null}

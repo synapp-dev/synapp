@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, or } from "drizzle-orm";
 
 import { resolveTeamAvatarUrl } from "@/entities/teams/lib/avatar-url";
 import { db } from "@/server/db/drizzle";
@@ -200,6 +200,38 @@ export async function getScrimById(id: string): Promise<ScrimDetail | null> {
     },
     map: mapRow[0] ? mapScrimMap(mapRow[0]) : null,
   };
+}
+
+/**
+ * The soonest upcoming confirmed scrim involving any of the given teams.
+ * Used by the dashboard "next scrim" widget. `nowIso` is the lower bound for
+ * `match_time` (pass the request time so it's stable per render).
+ */
+export async function getNextScrimForTeams(
+  teamIds: string[],
+  nowIso: string,
+): Promise<ScrimDetail | null> {
+  if (teamIds.length === 0) return null;
+
+  const rows = await db
+    .select({ id: scrims.id })
+    .from(scrims)
+    .where(
+      and(
+        eq(scrims.active, true),
+        gte(scrims.matchTime, nowIso),
+        or(
+          inArray(scrims.homeTeamId, teamIds),
+          inArray(scrims.awayTeamId, teamIds),
+        ),
+      ),
+    )
+    .orderBy(asc(scrims.matchTime))
+    .limit(1);
+
+  const id = rows[0]?.id;
+  if (!id) return null;
+  return getScrimById(id);
 }
 
 /** Active manual servers for a team (connect details). */

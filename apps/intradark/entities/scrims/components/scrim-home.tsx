@@ -176,7 +176,7 @@ export function ScrimHome() {
   const canSubmit = proposed.size > 0 && selectedMaps.length > 0 && !saving;
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+    <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-4">
       {/* Date + view controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -390,7 +390,7 @@ export function ScrimHome() {
           No slots in this window. Toggle AM/PM or Pro Hours.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid min-h-0 flex-1 auto-rows-fr grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {visibleHours.map((slot, i) => (
             <ScrimDayCard
               key={slot.instant.getTime()}
@@ -401,6 +401,8 @@ export function ScrimHome() {
               selected={proposed.has(slot.instant.getTime())}
               selectedMaps={selectedMaps}
               maps={maps}
+              tiers={tiers}
+              minTier={minTier}
               selectedTeamId={teamId ?? ""}
               onToggle={toggleSlot}
             />

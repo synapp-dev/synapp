@@ -37,3 +37,17 @@ export function tierColor(tier: Tier | null): string | undefined {
   if (!tier?.color) return undefined;
   return `#${tier.color}`;
 }
+
+/** Tier "star" emblem by rank: 1 = Champions, 2 = Stellaris, 3 = Genesis. */
+const TIER_STAR_BY_RANK: Record<number, string> = {
+  1: "champions-star",
+  2: "stellaris-star",
+  3: "genesis-star",
+};
+
+/** Public path to a tier's star emblem, or null if no tier. */
+export function tierStar(tier: Tier | null): string | null {
+  if (!tier) return null;
+  const name = TIER_STAR_BY_RANK[tier.rank] ?? "genesis-star";
+  return `/images/icons/${name}.svg`;
+}
