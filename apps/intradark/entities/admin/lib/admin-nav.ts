@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   BookOpen,
+  Bot,
   CalendarDays,
   ClipboardCheck,
   Code2,
@@ -10,8 +11,10 @@ import {
   MessageSquare,
   Newspaper,
   Server,
+  ShieldAlert,
   SquareStack,
   Swords,
+  UserCog,
   UserRound,
   Users,
   Wrench,
@@ -21,6 +24,7 @@ import {
   ROLE_DEVELOPER,
   ROLE_NEWS_EDITOR,
   ROLE_SANDBOX_ACCESS,
+  ROLE_UTILITY_EDITOR,
 } from "./rbac-constants";
 import { hasCapability, hasRoleSlug } from "./role-slugs";
 
@@ -51,6 +55,16 @@ export type AdminNavItem = {
  * Items with `children` are section landing pages (see {@link adminItemHrefs}).
  */
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  // Platform access control
+  {
+    title: "Users",
+    href: "/admin/users",
+    icon: UserCog,
+    description: "Manage members and grant or revoke admin access.",
+    requiredSlug: ROLE_DEVELOPER,
+    exactRole: true,
+  },
+
   // Community
   {
     title: "News",
@@ -102,6 +116,22 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     exactRole: true,
   },
   {
+    title: "Anticheat",
+    href: "/admin/anticheat",
+    icon: ShieldAlert,
+    description: "Review anticheat flags; confirm or dismiss detections.",
+    requiredSlug: ROLE_DEVELOPER,
+    exactRole: true,
+  },
+  {
+    title: "Steam bot",
+    href: "/admin/steam-bot",
+    icon: Bot,
+    description: "Control the Steam friends bot: broadcast and DM friends.",
+    requiredSlug: ROLE_DEVELOPER,
+    exactRole: true,
+  },
+  {
     title: "Tournaments",
     href: "/admin/tournaments",
     icon: CalendarDays,
@@ -132,8 +162,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     href: "/admin/utility",
     icon: Wrench,
     description: "Community utility lineup submissions and review tools.",
-    requiredSlug: ROLE_DEVELOPER,
-    exactRole: true,
+    requiredSlug: ROLE_UTILITY_EDITOR,
     children: [
       {
         title: "Pending lineups",
@@ -141,8 +170,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
         icon: ClipboardCheck,
         description:
           "Review and publish community utility lineup submissions.",
-        requiredSlug: ROLE_DEVELOPER,
-        exactRole: true,
+        requiredSlug: ROLE_UTILITY_EDITOR,
       },
     ],
   },
@@ -168,6 +196,14 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
         icon: Server,
         description:
           "List, power-cycle, and tear down CS2 game servers via Redline.",
+        requiredSlug: ROLE_SANDBOX_ACCESS,
+      },
+      {
+        title: "Demos",
+        href: "/admin/devtools/demos",
+        icon: Film,
+        description:
+          "Upload a CS2 .dem and pull curated insights via @laihoe/demoparser2.",
         requiredSlug: ROLE_SANDBOX_ACCESS,
       },
       {
