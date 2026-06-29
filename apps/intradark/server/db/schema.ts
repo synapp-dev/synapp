@@ -283,6 +283,8 @@ export const newsArticles = pgTable(
       mode: "string",
     }),
     authorUserId: uuid("author_user_id").notNull(),
+    /** Raw total view count — bumped +1 on every page load (see migration 0040). */
+    viewCount: integer("view_count").notNull().default(0),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "string",
@@ -1137,6 +1139,135 @@ export const playerProfileCommentReports = pgTable(
 );
 
 /**
+ * reactions — generic polymorphic emoji reactions, one per user per target.
+ * Targets span comments and entities app-wide (player profiles/comments, news
+ * articles/comments, forum threads/replies). `targetId` is text so it can hold
+ * uuids and steamid64 keys alike. See migration 0039_reactions.sql.
+ */
+export const reactions = pgTable(
+  "reactions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    targetType: varchar("target_type", { length: 32 }).notNull(),
+    targetId: text("target_id").notNull(),
+    reactType: varchar("react_type", { length: 16 }).notNull(),
+    userId: uuid("user_id").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("reactions_target_user_key").on(
+      table.targetType,
+      table.targetId,
+      table.userId,
+    ),
+    index("idx_reactions_target").on(
+      table.targetType,
+      table.targetId,
+      table.createdAt,
+    ),
+    check(
+      "reactions_react_type_check",
+      sql`react_type IN ('like', 'love', 'laugh', 'fire', 'sad')`,
+    ),
+  ],
+);
+
+/**
+ * news_comments — threaded, soft-deletable comments on news articles. Mirrors
+ * player_profile_comments minus the trust-signal machinery. Emoji reactions
+ * attach via the generic `reactions` table (target_type = 'news_comment').
+ */
+export const newsComments = pgTable(
+  "news_comments",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => newsArticles.id, { onDelete: "cascade" }),
+    parentCommentId: uuid("parent_comment_id"),
+    body: text().notNull(),
+    authorUserId: uuid("author_user_id").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+  },
+  (table) => [
+    index("idx_news_comments_article_created_at").on(
+      table.articleId,
+      table.createdAt,
+    ),
+    index("idx_news_comments_parent_comment_id").on(table.parentCommentId),
+    index("idx_news_comments_author_article_created").on(
+      table.authorUserId,
+      table.articleId,
+      table.createdAt,
+    ),
+    foreignKey({
+      columns: [table.parentCommentId],
+      foreignColumns: [table.id],
+      name: "news_comments_parent_comment_id_fkey",
+    }).onDelete("cascade"),
+  ],
+);
+
+/**
+ * news_article_views — one row per unique viewer (member or anonymous) per
+ * article, deduped on (article_id, viewer_key). Powers the unique / members /
+ * anonymous breakdown; the raw total lives in news_articles.view_count.
+ * Server-only access (RLS enabled, no policies). See migration 0040.
+ */
+export const newsArticleViews = pgTable(
+  "news_article_views",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => newsArticles.id, { onDelete: "cascade" }),
+    userId: uuid("user_id"),
+    anonId: text("anon_id"),
+    /** 'u:<userId>' for members, 'a:<anonId>' for anonymous. */
+    viewerKey: text("viewer_key").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("news_article_views_article_viewer_key").on(
+      table.articleId,
+      table.viewerKey,
+    ),
+    index("idx_news_article_views_article").on(table.articleId),
+  ],
+);
+
+/**
  * dm_kill_events — raw deathmatch event firehose (one row per game event).
  * Fully separate from MatchZy/PUG (own table/route/secret/plugin; see
  * docs/cs2-stats-leaderboard.md). NOT FK'd to players: the DM server reports every
@@ -1279,6 +1410,13 @@ export const matches = pgTable(
     seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
     league: varchar({ length: 32 }).default("open").notNull(),
     region: varchar({ length: 32 }),
+    // Tournament attribution (migration 0043). Kept as plain columns (FKs to the
+    // competition_* tables are declared in 0043) to avoid forward-ref ordering.
+    seasonId: uuid("season_id"),
+    stageId: uuid("stage_id"),
+    matchSource: varchar("match_source", { length: 24 }).default("queue").notNull(),
+    homeEntrantId: uuid("home_entrant_id"),
+    awayEntrantId: uuid("away_entrant_id"),
     status: varchar({ length: 24 }).default("pending_accept").notNull(),
     map: varchar({ length: 64 }),
     serverId: uuid("server_id").references(() => gameServers.id, {
@@ -1743,4 +1881,745 @@ export const scrimChatMessages = pgTable(
       .notNull(),
   },
   (table) => [index("scrim_chat_messages_scrim_ts_idx").on(table.scrimId, table.timestamp)],
+);
+
+/**
+ * Steam friends notification bot (see docs/steam-friends-bot/plan.md).
+ * RLS, scrim enqueue triggers, and the auth.users FKs live in migration 0038 —
+ * not expressible in the Drizzle schema, so they're SQL-only.
+ */
+
+/** Unified outbound Steam DM queue: `direct` (match pop) + `broadcast` (fan-out). */
+export const steamDmJobs = pgTable(
+  "steam_dm_jobs",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** 'direct' | 'broadcast' */
+    kind: varchar({ length: 16 }).notNull(),
+    /** 'match' | 'news' | 'scrim' | 'broadcast' */
+    category: varchar({ length: 24 }).notNull(),
+    /** Recipient for 'direct' jobs; null for 'broadcast' (audience in payload). */
+    steamid64: text(),
+    payload: jsonb().default(sql`'{}'::jsonb`).notNull(),
+    dedupKey: text("dedup_key"),
+    /** queued|running|done|error */
+    status: varchar({ length: 16 }).default("queued").notNull(),
+    attempts: integer().default(0).notNull(),
+    error: text(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
+    finishedAt: timestamp("finished_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    uniqueIndex("steam_dm_jobs_dedup_key_key")
+      .on(table.dedupKey)
+      .where(sql`${table.dedupKey} IS NOT NULL`),
+    index("steam_dm_jobs_drain_idx").on(table.status, table.createdAt),
+  ],
+);
+
+/** Per-recipient delivery ledger so a retried broadcast never double-sends. */
+export const steamDmDeliveries = pgTable(
+  "steam_dm_deliveries",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => steamDmJobs.id, { onDelete: "cascade" }),
+    steamid64: text().notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("steam_dm_deliveries_job_recipient_key").on(table.jobId, table.steamid64),
+  ],
+);
+
+/** Per-user notification category toggles (master switch = bot friendship). */
+export const steamNotificationPrefs = pgTable("steam_notification_prefs", {
+  /** auth.users(id) — FK in migration 0038. */
+  userId: uuid("user_id").primaryKey(),
+  notifyMatch: boolean("notify_match").default(true).notNull(),
+  notifyNews: boolean("notify_news").default(true).notNull(),
+  notifyScrim: boolean("notify_scrim").default(true).notNull(),
+  notifyBroadcast: boolean("notify_broadcast").default(true).notNull(),
+  notifyTournament: boolean("notify_tournament").default(true).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+    .defaultNow()
+    .notNull(),
+});
+
+/** Roster of accounts that have added the bot; user_id back-filled on link. */
+export const steamFriends = pgTable(
+  "steam_friends",
+  {
+    steamid64: text().primaryKey(),
+    /** auth.users(id) — FK in migration 0038; null until the steamid is linked. */
+    userId: uuid("user_id"),
+    /** active|removed|blocked */
+    friendStatus: varchar("friend_status", { length: 16 }).default("active").notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    lastDmAt: timestamp("last_dm_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [index("steam_friends_user_id_idx").on(table.userId)],
+);
+
+// ============================================================================
+// Anticheat client (migration 0042). All service-role only — clients write via
+// /api/ac/*, never the DB. See docs/anticheat-client-build-decisions.md.
+// ============================================================================
+
+/** One paired machine per row. Device token stored hashed, never raw. */
+export const acDevices = pgTable(
+  "ac_devices",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** auth.users(id) — FK in migration 0042. */
+    userId: uuid("user_id").notNull(),
+    /** sha-256 of the device token. */
+    tokenHash: text("token_hash").notNull(),
+    label: varchar({ length: 120 }),
+    osInfo: jsonb("os_info").default(sql`'{}'::jsonb`).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "string" }),
+    /** null = active. */
+    revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    uniqueIndex("ac_devices_token_hash_key").on(table.tokenHash),
+    index("ac_devices_user_id_idx").on(table.userId),
+  ],
+);
+
+/**
+ * One client run. The accept gate reads lastHeartbeatAt. Environment attestation
+ * is embedded (informational only — never a gate in v1). No per-heartbeat table.
+ */
+export const acSessions = pgTable(
+  "ac_sessions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    deviceId: uuid("device_id")
+      .notNull()
+      .references(() => acDevices.id, { onDelete: "cascade" }),
+    /** auth.users(id) — denormalized for fast gate reads (FK in migration 0042). */
+    userId: uuid("user_id").notNull(),
+    /** Resolved at session start, for match correlation / RCON kick. */
+    steamid64: text(),
+    matchId: uuid("match_id").references(() => matches.id, { onDelete: "set null" }),
+    appVersion: varchar("app_version", { length: 32 }),
+    /** active|ended|stale */
+    status: varchar({ length: 16 }).default("active").notNull(),
+    tpmPresent: boolean("tpm_present"),
+    secureBoot: boolean("secure_boot"),
+    iommu: boolean(),
+    vbs: boolean(),
+    osBuild: text("os_build"),
+    envRaw: jsonb("env_raw").default(sql`'{}'::jsonb`).notNull(),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true, mode: "string" }),
+    heartbeatCount: integer("heartbeat_count").default(0).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    index("ac_sessions_user_heartbeat_idx").on(table.userId, table.lastHeartbeatAt),
+    index("ac_sessions_match_id_idx")
+      .on(table.matchId)
+      .where(sql`${table.matchId} IS NOT NULL`),
+    index("ac_sessions_status_idx").on(table.status),
+    check(
+      "ac_sessions_status_chk",
+      sql`${table.status} IN ('active','ended','stale')`,
+    ),
+  ],
+);
+
+/** Server-owned detection list, served as a versioned bundle to the dumb client. */
+export const acSignatures = pgTable(
+  "ac_signatures",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** hash|process_name|driver_name|window */
+    kind: varchar({ length: 16 }).notNull(),
+    /** the sha-256 / name / pattern to match. */
+    value: text().notNull(),
+    /** info|low|medium|high|critical */
+    severity: varchar({ length: 16 }).default("medium").notNull(),
+    label: varchar({ length: 160 }),
+    enabled: boolean().default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("ac_signatures_kind_value_key").on(table.kind, table.value),
+    index("ac_signatures_enabled_idx").on(table.enabled, table.updatedAt),
+    check(
+      "ac_signatures_kind_chk",
+      sql`${table.kind} IN ('hash','process_name','driver_name','window')`,
+    ),
+    check(
+      "ac_signatures_severity_chk",
+      sql`${table.severity} IN ('info','low','medium','high','critical')`,
+    ),
+  ],
+);
+
+/** Forensic findings. Idempotent on a composite content key (no trustworthy client id). */
+export const acEvents = pgTable(
+  "ac_events",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    sessionId: uuid("session_id").references(() => acSessions.id, {
+      onDelete: "set null",
+    }),
+    /** auth.users(id) — FK in migration 0042. */
+    userId: uuid("user_id").notNull(),
+    steamid64: text(),
+    matchId: uuid("match_id").references(() => matches.id, { onDelete: "set null" }),
+    /** signature_match|new_driver|new_process|env_snapshot|ac_dropout|kicked|backend_unverified */
+    kind: text().notNull(),
+    /** info|low|medium|high|critical */
+    severity: varchar({ length: 16 }).default("info").notNull(),
+    signatureId: uuid("signature_id").references(() => acSignatures.id, {
+      onDelete: "set null",
+    }),
+    payload: jsonb().default(sql`'{}'::jsonb`).notNull(),
+    /** composite content hash for idempotency. */
+    dedupKey: text("dedup_key"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("ac_events_dedup_key_key")
+      .on(table.dedupKey)
+      .where(sql`${table.dedupKey} IS NOT NULL`),
+    index("ac_events_user_created_idx").on(table.userId, table.createdAt),
+    index("ac_events_match_id_idx")
+      .on(table.matchId)
+      .where(sql`${table.matchId} IS NOT NULL`),
+    index("ac_events_triage_idx").on(table.severity, table.kind, table.createdAt),
+    check(
+      "ac_events_severity_chk",
+      sql`${table.severity} IN ('info','low','medium','high','critical')`,
+    ),
+  ],
+);
+
+/** Admin review queue. Nothing auto-bans; confirmed flags feed Veritas. */
+export const acFlags = pgTable(
+  "ac_flags",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    /** auth.users(id) — FK in migration 0042. */
+    userId: uuid("user_id").notNull(),
+    eventId: uuid("event_id").references(() => acEvents.id, { onDelete: "set null" }),
+    /** open|reviewing|confirmed|dismissed */
+    status: varchar({ length: 16 }).default("open").notNull(),
+    /** info|low|medium|high|critical */
+    severity: varchar({ length: 16 }).default("medium").notNull(),
+    /** auth.users(id) — FK in migration 0042. */
+    reviewedBy: uuid("reviewed_by"),
+    resolution: text(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("ac_flags_status_created_idx").on(table.status, table.createdAt),
+    index("ac_flags_user_id_idx").on(table.userId),
+    uniqueIndex("ac_flags_event_id_key")
+      .on(table.eventId)
+      .where(sql`${table.eventId} IS NOT NULL`),
+    check(
+      "ac_flags_status_chk",
+      sql`${table.status} IN ('open','reviewing','confirmed','dismissed')`,
+    ),
+    check(
+      "ac_flags_severity_chk",
+      sql`${table.severity} IN ('info','low','medium','high','critical')`,
+    ),
+  ],
+);
+
+// ============================================================================
+// Tournament / Competition module (migration 0043). See docs/tournaments/plan.md.
+// ============================================================================
+
+/** The persistent series/brand (config + identity). */
+export const competitions = pgTable(
+  "competitions",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    slug: varchar({ length: 160 }).notNull(),
+    name: varchar({ length: 255 }).notNull(),
+    game: varchar({ length: 32 }).default("cs2").notNull(),
+    gameMode: varchar("game_mode", { length: 16 }).notNull(),
+    /** Driver slug, validated app-side (NOT a pg enum). */
+    format: varchar({ length: 32 }).notNull(),
+    entryType: varchar("entry_type", { length: 16 }).default("open").notNull(),
+    recurrence: varchar({ length: 16 }).default("one_shot").notNull(),
+    description: text(),
+    branding: jsonb().default(sql`'{}'::jsonb`).notNull(),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("competitions_slug_key").on(sql`LOWER(${table.slug})`),
+    index("competitions_format_idx").on(table.format),
+    check(
+      "competitions_entry_type_chk",
+      sql`${table.entryType} IN ('open','approval','invite_only')`,
+    ),
+    check(
+      "competitions_recurrence_chk",
+      sql`${table.recurrence} IN ('one_shot','recurring')`,
+    ),
+  ],
+);
+
+/** Time-boxed instance; owns prizepool, registration window, roster-lock rules. */
+export const competitionSeasons = pgTable(
+  "competition_seasons",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    competitionId: uuid("competition_id")
+      .notNull()
+      .references(() => competitions.id, { onDelete: "cascade" }),
+    seasonNumber: integer("season_number").default(1).notNull(),
+    name: varchar({ length: 255 }),
+    status: varchar({ length: 24 }).default("draft").notNull(),
+    registrationOpensAt: timestamp("registration_opens_at", { withTimezone: true, mode: "string" }),
+    registrationClosesAt: timestamp("registration_closes_at", { withTimezone: true, mode: "string" }),
+    rosterLockAt: timestamp("roster_lock_at", { withTimezone: true, mode: "string" }),
+    startAt: timestamp("start_at", { withTimezone: true, mode: "string" }),
+    endAt: timestamp("end_at", { withTimezone: true, mode: "string" }),
+    maxEntrants: integer("max_entrants"),
+    minRoster: integer("min_roster").default(1).notNull(),
+    maxRoster: integer("max_roster").default(1).notNull(),
+    checkInRequired: boolean("check_in_required").default(false).notNull(),
+    checkInOpensAt: timestamp("check_in_opens_at", { withTimezone: true, mode: "string" }),
+    eligibilityRules: jsonb("eligibility_rules").default(sql`'{}'::jsonb`).notNull(),
+    mapPool: jsonb("map_pool").default(sql`'[]'::jsonb`).notNull(),
+    matchDefaults: jsonb("match_defaults").default(sql`'{}'::jsonb`).notNull(),
+    entryFee: numeric("entry_fee"),
+    fundingSource: varchar("funding_source", { length: 16 }).default("internal").notNull(),
+    prizePool: numeric("prize_pool"),
+    prizeCurrency: varchar("prize_currency", { length: 8 }).default("AUD"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("competition_seasons_number_key").on(table.competitionId, table.seasonNumber),
+    index("competition_seasons_status_idx").on(table.status),
+    check(
+      "competition_seasons_status_chk",
+      sql`${table.status} IN ('draft','announced','registration_open','registration_closed','seeding','live','completed','archived')`,
+    ),
+    check(
+      "competition_seasons_funding_chk",
+      sql`${table.fundingSource} IN ('internal','sponsor','entry_fees')`,
+    ),
+  ],
+);
+
+/** Ordered phases; each runs its own format driver and owns standings. */
+export const competitionStages = pgTable(
+  "competition_stages",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => competitionSeasons.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    name: varchar({ length: 120 }).notNull(),
+    format: varchar({ length: 32 }).notNull(),
+    formatConfig: jsonb("format_config").default(sql`'{}'::jsonb`).notNull(),
+    advancementRule: jsonb("advancement_rule").default(sql`'{}'::jsonb`).notNull(),
+    status: varchar({ length: 16 }).default("pending").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("competition_stages_order_key").on(table.seasonId, table.sortOrder),
+    check(
+      "competition_stages_status_chk",
+      sql`${table.status} IN ('pending','active','completed')`,
+    ),
+  ],
+);
+
+/** The universal competitor (1..N members). Optional team_id for provenance. */
+export const competitionEntrants = pgTable(
+  "competition_entrants",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => competitionSeasons.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+    displayName: varchar("display_name", { length: 255 }).notNull(),
+    avatar: text(),
+    seed: integer(),
+    ladderRank: integer("ladder_rank"),
+    status: varchar({ length: 16 }).default("registered").notNull(),
+    lockedAt: timestamp("locked_at", { withTimezone: true, mode: "string" }),
+    entryPaymentStatus: varchar("entry_payment_status", { length: 16 }),
+    createdBy: uuid("created_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("competition_entrants_season_idx").on(table.seasonId),
+    uniqueIndex("competition_entrants_ladder_rank_key")
+      .on(table.seasonId, table.ladderRank)
+      .where(sql`${table.ladderRank} IS NOT NULL`),
+    check(
+      "competition_entrants_status_chk",
+      sql`${table.status} IN ('registered','approved','checked_in','active','eliminated','dq','withdrawn')`,
+    ),
+  ],
+);
+
+/** Explicit per-stage participants (composite multi-stage). Empty = all entrants. */
+export const competitionStageEntrants = pgTable(
+  "competition_stage_entrants",
+  {
+    stageId: uuid("stage_id")
+      .notNull()
+      .references(() => competitionStages.id, { onDelete: "cascade" }),
+    entrantId: uuid("entrant_id")
+      .notNull()
+      .references(() => competitionEntrants.id, { onDelete: "cascade" }),
+    seed: integer(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.stageId, table.entrantId] }),
+    index("competition_stage_entrants_stage_idx").on(table.stageId),
+  ],
+);
+
+/** Roster snapshot. season_id denormalized for the one-per-season rule. */
+export const competitionEntrantMembers = pgTable(
+  "competition_entrant_members",
+  {
+    entrantId: uuid("entrant_id")
+      .notNull()
+      .references(() => competitionEntrants.id, { onDelete: "cascade" }),
+    steamid64: text()
+      .notNull()
+      .references(() => players.steamid64, { onDelete: "cascade" }),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => competitionSeasons.id, { onDelete: "cascade" }),
+    role: varchar({ length: 16 }).default("member").notNull(),
+    isCaptain: boolean("is_captain").default(false).notNull(),
+    uniqueEnforced: boolean("unique_enforced").default(true).notNull(),
+    addedAt: timestamp("added_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entrantId, table.steamid64] }),
+    uniqueIndex("competition_entrant_members_one_per_season")
+      .on(table.seasonId, table.steamid64)
+      .where(sql`${table.uniqueEnforced}`),
+    index("competition_entrant_members_steamid_idx").on(table.steamid64),
+  ],
+);
+
+/** Scheduled / bracket-positioned matchup. next_fixture_id wires advancement. */
+export const competitionFixtures = pgTable(
+  "competition_fixtures",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    stageId: uuid("stage_id")
+      .notNull()
+      .references(() => competitionStages.id, { onDelete: "cascade" }),
+    round: integer(),
+    bracketSlot: varchar("bracket_slot", { length: 64 }),
+    homeEntrantId: uuid("home_entrant_id").references(() => competitionEntrants.id, {
+      onDelete: "set null",
+    }),
+    awayEntrantId: uuid("away_entrant_id").references(() => competitionEntrants.id, {
+      onDelete: "set null",
+    }),
+    bestOf: integer("best_of"),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true, mode: "string" }),
+    matchId: uuid("match_id").references(() => matches.id, { onDelete: "set null" }),
+    // Self-ref FKs created in migrations 0043/0045 (kept plain to avoid TS cycles).
+    nextFixtureId: uuid("next_fixture_id"),
+    nextSlot: varchar("next_slot", { length: 8 }),
+    // Double-elim: 'wb' | 'lb' | 'gf'; loser drops into loser_fixture_id slot.
+    bracket: varchar({ length: 8 }),
+    loserFixtureId: uuid("loser_fixture_id"),
+    loserSlot: varchar("loser_slot", { length: 8 }),
+    status: varchar({ length: 16 }).default("pending").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("competition_fixtures_stage_idx").on(table.stageId),
+    index("competition_fixtures_scheduled_idx").on(table.scheduledAt),
+    check(
+      "competition_fixtures_status_chk",
+      sql`${table.status} IN ('pending','scheduled','live','completed','forfeit','bye','cancelled')`,
+    ),
+  ],
+);
+
+/** Stored standings, recomputed by the driver. entrant_id OR steamid64. */
+export const competitionStandings = pgTable(
+  "competition_standings",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    stageId: uuid("stage_id")
+      .notNull()
+      .references(() => competitionStages.id, { onDelete: "cascade" }),
+    entrantId: uuid("entrant_id").references(() => competitionEntrants.id, {
+      onDelete: "cascade",
+    }),
+    steamid64: text().references(() => players.steamid64, { onDelete: "cascade" }),
+    rank: integer(),
+    points: numeric().default("0").notNull(),
+    wins: integer().default(0).notNull(),
+    losses: integer().default(0).notNull(),
+    draws: integer().default(0).notNull(),
+    roundsFor: integer("rounds_for").default(0).notNull(),
+    roundsAgainst: integer("rounds_against").default(0).notNull(),
+    matchesPlayed: integer("matches_played").default(0).notNull(),
+    tiebreak: jsonb().default(sql`'{}'::jsonb`).notNull(),
+    finalPlacement: integer("final_placement"),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("competition_standings_stage_entrant_key")
+      .on(table.stageId, table.entrantId)
+      .where(sql`${table.entrantId} IS NOT NULL`),
+    uniqueIndex("competition_standings_stage_steamid_key")
+      .on(table.stageId, table.steamid64)
+      .where(sql`${table.steamid64} IS NOT NULL`),
+  ],
+);
+
+/** The ladder challenge (scrim-challenge analog + a season). */
+export const competitionChallenges = pgTable(
+  "competition_challenges",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    stageId: uuid("stage_id")
+      .notNull()
+      .references(() => competitionStages.id, { onDelete: "cascade" }),
+    challengerEntrantId: uuid("challenger_entrant_id")
+      .notNull()
+      .references(() => competitionEntrants.id, { onDelete: "cascade" }),
+    challengedEntrantId: uuid("challenged_entrant_id")
+      .notNull()
+      .references(() => competitionEntrants.id, { onDelete: "cascade" }),
+    challengerRank: integer("challenger_rank"),
+    challengedRank: integer("challenged_rank"),
+    status: varchar({ length: 16 }).default("pending").notNull(),
+    matchId: uuid("match_id").references(() => matches.id, { onDelete: "set null" }),
+    proposedAt: timestamp("proposed_at", { withTimezone: true, mode: "string" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("competition_challenges_stage_idx").on(table.stageId, table.status),
+    uniqueIndex("competition_challenges_active_challenger_key")
+      .on(table.challengerEntrantId)
+      .where(sql`${table.status} IN ('pending','accepted')`),
+    uniqueIndex("competition_challenges_active_challenged_key")
+      .on(table.challengedEntrantId)
+      .where(sql`${table.status} IN ('pending','accepted')`),
+    check(
+      "competition_challenges_status_chk",
+      sql`${table.status} IN ('pending','accepted','declined','expired','forfeit','completed','cancelled')`,
+    ),
+  ],
+);
+
+/** Placement-range payouts. */
+export const competitionPrizes = pgTable(
+  "competition_prizes",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => competitionSeasons.id, { onDelete: "cascade" }),
+    placementLow: integer("placement_low").notNull(),
+    placementHigh: integer("placement_high").notNull(),
+    prizeType: varchar("prize_type", { length: 20 }).notNull(),
+    amount: numeric(),
+    currency: varchar({ length: 8 }),
+    description: text(),
+    recipientEntrantId: uuid("recipient_entrant_id").references(
+      () => competitionEntrants.id,
+      { onDelete: "set null" },
+    ),
+    payoutStatus: varchar("payout_status", { length: 16 }).default("pending").notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("competition_prizes_season_idx").on(table.seasonId),
+    check(
+      "competition_prizes_type_chk",
+      sql`${table.prizeType} IN ('cash','in_game_item','platform_points','physical','custom')`,
+    ),
+    check(
+      "competition_prizes_payout_chk",
+      sql`${table.payoutStatus} IN ('pending','paid')`,
+    ),
+  ],
+);
+
+/** Per-competition organizer delegation. */
+export const competitionOrganizers = pgTable(
+  "competition_organizers",
+  {
+    competitionId: uuid("competition_id")
+      .notNull()
+      .references(() => competitions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").notNull(),
+    role: varchar({ length: 16 }).notNull(),
+    grantedAt: timestamp("granted_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.competitionId, table.userId] }),
+    check(
+      "competition_organizers_role_chk",
+      sql`${table.role} IN ('owner','admin','moderator')`,
+    ),
+  ],
+);
+
+/** Every sensitive organizer action. Service-role only. */
+export const competitionAuditLog = pgTable(
+  "competition_audit_log",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    competitionId: uuid("competition_id").references(() => competitions.id, {
+      onDelete: "set null",
+    }),
+    seasonId: uuid("season_id"),
+    actorUserId: uuid("actor_user_id"),
+    action: varchar({ length: 64 }).notNull(),
+    target: text(),
+    before: jsonb(),
+    after: jsonb(),
+    reason: text(),
+    at: timestamp({ withTimezone: true, mode: "string" }).defaultNow().notNull(),
+  },
+  (table) => [index("competition_audit_log_competition_idx").on(table.competitionId, table.at)],
+);
+
+/** Demo-linked dispute tickets. Service-role only. */
+export const matchDisputes = pgTable(
+  "match_disputes",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    matchId: uuid("match_id")
+      .notNull()
+      .references(() => matches.id, { onDelete: "cascade" }),
+    raisedByEntrant: uuid("raised_by_entrant").references(() => competitionEntrants.id, {
+      onDelete: "set null",
+    }),
+    raisedByUser: uuid("raised_by_user"),
+    type: varchar({ length: 32 }).notNull(),
+    description: text(),
+    evidenceUrls: jsonb("evidence_urls").default(sql`'[]'::jsonb`).notNull(),
+    demoObjectPath: text("demo_object_path"),
+    status: varchar({ length: 16 }).default("open").notNull(),
+    resolution: text(),
+    resolvedBy: uuid("resolved_by"),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true, mode: "string" }),
+  },
+  (table) => [
+    index("match_disputes_match_idx").on(table.matchId),
+    check(
+      "match_disputes_status_chk",
+      sql`${table.status} IN ('open','reviewing','resolved','rejected')`,
+    ),
+  ],
+);
+
+/** Typed link between a news article and a season. */
+export const newsArticleCompetitions = pgTable(
+  "news_article_competitions",
+  {
+    articleId: uuid("article_id")
+      .notNull()
+      .references(() => newsArticles.id, { onDelete: "cascade" }),
+    seasonId: uuid("season_id")
+      .notNull()
+      .references(() => competitionSeasons.id, { onDelete: "cascade" }),
+    relationType: varchar("relation_type", { length: 16 }).default("general").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.articleId, table.seasonId] }),
+    index("news_article_competitions_season_idx").on(table.seasonId),
+    check(
+      "news_article_competitions_relation_chk",
+      sql`${table.relationType} IN ('announcement','preview','recap','result','general')`,
+    ),
+  ],
 );
