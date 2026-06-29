@@ -2,6 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 
 /**
  * Intradark 3D loading spinner — a star tetrahedron (stellated octahedron /
@@ -9,9 +12,14 @@ import * as THREE from "three";
  * the shared 3-fold axis vertical (one tetra apex-up, one apex-down) and viewed
  * from the front, then spun about the vertical axis.
  *
- * Each face is vertex-coloured by the axis its normal points down, recreating
- * the three brand blues from intradark-symbol-blue.svg:
+ * By default each face is vertex-coloured by the axis its normal points down,
+ * recreating the three brand blues from intradark-symbol-blue.svg:
  *   #00497d (dark)  ·  #0483c8 (mid)  ·  #4c9ccb (light)
+ *
+ * Pass `faceColor` to flat-fill the faces with a single colour instead (use the
+ * literal "background" to match the page background, turning the star into a
+ * white wireframe outline). `strokeColor` / `strokeWidth` / `strokeOpacity`
+ * control the edge stroke; widths > 1 render as true fat lines.
  */
 
 // Brand palette — the three blues from the SVG's isometric three-tone scheme.
@@ -108,6 +116,28 @@ function buildTetra(
   return geo;
 }
 
+/**
+ * Resolve a face colour to a THREE-parseable string. `getComputedStyle` always
+ * serialises `background-color` to `rgb(...)`/`rgba(...)` (never oklch), so we
+ * can match whatever the theme paints by walking up to the first opaque
+ * ancestor background.
+ */
+function resolveFaceColor(input: string, from: HTMLElement | null): string {
+  if (input !== "background") return input;
+  let node: HTMLElement | null = from;
+  while (node) {
+    const bg = getComputedStyle(node).backgroundColor;
+    const m = bg.match(/rgba?\(([^)]+)\)/);
+    if (m && m[1]) {
+      const parts = m[1].split(",").map((s) => parseFloat(s));
+      const alpha = parts[3] ?? 1;
+      if (alpha > 0) return `rgb(${parts[0]}, ${parts[1]}, ${parts[2]})`;
+    }
+    node = node.parentElement;
+  }
+  return "#000000";
+}
+
 export interface IntradarkSpinnerProps {
   /** Pixel size of the (square) canvas. Default 96. */
   size?: number;
@@ -119,6 +149,17 @@ export interface IntradarkSpinnerProps {
    * spin stays clean (no wobble). Default vertical [0,1,0].
    */
   spinAxis?: [number, number, number];
+  /**
+   * Solid, unlit face colour. Pass the literal "background" to match the page
+   * background (white-wireframe look). Omit for the brand-blue lit faces.
+   */
+  faceColor?: string;
+  /** Edge stroke colour. Default white. */
+  strokeColor?: string;
+  /** Edge stroke opacity. Default 0.5. */
+  strokeOpacity?: number;
+  /** Edge stroke thickness in px (fat lines when > 1). Default 1. */
+  strokeWidth?: number;
 }
 
 export function IntradarkSpinner({
@@ -126,6 +167,10 @@ export function IntradarkSpinner({
   speed = 0.4,
   className,
   spinAxis = [0, 1, 0],
+  faceColor,
+  strokeColor = "#ffffff",
+  strokeOpacity = 0.5,
+  strokeWidth = 1,
 }: IntradarkSpinnerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
 
@@ -162,7 +207,8 @@ export function IntradarkSpinner({
     mount.appendChild(renderer.domElement);
 
     // Three brand blues as coloured lights from three directions — facets pick
-    // up colour by orientation and shift as the star spins.
+    // up colour by orientation and shift as the star spins. (Ignored when
+    // `faceColor` is set, since that path uses an unlit material.)
     const LIGHTS = [
       { color: "#4c9ccb", dir: [0, 1, 0.5], intensity: 2.3 }, // light · from top
       { color: "#0483c8", dir: [1, 0, 0.5], intensity: 2.6 }, // mid · from right
@@ -176,36 +222,76 @@ export function IntradarkSpinner({
     // Gentle blue ambient so faces facing away from every light aren't pure black.
     scene.add(new THREE.AmbientLight("#0a2540", 0.12));
 
-    // Flat-shaded lit material → each facet takes a solid tint from the lights.
-    // polygonOffset pushes faces slightly back so the edge strokes sit cleanly
-    // on top without z-fighting.
-    const star = new THREE.Group();
-    const material = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.85,
-      metalness: 0,
-      flatShading: true,
-      polygonOffset: true,
-      polygonOffsetFactor: 1,
-      polygonOffsetUnits: 1,
-    });
-    const tetA = new THREE.Mesh(buildTetra(TET_A), material);
-    const tetB = new THREE.Mesh(
-      buildTetra(TET_B, TETB_COLOR_OFFSET),
-      material,
-    );
+    // Face material. Default: flat-shaded lit (brand-tinted by the lights).
+    // `faceColor`: a solid unlit fill (e.g. the page background). Either way,
+    // polygonOffset pushes faces back so the edge strokes sit cleanly on top.
+    const solidFace = faceColor
+      ? resolveFaceColor(faceColor, mount)
+      : null;
+    const material: THREE.Material = solidFace
+      ? new THREE.MeshBasicMaterial({
+          color: new THREE.Color(solidFace),
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1,
+        })
+      : new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.85,
+          metalness: 0,
+          flatShading: true,
+          vertexColors: true,
+          polygonOffset: true,
+          polygonOffsetFactor: 1,
+          polygonOffsetUnits: 1,
+        });
 
-    // White stroke along each tetrahedron's edges.
-    // WebGL renders lines at 1px min; lower the opacity so the stroke reads finer.
-    const edgeMaterial = new THREE.LineBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.5,
-    });
-    const edgesA = new THREE.EdgesGeometry(tetA.geometry);
-    const edgesB = new THREE.EdgesGeometry(tetB.geometry);
-    tetA.add(new THREE.LineSegments(edgesA, edgeMaterial));
-    tetB.add(new THREE.LineSegments(edgesB, edgeMaterial));
+    const star = new THREE.Group();
+    const geoA = buildTetra(TET_A);
+    const geoB = buildTetra(TET_B, TETB_COLOR_OFFSET);
+    const tetA = new THREE.Mesh(geoA, material);
+    const tetB = new THREE.Mesh(geoB, material);
+
+    // Edge stroke. WebGL caps LineBasicMaterial at 1px, so for thicker strokes
+    // we build true fat lines (screen-space quads) via LineSegments2.
+    const fat = strokeWidth > 1;
+    const disposers: Array<() => void> = [];
+    const addEdges = (mesh: THREE.Mesh, geo: THREE.BufferGeometry) => {
+      const edges = new THREE.EdgesGeometry(geo);
+      if (fat) {
+        const lsg = new LineSegmentsGeometry().setPositions(
+          Array.from(edges.attributes.position!.array as Float32Array),
+        );
+        const lineMat = new LineMaterial({
+          linewidth: strokeWidth,
+          transparent: true,
+          opacity: strokeOpacity,
+          worldUnits: false,
+        });
+        lineMat.color.set(strokeColor);
+        lineMat.resolution.set(size, size);
+        const seg = new LineSegments2(lsg, lineMat);
+        mesh.add(seg);
+        edges.dispose();
+        disposers.push(() => {
+          lsg.dispose();
+          lineMat.dispose();
+        });
+      } else {
+        const lineMat = new THREE.LineBasicMaterial({
+          color: new THREE.Color(strokeColor),
+          transparent: true,
+          opacity: strokeOpacity,
+        });
+        mesh.add(new THREE.LineSegments(edges, lineMat));
+        disposers.push(() => {
+          edges.dispose();
+          lineMat.dispose();
+        });
+      }
+    };
+    addEdges(tetA, geoA);
+    addEdges(tetB, geoB);
 
     star.add(tetA, tetB);
     scene.add(star);
@@ -237,17 +323,25 @@ export function IntradarkSpinner({
     return () => {
       cancelAnimationFrame(raf);
       renderer.dispose();
-      tetA.geometry.dispose();
-      tetB.geometry.dispose();
-      edgesA.dispose();
-      edgesB.dispose();
-      edgeMaterial.dispose();
+      geoA.dispose();
+      geoB.dispose();
+      for (const dispose of disposers) dispose();
       material.dispose();
       if (renderer.domElement.parentNode === mount) {
         mount.removeChild(renderer.domElement);
       }
     };
-  }, [size, speed, spinAxis[0], spinAxis[1], spinAxis[2]]);
+  }, [
+    size,
+    speed,
+    spinAxis[0],
+    spinAxis[1],
+    spinAxis[2],
+    faceColor,
+    strokeColor,
+    strokeOpacity,
+    strokeWidth,
+  ]);
 
   return (
     <div

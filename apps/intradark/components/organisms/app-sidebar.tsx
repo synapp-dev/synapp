@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Shield } from "lucide-react";
 
 import { NavMain } from "@/components/organisms/nav-main";
+import { SidebarPlayButton } from "@/components/organisms/sidebar-play-button";
 import { NavUser } from "@/components/molecules/nav-user";
 import {
   Sidebar,
@@ -22,6 +23,7 @@ import {
   ROLE_DEVELOPER,
   ROLE_NEWS_EDITOR,
   ROLE_SANDBOX_ACCESS,
+  ROLE_UTILITY_EDITOR,
 } from "@/entities/admin/lib/rbac-constants";
 import { applyNavRbacToItems } from "@/entities/rbac/lib/filter-nav-for-rbac";
 import { NAV_ANONYMOUS_SLUGS } from "@/entities/rbac/lib/nav-slugs";
@@ -42,13 +44,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const navPlatform = React.useMemo(() => {
     const slugs = user?.role_slugs ?? NAV_ANONYMOUS_SLUGS;
+    const adminButtonSlugs: readonly string[] = [
+      ROLE_SANDBOX_ACCESS,
+      ROLE_NEWS_EDITOR,
+      ROLE_UTILITY_EDITOR,
+    ];
     const showAdmin =
       slugs.includes(ROLE_DEVELOPER) ||
-      slugs.some((s) =>
-        [ROLE_SANDBOX_ACCESS, ROLE_NEWS_EDITOR].includes(
-          s as typeof ROLE_SANDBOX_ACCESS | typeof ROLE_NEWS_EDITOR,
-        ),
-      );
+      slugs.some((s) => adminButtonSlugs.includes(s));
     const prefix: NavMainSidebarItem[] = [];
     if (showAdmin) {
       prefix.push({ title: "Admin", url: "/admin", icon: Shield });
@@ -117,6 +120,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </div>
           )}
         </Link>
+        <SidebarPlayButton />
       </SidebarHeader>
       <SidebarContent>
         <ScrollArea className="h-full">
