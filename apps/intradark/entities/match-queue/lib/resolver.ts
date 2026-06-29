@@ -5,6 +5,8 @@ import { and, eq, lt, sql } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 import { matches } from "@/server/db/schema";
 
+import { sweepAcKicks } from "@/entities/anticheat/lib/server/kick";
+
 import { resolveAcceptPhase } from "./accept";
 import { resolveStaging, startStaging } from "./staging";
 
@@ -26,6 +28,7 @@ export type ResolveSweepSummary = {
   staged: number;
   acceptResolved: number;
   stagingResolved: number;
+  acKicked: number;
   errors: number;
 };
 
@@ -34,6 +37,7 @@ export async function resolveDueMatches(): Promise<ResolveSweepSummary> {
     staged: 0,
     acceptResolved: 0,
     stagingResolved: 0,
+    acKicked: 0,
     errors: 0,
   };
 
@@ -93,6 +97,16 @@ export async function resolveDueMatches(): Promise<ResolveSweepSummary> {
       summary.errors++;
       console.error("[resolver] resolveStaging", m.id, err);
     }
+  }
+
+  // 4. AC in-match enforcement: kick players whose anticheat heartbeat went silent
+  //    on a live server (§Q5). No-op unless AC_GATE_ENABLED + a provisioned server.
+  try {
+    const ac = await sweepAcKicks();
+    summary.acKicked = ac.kicked;
+  } catch (err) {
+    summary.errors++;
+    console.error("[resolver] sweepAcKicks", err);
   }
 
   return summary;

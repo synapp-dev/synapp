@@ -3,7 +3,10 @@ import "server-only";
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/server/db/drizzle";
-import { matchPlayers, matches, queueEntries } from "@/server/db/schema";
+import { matchPlayers, matches, queueEntries, steamDmJobs } from "@/server/db/schema";
+import { buildMatchPopJobs, pokeFriendsBot } from "@/entities/notifications/lib/server/steam-dm";
+
+import { getQueueSeasonStage } from "@/entities/tournament/lib/queue-attribution";
 
 import { ACCEPT_WINDOW_SECONDS, MATCH_SIZE, type QueueLeague } from "./leagues";
 import { balanceTeams } from "./team-balance";
@@ -22,7 +25,11 @@ export type FormedMatch = { matchId: string };
 export async function tryFormMatch(
   league: QueueLeague,
 ): Promise<FormedMatch | null> {
-  return db.transaction(async (tx) => {
+  // Attribute the match to this league's live PUG season (steal-points). Resolved
+  // outside the tx; null degrades gracefully to an unattributed match.
+  const attribution = await getQueueSeasonStage(league).catch(() => null);
+
+  const formed = await db.transaction(async (tx) => {
     const waiting = await tx
       .select({
         id: queueEntries.id,
@@ -55,7 +62,14 @@ export async function tryFormMatch(
 
     const [match] = await tx
       .insert(matches)
-      .values({ league, status: "pending_accept", acceptDeadline })
+      .values({
+        league,
+        status: "pending_accept",
+        acceptDeadline,
+        matchSource: "queue",
+        seasonId: attribution?.seasonId ?? null,
+        stageId: attribution?.stageId ?? null,
+      })
       .returning({ id: matches.id });
     if (!match) throw new Error("Failed to create match row");
 
@@ -78,6 +92,26 @@ export async function tryFormMatch(
         ),
       );
 
+    // Enqueue a match-pop DM per roster player (the friends bot re-checks
+    // eligibility + drives the accept countdown). Atomic with match creation;
+    // the worker is poked after commit. Idempotent via dedup_key.
+    await tx
+      .insert(steamDmJobs)
+      .values(
+        buildMatchPopJobs(
+          match.id,
+          waiting.map((w) => w.steamid64),
+          acceptDeadline,
+        ),
+      )
+      .onConflictDoNothing();
+
     return { matchId: match.id };
   });
+
+  // Poke the friends bot after commit so the match-pop DMs go out immediately
+  // (the 30s accept window is far shorter than the 60s cron / 5s poll cadence).
+  if (formed) void pokeFriendsBot();
+
+  return formed;
 }

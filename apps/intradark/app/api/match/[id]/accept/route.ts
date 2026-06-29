@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { setAcceptDecision } from "@/entities/match-queue/lib/accept";
+import { recordUnverifiedAccept } from "@/lib/ac/events";
+import { isAcGateEnabled, isAcLiveBySteamid64 } from "@/lib/ac/gate";
 import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 
 /**
@@ -36,6 +38,29 @@ export async function POST(
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json({ ok: false, error: "Invalid decision" }, { status: 400 });
+  }
+
+  // AC gate (§Q2/Q8): you can't accept without a live anticheat client. Behind a
+  // flag (default off — the league can launch without AC). Fail OPEN if our own
+  // backend is unreachable: let play proceed but mark the accept "AC-unverified".
+  if (parsed.data.decision === "accept" && isAcGateEnabled()) {
+    let live: boolean;
+    try {
+      live = await isAcLiveBySteamid64(steamid64);
+    } catch {
+      live = true; // our outage, not the player's fault — don't block.
+      await recordUnverifiedAccept(me.user.id, steamid64, id).catch(() => {});
+    }
+    if (!live) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "ac_required",
+          error: "Launch the Intradark Anticheat client to accept this match.",
+        },
+        { status: 409 },
+      );
+    }
   }
 
   const result = await setAcceptDecision(id, steamid64, parsed.data.decision);
