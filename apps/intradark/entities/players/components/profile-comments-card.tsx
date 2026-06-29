@@ -45,6 +45,10 @@ import { Separator } from "@workspace/ui/components/separator";
 import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 
+import { ReactionBar } from "@/entities/reactions/components/reaction-bar";
+import { UserHoverCard } from "@/entities/reactions/components/user-hover-card";
+import type { ReactionAuthor, ReactionView } from "@/entities/reactions/lib/types";
+
 import {
   createPlayerProfileCommentAction,
   deletePlayerProfileCommentAction,
@@ -69,6 +73,31 @@ function formatRelativeTime(iso: string): string {
   } catch {
     return "";
   }
+}
+
+function authorForComment(comment: ProfileCommentTreeNode): ReactionAuthor {
+  return {
+    userId: comment.authorUserId,
+    username: comment.authorUsername,
+    displayName: comment.authorDisplayName,
+    avatarUrl: comment.authorAvatar,
+    countryFlag: comment.authorCountryFlag,
+    steamid64: comment.authorSteamid64,
+  };
+}
+
+function displayNameFor(comment: ProfileCommentTreeNode): string {
+  return (
+    comment.authorDisplayName?.trim() ||
+    comment.authorUsername?.trim() ||
+    "Player"
+  );
+}
+
+function avatarInitials(name: string): string {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]![0]}${parts[1]![0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
 }
 
 function trustBadge(signal: ProfileTrustSignal | null) {
@@ -118,9 +147,7 @@ function TrustToggle({ value, onChange, disabled }: TrustToggleProps) {
         size="sm"
         variant={value === "suspicious" ? "default" : "outline"}
         disabled={disabled}
-        onClick={() =>
-          onChange(value === "suspicious" ? null : "suspicious")
-        }
+        onClick={() => onChange(value === "suspicious" ? null : "suspicious")}
       >
         Suspicious
       </Button>
@@ -150,9 +177,7 @@ function CommentComposer({
   autoFocus,
 }: ComposerProps) {
   const [body, setBody] = useState("");
-  const [trustSignal, setTrustSignal] = useState<ProfileTrustSignal | null>(
-    null,
-  );
+  const [trustSignal, setTrustSignal] = useState<ProfileTrustSignal | null>(null);
   const [pending, startTransition] = useTransition();
 
   const insertEmoji = (emoji: string) => {
@@ -232,7 +257,7 @@ function CommentComposer({
                   <button
                     key={emoji}
                     type="button"
-                    className="rounded p-1 text-lg hover:bg-muted"
+                    className="rounded p-1 text-lg transition-transform hover:scale-125 hover:bg-muted"
                     onClick={() => insertEmoji(emoji)}
                   >
                     {emoji}
@@ -258,11 +283,7 @@ function CommentComposer({
               disabled={pending}
             />
           ) : null}
-          <Button
-            type="button"
-            disabled={!body.trim() || pending}
-            onClick={submit}
-          >
+          <Button type="button" disabled={!body.trim() || pending} onClick={submit}>
             {pending ? (
               <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
             ) : (
@@ -282,6 +303,8 @@ type CommentItemProps = {
   linkedUsername?: string | null;
   eligibility: ProfileCommentEligibility;
   viewerUserId?: string | null;
+  viewerAuthor?: ReactionAuthor | null;
+  reactionsByComment: Record<string, ReactionView[]>;
   onRefresh: () => void;
 };
 
@@ -292,6 +315,8 @@ function CommentItem({
   linkedUsername,
   eligibility,
   viewerUserId,
+  viewerAuthor,
+  reactionsByComment,
   onRefresh,
 }: CommentItemProps) {
   const [replyOpen, setReplyOpen] = useState(false);
@@ -303,8 +328,8 @@ function CommentItem({
   const [pending, startTransition] = useTransition();
 
   const isOwn = viewerUserId != null && comment.authorUserId === viewerUserId;
-  const initials =
-    comment.authorUsername?.slice(0, 2).toUpperCase() ?? "??";
+  const author = authorForComment(comment);
+  const name = displayNameFor(comment);
 
   const saveEdit = () => {
     startTransition(async () => {
@@ -354,21 +379,34 @@ function CommentItem({
 
   return (
     <div
-      className={cn("space-y-3", depth > 0 && "ml-4 border-l border-white/10 pl-4 sm:ml-6")}
+      className={cn(
+        "space-y-3",
+        depth > 0 && "ml-4 border-l border-white/10 pl-4 sm:ml-6",
+      )}
     >
-      <div className="flex items-start gap-3">
-        <Avatar className="size-9 shrink-0">
-          <AvatarImage src={comment.authorAvatar ?? undefined} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+      <div
+        id={`comment-${comment.id}`}
+        className="group/comment flex items-start gap-3 scroll-mt-24 transition-all"
+      >
+        <UserHoverCard author={author}>
+          <Avatar className="size-9 shrink-0 border border-border bg-gradient-to-b from-transparent to-muted transition-colors group-hover/comment:border-muted-foreground/50">
+            <AvatarImage src={comment.authorAvatar ?? undefined} alt={name} />
+            <AvatarFallback>{avatarInitials(name)}</AvatarFallback>
+          </Avatar>
+        </UserHoverCard>
         <div className="min-w-0 flex-1 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium">
-              {comment.authorUsername ?? "Player"}
-            </span>
+            <UserHoverCard author={author}>
+              <span className="animated-underline-1 cursor-default text-sm font-medium text-muted-foreground transition-colors group-hover/comment:text-foreground">
+                {name}
+              </span>
+            </UserHoverCard>
             {trustBadge(comment.trustSignal)}
-            <span className="text-xs text-muted-foreground">
-              {formatRelativeTime(comment.createdAt)}
+            <span className="flex items-center gap-1 text-xs text-muted transition-colors group-hover/comment:text-muted-foreground">
+              <span className="hidden size-1 rounded-full bg-muted-foreground animate-pulse group-hover/comment:inline-block" />
+              <span className="transition-transform group-hover/comment:translate-x-0.5">
+                {formatRelativeTime(comment.createdAt)}
+              </span>
             </span>
           </div>
 
@@ -394,11 +432,7 @@ function CommentItem({
                 <Button size="sm" onClick={saveEdit} disabled={pending}>
                   Save
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setEditOpen(false)}
-                >
+                <Button size="sm" variant="ghost" onClick={() => setEditOpen(false)}>
                   Cancel
                 </Button>
               </div>
@@ -410,14 +444,25 @@ function CommentItem({
           )}
 
           {!editOpen ? (
+            <ReactionBar
+              targetType="player_comment"
+              targetId={comment.id}
+              initialReactions={reactionsByComment[comment.id] ?? []}
+              viewerUserId={viewerUserId ?? null}
+              viewerAuthor={viewerAuthor}
+              canReact={eligibility.isSignedIn}
+            />
+          ) : null}
+
+          {!editOpen ? (
             <div className="flex flex-wrap items-center gap-3">
               {depth < 3 && eligibility.canWrite ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  className="group/reply inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                   onClick={() => setReplyOpen((v) => !v)}
                 >
-                  <Reply className="size-3" />
+                  <Reply className="size-3 transition-transform group-hover/reply:-rotate-12" />
                   Reply
                 </button>
               ) : null}
@@ -426,7 +471,7 @@ function CommentItem({
                   <DropdownMenuTrigger asChild>
                     <button
                       type="button"
-                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <MoreHorizontal className="size-3" />
                     </button>
@@ -445,7 +490,7 @@ function CommentItem({
               ) : eligibility.canWrite ? (
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
                   onClick={report}
                   disabled={pending}
                 >
@@ -485,6 +530,8 @@ function CommentItem({
           linkedUsername={linkedUsername}
           eligibility={eligibility}
           viewerUserId={viewerUserId}
+          viewerAuthor={viewerAuthor}
+          reactionsByComment={reactionsByComment}
           onRefresh={onRefresh}
         />
       ))}
@@ -498,6 +545,9 @@ export type ProfileCommentsCardProps = {
   initialPage: ProfileCommentsPage;
   eligibility: ProfileCommentEligibility;
   viewerUserId?: string | null;
+  viewerAuthor?: ReactionAuthor | null;
+  reactionsByComment?: Record<string, ReactionView[]>;
+  profileReactions?: ReactionView[];
 };
 
 export function ProfileCommentsCard({
@@ -506,6 +556,9 @@ export function ProfileCommentsCard({
   initialPage,
   eligibility,
   viewerUserId,
+  viewerAuthor,
+  reactionsByComment = {},
+  profileReactions = [],
 }: ProfileCommentsCardProps) {
   const router = useRouter();
   const [page, setPage] = useState(initialPage);
@@ -550,6 +603,18 @@ export function ProfileCommentsCard({
           Community notes about this player. Steam-linked members can comment and
           optionally mark legit or suspicious.
         </CardDescription>
+        <div className="pt-2">
+          <ReactionBar
+            targetType="player_profile"
+            targetId={steamid64}
+            initialReactions={profileReactions}
+            viewerUserId={viewerUserId ?? null}
+            viewerAuthor={viewerAuthor}
+            canReact={eligibility.isSignedIn}
+            size="md"
+            emptyPrompt="React to this player!"
+          />
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <CommentComposer
@@ -577,6 +642,8 @@ export function ProfileCommentsCard({
                   linkedUsername={linkedUsername}
                   eligibility={eligibility}
                   viewerUserId={viewerUserId}
+                  viewerAuthor={viewerAuthor}
+                  reactionsByComment={reactionsByComment}
                   onRefresh={refresh}
                 />
                 <Separator className="mt-6" />

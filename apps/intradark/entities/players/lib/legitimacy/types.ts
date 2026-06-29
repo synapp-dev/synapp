@@ -43,6 +43,12 @@ export interface LegitimacyInput {
   emailVerified?: boolean;
   hasGc?: boolean;
   gcPlayerLevel?: number | null;
+  /**
+   * Count of admin-CONFIRMED anticheat detections (ac_flags status='confirmed').
+   * Only confirmed flags feed the score — raw findings never auto-penalize
+   * (see docs/anticheat-client-build-decisions.md §Q7).
+   */
+  acConfirmedDetections?: number | null;
 }
 
 export interface LegitimacyPenalty {

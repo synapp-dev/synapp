@@ -51,6 +51,21 @@ export function collectPenalties(input: LegitimacyInput): LegitimacyPenalty[] {
     });
   }
 
+  // Anticheat: ONLY admin-confirmed detections score (raw findings never auto-
+  // penalize — see docs/anticheat-client-build-decisions.md §Q7). Scales with
+  // count but caps so it informs rather than hard-zeroes the score.
+  const acConfirmed = input.acConfirmedDetections ?? 0;
+  if (acConfirmed > 0) {
+    penalties.push({
+      code: "ac_confirmed_detection",
+      points: Math.min(60, 35 + (acConfirmed - 1) * 10),
+      label:
+        acConfirmed === 1
+          ? "Confirmed anticheat detection"
+          : `${acConfirmed} confirmed anticheat detections`,
+    });
+  }
+
   return penalties;
 }
 

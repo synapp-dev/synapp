@@ -1,4 +1,5 @@
 import { track } from "@vercel/analytics/server";
+import { and, count, eq } from "drizzle-orm";
 
 import { computeLegitimacy } from "@/entities/players/lib/legitimacy/score";
 import type { LegitimacyResult } from "@/entities/players/lib/legitimacy/types";
@@ -7,6 +8,8 @@ import {
   type LegitimacySourceRows,
 } from "@/entities/players/lib/server/build-legitimacy-input";
 import { isLegitimacyScoringEnabled } from "@/entities/players/lib/server/legitimacy-config";
+import { db } from "@/server/db/drizzle";
+import { acFlags } from "@/server/db/schema";
 import { createAdminClient } from "@/utils/supabase/admin";
 
 export interface LegitimacyScoreRow {
@@ -63,13 +66,32 @@ async function loadSourceRows(
   ]);
 
   let platform: LegitimacySourceRows["platform"] = null;
+  let anticheat: LegitimacySourceRows["anticheat"] = null;
   if (playerRes.data?.user_profile_id) {
     const { data: profile } = await admin
       .from("user_profiles")
-      .select("discord_user_id, is_verified")
+      .select("discord_user_id, is_verified, user_id")
       .eq("id", playerRes.data.user_profile_id)
       .maybeSingle();
-    platform = profile ?? null;
+    platform = profile
+      ? { discord_user_id: profile.discord_user_id, is_verified: profile.is_verified }
+      : null;
+
+    // Confirmed anticheat detections, keyed by auth user id (ac_flags isn't in the
+    // generated Supabase types yet, so count via drizzle). Confirmed only — §Q7.
+    if (profile?.user_id) {
+      try {
+        const [row] = await db
+          .select({ n: count() })
+          .from(acFlags)
+          .where(
+            and(eq(acFlags.userId, profile.user_id), eq(acFlags.status, "confirmed")),
+          );
+        anticheat = { confirmedDetections: Number(row?.n ?? 0) };
+      } catch {
+        anticheat = null;
+      }
+    }
   }
 
   return {
@@ -78,6 +100,7 @@ async function loadSourceRows(
     faceit: faceitRes.data ?? null,
     gc: gcRes.data ?? null,
     platform,
+    anticheat,
   };
 }
 

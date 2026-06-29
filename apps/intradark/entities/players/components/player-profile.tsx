@@ -27,6 +27,10 @@ import {
   PlayerProfileTabs,
   type PlayerProfileTab,
 } from "@/entities/players/components/player-profile-tabs";
+import type {
+  ReactionAuthor,
+  ReactionView,
+} from "@/entities/reactions/lib/types";
 import type { ProfileCommentEligibility } from "@/entities/players/lib/profile-comments/eligibility";
 import type {
   ProfileCommentsPage,
@@ -66,6 +70,12 @@ export interface PlayerProfileProps {
   commentsPage?: ProfileCommentsPage;
   commentEligibility?: ProfileCommentEligibility;
   viewerUserId?: string | null;
+  /** Viewer identity for optimistic reaction inserts. */
+  viewerAuthor?: ReactionAuthor | null;
+  /** Emoji reactions keyed by comment id (player_comment targets). */
+  reactionsByComment?: Record<string, ReactionView[]>;
+  /** Emoji reactions on the profile itself (player_profile target). */
+  profileReactions?: ReactionView[];
 }
 
 /**
@@ -86,6 +96,9 @@ export function PlayerProfile({
   commentsPage,
   commentEligibility,
   viewerUserId = null,
+  viewerAuthor = null,
+  reactionsByComment = {},
+  profileReactions = [],
 }: PlayerProfileProps) {
   const prefersReducedMotion = usePrefersReducedMotion();
   const queryClient = useQueryClient();
@@ -252,6 +265,9 @@ export function PlayerProfile({
                     initialPage={commentsPage}
                     eligibility={commentEligibility}
                     viewerUserId={viewerUserId}
+                    viewerAuthor={viewerAuthor}
+                    reactionsByComment={reactionsByComment}
+                    profileReactions={profileReactions}
                   />
                 ) : null}
               </StaggeredAnimation>

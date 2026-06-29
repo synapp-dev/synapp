@@ -11,6 +11,9 @@ export type ProfileCommentFlat = {
   updatedAt: string;
   authorUsername: string | null;
   authorAvatar: string | null;
+  authorDisplayName: string | null;
+  authorCountryFlag: string | null;
+  authorSteamid64: string | null;
 };
 
 export type ProfileCommentTreeNode = ProfileCommentFlat & {
@@ -67,4 +70,17 @@ export function buildCommentTree(
   }
 
   return roots;
+}
+
+/** Flattens every comment id in a forest (roots + all descendants). */
+export function collectTreeCommentIds(
+  trees: ProfileCommentTreeNode[],
+): string[] {
+  const ids: string[] = [];
+  const walk = (node: ProfileCommentTreeNode) => {
+    ids.push(node.id);
+    for (const child of node.children) walk(child);
+  };
+  for (const tree of trees) walk(tree);
+  return ids;
 }

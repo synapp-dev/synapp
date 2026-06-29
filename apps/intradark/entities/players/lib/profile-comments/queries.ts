@@ -13,6 +13,7 @@ import {
 
 import { db } from "@/server/db/drizzle";
 import {
+  players,
   playerProfileComments,
   playerProfileTrustVotes,
   steamProfiles,
@@ -42,6 +43,9 @@ function mapCommentRow(
   author: {
     username: string | null;
     avatar: string | null;
+    displayName: string | null;
+    countryFlag: string | null;
+    steamid64: string | null;
   },
 ): ProfileCommentFlat {
   return {
@@ -55,6 +59,9 @@ function mapCommentRow(
     updatedAt: row.updatedAt,
     authorUsername: author.username,
     authorAvatar: author.avatar,
+    authorDisplayName: author.displayName,
+    authorCountryFlag: author.countryFlag,
+    authorSteamid64: author.steamid64,
   };
 }
 
@@ -67,7 +74,11 @@ async function fetchCommentsWithAuthors(
     .select({
       comment: playerProfileComments,
       username: userProfiles.username,
+      displayName: userProfiles.displayName,
+      profileAvatar: userProfiles.avatarUrl,
       steamAvatar: steamProfiles.avatarfull,
+      steamid64: userProfiles.steamProfileId,
+      countryFlag: players.countryFlag,
     })
     .from(playerProfileComments)
     .leftJoin(
@@ -78,6 +89,7 @@ async function fetchCommentsWithAuthors(
       steamProfiles,
       eq(steamProfiles.steamid64, userProfiles.steamProfileId),
     )
+    .leftJoin(players, eq(players.steamid64, userProfiles.steamProfileId))
     .where(
       and(
         inArray(playerProfileComments.id, commentIds),
@@ -88,7 +100,10 @@ async function fetchCommentsWithAuthors(
   return rows.map((r) =>
     mapCommentRow(r.comment, {
       username: r.username,
-      avatar: r.steamAvatar,
+      avatar: r.steamAvatar ?? r.profileAvatar,
+      displayName: r.displayName,
+      countryFlag: r.countryFlag,
+      steamid64: r.steamid64,
     }),
   );
 }

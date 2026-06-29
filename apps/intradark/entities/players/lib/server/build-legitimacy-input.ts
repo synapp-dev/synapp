@@ -74,6 +74,10 @@ export interface LegitimacySourceRows {
     discord_user_id: string | null;
     is_verified: boolean | null;
   } | null;
+  anticheat: {
+    /** Count of admin-confirmed ac_flags for this player's account. */
+    confirmedDetections: number;
+  } | null;
 }
 
 export function buildLegitimacyInput(
@@ -136,5 +140,6 @@ export function buildLegitimacyInput(
     emailVerified: platform?.is_verified === true,
     hasGc: gc != null,
     gcPlayerLevel: gc?.player_level ?? null,
+    acConfirmedDetections: rows.anticheat?.confirmedDetections ?? null,
   };
 }

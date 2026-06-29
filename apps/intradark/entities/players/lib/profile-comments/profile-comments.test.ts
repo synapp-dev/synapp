@@ -19,6 +19,9 @@ describe("buildCommentTree", () => {
         updatedAt: "2026-01-02T00:00:00Z",
         authorUsername: "a",
         authorAvatar: null,
+        authorDisplayName: null,
+        authorCountryFlag: null,
+        authorSteamid64: null,
       },
       {
         id: "b",
@@ -31,6 +34,9 @@ describe("buildCommentTree", () => {
         updatedAt: "2026-01-03T00:00:00Z",
         authorUsername: "b",
         authorAvatar: null,
+        authorDisplayName: null,
+        authorCountryFlag: null,
+        authorSteamid64: null,
       },
     ];
     const tree = buildCommentTree(flat);

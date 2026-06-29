@@ -2,10 +2,16 @@ import { notFound, redirect } from "next/navigation";
 
 import { getProfileCommentEligibilityForViewer } from "@/entities/players/actions/profile-comments-actions";
 import { resolvePlayerIdentifier } from "@/entities/players/lib/server/resolve-server";
+import { collectTreeCommentIds } from "@/entities/players/lib/profile-comments/build-comment-tree";
 import {
   getPlayerProfileTrustCounts,
   listCommentsForSubject,
 } from "@/entities/players/lib/profile-comments/queries";
+import {
+  getReactionsForTarget,
+  getReactionsForTargets,
+} from "@/entities/reactions/lib/queries";
+import { viewerAuthorFromProfiles } from "@/entities/reactions/lib/viewer";
 import { getPlayerTeamForProfile } from "@/entities/teams/lib/queries";
 import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 import { PlayerProfile } from "@/entities/players/components/player-profile";
@@ -51,6 +57,14 @@ export default async function PlayerProfilePage({
       }),
     ]);
 
+  // Emoji reactions for the visible comments + the profile itself.
+  const commentIds = collectTreeCommentIds(commentsPage.trees);
+  const [reactionsMap, profileReactions] = await Promise.all([
+    getReactionsForTargets("player_comment", commentIds),
+    getReactionsForTarget("player_profile", resolved.steamid64),
+  ]);
+  const reactionsByComment = Object.fromEntries(reactionsMap);
+
   return (
     <PlayerProfile
       steamid64={resolved.steamid64}
@@ -65,6 +79,9 @@ export default async function PlayerProfilePage({
       commentsPage={commentsPage}
       commentEligibility={commentEligibility}
       viewerUserId={viewer?.user.id ?? null}
+      viewerAuthor={viewerAuthorFromProfiles(viewer)}
+      reactionsByComment={reactionsByComment}
+      profileReactions={profileReactions}
     />
   );
 }
