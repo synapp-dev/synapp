@@ -1,20 +1,24 @@
-import { format } from "date-fns";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { NewsArticleBodyHtml } from "@/entities/news/components/news-article-body-html";
-import { NewsTagChips } from "@/entities/news/components/news-tag-chip";
+import { NewsArticleView } from "@/entities/news/components/news-article-view";
+import { collectNewsCommentIds } from "@/entities/news/lib/comments/build-comment-tree";
+import { listNewsCommentsForArticle } from "@/entities/news/lib/comments/queries";
 import {
   getPublishedArticleBySlug,
   getTagsForArticleIds,
 } from "@/entities/news/lib/queries";
+import { readTimeFromDoc } from "@/entities/news/lib/read-time";
+import { getNewsSubscriptionState } from "@/entities/news/lib/subscribe/queries";
+import { getNewsViewBreakdown } from "@/entities/news/lib/views/queries";
+import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar";
-import { Separator } from "@workspace/ui/components/separator";
+  getReactionsForTarget,
+  getReactionsForTargets,
+} from "@/entities/reactions/lib/queries";
+import type { ReactionAuthor } from "@/entities/reactions/lib/types";
+import { viewerAuthorFromProfiles } from "@/entities/reactions/lib/viewer";
+import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 
 export default async function NewsArticlePage({
   params,
@@ -27,69 +31,56 @@ export default async function NewsArticlePage({
     notFound();
   }
 
-  const tags = (await getTagsForArticleIds([article.id])).get(article.id) ?? [];
-  const publishedLabel = article.publishedAt
-    ? format(new Date(article.publishedAt), "MMMM d, yyyy")
-    : "";
-  const authorName =
-    article.authorDisplayName ?? article.authorUsername ?? "Intradark";
-  const authorInitial = authorName.charAt(0).toUpperCase();
+  const [tagsMap, commentsPage, viewer, userId, views] = await Promise.all([
+    getTagsForArticleIds([article.id]),
+    listNewsCommentsForArticle(article.id),
+    getCurrentUserProfiles(),
+    getSessionUserId(),
+    getNewsViewBreakdown(article.id),
+  ]);
+
+  const tags = tagsMap.get(article.id) ?? [];
+
+  const commentIds = collectNewsCommentIds(commentsPage.trees);
+  const [reactionsMap, articleReactions, subscription] = await Promise.all([
+    getReactionsForTargets("news_comment", commentIds),
+    getReactionsForTarget("news_article", article.id),
+    getNewsSubscriptionState(userId),
+  ]);
+  const reactionsByComment = Object.fromEntries(reactionsMap);
+
+  const author: ReactionAuthor = {
+    userId: article.authorUserId,
+    username: article.authorUsername,
+    displayName: article.authorDisplayName,
+    avatarUrl: article.authorAvatarUrl,
+    countryFlag: article.authorCountryFlag,
+    steamid64: article.authorSteamid64,
+  };
 
   return (
-    <article className="mx-auto w-full max-w-2xl pb-16">
-      <Link
-        href="/news"
-        className="text-muted-foreground hover:text-foreground mb-8 inline-flex items-center gap-1.5 text-sm font-medium transition-colors"
-      >
-        <ArrowLeft className="size-4" />
-        All news
-      </Link>
-
-      <header className="space-y-4">
-        <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl md:text-[2.6rem] md:leading-[1.12]">
-          {article.title}
-        </h1>
-        {article.excerpt ? (
-          <p className="text-muted-foreground text-xl leading-snug">
-            {article.excerpt}
-          </p>
-        ) : null}
-
-        {tags.length > 0 ? <NewsTagChips tags={tags} /> : null}
-
-        <div className="flex items-center gap-3 pt-1">
-          <Avatar className="size-9">
-            {article.authorAvatarUrl ? (
-              <AvatarImage src={article.authorAvatarUrl} alt="" />
-            ) : null}
-            <AvatarFallback>{authorInitial}</AvatarFallback>
-          </Avatar>
-          <div className="text-sm leading-tight">
-            <p className="font-medium">{authorName}</p>
-            {publishedLabel ? (
-              <p className="text-muted-foreground text-xs">{publishedLabel}</p>
-            ) : null}
-          </div>
-        </div>
-      </header>
-
-      <Separator className="my-8" />
-
-      {article.coverImageUrl ? (
-        <div className="bg-muted relative mb-10 aspect-[16/9] w-full overflow-hidden rounded-xl border">
-          {/* eslint-disable-next-line @next/next/no-img-element -- Supabase CDN media */}
-          <img
-            src={article.coverImageUrl}
-            alt=""
-            className="size-full object-cover"
-            aria-hidden
-          />
-        </div>
-      ) : null}
-
-      <div className="font-[Georgia,'Times_New_Roman',serif]">
-        <NewsArticleBodyHtml doc={article.bodyJson} />
-      </div>
-    </article>
+    <NewsArticleView
+      article={{
+        id: article.id,
+        slug: article.slug,
+        title: article.title,
+        excerpt: article.excerpt,
+        coverImageUrl: article.coverImageUrl,
+        publishedAt: article.publishedAt,
+        author,
+        authorBio: article.authorBio,
+      }}
+      tags={tags}
+      readTime={readTimeFromDoc(article.bodyJson)}
+      views={views}
+      subscription={subscription}
+      body={<NewsArticleBodyHtml doc={article.bodyJson} />}
+      commentsPage={commentsPage}
+      reactionsByComment={reactionsByComment}
+      articleReactions={articleReactions}
+      viewerUserId={viewer?.user.id ?? null}
+      viewerAuthor={viewerAuthorFromProfiles(viewer)}
+      canWrite={Boolean(userId)}
+    />
   );
 }

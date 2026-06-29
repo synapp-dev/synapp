@@ -5,6 +5,8 @@ import {
   newsArticleTags,
   newsArticles,
   newsTags,
+  players,
+  steamProfiles,
   userProfiles,
 } from "@/server/db/schema";
 
@@ -30,9 +32,18 @@ export async function getPublishedArticleBySlug(slug: string) {
       authorDisplayName: userProfiles.displayName,
       authorUsername: userProfiles.username,
       authorAvatarUrl: userProfiles.avatarUrl,
+      authorBio: userProfiles.bio,
+      authorSteamAvatar: steamProfiles.avatarfull,
+      authorSteamid64: userProfiles.steamProfileId,
+      authorCountryFlag: players.countryFlag,
     })
     .from(newsArticles)
     .leftJoin(userProfiles, eq(userProfiles.userId, newsArticles.authorUserId))
+    .leftJoin(
+      steamProfiles,
+      eq(steamProfiles.steamid64, userProfiles.steamProfileId),
+    )
+    .leftJoin(players, eq(players.steamid64, userProfiles.steamProfileId))
     .where(
       and(
         eq(newsArticles.slug, slug),
@@ -47,7 +58,10 @@ export async function getPublishedArticleBySlug(slug: string) {
     ...row.article,
     authorDisplayName: row.authorDisplayName,
     authorUsername: row.authorUsername,
-    authorAvatarUrl: row.authorAvatarUrl,
+    authorAvatarUrl: row.authorSteamAvatar ?? row.authorAvatarUrl,
+    authorBio: row.authorBio,
+    authorSteamid64: row.authorSteamid64,
+    authorCountryFlag: row.authorCountryFlag,
   };
 }
 

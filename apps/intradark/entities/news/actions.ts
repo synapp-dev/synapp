@@ -12,6 +12,7 @@ import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import { db } from "@/server/db/drizzle";
 import { newsArticles } from "@/server/db/schema";
+import { enqueueNewsDm } from "@/entities/notifications/lib/server/steam-dm";
 
 import type { NewsActionResult } from "./lib/action-types";
 import { parseAndValidateBodyJson } from "./lib/article-payload";
@@ -254,6 +255,14 @@ export async function publishNewsArticleAction(
     );
   } catch (e) {
     console.warn("[news] analytics track failed", e);
+  }
+
+  // Fan out a Steam DM to opted-in friends (manual publish only; auto-ingested
+  // articles bypass this action). Best-effort — never block publishing.
+  try {
+    await enqueueNewsDm(idParsed.data.id);
+  } catch (e) {
+    console.warn("[news] steam DM enqueue failed", e);
   }
 
   return { ok: true, data: { slug: article.slug } };
