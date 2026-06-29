@@ -21,6 +21,7 @@
     "generate:dust2-lineups-sql": "tsx scripts/generate-dust2-lineups-sql.ts",
     "discord-bot": "dotenv -e .env.local -- tsx discord-bot/index.ts",
     "cs2-gc-bot": "dotenv -e .env.local -- tsx cs2-gc-bot/index.ts",
+    "steam-friends-bot": "dotenv -e .env.local -- tsx steam-friends-bot/index.ts",
     "backfill:players": "dotenv -e .env.local -- tsx scripts/backfill-players.ts",
     "seed:news-bot": "dotenv -e .env.local -- tsx scripts/seed-news-bot.ts",
     "package:cs2-plugins": "dotenv -e .env.local -- node scripts/package-cs2-plugins.mjs",
@@ -30,6 +31,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@laihoe/demoparser2": "^0.41.3",
     "@radix-ui/react-select": "^2.2.5",
     "@supabase/ssr": "^0.6.1",
     "@supabase/supabase-js": "^2.51.0",
