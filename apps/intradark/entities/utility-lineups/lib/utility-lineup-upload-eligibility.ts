@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
 
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
+import { hasUtilityEditorRole } from "@/entities/utility-lineups/lib/roles";
 import { db } from "@/server/db/drizzle";
 import { userProfiles } from "@/server/db/schema";
 import { createServerClient } from "@/utils/supabase/server";
@@ -66,6 +68,16 @@ export async function resolveUtilityLineupUploadEligibility(): Promise<UtilityLi
     .limit(1);
 
   const profile = rows[0];
+
+  // Utility editors (and developers) bypass the email/Steam/Discord upload lock.
+  // They still need a profile row, since uploads are attributed to it.
+  if (profile) {
+    const slugs = await getEffectiveRoleSlugsForUser(user.id);
+    if (hasUtilityEditorRole(slugs)) {
+      return { ok: true, userId: user.id, profileId: profile.id };
+    }
+  }
+
   const issue = utilityLineupUploadEligibilityIssue({
     emailConfirmedAt: user.email_confirmed_at,
     steamProfileId: profile?.steamProfileId ?? null,
