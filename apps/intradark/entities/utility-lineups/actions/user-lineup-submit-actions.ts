@@ -4,6 +4,8 @@ import { track } from "@vercel/analytics/server";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
+import { hasUtilityEditorRole } from "@/entities/utility-lineups/lib/roles";
 import { formatZodErrorForClient } from "@/entities/utility-lineups/lib/format-zod-error";
 import {
   userLineupFinalizeSchema,
@@ -45,6 +47,7 @@ export type InsertEnemyPovVideoResult =
 export async function insertPendingUtilityLineupRow(
   profileId: string,
   v: UserLineupFinalizeInput,
+  status: "pending" | "published" = "pending",
 ): Promise<UserLineupSubmitActionResult> {
   try {
     const mapRow = await db
@@ -84,7 +87,7 @@ export async function insertPendingUtilityLineupRow(
         description: v.description,
         setposText: v.setposText ?? null,
         authorProfileId: profileId,
-        status: "pending",
+        status,
         proVerified: false,
         intradarkVerified: false,
         updatedAt: new Date().toISOString(),
@@ -191,7 +194,15 @@ export async function finalizeUserUtilityLineupAction(
     };
   }
 
-  const inserted = await insertPendingUtilityLineupRow(profileId, v);
+  // Utility editors (and developers) skip the moderation queue: publish on submit.
+  const slugs = await getEffectiveRoleSlugsForUser(gate.userId);
+  const autoPublish = hasUtilityEditorRole(slugs);
+
+  const inserted = await insertPendingUtilityLineupRow(
+    profileId,
+    v,
+    autoPublish ? "published" : "pending",
+  );
   if (!inserted.ok) {
     void track("utility_lineup_submit_finalize", { ok: false });
     return inserted;
@@ -200,6 +211,7 @@ export async function finalizeUserUtilityLineupAction(
   void track("utility_lineup_submit_finalize", {
     ok: true,
     map_slug: v.mapSlug,
+    auto_published: autoPublish,
   });
   revalidatePath("/utility");
   revalidatePath(`/utility/${v.mapSlug}`);

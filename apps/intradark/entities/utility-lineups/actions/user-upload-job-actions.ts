@@ -12,6 +12,8 @@ import {
   utilityLineupUploadJobCreateSchema,
 } from "@/entities/utility-lineups/lib/user-lineup-submit-schema";
 import { resolveUtilityLineupUploadEligibility } from "@/entities/utility-lineups/lib/utility-lineup-upload-eligibility";
+import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
+import { hasUtilityEditorRole } from "@/entities/utility-lineups/lib/roles";
 import { INTRADARK_MEDIA_BUCKET } from "@/lib/media/constants";
 import { validateMediaObjectPath } from "@/lib/media/storage-paths";
 import { buildUtilityLineupVideoObjectPath } from "@/lib/media/utility-lineup-upload-path";
@@ -478,7 +480,15 @@ export async function finalizeUtilityLineupUploadJobAction(
     .set({ status: "finalizing", updatedAt: new Date().toISOString() })
     .where(eq(utilityLineupUploadJobs.id, jobId));
 
-  const inserted = await insertPendingUtilityLineupRow(gate.profileId, v);
+  // Utility editors (and developers) skip the moderation queue: publish on submit.
+  const slugs = await getEffectiveRoleSlugsForUser(gate.userId);
+  const autoPublish = hasUtilityEditorRole(slugs);
+
+  const inserted = await insertPendingUtilityLineupRow(
+    gate.profileId,
+    v,
+    autoPublish ? "published" : "pending",
+  );
   if (!inserted.ok) {
     await db
       .update(utilityLineupUploadJobs)
@@ -511,6 +521,7 @@ export async function finalizeUtilityLineupUploadJobAction(
   void track("utility_upload_job_completed", {
     job_id: jobId,
     lineup_id: inserted.lineupId,
+    auto_published: autoPublish,
   });
   revalidatePath("/utility");
   revalidatePath(`/utility/${v.mapSlug}`);
