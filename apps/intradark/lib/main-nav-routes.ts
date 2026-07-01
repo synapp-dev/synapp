@@ -10,6 +10,7 @@ import {
   Newspaper,
   Play,
   Shield,
+  Sparkles,
   SquareStack,
   Swords,
   Trophy,
@@ -23,6 +24,7 @@ export const MAIN_NAV_SEGMENT_META: Record<
   string,
   { label: string; icon: LucideIcon }
 > = {
+  welcome: { label: "Welcome", icon: Sparkles },
   play: { label: "Play", icon: Play },
   dashboard: { label: "Dashboard", icon: LayoutDashboard },
   matches: { label: "Matches", icon: Trophy },
@@ -59,6 +61,7 @@ export type NavMainSidebarItem = {
 /** Static platform links (Admin, with optional Sandbox child, are prepended in `AppSidebar` from RBAC). */
 export function getNavPlatformBase(): NavMainSidebarItem[] {
   return [
+    { title: "Welcome", url: "/welcome", icon: Sparkles, exact: true },
     { title: "Play", url: "/play", icon: Play, exact: true },
     {
       title: "Dashboard",
