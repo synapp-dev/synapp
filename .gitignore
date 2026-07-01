@@ -56,6 +56,9 @@ apps/intradark/steam-friends-bot/.steam-session.json
 # Jourdain: raw 4K orb source video (150MB, exceeds GitHub limits) - the web asset is jourdain-orb-loop.mp4
 apps/jourdain/public/videos/jourdain-orb.mov
 
+# Intradark: welcome smoke-loop source master (55MB) - the web assets are welcome-smoke-loop.mp4/.webm
+apps/intradark/public/video/welcome-smoke-loop.mov
+
 # CS2 plugin packaging: download cache, staging tree, and output zips (do not commit)
 apps/intradark/.cache/
 apps/intradark/dist/
