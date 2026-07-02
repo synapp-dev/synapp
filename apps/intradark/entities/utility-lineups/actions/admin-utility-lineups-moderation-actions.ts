@@ -54,6 +54,37 @@ const updateSpotsSchema = z.object({
   landSpotY: z.number().min(0).max(1),
 });
 
+const updateDetailsSchema = z.object({
+  lineupId: z.string().uuid(),
+  mapSlug: z.string().min(1).max(128),
+  throwLabel: z.string().min(1).max(500),
+  landLabel: z.string().min(1).max(500),
+  grenadeType: z.enum(["smoke", "molotov", "flashbang", "he"]),
+  side: z.enum(["t", "ct", "both"]),
+  movement: z.enum([
+    "stationary",
+    "running",
+    "walking",
+    "crouched",
+    "crouched_walking",
+  ]),
+  technique: z.enum([
+    "left_click",
+    "right_click",
+    "left_and_right_click",
+    "jump_left_click",
+    "jump_right_click",
+    "jump_left_and_right_click",
+  ]),
+  margin: z.enum(["low", "medium", "high"]),
+  description: z.string().min(1).max(8000),
+  setposText: z.string().max(4000).nullable().optional(),
+  youtubeUrl: z
+    .union([z.string().url().max(2000), z.literal(""), z.null()])
+    .optional()
+    .transform((s) => (s === "" || s === undefined || s === null ? null : s)),
+});
+
 const updateTimelineSchema = z
   .object({
     lineupId: z.string().uuid(),
@@ -282,6 +313,89 @@ export async function updateUtilityLineupTimelineAction(
       ok: false,
       code: "SERVER",
       message: "Could not update lineup timeline.",
+    };
+  }
+}
+
+/** Utility-editor only: nade metadata + text fields (everything the upload wizard collects besides spots/timeline/video). */
+export async function updateUtilityLineupDetailsAction(
+  raw: unknown,
+): Promise<AdminUtilityModerationResult> {
+  const gate = await requireUtilityEditor();
+  if (!gate.ok) return gate;
+
+  const parsed = updateDetailsSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "VALIDATION",
+      message: formatZodErrorForClient(parsed.error),
+    };
+  }
+
+  const {
+    lineupId,
+    mapSlug,
+    throwLabel,
+    landLabel,
+    grenadeType,
+    side,
+    movement,
+    technique,
+    margin,
+    description,
+    setposText,
+    youtubeUrl,
+  } = parsed.data;
+
+  try {
+    const existing = await db
+      .select({
+        id: utilityLineups.id,
+        mapSlug: maps.slug,
+      })
+      .from(utilityLineups)
+      .innerJoin(maps, eq(utilityLineups.mapId, maps.id))
+      .where(eq(utilityLineups.id, lineupId))
+      .limit(1);
+
+    const row = existing[0];
+    if (!row) {
+      return { ok: false, code: "NOT_FOUND", message: "Lineup not found." };
+    }
+    if (row.mapSlug !== mapSlug) {
+      return { ok: false, code: "VALIDATION", message: "Map slug mismatch." };
+    }
+
+    await db
+      .update(utilityLineups)
+      .set({
+        throwLabel,
+        landLabel,
+        grenadeType,
+        side,
+        movement,
+        technique,
+        margin,
+        description,
+        setposText: setposText ?? null,
+        youtubeUrl: youtubeUrl ?? null,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(utilityLineups.id, lineupId));
+
+    void track("utility_lineup_details_update", { ok: true, lineup_id: lineupId });
+    revalidatePath("/utility");
+    revalidatePath(`/utility/${mapSlug}`);
+    revalidatePath("/admin/utility/pending");
+    return { ok: true };
+  } catch (e) {
+    console.error("updateUtilityLineupDetailsAction", e);
+    void track("utility_lineup_details_update", { ok: false });
+    return {
+      ok: false,
+      code: "SERVER",
+      message: "Could not update lineup details.",
     };
   }
 }

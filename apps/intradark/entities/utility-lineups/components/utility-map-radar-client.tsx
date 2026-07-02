@@ -32,11 +32,18 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@workspace/ui/components/sheet";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs";
 
 import {
   updateUtilityLineupSpotsAction,
   updateUtilityLineupTimelineAction,
 } from "@/entities/utility-lineups/actions/admin-utility-lineups-moderation-actions";
+import { AdminDetailsEditBlock } from "@/entities/utility-lineups/components/admin-lineup-details-edit-block";
 import {
   mapDisplayRadarNormToStored,
   mapStoredRadarNormToDisplay,
@@ -1943,14 +1950,17 @@ export function UtilityMapRadarClient({
           if (!next) setActiveLineupId(null);
         }}
       >
-        <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-lg">
+        <SheetContent
+          side="bottom"
+          className="mx-auto h-[90vh] max-h-[90vh] w-full gap-0 rounded-t-xl p-0 sm:max-w-2xl"
+        >
           <SheetHeader className="border-border shrink-0 border-b p-4 text-left">
             <SheetTitle>{sheetTitle}</SheetTitle>
             <SheetDescription className="sr-only">
               Lineup details for {displayName}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex max-h-[calc(100vh-5rem)] flex-col gap-4 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-4">
             {activeLineupId && lineupsById[activeLineupId] ? (
               <LineupDetailCard
                 lineup={lineupsById[activeLineupId]}
@@ -2368,10 +2378,12 @@ function LineupDetailCard({
   canEditSpots: boolean;
   onSpotsSaved: () => void;
 }) {
+  const [editDetailsOpen, setEditDetailsOpen] = React.useState(false);
   const [editSpotsOpen, setEditSpotsOpen] = React.useState(false);
   const [editTimelineOpen, setEditTimelineOpen] = React.useState(false);
 
   React.useEffect(() => {
+    setEditDetailsOpen(false);
     setEditSpotsOpen(false);
     setEditTimelineOpen(false);
   }, [lineup.id]);
@@ -2385,8 +2397,15 @@ function LineupDetailCard({
     ? intradarkMediaPublicUrl(lineup.videoObjectPath)
     : null;
 
+  const hasStills =
+    lineup.stillStandMs != null ||
+    lineup.stillThrowMs != null ||
+    lineup.stillLandMs != null ||
+    lineup.grenadeReleaseMs != null ||
+    lineup.grenadeBloomMs != null;
+
   return (
-    <article className="border-border space-y-3 rounded-lg border p-3">
+    <article className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{lineup.grenadeType}</Badge>
         <Badge variant="outline">{lineup.side}</Badge>
@@ -2399,140 +2418,172 @@ function LineupDetailCard({
         From <span className="text-foreground">{lineup.throwLabel}</span> →{" "}
         <span className="text-foreground">{lineup.landLabel}</span>
       </p>
-      {canEditSpots ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditSpotsOpen((o) => !o)}
-          >
-            {editSpotsOpen ? "Close position editor" : "Edit throw & land"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setEditTimelineOpen((o) => !o)}
-          >
-            {editTimelineOpen ? "Close timeline editor" : "Edit timeline"}
-          </Button>
-        </div>
-      ) : null}
-      {editTimelineOpen && canEditSpots ? (
-        <AdminTimelineEditBlock
-          lineup={lineup}
-          mapSlug={mapSlug}
-          onCancel={() => setEditTimelineOpen(false)}
-          onSaved={() => {
-            setEditTimelineOpen(false);
-            onSpotsSaved();
-          }}
-        />
-      ) : null}
-      {editSpotsOpen && canEditSpots ? (
-        <AdminSpotEditBlock
-          lineup={lineup}
-          mapSlug={mapSlug}
-          radarImageUrl={radarImageUrl}
-          displayName={displayName}
-          onCancel={() => setEditSpotsOpen(false)}
-          onSaved={() => {
-            setEditSpotsOpen(false);
-            onSpotsSaved();
-          }}
-        />
-      ) : null}
-      {(lineup.stillStandMs != null ||
-        lineup.stillThrowMs != null ||
-        lineup.stillLandMs != null ||
-        lineup.grenadeReleaseMs != null ||
-        lineup.grenadeBloomMs != null) && (
-        <dl className="text-muted-foreground grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border pt-2 text-[10px]">
-          {lineup.stillStandMs != null ? (
-            <>
-              <dt>Stand still</dt>
-              <dd className="font-mono text-foreground">
-                {(lineup.stillStandMs / 1000).toFixed(1)}s
-              </dd>
-            </>
+
+      <Tabs defaultValue="details" className="w-full gap-3">
+        <TabsList className={cn("w-full", canEditSpots ? "grid grid-cols-3" : "grid grid-cols-2")}>
+          <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="video">Video</TabsTrigger>
+          {canEditSpots ? <TabsTrigger value="admin">Admin</TabsTrigger> : null}
+        </TabsList>
+
+        <TabsContent value="details" className="space-y-3">
+          {hasStills && (
+            <dl className="text-muted-foreground grid grid-cols-2 gap-x-3 gap-y-1 border-t border-border pt-2 text-[10px]">
+              {lineup.stillStandMs != null ? (
+                <>
+                  <dt>Stand still</dt>
+                  <dd className="font-mono text-foreground">
+                    {(lineup.stillStandMs / 1000).toFixed(1)}s
+                  </dd>
+                </>
+              ) : null}
+              {lineup.stillThrowMs != null ? (
+                <>
+                  <dt>Throw still</dt>
+                  <dd className="font-mono text-foreground">
+                    {(lineup.stillThrowMs / 1000).toFixed(1)}s
+                  </dd>
+                </>
+              ) : null}
+              {lineup.stillLandMs != null ? (
+                <>
+                  <dt>Land still</dt>
+                  <dd className="font-mono text-foreground">
+                    {(lineup.stillLandMs / 1000).toFixed(1)}s
+                  </dd>
+                </>
+              ) : null}
+              {lineup.grenadeReleaseMs != null ? (
+                <>
+                  <dt>Released</dt>
+                  <dd className="font-mono text-foreground">
+                    {(lineup.grenadeReleaseMs / 1000).toFixed(1)}s
+                  </dd>
+                </>
+              ) : null}
+              {lineup.grenadeBloomMs != null ? (
+                <>
+                  <dt>Blooms</dt>
+                  <dd className="font-mono text-foreground">
+                    {(lineup.grenadeBloomMs / 1000).toFixed(1)}s
+                  </dd>
+                </>
+              ) : null}
+            </dl>
+          )}
+          <p className="text-sm whitespace-pre-wrap">{lineup.description}</p>
+          {lineup.setposText ? (
+            <pre className="bg-muted max-h-24 overflow-x-auto rounded-md p-2 text-xs">
+              {lineup.setposText}
+            </pre>
           ) : null}
-          {lineup.stillThrowMs != null ? (
-            <>
-              <dt>Throw still</dt>
-              <dd className="font-mono text-foreground">
-                {(lineup.stillThrowMs / 1000).toFixed(1)}s
-              </dd>
-            </>
+          {lineup.lineupImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={lineup.lineupImageUrl}
+              alt="Lineup reference"
+              className="w-full rounded-md border border-border"
+            />
           ) : null}
-          {lineup.stillLandMs != null ? (
-            <>
-              <dt>Land still</dt>
-              <dd className="font-mono text-foreground">
-                {(lineup.stillLandMs / 1000).toFixed(1)}s
-              </dd>
-            </>
+        </TabsContent>
+
+        <TabsContent value="video" className="space-y-3">
+          {embedSrc ? (
+            <div className="aspect-video w-full overflow-hidden rounded-md border border-border">
+              <iframe
+                title="Lineup video"
+                src={embedSrc}
+                className="h-full w-full"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          ) : storageVideoSrc ? (
+            <StorageLineupVideo
+              src={storageVideoSrc}
+              startMs={lineup.videoStartMs}
+              endMs={lineup.videoEndMs}
+            />
+          ) : (
+            <p className="text-muted-foreground text-sm">
+              No video for this lineup.
+            </p>
+          )}
+          {lineup.youtubeUrl ? (
+            <Button variant="link" className="h-auto px-0" asChild>
+              <a href={lineup.youtubeUrl} target="_blank" rel="noopener noreferrer">
+                Open on YouTube
+              </a>
+            </Button>
           ) : null}
-          {lineup.grenadeReleaseMs != null ? (
-            <>
-              <dt>Released</dt>
-              <dd className="font-mono text-foreground">
-                {(lineup.grenadeReleaseMs / 1000).toFixed(1)}s
-              </dd>
-            </>
-          ) : null}
-          {lineup.grenadeBloomMs != null ? (
-            <>
-              <dt>Blooms</dt>
-              <dd className="font-mono text-foreground">
-                {(lineup.grenadeBloomMs / 1000).toFixed(1)}s
-              </dd>
-            </>
-          ) : null}
-        </dl>
-      )}
-      <p className="text-sm whitespace-pre-wrap">{lineup.description}</p>
-      {lineup.setposText ? (
-        <pre className="bg-muted max-h-24 overflow-x-auto rounded-md p-2 text-xs">
-          {lineup.setposText}
-        </pre>
-      ) : null}
-      {lineup.lineupImageUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={lineup.lineupImageUrl}
-          alt="Lineup reference"
-          className="w-full rounded-md border border-border"
-        />
-      ) : null}
-      {embedSrc ? (
-        <div className="aspect-video w-full overflow-hidden rounded-md border border-border">
-          <iframe
-            title="Lineup video"
-            src={embedSrc}
-            className="h-full w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-          />
-        </div>
-      ) : storageVideoSrc ? (
-        <StorageLineupVideo
-          src={storageVideoSrc}
-          startMs={lineup.videoStartMs}
-          endMs={lineup.videoEndMs}
-        />
-      ) : (
-        <p className="text-muted-foreground text-sm">
-          No video for this lineup.
-        </p>
-      )}
-      {lineup.youtubeUrl ? (
-        <Button variant="link" className="h-auto px-0" asChild>
-          <a href={lineup.youtubeUrl} target="_blank" rel="noopener noreferrer">
-            Open on YouTube
-          </a>
-        </Button>
-      ) : null}
+        </TabsContent>
+
+        {canEditSpots ? (
+          <TabsContent value="admin" className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditDetailsOpen((o) => !o)}
+              >
+                {editDetailsOpen ? "Close details editor" : "Edit details"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditSpotsOpen((o) => !o)}
+              >
+                {editSpotsOpen ? "Close position editor" : "Edit throw & land"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setEditTimelineOpen((o) => !o)}
+              >
+                {editTimelineOpen ? "Close timeline editor" : "Edit timeline"}
+              </Button>
+            </div>
+            {editDetailsOpen ? (
+              <AdminDetailsEditBlock
+                lineup={lineup}
+                mapSlug={mapSlug}
+                onCancel={() => setEditDetailsOpen(false)}
+                onSaved={() => {
+                  setEditDetailsOpen(false);
+                  onSpotsSaved();
+                }}
+              />
+            ) : null}
+            {editTimelineOpen ? (
+              <AdminTimelineEditBlock
+                lineup={lineup}
+                mapSlug={mapSlug}
+                onCancel={() => setEditTimelineOpen(false)}
+                onSaved={() => {
+                  setEditTimelineOpen(false);
+                  onSpotsSaved();
+                }}
+              />
+            ) : null}
+            {editSpotsOpen ? (
+              <AdminSpotEditBlock
+                lineup={lineup}
+                mapSlug={mapSlug}
+                radarImageUrl={radarImageUrl}
+                displayName={displayName}
+                onCancel={() => setEditSpotsOpen(false)}
+                onSaved={() => {
+                  setEditSpotsOpen(false);
+                  onSpotsSaved();
+                }}
+              />
+            ) : null}
+          </TabsContent>
+        ) : null}
+      </Tabs>
     </article>
   );
 }

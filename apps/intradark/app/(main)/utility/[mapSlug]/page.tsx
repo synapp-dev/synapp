@@ -3,8 +3,7 @@ import { notFound } from "next/navigation";
 
 import { getSessionUserId } from "@/entities/admin/lib/auth-session";
 import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
-import { hasRoleSlug } from "@/entities/admin/lib/role-slugs";
-import { ROLE_DEVELOPER } from "@/entities/admin/lib/rbac-constants";
+import { hasUtilityEditorRole } from "@/entities/utility-lineups/lib/roles";
 import { MainSectionShell } from "@/components/organisms/main-section-shell";
 import { UtilityMapFiltersBar } from "@/entities/utility-lineups/components/utility-map-filters-bar";
 import { UtilityMapRadarClient } from "@/entities/utility-lineups/components/utility-map-radar-client";
@@ -42,7 +41,7 @@ export default async function UtilityMapPage({
     getUtilityLineupUploadGateForPage(),
   ]);
   const roleSlugs = authUserId ? await getEffectiveRoleSlugsForUser(authUserId) : [];
-  const canEditUtilitySpots = hasRoleSlug(roleSlugs, ROLE_DEVELOPER);
+  const canEditUtilitySpots = hasUtilityEditorRole(roleSlugs);
 
   await track("utility_map_view", { map_slug: mapSlug });
 
