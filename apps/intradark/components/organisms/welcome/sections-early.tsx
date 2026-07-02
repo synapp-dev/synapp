@@ -102,13 +102,6 @@ export function BootHero({
 
 /* ============================================================ 01 · PLAY */
 
-const PLAY_INTEGRATIONS = [
-  "Website",
-  "Discord",
-  "In-game plugin",
-  "Anti-cheat",
-];
-
 export function PlaySection({
   persona,
   personaAvatar,
@@ -125,7 +118,7 @@ export function PlaySection({
     <SectionShell index={1}>
       <div
         ref={ref}
-        className="relative grid gap-10 lg:grid-cols-[1fr_minmax(340px,420px)] lg:items-center"
+        className="relative grid gap-10 lg:grid-cols-[1fr_minmax(340px,551px)] lg:items-center"
       >
         <div className="relative z-10 space-y-6">
           {shown && (
@@ -138,25 +131,6 @@ export function PlaySection({
                 </span>
               </Headline>
               <Lede>No mutes. No rogue heroes. No 5 stacks in PUGs.</Lede>
-              <div className="flex flex-wrap gap-2">
-                {PLAY_INTEGRATIONS.map((l, i) => (
-                  <StaggeredAnimation
-                    key={l}
-                    index={i}
-                    fadeDirection="up"
-                    chainFromZero
-                    incrementDelay={0.08}
-                    reducedMotion={reduced}
-                  >
-                    <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-white/70">
-                      {l}
-                    </span>
-                  </StaggeredAnimation>
-                ))}
-              </div>
-              <p className="font-mono text-[0.65rem] uppercase tracking-[0.24em] text-white/35">
-                queue → accept → draft → discord → veto → positions → live
-              </p>
             </>
           )}
         </div>

@@ -422,64 +422,7 @@ function StageBody({
   }
 
   if (stage === "veto") {
-    return (
-      <div className="flex flex-1 flex-col">
-        <div className="mb-3 text-center font-stratum text-sm font-black uppercase tracking-widest text-white/80">
-          Alternating map bans
-        </div>
-        <div className="flex flex-1 flex-col justify-center gap-1.5">
-          {VETO_MAPS.map((m, i) => {
-            const banStep = VETO_BAN_ORDER.indexOf(i);
-            const banned = banStep >= 0;
-            const isDecider = m.name === "Mirage";
-            return (
-              <div
-                key={m.name}
-                className={cn(
-                  "flex items-center gap-2 rounded-md border px-2 py-1 transition-all",
-                  isDecider
-                    ? "border-[var(--brand-intradark-primary)]/60 bg-[var(--brand-intradark-primary)]/15"
-                    : "border-white/10 bg-white/[0.03]",
-                )}
-                ref={(el) => {
-                  if (!el || reduced) return;
-                  if (banned) {
-                    window.setTimeout(
-                      () => {
-                        el.style.opacity = "0.28";
-                        el.style.textDecoration = "line-through";
-                      },
-                      (0.4 + banStep * 0.42) * 1000,
-                    );
-                  }
-                }}
-              >
-                <Image
-                  src={`/images/steam/maps/${m.badge}-badge.png`}
-                  alt=""
-                  width={20}
-                  height={20}
-                  className="h-6 w-auto object-contain"
-                />
-                <span
-                  className={cn(
-                    "flex-1 text-xs font-semibold uppercase tracking-wide",
-                    isDecider ? "text-[#9fd3f2]" : "text-white/70",
-                  )}
-                >
-                  {m.name}
-                </span>
-                {isDecider && (
-                  <span className="rounded bg-[var(--brand-intradark-primary)]/30 px-1.5 py-0.5 text-[0.55rem] font-bold uppercase text-[#9fd3f2]">
-                    Decider
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+    return <VetoStage reduced={reduced} />;
   }
 
   if (stage === "positions") {
@@ -567,6 +510,102 @@ function StageBody({
   }
 
   return <ConnectStage reduced={reduced} />;
+}
+
+/** Maps sit in a center column; each ban slides in a "Team A"/"Team B" tag on
+ *  the side of the team that banned it. The lone survivor only picks up the
+ *  blue "Decider" treatment once every other map has been banned. */
+function VetoStage({ reduced }: { reduced: boolean }) {
+  const [revealCount, setRevealCount] = React.useState(
+    reduced ? VETO_BAN_ORDER.length : 0,
+  );
+
+  React.useEffect(() => {
+    if (reduced) return;
+    const timers = VETO_BAN_ORDER.map((_, step) =>
+      window.setTimeout(
+        () => setRevealCount((n) => Math.max(n, step + 1)),
+        (0.4 + step * 0.42) * 1000,
+      ),
+    );
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [reduced]);
+
+  const deciderRevealed = revealCount >= VETO_BAN_ORDER.length;
+
+  return (
+    <div className="flex flex-1 flex-col">
+      <div className="mb-3 text-center font-stratum text-sm font-black uppercase tracking-widest text-white/80">
+        Alternating map bans
+      </div>
+      <div className="flex flex-1 flex-col justify-center gap-1.5">
+        {VETO_MAPS.map((m, i) => {
+          const banStep = VETO_BAN_ORDER.indexOf(i);
+          const banned = banStep >= 0 && banStep < revealCount;
+          const isDecider = banStep === -1 && deciderRevealed;
+          const team = banStep >= 0 ? (banStep % 2 === 0 ? "A" : "B") : null;
+          return (
+            <div
+              key={m.name}
+              className="grid grid-cols-[3.75rem_1fr_3.75rem] items-center gap-1.5"
+            >
+              <div className="flex justify-end">
+                {banned && team === "A" && (
+                  <span
+                    className="rounded bg-sky-400/15 px-1 py-0.5 text-[0.5rem] font-bold uppercase text-sky-300"
+                    style={{ animation: "slide-left-fade-in 0.3s ease-out both" }}
+                  >
+                    Team A
+                  </span>
+                )}
+              </div>
+              <div
+                className={cn(
+                  "flex items-center gap-2 rounded-md border px-2 py-1 transition-all duration-300",
+                  isDecider
+                    ? "border-[var(--brand-intradark-primary)]/60 bg-[var(--brand-intradark-primary)]/15"
+                    : "border-white/10 bg-white/[0.03]",
+                  banned && "opacity-30",
+                )}
+              >
+                <Image
+                  src={`/images/steam/maps/${m.badge}-badge.png`}
+                  alt=""
+                  width={20}
+                  height={20}
+                  className="h-6 w-auto object-contain"
+                />
+                <span
+                  className={cn(
+                    "flex-1 text-xs font-semibold uppercase tracking-wide",
+                    banned && "line-through",
+                    isDecider ? "text-[#9fd3f2]" : "text-white/70",
+                  )}
+                >
+                  {m.name}
+                </span>
+                {isDecider && (
+                  <span className="rounded bg-[var(--brand-intradark-primary)]/30 px-1.5 py-0.5 text-[0.55rem] font-bold uppercase text-[#9fd3f2]">
+                    Decider
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-start">
+                {banned && team === "B" && (
+                  <span
+                    className="rounded bg-orange-400/15 px-1 py-0.5 text-[0.5rem] font-bold uppercase text-orange-300"
+                    style={{ animation: "slide-right-fade-in 0.3s ease-out both" }}
+                  >
+                    Team B
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 /** A Discord-styled voice hub: 10 players start in Lobby, get pulled one-by-one
