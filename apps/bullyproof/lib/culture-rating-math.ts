@@ -73,6 +73,8 @@ function pctChangeNumeratorDenominator(
   lowerIsBetter: boolean
 ): number | null {
   if (before == null || after == null) return null;
+  // Zero in both periods is "no change", not an unknown.
+  if (before === 0 && after === 0) return 0;
   if (before === 0) return null;
   const raw = ((after - before) / before) * 100;
   return lowerIsBetter ? -raw : raw;
@@ -106,26 +108,30 @@ export function compareToBenchmark(
     true
   );
 
-  const wAtt =
-    attendanceRateChangePercent != null
-      ? CULTURE_RATING_WEIGHTS.attendance * attendanceRateChangePercent
-      : null;
-  const wBeh =
-    behaviourIncidentsRateChangePercent != null
-      ? CULTURE_RATING_WEIGHTS.behaviour * behaviourIncidentsRateChangePercent
-      : null;
-  const wSus =
-    suspensionsRateChangePercent != null
-      ? CULTURE_RATING_WEIGHTS.suspensions * suspensionsRateChangePercent
-      : null;
-  const wExc =
-    exclusionsRateChangePercent != null
-      ? CULTURE_RATING_WEIGHTS.exclusions * exclusionsRateChangePercent
-      : null;
-
+  // A metric with no measurable change (e.g. zero-base denominator) drops out
+  // and its weight is re-distributed proportionally across the metrics that
+  // do have data, so the headline works with any subset of inputs.
+  const components: Array<{ weight: number; value: number | null }> = [
+    { weight: CULTURE_RATING_WEIGHTS.attendance, value: attendanceRateChangePercent },
+    { weight: CULTURE_RATING_WEIGHTS.behaviour, value: behaviourIncidentsRateChangePercent },
+    { weight: CULTURE_RATING_WEIGHTS.suspensions, value: suspensionsRateChangePercent },
+    { weight: CULTURE_RATING_WEIGHTS.exclusions, value: exclusionsRateChangePercent },
+  ];
+  const available = components.filter(
+    (component): component is { weight: number; value: number } =>
+      component.value != null
+  );
+  const availableWeight = available.reduce(
+    (sum, component) => sum + component.weight,
+    0
+  );
   const cultureRatingPercent =
-    wAtt != null && wBeh != null && wSus != null && wExc != null
-      ? wAtt + wBeh + wSus + wExc
+    available.length > 0 && availableWeight > 0
+      ? available.reduce(
+          (sum, component) =>
+            sum + (component.weight / availableWeight) * component.value,
+          0
+        )
       : null;
 
   return {
