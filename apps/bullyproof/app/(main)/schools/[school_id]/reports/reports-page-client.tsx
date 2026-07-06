@@ -89,10 +89,10 @@ export function ReportsPageClient({ schoolSlug }: ReportsPageClientProps) {
                 Coming Soon
               </Badge>
               <h2 className="text-xl font-semibold mb-2">
-                Reports will be available after Term 1
+                Reports will be available soon
               </h2>
               <p className="text-muted-foreground">
-                Check back after Term 1 to generate and download school reports.
+                Check back soon to generate and download school reports.
               </p>
             </div>
           </CardContent>

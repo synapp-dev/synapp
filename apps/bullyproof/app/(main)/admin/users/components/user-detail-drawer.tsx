@@ -483,7 +483,7 @@ function UserDetailDrawerContent({
         });
 
         if (result.error) {
-          const errorMessage = result.error.message || "Failed to assign role";
+          const errorMessage = result.error.message || "Failed to assign access level";
           setToggleRoleError(errorMessage);
           setIsTogglingRole(false);
           return;
@@ -530,7 +530,7 @@ function UserDetailDrawerContent({
 
           if (result.error) {
             const errorMessage =
-              result.error.message || "Failed to remove role";
+              result.error.message || "Failed to remove access level";
             setToggleRoleError(errorMessage);
             setIsTogglingRole(false);
             return;
@@ -564,7 +564,7 @@ function UserDetailDrawerContent({
 
             if (result.error) {
               const errorMessage =
-                result.error.message || "Failed to remove role";
+                result.error.message || "Failed to remove access level";
               setToggleRoleError(errorMessage);
               setIsTogglingRole(false);
               return;
@@ -611,8 +611,8 @@ function UserDetailDrawerContent({
       setIsTogglingRole(false);
       setRoleToToggle(null);
     } catch (err: any) {
-      console.error("Failed to toggle role:", err);
-      const errorMessage = err.message || "Failed to toggle role";
+      console.error("Failed to update access level:", err);
+      const errorMessage = err.message || "Failed to update access level";
       setToggleRoleError(errorMessage);
       setIsTogglingRole(false);
       // Keep roleToToggle set on error so user can see which one failed
@@ -632,7 +632,7 @@ function UserDetailDrawerContent({
       });
 
       if (result.error) {
-        alert(result.error.message || "Failed to remove role");
+        alert(result.error.message || "Failed to remove access level");
         return;
       }
 
@@ -643,8 +643,8 @@ function UserDetailDrawerContent({
       // Refresh user data
       onUserUpdate?.();
     } catch (err: any) {
-      console.error("Failed to remove role:", err);
-      alert(err.message || "Failed to remove role");
+      console.error("Failed to remove access level:", err);
+      alert(err.message || "Failed to remove access level");
     } finally {
       setIsRemovingRole(false);
     }
@@ -701,7 +701,7 @@ function UserDetailDrawerContent({
 
           if (result.error) {
             const errorMessage =
-              result.error.message || "Failed to assign role";
+              result.error.message || "Failed to assign access level";
             setToggleRoleError(errorMessage);
             setIsSavingRoles(false);
             return;
@@ -737,8 +737,8 @@ function UserDetailDrawerContent({
       // Refresh user data
       onUserUpdate?.();
     } catch (err: any) {
-      console.error("Failed to save roles:", err);
-      const errorMessage = err.message || "Failed to save roles";
+      console.error("Failed to save access levels:", err);
+      const errorMessage = err.message || "Failed to save access levels";
       setToggleRoleError(errorMessage);
     } finally {
       setIsSavingRoles(false);
@@ -756,7 +756,7 @@ function UserDetailDrawerContent({
         roleId,
       });
       if (result.error) {
-        setToggleRoleError(result.error.message || "Failed to assign role");
+        setToggleRoleError(result.error.message || "Failed to assign access level");
         return;
       }
       setIsAddRoleDialogOpen(false);
@@ -766,7 +766,7 @@ function UserDetailDrawerContent({
     } catch (err: unknown) {
       console.error("Failed to assign platform role:", err);
       setToggleRoleError(
-        err instanceof Error ? err.message : "Failed to assign role",
+        err instanceof Error ? err.message : "Failed to assign access level",
       );
     } finally {
       setIsSavingRoles(false);
@@ -992,11 +992,12 @@ function UserDetailDrawerContent({
                         <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 w-full">
                           <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
                           <AlertTitle className="text-yellow-800 dark:text-yellow-200">
-                            Platform Role Restriction
+                            Platform Access Level Restriction
                           </AlertTitle>
                           <AlertDescription className="text-yellow-700 dark:text-yellow-300">
                             This user is a '{platformRoleName}' and can only
-                            have one role. They cannot have any other roles.
+                            have one access level. They cannot have any other
+                            access levels.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -1004,11 +1005,11 @@ function UserDetailDrawerContent({
                         <Alert className="border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20 w-full">
                           <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
                           <AlertTitle className="text-yellow-800 dark:text-yellow-200">
-                            School Role Restriction
+                            School Access Level Restriction
                           </AlertTitle>
                           <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-                            This user has school roles and cannot have platform
-                            roles.
+                            This user has school access levels and cannot have
+                            platform access levels.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -1030,7 +1031,7 @@ function UserDetailDrawerContent({
                         disabled={!canMutateTargetUser}
                       >
                         <UserPlus className="h-4 w-4" />
-                        Add New Role
+                        Add New Access Level
                       </Button>
                     </FeatureGuard>
                   )}

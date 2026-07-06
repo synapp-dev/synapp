@@ -122,15 +122,15 @@ export function PlatformRoleSwapDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Change platform role</DialogTitle>
+          <DialogTitle>Change platform access level</DialogTitle>
           <DialogDescription>
-            Select a new platform role for {userDisplayName}. School roles
-            cannot be combined with a platform role.
+            Select a new platform access level for {userDisplayName}. School
+            access levels cannot be combined with a platform access level.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
           {swapOptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No other roles available.</p>
+            <p className="text-sm text-muted-foreground">No other access levels available.</p>
           ) : (
             <RadioGroup
               value={selectedRoleId}

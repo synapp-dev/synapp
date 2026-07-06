@@ -463,20 +463,21 @@ export function SchoolRoleAssignmentDialog({
                 onValueChange={(v) => setAssignTab(v as "school" | "platform")}
               >
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="school">School roles</TabsTrigger>
-                  <TabsTrigger value="platform">Platform role</TabsTrigger>
+                  <TabsTrigger value="school">School access levels</TabsTrigger>
+                  <TabsTrigger value="platform">Platform access level</TabsTrigger>
                 </TabsList>
                 <TabsContent value="school" className="space-y-4 pt-4">
                   {schoolForm}
                 </TabsContent>
                 <TabsContent value="platform" className="space-y-4 pt-4">
                   <p className="text-sm text-muted-foreground">
-                    Assign a global platform role. This user cannot have school
-                    roles while they hold a platform role.
+                    Assign a global platform access level. This user cannot have
+                    school access levels while they hold a platform access
+                    level.
                   </p>
                   {platformPickerRoles.length === 0 ? (
                     <p className="text-sm text-destructive">
-                      No platform roles found in directory.
+                      No platform access levels found in directory.
                     </p>
                   ) : (
                     <RadioGroup

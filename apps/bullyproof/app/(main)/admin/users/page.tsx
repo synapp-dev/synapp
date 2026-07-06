@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import type { SortingState } from "@tanstack/react-table";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { useUsers, useAllUsers, useRoles } from "@/entities/users/model/store";
 
@@ -105,6 +106,18 @@ function AdminUsersPageContent() {
   const pageIndex = pageIndexParam >= 0 ? pageIndexParam : 0;
   const offset = pageSize === -1 ? 0 : pageIndex * pageSize;
 
+  // Column sorting is server-side: pagination spans many pages (item 28 defect)
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const activeSort = sorting[0];
+  const sortBy = activeSort
+    ? activeSort.id === "lastLoginAt"
+      ? ("lastActive" as const)
+      : activeSort.id === "createdAt"
+        ? ("createdAt" as const)
+        : ("name" as const)
+    : undefined;
+  const sortDir = activeSort ? (activeSort.desc ? "desc" : "asc") : undefined;
+
   // Use React Query hooks for data fetching with filters
   const {
     users,
@@ -118,6 +131,8 @@ function AdminUsersPageContent() {
     schoolId: schoolFilter || undefined,
     limit: pageSize,
     offset: offset,
+    sortBy,
+    sortDir,
   });
 
   const {
@@ -588,7 +603,7 @@ function AdminUsersPageContent() {
                 <SelectValue placeholder="Access Level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="all">All Access Levels</SelectItem>
                 <SelectItem value="__NONE__">None</SelectItem>
                 {availableRoles.length > 0 ? (
                   availableRoles.map((role) => {
@@ -732,6 +747,8 @@ function AdminUsersPageContent() {
             totalCount={totalCount}
             onPageChange={handlePageChange}
             onPageSizeChange={handlePageSizeChange}
+            sorting={sorting}
+            onSortingChange={setSorting}
             isRowSelectionLocked={(u) =>
               !canManageIntradarkDevScopedUser(
                 realViewer?.platformRoles,
