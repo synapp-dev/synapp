@@ -26,7 +26,7 @@
 
 ## Still open (tracked)
 
-- D6 Administrator User Guide + System Administrator Guide (in progress)
+- D6 Administrator User Guide + System Administrator Guide: markdown drafts complete at docs/handover/{admin-user-guide,system-administrator-guide}.md; convert to Word at packaging
 - D7 Bill of Materials (scripted at handover)
 - Woodford weighting constants (blocked on Glenn confirming the 25 April mapping)
 - Production Supabase auth settings spot-check at deploy (sessions not timeboxed)
