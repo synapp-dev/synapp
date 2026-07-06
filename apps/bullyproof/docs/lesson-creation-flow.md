@@ -36,11 +36,11 @@ A summary screen shows the selected classes, topic, and teacher name. The user c
 
 A `POST /api/lessons` call triggers:
 
-1. Server-side input validation.
-2. Authorization checks (feature access and role-based).
-3. A database transaction that inserts the lesson record and links it to the selected classes via the `lessonClasses` junction table.
+1. Server-side input validation (`lessons.validators.ts`).
+2. Authorization and owner resolution (`create-lesson.ts` → `lesson-access-policy.ts`).
+3. A database transaction that inserts the lesson record and links it to the selected classes via the `lessonClasses` junction table (`lessons.repo.ts`).
 
-The lesson is created with status `preparing`.
+The lesson is created with status `preparing` (or `ready` when the teacher chooses "Start lesson" from the wizard).
 
 ### 7. Redirect
 
@@ -52,11 +52,12 @@ The user is redirected to the new lesson's page at `/schools/{schoolSlug}/lesson
 
 | File | Role |
 | --- | --- |
-| `components/organisms/lesson-wizard.tsx` | Main wizard orchestrator |
-| `components/organisms/lesson-wizard-classes.tsx` | Step 1 -- Class selection |
-| `components/organisms/lesson-wizard-recommendation.tsx` | Step 2 -- Recommendations |
-| `components/organisms/lesson-wizard-topic.tsx` | Step 3 -- Topic selection |
-| `components/organisms/lesson-wizard-confirm.tsx` | Step 4 -- Confirmation |
+| `components/organisms/lesson-wizard.tsx` | Wizard shell (drawer, URL sync, data fetching) |
+| `components/organisms/lesson-wizard-classes.tsx` | Step 1 — Class selection |
+| `components/organisms/lesson-wizard-recommendation.tsx` | Step 2 — Recommendations display |
+| `components/organisms/lesson-wizard-topic.tsx` | Step 3 — Topic selection |
+| `components/organisms/lesson-wizard-confirm.tsx` | Step 4 — Confirmation |
+| `entities/lessons/lesson-creation/` | Wizard navigation, proceed guards, create payload builder |
 | `app/(main)/schools/[school_id]/lessons/page.tsx` | Lessons list page (triggers wizard) |
 
 ### API Layer
@@ -66,14 +67,20 @@ The user is redirected to the new lesson's page at `/schools/{schoolSlug}/lesson
 | `app/api/lessons/route.ts` | Create lesson endpoint |
 | `app/api/lessons/recommendations/route.ts` | Recommendations endpoint |
 | `entities/lessons/api/endpoints.ts` | Client-side API wrapper |
+| `types/lesson-create.ts` | Shared create request type |
+| `types/lesson-recommendations.ts` | Shared recommendation response type |
 
 ### Server Layer
 
 | File | Role |
 | --- | --- |
-| `server/lessons/lessons.service.ts` | Business logic |
+| `server/lessons/create-lesson.ts` | Create orchestration (auth, owner, metadata, repo) |
+| `server/lessons/recommendation-orchestrator.ts` | Recommendation orchestration |
+| `server/lessons/lessons.service.ts` | Thin service facade |
 | `server/lessons/lessons.repo.ts` | Database operations |
 | `server/lessons/lessons.validators.ts` | Input validation |
+| `server/lessons/lesson-access-policy.ts` | Permission rules |
+| `lib/lesson-lifecycle/` | Status → page redirects, invalidation keys, live-store effects |
 
 ### Data Model
 

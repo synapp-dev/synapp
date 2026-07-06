@@ -1,0 +1,99 @@
+BULLYPROOF — Change Request
+One-page summary · gap analysis & indicative pricing · 22 June 2026
+
+60 requested features across 14 areas. Indicative total $349,250 AUD ex-GST (~317.5 engineering days @ $1,100/day — the market contract rate for a senior full-stack React / Next.js developer billing direct as a company, AU FY25/26).
+7
+EXISTS
+29
+PARTIAL
+24
+MISSING
+
+Cost roll-up by section
+Sec
+Section
+Items
+Days
+Indicative price
+A
+Admin — Home / Dashboard
+9
+64.5
+$70,950
+B
+School Terms / Schedule Engine
+4
+29.5
+$32,450
+C
+Culture Rating
+4
+11.5
+$12,650
+D
+Content Types (Multi-Curriculum)
+4
+29.5
+$32,450
+E
+Content Management / Security
+4
+21.5
+$23,650
+F
+Getting Started Videos
+1
+7.5
+$8,250
+G
+Add New School
+1
+3.5
+$3,850
+H
+Roles / Access Levels
+3
+14
+$15,400
+I
+Branding
+1
+12
+$13,200
+J
+AP Certificate
+2
+11
+$12,100
+K
+Reports (Admin)
+4
+22.5
+$24,750
+L
+Onboarding
+5
+20.5
+$22,550
+M
+School Portal
+17
+62.5
+$68,750
+N
+Documentation
+1
+7.5
+$8,250
+TOTAL
+60
+317.5
+$349,250 AUD
+
+Where the cost is
+XL foundational: schedule engine (Items 3+12) + dependent dashboard columns (8); multi-curriculum content types (18). These two areas dominate.
+Large: program-year model (5), government reporting (36), BP→BA rebrand (31), content audit-log & versioning (24/25), onboarding service-steps (38), certificate template (33), school & admin reports (47/59), year-reset (54), performance comparison (56), documentation (60).
+Quick wins / already done: tooltips (46), class star toggle (50) and support mailto (58) are complete; test-school exclusion (37), Class Size on Add (42), remove Ctrl+K (44), header renames (45) and default-5-stars (55) are ≤1 day each.
+Two reported defects already appear fixed/near-trivial: address & email-domain saving (39) and support mailto (58).
+
+Figures are indicative engineering effort for scoping, ex-GST (add 10% on invoice), excluding design, content authoring, UAT and PM unless noted. Full per-item detail in the companion document “Bullyproof — Change Request Gap Analysis & Pricing”.

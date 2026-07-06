@@ -1,0 +1,803 @@
+BULLYPROOF
+Change Request — Gap Analysis & Indicative Pricing
+
+Prepared for client review · pricing & scoping
+Date: 22 June 2026
+Scope: apps/bullyproof (Next.js · Supabase / Drizzle) + shared packages
+Indicative total: $920,750 AUD  ·  ~317.5 engineering days  ·  $2,900/day
+Read-only codebase audit. No application code was modified in producing this document.
+Contents
+
+TOC \h \o "1-1"
+
+How to read this document
+
+Each requested feature is assessed against the current codebase and given a build status, an effort band and an indicative price. Items are grouped by the client’s change-request headings. Every section and every item begins on its own page.
+
+Basis of estimate
+Pricing uses a day rate derived from the historical delivery benchmark for this platform: approximately $250,000 AUD for ~4 months of full-time delivery of the existing Bullyproof codebase (~86 working days), i.e. ≈ $2,900 AUD per working day. Item estimates are engineering effort only and exclude design iteration, content authoring, UAT and project management unless noted. Ranges are indicative for scoping, not a fixed quote.
+
+Build status
+Status
+Meaning
+EXISTS
+Fully built and working today. No build (or verify-only).
+PARTIAL
+Scaffolding or closely related code exists; needs extension to meet the request.
+MISSING
+Not present in the codebase. Net-new build.
+
+Effort bands & price mapping
+Band
+Effort (days)
+Indicative price range
+Description
+S
+0.5 – 1
+$1,450 – $2,900
+Small / quick win
+M
+2 – 5
+$5,800 – $14,500
+Medium
+L
+5 – 10
+$14,500 – $29,000
+Large
+XL
+10+
+$29,000 – $58,000+
+Extra large / foundational
+
+Per-item price = estimated days × $2,900 AUD/day. Compound items (e.g. “S + M”) are estimated as a single blended figure.
+Executive summary
+
+This analysis covers 60 requested features across 14 areas of the Bullyproof platform. Indicative total: $920,750 AUD (~317.5 engineering days at $2,900/day).
+
+EXISTS
+PARTIAL
+MISSING
+7
+29
+24
+fully built
+needs extension
+net-new build
+
+Cost roll-up by section
+Sec
+Section
+Days
+Indicative price
+A
+Admin — Home / Dashboard
+64.5
+$187,050
+B
+School Terms / Schedule Engine
+29.5
+$85,550
+C
+Culture Rating
+11.5
+$33,350
+D
+Content Types (Multi-Curriculum)
+29.5
+$85,550
+E
+Content Management / Security
+21.5
+$62,350
+F
+Getting Started Videos
+7.5
+$21,750
+G
+Add New School
+3.5
+$10,150
+H
+Roles / Access Levels
+14
+$40,600
+I
+Branding
+12
+$34,800
+J
+AP Certificate
+11
+$31,900
+K
+Reports (Admin)
+22.5
+$65,250
+L
+Onboarding
+20.5
+$59,450
+M
+School Portal
+62.5
+$181,250
+N
+Documentation
+7.5
+$21,750
+TOTAL
+317.5
+$920,750 AUD
+
+Largest build efforts (XL)
+Items 3 + 12 — Schedule engine (term calendars × 8 states, cadence math, class→school aggregation), and the Item 8 dashboard columns that depend on it. ~$120k+ combined.
+Item 18 — Multi-curriculum / Content Types (new top-level entity rippling through schema, routing and every editor).
+
+Significant efforts (L – L/XL)
+Program-year model (5), government reporting (36), BP→BA rebrand (31), content audit-log + versioning (24/25), onboarding service-steps (38), certificate-template system (33), school reports (47/59), year-reset (54), performance comparison (56), documentation (60).
+
+Quick wins (S — mostly done or trivial)
+Test-school exclusion (37), Class Size on Add (42), remove Ctrl+K (44), page-header renames (45), default-5-stars (55), unified CTA (48). Items 46, 50 and 58 are already done (no cost).
+
+Notes for the commercial review
+Two reported defects already appear resolved or near-trivial: Item 39 (address/email-domain persistence chain is intact) and Item 58 (support mailto already wired).
+Dead / orphaned code to note: lesson-wizard-schedule.tsx (unused), lessons/[lesson_id]/deliver/page.tsx (legacy, no take-over) and lessons/[lesson_id]/history/page.tsx (hardcoded dummy data).
+Much of the admin work is already designed in docs/features/admin-dashboard-redesign/ (program-health + schedule-engine), which de-risks the XL estimates.
+A. Admin — Home / Dashboard
+
+9 items  ·  ~64.5 days  ·  $187,050 AUD
+Item 1.  Admin landing / dashboard (to be replaced)
+
+STATUS   EXISTS
+
+EFFORT   —   ·   no build (delivered / verify-only)
+
+Assessment
+The dashboard to be replaced is /dashboard (hero + 4 quick-action cards + 4 snapshot metric cards). /admin is a separate tools-launcher grid. Both render today. No build — replacement is captured by Items 2–9.
+Key files / paths
+app/(main)/dashboard/page.tsxentities/dashboard/ui/admin/admin-dashboard.tsxapp/(main)/admin/page.tsx
+Item 2.  Total Schools vs Active (onboarding-complete) Schools
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Total schools and an “active licence” count exist. An “active = onboarding-complete” count and Ahead/Behind summary cards do not. resolveSchoolStatus() exists but is not aggregated into a dashboard summary.
+Key files / paths
+entities/dashboard/ui/admin/sections/overview/overview-section.tsxentities/dashboard/ui/admin/sections/reports/reports-overview-content.tsx
+Item 3.  Per-school schedule status (On / Ahead / Slightly Behind / Behind)
+
+STATUS   MISSING
+
+EFFORT   XL   ·   ~15 days   ·   $43,500 AUD
+
+Assessment
+No schedule engine, no term-calendar table, no cadence math anywhere in code. Fully designed in the redesign docs but zero implementation.
+Key files / paths
+docs/features/admin-dashboard-redesign/schedule-engine/ (design only)
+Build scope
+Term calendars (8 states), cadence rules, class→school aggregation, status API. Depends on the schedule engine (Item 12).
+Item 4.  “This School Year” / program-year selector (multi-year)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+No multi-program-year selector anywhere. Reports have an all-schools / per-school scope combobox only. Depends on the program-year data model (Item 5).
+Key files / paths
+entities/dashboard/ui/admin/sections/reports/reports-layout-shell.tsx
+Item 5.  Data model: each school’s initial year vs ongoing years
+
+STATUS   MISSING
+
+EFFORT   L–XL   ·   ~12 days   ·   $34,800 AUD
+
+Assessment
+No program/cohort-year concept exists. The existing schoolYears table is grade levels (Year 7 etc.), and schoolYearAssignments is which grade levels a school covers — not program years. schoolLicences has start dates but no “year 1 vs year 2” model.
+Key files / paths
+drizzle/schema.ts → schoolYears, schoolYearAssignments, schoolLicences
+Build scope
+New schema (program-year / cohort) + backfill of existing schools.
+Item 6.  Sidebar items: Manage Schools / Lessons / AP Cert / Users
+
+STATUS   EXISTS
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+Present as quick-action cards (mostly shipped). Classes and Lessons admin items are currently disabled in config.
+Key files / paths
+entities/dashboard/ui/admin/sections/overview/overview-section.tsxlib/admin-items.ts
+Item 7.  Dashboard filters: state, school level, sector, AP level, status
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+State / Sector / Status / Type filters exist on the /admin/schools table, not on a dashboard. No “AP level” filter and no Schedule filter (depends on Item 3).
+Key files / paths
+entities/dashboard/ui/admin/sections/schools/schools-section.tsx
+Item 8.  Dashboard columns (Culture trend, AP Cert %, Students, Classes, Teacher History, Lessons %, Schedule, Last Activity, Action)
+
+STATUS   PARTIAL
+
+EFFORT   L–XL   ·   ~12 days   ·   $34,800 AUD
+
+Assessment
+Current columns: Status, Name (opens drawer), Level, State, Sector, Staff, Teachers, Classes. The 9 requested columns are specced but unbuilt; several need new aggregation + the schedule engine + a culture indicator. Total Students has no source column today.
+Key files / paths
+entities/dashboard/ui/admin/sections/schools/components/schools-table-columns.tsxdocs/features/admin-dashboard-redesign/plan.md §5
+Item 9.  Drill-downs: Onboarding, Culture, AP Cert detail, Class, Lesson History, Teacher History
+
+STATUS   PARTIAL
+
+EFFORT   M×4   ·   ~10 days   ·   $29,000 AUD
+
+Assessment
+Onboarding / Culture / Class exist as drawer tabs. Lesson History, Teacher History, and per-school AP Cert % are missing. The Activity panel is a “coming soon” stub. Four drill-downs to build at ~M each.
+Key files / paths
+entities/dashboard/ui/admin/sections/schools/school-detail/panels/*
+B. School Terms / Schedule Engine
+
+4 items  ·  ~29.5 days  ·  $85,550 AUD
+Item 10.  Settings → School Terms (per-state term dates, per year, annual reset)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+No term-date data model or settings UI. The states table is id/code/name only; schoolYears is grade levels, not calendar terms. Annual reset is deferred to a follow-up cron.
+Key files / paths
+docs/features/admin-dashboard-redesign/schedule-engine/tdd.md (design only)no schoolTermCalendars table in drizzle/schema.ts
+Build scope
+Table + RLS + seed (8 states × 4 terms) + admin entry UI + annual-reset path.
+Item 11.  Term entry form (year/state/term dropdowns, date pickers, end-before-start validation)
+
+STATUS   MISSING
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+No component exists. Only a generic end ≥ start pattern exists elsewhere (culture benchmarks). Assumes the term table from Item 10 exists.
+Key files / paths
+(none — to be created under admin settings)
+Item 12.  Schedule calculation engine (progress vs Term 2 cadence, by state terms)
+
+STATUS   MISSING
+
+EFFORT   XL   ·   ~15 days   ·   $43,500 AUD
+
+Assessment
+Fully TDD-specced (getTerm2Progress, computeClassSchedule, computeSchoolSchedule) but zero code — grep returns no implementation. School status = worst class; class status by lesson cadence vs week-of-term.
+Key files / paths
+docs/features/admin-dashboard-redesign/schedule-engine/tdd.md (spec only)
+Item 13.  “Progress to End of Term 2” widget (current week, % elapsed by school days)
+
+STATUS   MISSING
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Planned in the redesign plan (termProgress: weekOfTerm, percentElapsed). Only hardcoded “Term 1/2” copy exists today. UI-only once the engine (Item 12) exists.
+Key files / paths
+docs/features/admin-dashboard-redesign/plan.md (design only)
+C. Culture Rating
+
+4 items  ·  ~11.5 days  ·  $33,350 AUD
+Item 14.  Data entry inputs (school days, attendance, absences, incidents, suspensions S/L, exclusions)
+
+STATUS   EXISTS
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+All 8 requested inputs present exactly — numeric, min 0. Built and working; only minor tweaks.
+Key files / paths
+entities/dashboard/ui/admin/sections/culture/culture-rating-metrics-fields.tsxentities/culture-rating/ui/school-culture-rating-data-form.tsx
+Item 15.  Calculation / formulas with zero-input weighting
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Weighted headline formula built but flagged interim “fitted to the sample workbook — until the official Woodford mapping is finalised.” Zero-input handling is a null-guard (returns null) rather than a zeroed weight.
+Key files / paths
+lib/culture-rating-math.tsserver/culture-ratings/culture-rating-metrics.tsserver/culture-ratings/culture-ratings.service.ts
+Item 16.  Benchmark + comparative periods (storage, rules: ≥20 days, overlap, post-program)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+≥20-school-days and non-overlap rules enforced; comparative must start after benchmark ends. The “post-program / all-lessons-delivered” rule is explicitly NOT enforced (TODO in code). Report-request → PDF upload → download flow is built.
+Key files / paths
+drizzle/schema.ts → schoolCultureBenchmarks, schoolCultureComparativePeriodsserver/culture-ratings/culture-rating-periods.ts
+Item 17.  UX: comparative-period dropdown + speedometer (±100%, expandable to 150/200%)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Comparative-period dropdown is done. The gauge is a fixed 0–100 semicircle, not the signed ±100/150/200% improvement dial requested. The component itself notes it should be refined when the official mapping lands.
+Key files / paths
+entities/culture-rating/ui/culture-rating-comparison-dashboard.tsx (SemiCircleGauge)
+D. Content Types (Multi-Curriculum)
+
+4 items  ·  ~29.5 days  ·  $85,550 AUD
+Item 18.  Add new Content Types / curricula (name, level count, level names)
+
+STATUS   MISSING
+
+EFFORT   XL   ·   ~15 days   ·   $43,500 AUD
+
+Assessment
+Two curricula are hardcoded as concepts (Curriculum and Certification). You can add a stage within the one curriculum, but cannot define a new content-type with its own level count / level names. No parent content-type table or content_type column exists.
+Key files / paths
+drizzle/schema.ts → curriculumStages, certificationCoursesentities/dashboard/ui/admin/sections/content/add-stage-sheet.tsx
+Build scope
+New top-level entity + FKs from stages/courses/topics/resources + routing + admin UI + migration of existing rows.
+Item 19.  Per-content-type lesson creation / upload
+
+STATUS   PARTIAL
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+Full slide/lesson authoring exists, but only for the two fixed trees. No mechanism to spin up authoring for a new content type.
+Key files / paths
+app/api/topic-slides/bulk-save/route.tsapp/api/certification/topics/[topicId]/slides/bulk/route.ts
+Item 20.  Content Type dropdown on Add New School
+
+STATUS   MISSING
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+The add-school wizard has Name / Level / State / Sector only. The schools table has no content-type FK. Depends on Item 18 existing first.
+Key files / paths
+entities/dashboard/ui/admin/sections/schools/components/add-school-wizard.tsx
+Item 21.  Per-content-type resources
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Resources scope to global vs a specific school and can be tagged to curriculum topics, but there is no link to a content-type level. (S if content-type is derived from the linked topic.)
+Key files / paths
+drizzle/schema.ts → resourceFiles, resourceFileTopics, resourceFolders
+E. Content Management / Security
+
+4 items  ·  ~21.5 days  ·  $62,350 AUD
+Item 22.  MFA on content edits (email verification code before saving)
+
+STATUS   MISSING
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Content edits are gated by feature permission (checkFeatureAccess) only. OTP exists at login only — never on a save action. No step-up verification.
+Key files / paths
+app/api/topic-slides/bulk-save/route.tsapp/api/certification/topics/[topicId]/slides/bulk/route.ts
+Item 23.  Sole-content-editor / content-edit permission model
+
+STATUS   PARTIAL
+
+EFFORT   S–M   ·   ~3 days   ·   $8,700 AUD
+
+Assessment
+A flexible permission gate exists (per global/role/school/user). There is no exclusive “single designated editor” lock or ownership field; multiple users can hold the permission.
+Key files / paths
+server/features/features.service.tsdrizzle/schema.ts → features, featurePermissions, permissionTemplatesapp/(main)/admin/features/
+Item 24.  Content audit log (create/edit/delete; date, user, event, content, version; comments)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+The audit-logs admin page is a placeholder stub. No app-level audit table; content mutations only console.log (“audit trail” comments are just logging).
+Key files / paths
+app/(main)/admin/audit-logs/page.tsx (stub)
+Build scope
+Audit table + write-on-mutation in every content route + report UI with filtering.
+Item 25.  Version numbers + last-updated/updated-by per lesson/module; report; read-only retention
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+No version numbering anywhere on content; no updated-by attribution on topics/slides/lessons/courses; no historical retention. Some tables carry updatedAt timestamps only.
+Key files / paths
+drizzle/schema.ts → topics, topicSlides, lessons, courseTopics (no version/updatedBy)
+F. Getting Started Videos
+
+1 item  ·  ~7.5 days  ·  $21,750 AUD
+Item 26.  Role-based getting-started videos (autoplay first login, sidebar replay, add/replace)
+
+STATUS   PARTIAL
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+One global welcome video with a binary completion flag. Not role-based, does not autoplay (requires click), no replay entry point, and not admin-manageable (URL is a hardcoded constant).
+Key files / paths
+app/(main)/welcome/page.tsx (hardcoded Vimeo URL)components/organisms/vimeo-player.tsxapp/api/me/tutorials/route.ts
+Build scope
+Role→video mapping table + admin upload/replace UI + autoplay handling + persistent replay control. Completion-tracking infra already exists.
+G. Add New School
+
+1 item  ·  ~3.5 days  ·  $10,150 AUD
+Item 27.  “Other” school level allowing arbitrary grade mixes (P-7, P-8)
+
+STATUS   MISSING
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Levels are a fixed two-value enum (primary/secondary, with “Both” mapping to both). A DB CHECK constraint restricts the key. Grades bind to a level, so true arbitrary mixes are non-trivial.
+Key files / paths
+components/molecules/invite-new-school-dialog.tsx:78drizzle/schema.ts:1420 (school_levels_key_chk)
+H. Roles / Access Levels
+
+3 items  ·  ~14 days  ·  $40,600 AUD
+Item 28.  Rename “Roles” → “Access Levels” throughout; show only highest level per user
+
+STATUS   MISSING
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Today the UI shows all roles, labelled “Roles” (~15 files). Rename is mechanical; “highest-only” can reuse existing priority maps (no migration).
+Key files / paths
+lib/platform-role-order.tscomponents/atoms/role-badges.tsxapp/(main)/admin/users/*
+Item 29.  “Amayda” access tier above Bullyproof Admin
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+AMAYDA exists only as course/certification content, never as a role/scope. Above PLATFORM_ADMIN there is only the internal INTRADARK_DEV. Role keys are hardcoded across many files.
+Key files / paths
+server/reports/admin-reports.service.ts (AMAYDA_SLUG)server/roles/roles.repo.tsserver/auth/rbac.ts
+Item 30.  School Licence account able to add/edit users (currently setup-only?)
+
+STATUS   PARTIAL
+
+EFFORT   S–M   ·   ~3 days   ·   $8,700 AUD
+
+Assessment
+User management is ongoing (a permanent settings page), not setup-only — but it is restricted to SCHOOL_ADMIN. SCHOOL_LICENCE is blocked server-side and is role-exclusive.
+Key files / paths
+server/lib/can-manage-school-users.tsscripts/enforce-school-licence-constraints.sqlapp/(main)/schools/[school_id]/settings/users/
+I. Branding
+
+1 item  ·  ~12 days  ·  $34,800 AUD
+Item 31.  Logo/icon: BP → BA everywhere, animated logo, icon variants
+
+STATUS   PARTIAL
+
+EFFORT   L–XL   ·   ~12 days   ·   $34,800 AUD
+
+Assessment
+Two static logo variants (full/mark) chosen by a ternary. No animated logo, no PWA/icon variant set, no central brand constant or <Logo> component. “Bullyproof” is hardcoded ~250 times across 83 files.
+Key files / paths
+public/images/bullyproof-logo.svg, bp-small-logo.svgcomponents/organisms/app-sidebar.tsxutils/metadata.ts
+Build scope
+New BA SVGs + favicon/PWA icon set + animated mark + brand-wide rename (best done via a brand constant + <Logo> component).
+J. AP Certificate
+
+2 items  ·  ~11 days  ·  $31,900 AUD
+Item 32.  Certificate generation on course completion; accessible/downloadable
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+A styled on-screen “AP Certified” card appears at 100% completion, but there is no PDF / print / image export and no persisted artifact. markCertificateIssued is defined but never called.
+Key files / paths
+components/molecules/topic-certificate.tsxapp/(main)/courses/[course_name]/page.tsx:734server/course-progress/course-progress.repo.ts:156
+Item 33.  Uploadable/replaceable certificate template with fields (name, date, optional cert number)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+Design, program name and badge are hardcoded in one component. No admin upload/config UI, no certificate_templates table, no cert-number field, no storage bucket.
+Key files / paths
+components/molecules/topic-certificate.tsx (hardcoded JSX)drizzle/schema.ts:1151 (certificate_type label only)
+K. Reports (Admin)
+
+4 items  ·  ~22.5 days  ·  $65,250 AUD
+Item 34.  Reports: School Status, Lesson Completion & Ratings, Culture Rating, AP Certification & Ratings
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Coverage exists but is split across /admin/reports, /admin/ratings and /admin/culture-ratings as raw counts (not %). Not unified/named as the four reports; no “School Status” report.
+Key files / paths
+app/(main)/admin/reports/{overview,certification,onboarding,lessons}app/(main)/admin/ratings/app/(main)/admin/culture-ratings/
+Item 35.  Per-report Filters panel + Export modal (CSV/Excel/PDF), export scope
+
+STATUS   MISSING
+
+EFFORT   M–L   ·   ~6 days   ·   $17,400 AUD
+
+Assessment
+Reports have only a school-scope combobox. No filters panel and no export anywhere in admin (no jsPDF/exceljs/xlsx libs present). Export infrastructure is net-new.
+Key files / paths
+entities/dashboard/ui/admin/sections/reports/reports-layout-shell.tsx
+Item 36.  Government stakeholder dashboards / reporting
+
+STATUS   MISSING
+
+EFFORT   L–XL   ·   ~12 days   ·   $34,800 AUD
+
+Assessment
+The government dashboard is a placeholder text stub; the roles/government page is a static marketing mock with non-functional buttons. No live gov reporting view.
+Key files / paths
+entities/dashboard/ui/government/government-dashboard.tsx (stub)app/(main)/support/roles/government/page.tsx (static)
+Item 37.  Exclude “Bullyproof Academy” test school from reports
+
+STATUS   MISSING
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+The seeded academy (60 classes) is counted in all reports/metrics. No test-school flag column and no exclusion filter exist.
+Key files / paths
+drizzle/0014_seed_bullyproof_academy_60_classes.sqlserver/reports/admin-reports.repo.ts
+L. Onboarding
+
+5 items  ·  ~20.5 days  ·  $59,450 AUD
+Item 38.  Onboarding checklist: Benchmark received, Jeff Horn visit, Practical Training, Onboarding Session (dates + active/locked)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+The current checklist is Essential (Licence/Admin/Staff/Classes) + Optional (domain/address/banner/avatar). None of the requested service-delivery steps exist, and there are no completion-date fields — steps are boolean-derived from counts.
+Key files / paths
+entities/dashboard/ui/admin/sections/schools/school-detail/panels/school-onboarding-panel.tsx
+Build scope
+New date-tracked checklist + backing table for the service steps.
+Item 39.  (defect) School Address & Email Domain not saving on edit
+
+STATUS   EXISTS
+
+EFFORT   S   ·   ~0.5 days   ·   $1,450 AUD
+
+Assessment
+The full persistence chain (form → validator → repo) is intact for both fields; the defect appears already fixed in current code. Verify-only / regression.
+Key files / paths
+entities/school/ui/school-details-form.tsxserver/school/school.validators.tsserver/school/school.repo.ts:452
+Item 40.  (defect/UX) Apply Template visual confirmation (Template Active / green)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+A success toast fires on apply, but there is no persistent “Template Active” badge on the card or per-school, and the dialog re-opens with an empty selection (no memory of which schools already have it).
+Key files / paths
+app/(main)/admin/features/permission-templates/page.tsx
+Item 41.  (defect) Activity / Licence / Feature Access buttons non-functional
+
+STATUS   PARTIAL
+
+EFFORT   L   ·   ~8 days   ·   $23,200 AUD
+
+Assessment
+Mixed: Licence and Feature Access panels are fully wired (verify only). The Activity panel is a hardcoded “coming soon” stub — the only genuinely non-functional one, and a real activity-feed build (~L).
+Key files / paths
+panels/school-licence-panel.tsx (✓)panels/school-features-tab.tsx (✓)panels/school-activity-panel.tsx (stub)
+Item 42.  Add Class: capture student numbers (Class Size field)
+
+STATUS   PARTIAL
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+The field exists on Edit Class (“Class Size” → studentCap) and in the table, but is absent from the Add Class dialog. It is a capacity, not enrolled count.
+Key files / paths
+entities/dashboard/ui/admin/sections/schools/school-detail/panels/school-classes-panel.tsxdrizzle/schema.ts:1236 (studentCap)
+M. School Portal
+
+17 items  ·  ~62.5 days  ·  $181,250 AUD
+Item 43.  Remove Dashboard; role-based Home pages (Staff / AP Teacher / School Admin)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~4.5 days   ·   $13,050 AUD
+
+Assessment
+/home renders one identical layout for all roles (feature-gated only). The real role-branching logic lives in the still-present /dashboard, which is the reference pattern to port and then remove.
+Key files / paths
+app/(main)/schools/[school_id]/home/page.tsxapp/(main)/dashboard/page.tsx
+Item 44.  Remove Ctrl+K command menu; keep light/dark toggle
+
+STATUS   PARTIAL
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+The Ctrl+K command menu is still mounted in the header. The light/dark toggle already exists. Removal is just deleting the mount + component.
+Key files / paths
+components/molecules/command-menu.tsxcomponents/organisms/app-header.tsx:190
+Item 45.  Rename Content → Preview Lessons, Lessons → Teach Lessons
+
+STATUS   PARTIAL
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+The sidebar is renamed, but stale labels remain: the page headers still read “Content” and “Lessons” and the breadcrumb auto-capitalises the URL segment with no override.
+Key files / paths
+app/(main)/schools/[school_id]/content/page.tsx:61app/(main)/schools/[school_id]/lessons/page.tsx:620components/molecules/breadcrumb.tsx
+Item 46.  Sidebar hover tooltips / screen-tips
+
+STATUS   EXISTS
+
+EFFORT   S   ·   no build (delivered / verify-only)
+
+Assessment
+Nav items already carry tooltips (shown when collapsed); locked items swap to a “Locked” message. Done — copy tuning only.
+Key files / paths
+components/organisms/nav-main.tsx (tooltip={title})
+Item 47.  Reports page message “available soon”
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+The school reports page is a single “Coming Soon — available after Term 1” card. None of the requested reports exist. (See Item 59.)
+Key files / paths
+app/(main)/schools/[school_id]/reports/reports-page-client.tsx
+Item 48.  AP Certification page states (Start / Continue / Course Completed)
+
+STATUS   PARTIAL
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+Rich per-topic CTA states are already computed (Begin/Continue, Start/Continue/Retake Quiz, Review slides). There is no single course-level Start/Continue/Completed button; completion swaps in the certificate card.
+Key files / paths
+app/(main)/courses/[course_name]/page.tsx
+Item 49.  Teachers list as sortable columns + take-over-lesson workflow
+
+STATUS   PARTIAL
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+Teachers render as a card grid with fixed sort — not sortable columns (a table rebuild, ~L). The take-over-lesson workflow is already fully built and feature-gated.
+Key files / paths
+app/(main)/schools/[school_id]/teachers/teachers-page-client.tsxcomponents/molecules/take-over-lesson-dialog.tsxapp/api/lessons/[id]/take-over/route.ts
+Item 50.  Classes page star toggle (My Classes / Other Classes)
+
+STATUS   EXISTS
+
+EFFORT   S   ·   no build (delivered / verify-only)
+
+Assessment
+Star toggle persists via meApi.teacherClasses.toggle; the page splits into My/Other sections with an All/My/Other filter. Built and working.
+Key files / paths
+app/(main)/schools/[school_id]/classes/page.tsx
+Item 51.  Teach Lessons defects (blank-screen, multi-level guidance, take-over, back-to-lesson)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~5 days   ·   $14,500 AUD
+
+Assessment
+Multi-level guidance and take-over are built. Residual: a blank state when recommendation resolves null with no multi-stage warning; “Back to lesson” hardcodes /prepare (dead-end loop for completed lessons); history page is dummy data.
+Key files / paths
+components/organisms/lesson-wizard*.tsxapp/(main)/schools/[school_id]/lessons/[lesson_id]/run-lesson/page.tsx
+Item 52.  Start Now vs Schedule lesson flow; scheduling (date/time, start previously-scheduled)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Both capabilities exist but are split: the wizard offers Prepare/Start only, while scheduling lives post-creation on prepare/run-lesson. The standalone schedule component is orphaned/dead code, and logic is duplicated.
+Key files / paths
+components/organisms/lesson-wizard-schedule.tsx (orphaned)app/(main)/schools/[school_id]/lessons/[lesson_id]/prepare/page.tsx
+Item 53.  Lesson recommendation issues (year ordering, loop to L1 after L10, only 3 showing, wrong lesson for mixed levels)
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~3.5 days   ·   $10,150 AUD
+
+Assessment
+Stage-complete is handled (no silent wrap to L1). Mixed-level classes resolve to the LOWEST matching stage — the likely source of “wrong recommended lesson”. The “only 3 lessons” cap is a UI limit, not the API.
+Key files / paths
+server/lessons/recommendation-engine.tsapp/api/lessons/recommendations/route.ts
+Item 54.  “Start new calendar year” reset (push classes to L1, archive prior-year audit logs)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+Backlog only (Sprint 8 in the admin-portal sprint doc) plus informational copy in the UI. No reset / promote / archive code exists.
+Key files / paths
+docs/sprints/admin-portal-sprint-jun-2026.md (planned)
+Item 55.  Lesson feedback: mandatory-rating note; default-to-5-stars option
+
+STATUS   PARTIAL
+
+EFFORT   S   ·   ~1 day   ·   $2,900 AUD
+
+Assessment
+Rating is required (UI + API). There is no default-to-5-stars option — initial state is null (“Click a star to rate”).
+Key files / paths
+components/organisms/lesson-feedback-form.tsxserver/lesson-feedback/lesson-feedback.validators.ts
+Item 56.  Performance page (enter / view comparative periods)
+
+STATUS   PARTIAL
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+Feature-gated; renders a view-only culture-rating comparison (benchmark vs comparative). Period entry happens on settings/culture-rating, not here. No general comparative metrics.
+Key files / paths
+app/(main)/schools/[school_id]/performance/performance-page-client.tsxentities/culture-rating/ui/culture-rating-comparison-dashboard.tsx
+Item 57.  Settings/Users, Settings/Classes (student numbers), Settings/Certification renames
+
+STATUS   PARTIAL
+
+EFFORT   M   ·   ~4.5 days   ·   $13,050 AUD
+
+Assessment
+Users = full management. Classes = “Class Size” on Edit only (a cap, not enrolled count, and absent from Add). Certification = read-only status table; no rename/edit of certifications/topics/stages.
+Key files / paths
+app/(main)/schools/[school_id]/settings/{users,classes,certification}/
+Item 58.  Support button → mailto support@bullyproofaustralia.org.au (+cc)
+
+STATUS   EXISTS
+
+EFFORT   S   ·   no build (delivered / verify-only)
+
+Assessment
+Verified: mailto support@bullyproofaustralia.org.au with cc jeff@… and Glenn@…. Wired into the sidebar Support item. Done.
+Key files / paths
+lib/support.ts (SUPPORT_MAILTO)
+Item 59.  School-admin reports: AP Certified Staff, AP Teacher, Class, Culture Rating (current + previous years)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+None of the four named reports exist, and there is no current/previous-year selector. (A separate culture-rating report request/download flow exists under settings.)
+Key files / paths
+app/(main)/schools/[school_id]/reports/reports-page-client.tsx (stub)
+N. Documentation
+
+1 item  ·  ~7.5 days  ·  $21,750 AUD
+Item 60.  Admin User Guide + System Administrator Guide (Word)
+
+STATUS   MISSING
+
+EFFORT   L   ·   ~7.5 days   ·   $21,750 AUD
+
+Assessment
+No end-user or system-administrator guide exists. docs/ holds only developer/internal material; support/resources shows a placeholder “User Guides” card with no linked files.
+Key files / paths
+docs/** (developer material only)app/(main)/support/resources/page.tsx (placeholder)

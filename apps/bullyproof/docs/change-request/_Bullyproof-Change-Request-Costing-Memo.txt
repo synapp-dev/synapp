@@ -1,0 +1,97 @@
+BULLYPROOF — Change Request
+Discipline costing & scope split · 23 June 2026 · all figures ex-GST
+
+This costs the change request by discipline (one specialist per category) rather than a blended day-rate, and separates what was originally agreed from scope added afterwards. Man-hours cost basis for the whole request: $251,931 (2023 hours).
+
+Headline: the originally-agreed work (content type + bug fixes) is ~$41,738 and stays on the committed ~6-week timeline. The additional scope added later is $229,394 at cost (51 items, 1843 hours) and needs its own schedule.
+1.  Cost by discipline
+
+Hours estimated per item per discipline, summed across all 60 items, priced at current AU contract day rates (direct/company, ex-GST):
+Discipline
+Hours
+Days
+Day rate
+Cost
+Design / UX
+190
+23.8
+$900
+$21,375
+Frontend (React/Next)
+732
+91.5
+$1,000
+$91,500
+Backend
+823
+102.9
+$1,050
+$108,019
+DevOps / Infra
+40
+5.0
+$1,150
+$5,750
+PM / BA / Admin
+238
+29.8
+$850
+$25,288
+TOTAL
+2023
+252.9
+
+$251,931
+
+Backend and Frontend dominate; DevOps and Design are light. Rates: Design $900, Frontend $1,000, Backend $1,050, DevOps $1,150, PM/Admin $850 per day — all editable in the companion workbook.
+2.  Original agreement vs additional scope
+
+Only the content-type switch and the bug fixes were in the original agreement. Everything else was added later and is billed separately, on its own timeline.
+Scope
+Items
+Hours
+Cost basis
+Note
+Original — bug fixes (39, 40, 51, 53)
+4
+94
+$11,738
+Within the committed ~6 weeks
+Original — content type (Item 18)
+1
+84
+$30,000
+Agreed in writing (≤$30k). Cost basis ~$10,550.
+Additional scope (added later)
+51
+1843
+$229,394
+Not in the original agreement — billed on top, own timeline
+
+Original agreement ≈ $41,738: content type at the agreed $30,000 plus 4 bug fixes (~$11,738 cost). Delivered within the committed ~6 weeks.
+Additional scope = 51 items, 1843 hours, $229,394 at cost. This is the bulk of the work and was not part of what was agreed.
+Item 41 (activity feed) is treated as additional, not a bug fix — two of its three buttons already work; the real work is building a new activity timeline.
+3.  Reasonable, firm and realistic: the pricing band
+
+The signed $30,000 for the content type is itself the strongest pricing signal: its delivery cost is only ~$10,550, so the client has already accepted roughly a 2.8× markup over cost on this work. Applying the same logic gives a defensible band:
+Basis
+Additional scope
+Whole program
+Cost floor (man-hours × market rate)
+$229,394
+$251,931
+Value basis (Item-18 precedent, ×2.8)
+$652,305
+$694,042
+
+Cost floor — the firm, conservative number: $229,394 for the additional scope ($251,931 whole program). Hard to argue down; it is market rate × honest hours.
+Value basis — what the client's own agreement implies: ~$652,305 for the additional scope. Not aggressive; it just applies the markup they already signed for one item to the rest.
+Recommendation: quote the additional scope on the cost-plus discipline basis as the floor, and hold the value figure as justified headroom in negotiation.
+4.  Timeline
+
+With one specialist per discipline working in parallel (~7 productive hours/day), calendar time is the longest single queue, not the sum of all hours:
+Original agreement (content + bugs): ~6 weeks, as committed.
+Full additional scope: backend is the critical path at ~24 weeks (823 hours). Frontend ~21 weeks. So the additional scope is a ~24-week (≈5.4-month) program with parallel help, or proportionally longer solo.
+Practical implication: the additional scope cannot be absorbed into the original 6-week window. It is a separate phase with its own schedule and price.
+
+Figures are indicative engineering effort for scoping, ex-GST (add 10% on invoice), and exclude content authoring, UAT and project management unless noted. Full per-item discipline hours are in the companion workbook “Bullyproof-Change-Request-Costing.xlsx”.

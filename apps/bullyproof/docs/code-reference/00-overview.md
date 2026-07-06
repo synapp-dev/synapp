@@ -70,5 +70,6 @@ Build output (`.next/`, `.turbo/`), dependencies, and static assets under `publi
 
 ## See also
 
+- [CONTEXT.md](../../CONTEXT.md) — domain glossary (School, Lesson, Curriculum, etc.).
 - [README.md](./README.md) in this folder — TOC and regeneration commands.
 - [../scripts/README.md](../scripts/README.md) — script-oriented notes where they exist.

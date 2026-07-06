@@ -1,0 +1,89 @@
+=== xl/worksheets/sheet1.xml ===
+Discipline rates & assumptions
+Discipline | Day rate (AUD) | Hourly (AUD)
+Design / UX | 900 | 
+Frontend (React/Next) | 1000 | 
+Backend | 1050 | 
+DevOps / Infra | 1150 | 
+PM / BA / Admin | 850 | 
+Hours per day | 8
+Note
+AU FY25/26 market contract rates, billed direct as a company (ex-GST; add 10% on invoice). Edit the day rates above — every figure in the Items and Summary sheets recalculates. Hours assume one specialist per discipline working in parallel. |  | 
+=== xl/worksheets/sheet2.xml ===
+Item | Section | Feature | Scope | Status | Design h | Frontend h | Backend h | DevOps h | PM/Admin h | Total h | Cost (AUD) | Notes
+1 | A. Admin — Home / Dashboard | Admin landing / dashboard (to be replaced) | Done/— | EXISTS | 0 | 0 | 0 | 0 | 0 |  |  | 
+2 | A. Admin — Home / Dashboard | Total Schools vs Active (onboarding-complete) Schools | Additional | PARTIAL | 3 | 8 | 10 | 0 | 2 |  |  | 
+3 | A. Admin — Home / Dashboard | Per-school schedule status (On / Ahead / Slightly Behind / Behind) | Additional | MISSING | 8 | 20 | 30 | 4 | 8 |  |  | 
+4 | A. Admin — Home / Dashboard | “This School Year” / program-year selector (multi-year) | Additional | MISSING | 4 | 16 | 16 | 0 | 4 |  |  | 
+5 | A. Admin — Home / Dashboard | Data model: each school’s initial year vs ongoing years | Additional | MISSING | 2 | 4 | 40 | 6 | 6 |  |  | 
+6 | A. Admin — Home / Dashboard | Sidebar items: Manage Schools / Lessons / AP Cert / Users | Additional | EXISTS | 0 | 5 | 0 | 0 | 1 |  |  | 
+7 | A. Admin — Home / Dashboard | Dashboard filters: state, school level, sector, AP level, status | Additional | PARTIAL | 3 | 14 | 6 | 0 | 2 |  |  | 
+8 | A. Admin — Home / Dashboard | Dashboard columns (Culture trend, AP Cert %, Students, Classes, Teacher History, Lessons %, Schedule, Last Activity, Action) | Additional | PARTIAL | 6 | 28 | 30 | 0 | 6 |  |  | 
+9 | A. Admin — Home / Dashboard | Drill-downs: Onboarding, Culture, AP Cert detail, Class, Lesson History, Teacher History | Additional | PARTIAL | 8 | 28 | 28 | 0 | 6 |  |  | 
+10 | B. School Terms / Schedule Engine | Settings → School Terms (per-state term dates, per year, annual reset) | Additional | MISSING | 4 | 16 | 20 | 4 | 4 |  |  | 
+11 | B. School Terms / Schedule Engine | Term entry form (year/state/term dropdowns, date pickers, end-before-start validation) | Additional | MISSING | 3 | 14 | 6 | 0 | 2 |  |  | 
+12 | B. School Terms / Schedule Engine | Schedule calculation engine (progress vs Term 2 cadence, by state terms) | Additional | MISSING | 2 | 6 | 60 | 6 | 8 |  |  | 
+13 | B. School Terms / Schedule Engine | “Progress to End of Term 2” widget (current week, % elapsed by school days) | Additional | MISSING | 4 | 14 | 6 | 0 | 1 |  |  | 
+14 | C. Culture Rating | Data entry inputs (school days, attendance, absences, incidents, suspensions S/L, exclusions) | Additional | EXISTS | 0 | 4 | 2 | 0 | 1 |  |  | 
+15 | C. Culture Rating | Calculation / formulas with zero-input weighting | Additional | PARTIAL | 2 | 4 | 16 | 0 | 3 |  |  | 
+16 | C. Culture Rating | Benchmark + comparative periods (storage, rules: ≥20 days, overlap, post-program) | Additional | PARTIAL | 1 | 3 | 18 | 0 | 3 |  |  | 
+17 | C. Culture Rating | UX: comparative-period dropdown + speedometer (±100%, expandable to 150/200%) | Additional | PARTIAL | 8 | 14 | 2 | 0 | 1 |  |  | 
+18 | D. Content Types (Multi-Curriculum) | Add new Content Types / curricula (name, level count, level names) | Original | MISSING | 8 | 28 | 36 | 4 | 8 |  |  | Agreed price $30,000 (value-priced; ~$10,550 at cost)
+19 | D. Content Types (Multi-Curriculum) | Per-content-type lesson creation / upload | Additional | PARTIAL | 4 | 24 | 16 | 0 | 4 |  |  | 
+20 | D. Content Types (Multi-Curriculum) | Content Type dropdown on Add New School | Additional | MISSING | 2 | 10 | 8 | 0 | 2 |  |  | 
+21 | D. Content Types (Multi-Curriculum) | Per-content-type resources | Additional | PARTIAL | 2 | 8 | 12 | 0 | 2 |  |  | 
+22 | E. Content Management / Security | MFA on content edits (email verification code before saving) | Additional | MISSING | 0 | 6 | 16 | 2 | 2 |  |  | 
+23 | E. Content Management / Security | Sole-content-editor / content-edit permission model | Additional | PARTIAL | 0 | 6 | 12 | 0 | 2 |  |  | 
+24 | E. Content Management / Security | Content audit log (create/edit/delete; date, user, event, content, version; comments) | Additional | MISSING | 2 | 14 | 28 | 0 | 4 |  |  | 
+25 | E. Content Management / Security | Version numbers + last-updated/updated-by per lesson/module; report; read-only retention | Additional | MISSING | 0 | 12 | 30 | 2 | 4 |  |  | 
+26 | F. Getting Started Videos | Role-based getting-started videos (autoplay first login, sidebar replay, add/replace) | Additional | PARTIAL | 6 | 18 | 16 | 2 | 6 |  |  | 
+27 | G. Add New School | “Other” school level allowing arbitrary grade mixes (P-7, P-8) | Additional | MISSING | 2 | 8 | 12 | 0 | 3 |  |  | 
+28 | H. Roles / Access Levels | Rename “Roles” → “Access Levels” throughout; show only highest level per user | Additional | MISSING | 2 | 14 | 6 | 0 | 3 |  |  | 
+29 | H. Roles / Access Levels | “Amayda” access tier above Bullyproof Admin | Additional | MISSING | 2 | 12 | 28 | 0 | 6 |  |  | 
+30 | H. Roles / Access Levels | School Licence account able to add/edit users (currently setup-only?) | Additional | PARTIAL | 0 | 5 | 12 | 0 | 3 |  |  | 
+31 | I. Branding | Logo/icon: BP → BA everywhere, animated logo, icon variants | Additional | PARTIAL | 36 | 30 | 0 | 6 | 6 |  |  | 
+32 | J. AP Certificate | Certificate generation on course completion; accessible/downloadable | Additional | PARTIAL | 4 | 10 | 8 | 0 | 2 |  |  | 
+33 | J. AP Certificate | Uploadable/replaceable certificate template with fields (name, date, optional cert number) | Additional | MISSING | 6 | 16 | 20 | 2 | 4 |  |  | 
+34 | K. Reports (Admin) | Reports: School Status, Lesson Completion & Ratings, Culture Rating, AP Certification & Ratings | Additional | PARTIAL | 2 | 10 | 10 | 0 | 3 |  |  | 
+35 | K. Reports (Admin) | Per-report Filters panel + Export modal (CSV/Excel/PDF), export scope | Additional | MISSING | 3 | 18 | 16 | 0 | 3 |  |  | 
+36 | K. Reports (Admin) | Government stakeholder dashboards / reporting | Additional | MISSING | 10 | 28 | 28 | 0 | 8 |  |  | 
+37 | K. Reports (Admin) | Exclude “Bullyproof Academy” test school from reports | Additional | MISSING | 0 | 0 | 5 | 0 | 1 |  |  | 
+38 | L. Onboarding | Onboarding checklist: Benchmark received, Jeff Horn visit, Practical Training, Onboarding Session (dates + active/locked) | Additional | MISSING | 4 | 18 | 20 | 0 | 6 |  |  | 
+39 | L. Onboarding | (defect) School Address & Email Domain not saving on edit | Original | EXISTS | 0 | 1 | 2 | 0 | 1 |  |  | 
+40 | L. Onboarding | (defect/UX) Apply Template visual confirmation (Template Active / green) | Original | PARTIAL | 3 | 16 | 4 | 0 | 2 |  |  | 
+41 | L. Onboarding | (defect) Activity / Licence / Feature Access buttons non-functional | Additional | PARTIAL | 3 | 20 | 28 | 0 | 4 |  |  | 
+42 | L. Onboarding | Add Class: capture student numbers (Class Size field) | Additional | PARTIAL | 0 | 5 | 2 | 0 | 1 |  |  | 
+43 | M. School Portal | Remove Dashboard; role-based Home pages (Staff / AP Teacher / School Admin) | Additional | PARTIAL | 4 | 22 | 6 | 0 | 3 |  |  | 
+44 | M. School Portal | Remove Ctrl+K command menu; keep light/dark toggle | Additional | PARTIAL | 0 | 5 | 0 | 0 | 1 |  |  | 
+45 | M. School Portal | Rename Content → Preview Lessons, Lessons → Teach Lessons | Additional | PARTIAL | 0 | 5 | 0 | 0 | 1 |  |  | 
+46 | M. School Portal | Sidebar hover tooltips / screen-tips | Done/— | EXISTS | 0 | 1 | 0 | 0 | 0 |  |  | 
+47 | M. School Portal | Reports page message “available soon” | Additional | MISSING | 4 | 18 | 20 | 0 | 6 |  |  | 
+48 | M. School Portal | AP Certification page states (Start / Continue / Course Completed) | Additional | PARTIAL | 0 | 6 | 0 | 0 | 1 |  |  | 
+49 | M. School Portal | Teachers list as sortable columns + take-over-lesson workflow | Additional | PARTIAL | 3 | 24 | 16 | 0 | 4 |  |  | 
+50 | M. School Portal | Classes page star toggle (My Classes / Other Classes) | Done/— | EXISTS | 0 | 1 | 0 | 0 | 0 |  |  | 
+51 | M. School Portal | Teach Lessons defects (blank-screen, multi-level guidance, take-over, back-to-lesson) | Original | PARTIAL | 2 | 20 | 14 | 0 | 4 |  |  | 
+52 | M. School Portal | Start Now vs Schedule lesson flow; scheduling (date/time, start previously-scheduled) | Additional | PARTIAL | 2 | 16 | 6 | 0 | 2 |  |  | 
+53 | M. School Portal | Lesson recommendation issues (year ordering, loop to L1 after L10, only 3 showing, wrong lesson for mixed levels) | Original | PARTIAL | 0 | 4 | 18 | 0 | 3 |  |  | 
+54 | M. School Portal | “Start new calendar year” reset (push classes to L1, archive prior-year audit logs) | Additional | MISSING | 0 | 12 | 28 | 2 | 6 |  |  | 
+55 | M. School Portal | Lesson feedback: mandatory-rating note; default-to-5-stars option | Additional | PARTIAL | 0 | 5 | 2 | 0 | 1 |  |  | 
+56 | M. School Portal | Performance page (enter / view comparative periods) | Additional | PARTIAL | 4 | 20 | 18 | 0 | 4 |  |  | 
+57 | M. School Portal | Settings/Users, Settings/Classes (student numbers), Settings/Certification renames | Additional | PARTIAL | 2 | 18 | 8 | 0 | 4 |  |  | 
+58 | M. School Portal | Support button → mailto support@bullyproofaustralia.org.au (+cc) | Done/— | EXISTS | 0 | 0 | 0 | 0 | 0 |  |  | 
+59 | M. School Portal | School-admin reports: AP Certified Staff, AP Teacher, Class, Culture Rating (current + previous years) | Additional | MISSING | 4 | 18 | 22 | 0 | 6 |  |  | 
+60 | N. Documentation | Admin User Guide + System Administrator Guide (Word) | Additional | MISSING | 6 | 2 | 0 | 0 | 44 |  |  | 
+ |  | TOTAL (man-hours cost) |  |  |  |  |  |  |  |  |  | 
+=== xl/worksheets/sheet3.xml ===
+Bullyproof — Change Request · Discipline costing
+By discipline
+Discipline | Hours | Day rate | Days | Cost (AUD)
+Design / UX |  |  |  | 
+Frontend (React/Next) |  |  |  | 
+Backend |  |  |  | 
+DevOps / Infra |  |  |  | 
+PM / BA / Admin |  |  |  | 
+TOTAL |  |  | 
+By scope
+Scope | Items | Hours | Cost (AUD) | Note
+Original agreement (content + bugs) |  |  |  | Committed ~6 weeks. Item 18 content type agreed at $30k.
+Additional scope (added later) |  |  |  | Billed on top, own timeline.
+TOTAL man-hours cost |  | 
