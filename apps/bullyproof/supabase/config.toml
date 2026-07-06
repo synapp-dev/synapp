@@ -181,6 +181,11 @@ max_frequency = "1s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
+# Kept short deliberately: the sign-in CODE is a security credential. The
+# SOW's ~60-day requirement is met by SESSION persistence instead - no
+# timebox / inactivity_timeout is set (see [auth.sessions] below), so signed-in
+# users stay signed in well beyond 60 days via refresh-token rotation.
+# Full position: docs/handover/auth-session-expiry.md
 otp_expiry = 3600
 
 # Use a production-ready SMTP server
