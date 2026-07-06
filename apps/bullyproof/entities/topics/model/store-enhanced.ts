@@ -1,9 +1,9 @@
+import type { TopicRow, TopicSlideRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import type { topics, topicSlides } from "@/server/db/schema";
 
-type Topic = typeof topics.$inferSelect;
-type TopicSlide = typeof topicSlides.$inferSelect & {
+type Topic = TopicRow;
+type TopicSlide = TopicSlideRow & {
   signedUrl?: string | null;
 };
 

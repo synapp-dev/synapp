@@ -1,5 +1,7 @@
 "use client";
 
+import type { CertificationCourseRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -23,9 +25,8 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Loader2, Edit, Trash2 } from "lucide-react";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { certificationCourses } from "@/server/db/schema";
 
-type Stage = typeof certificationCourses.$inferSelect & {
+type Stage = CertificationCourseRow & {
   topicCount?: number;
 };
 

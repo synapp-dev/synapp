@@ -1,5 +1,7 @@
 "use client";
 
+import type { CourseTopicQuizRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -23,9 +25,8 @@ import { Switch } from "@workspace/ui/components/switch";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { courseTopicQuizzes } from "@/server/db/schema";
 
-type Quiz = typeof courseTopicQuizzes.$inferSelect;
+type Quiz = CourseTopicQuizRow;
 
 interface EditQuizSettingsDrawerProps {
   open: boolean;

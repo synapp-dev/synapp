@@ -1,7 +1,8 @@
+import type { SchoolReadableRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { vSchoolsReadable } from "@/drizzle/schema";
+import type { SchoolRefInput, SchoolSlug } from "@/types/school";
 
-type School = typeof vSchoolsReadable.$inferSelect;
+type School = SchoolReadableRow;
 export type SchoolCertificationStatusRow = {
   userId: string;
   userName: string;
@@ -49,17 +50,19 @@ export const schoolApi = {
       const query = searchParams.toString();
       return apiFetch<School[]>(`/schools${query ? `?${query}` : ""}`);
     },
-    schoolBySlug(slug: string): Promise<ApiResult<School | null>> {
+    /** Fetch school by URL slug (not UUID). */
+    schoolBySlug(slug: SchoolSlug): Promise<ApiResult<School | null>> {
       return apiFetch<School | null>(`/schools/${encodeURIComponent(slug)}`);
     },
-    stats(schoolIdOrSlug: string): Promise<
+    /** Accepts SchoolSlug or SchoolId — server resolves via `resolveSchoolRef`. */
+    stats(schoolIdOrSlug: SchoolRefInput): Promise<
       ApiResult<{ daysBullyProof: number; startDate: string | null; teacherCount: number; totalStaff: number; classCount: number; completedLessonCount: number }>
     > {
       return apiFetch(
         `/schools/${encodeURIComponent(schoolIdOrSlug)}/stats`
       );
     },
-    keyStaff(schoolIdOrSlug: string): Promise<
+    keyStaff(schoolIdOrSlug: SchoolRefInput): Promise<
       ApiResult<{
         admins: Array<{
           id: string;

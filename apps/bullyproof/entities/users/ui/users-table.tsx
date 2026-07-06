@@ -1,5 +1,7 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
+
 import * as React from "react";
 import {
   ColumnDef,
@@ -44,11 +46,10 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { Loader2 } from "lucide-react";
 import { RoleBadges } from "@/components/atoms/role-badges";
-import type { roles } from "@/server/db/schema";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { columns } from "@/app/(main)/admin/users/components/users-table-columns";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 type User = UserWithRolesAndSchools;
 
 interface UsersTableProps {

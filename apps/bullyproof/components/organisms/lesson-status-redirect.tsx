@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLessonStatusRealtime } from "@/hooks/use-lesson-status-realtime";
+import { resolveRealtimeStatusRedirect } from "@/lib/lesson-lifecycle";
 
 interface LessonStatusRedirectProps {
   schoolId: string;
@@ -11,8 +12,7 @@ interface LessonStatusRedirectProps {
 }
 
 /**
- * Client component that listens for lesson status changes and redirects
- * to the feedback page when the lesson becomes completed or enters feedback stage
+ * Listens for lesson status changes and redirects per lifecycle rules.
  */
 export function LessonStatusRedirect({
   schoolId,
@@ -23,17 +23,15 @@ export function LessonStatusRedirect({
   const pathname = usePathname();
 
   const handleStatusChange = useCallback(
-    (newStatus: string, oldStatus: string) => {
-      // Redirect to feedback when lesson becomes completed or feedback
-      // (but not if already on feedback page)
-      if (
-        (newStatus === "completed" || newStatus === "feedback") &&
-        !pathname.includes("/feedback")
-      ) {
-        console.log(
-          `[LessonStatusRedirect] Redirecting to feedback page (status: ${oldStatus} -> ${newStatus})`
-        );
-        router.replace(`/schools/${schoolId}/lessons/${lessonId}/feedback`);
+    (newStatus: string) => {
+      const target = resolveRealtimeStatusRedirect({
+        schoolSlug: schoolId,
+        lessonId,
+        newStatus,
+        pathname,
+      });
+      if (target) {
+        router.replace(target);
       }
     },
     [pathname, router, schoolId, lessonId]

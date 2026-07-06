@@ -1,5 +1,6 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
 import * as React from "react";
 import {
   ColumnDef,
@@ -26,10 +27,9 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { cn } from "@workspace/ui/lib/utils";
 import { ShieldCheck, Users as UsersIcon, FileBadge2 } from "lucide-react";
-import type { roles } from "@/server/db/schema";
 import { columns, type User } from "./users-table-columns";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 interface UsersDataTableProps {
   onUserClick: (user: User) => void;

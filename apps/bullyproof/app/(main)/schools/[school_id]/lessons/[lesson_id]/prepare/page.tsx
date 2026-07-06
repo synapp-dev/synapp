@@ -1,5 +1,7 @@
 "use client";
 
+import type { TopicRow } from "@/types/db";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -32,8 +34,10 @@ import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useMeStore } from "@/entities/me/model/store";
 import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
+import { useFeaturesAccess } from "@/hooks/use-features-access";
+import { ACTION_FEATURES } from "@/lib/feature-keys";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { getAuthHeaders } from "@/lib/api/fetcher.client";
 import { useQueryClient } from "@tanstack/react-query";
@@ -55,9 +59,8 @@ import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
-import type { topics } from "@/server/db/schema";
 
-type Topic = typeof topics.$inferSelect & { slides?: any[] };
+type Topic = TopicRow & { slides?: any[] };
 
 export default function LessonPreparePage() {
   usePageTitle(["schools", "lessons", "prepare"]);
@@ -93,10 +96,17 @@ export default function LessonPreparePage() {
   const currentUser = useMeStore((s) => s.currentUser);
   const isLessonCreator = currentUser?.id === lessonData?.createdByUserId;
   const takeOverableStatuses = ["preparing", "ready", "in_progress"];
+  const takeOverFeatureAccess = useFeaturesAccess(
+    [ACTION_FEATURES.TAKE_OVER_LESSON],
+    lessonData?.schoolId
+  );
+  const hasTakeOverFeature =
+    takeOverFeatureAccess[ACTION_FEATURES.TAKE_OVER_LESSON]?.hasAccess ?? false;
   const canShowTakeOver =
     !isLessonCreator &&
-    lessonData?.status &&
-    takeOverableStatuses.includes(lessonData.status);
+    !!lessonData?.status &&
+    takeOverableStatuses.includes(lessonData.status) &&
+    hasTakeOverFeature;
   const isFeedbackOrCompleted =
     lessonData?.status === "feedback" || lessonData?.status === "completed";
 
@@ -545,6 +555,7 @@ export default function LessonPreparePage() {
         queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
         toast.success("You have taken over this lesson");
         setShowTakeOverDialog(false);
+        router.refresh();
       } catch (err) {
         toast.error("Failed to take over lesson", {
           description: err instanceof Error ? err.message : "Unknown error",

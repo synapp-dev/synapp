@@ -9,6 +9,7 @@ export default async function SchoolLayout({
   params: Promise<{ school_id: string }>;
 }) {
   const { school_id } = await params;
+  // Route param is always a SchoolSlug — see CONTEXT.md
   const slug = school_id;
 
   return (

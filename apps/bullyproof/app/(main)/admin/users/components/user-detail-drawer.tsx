@@ -1,5 +1,7 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
+
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -33,19 +35,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@workspace/ui/components/avatar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
+
 import {
   Alert,
   AlertDescription,
@@ -61,19 +51,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@workspace/ui/components/tabs";
+
 import {
   meApi,
   type UserWithRolesAndSchools,
@@ -83,7 +61,6 @@ import { schoolApi } from "@/entities/school/api/endpoints";
 import { usersApi } from "@/entities/users/api/endpoints";
 import { useRoles } from "@/entities/users/model/store";
 import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
-import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
   User,
@@ -134,7 +111,7 @@ import type {
   HistorySubTabType,
 } from "./user-detail-drawer/types";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 function UserDetailDrawerContent({
   user,
@@ -146,7 +123,7 @@ function UserDetailDrawerContent({
   // Use React Query hooks with Zustand caching for roles and schools
   const { roles, isLoading: loadingRoles } = useRoles();
   const { data: schools = [], isLoading: loadingSchools } = useListSchoolsQuery(
-    { limit: 100 }
+    { limit: 100 },
   );
   // Removed: editing state moved to UserDetailsCard component
 
@@ -170,7 +147,7 @@ function UserDetailDrawerContent({
   const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
   const [addRoleSchoolId, setAddRoleSchoolId] = useState<string>("");
   const [addRoleSelectedRoles, setAddRoleSelectedRoles] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [isSavingRoles, setIsSavingRoles] = useState(false);
   const [isPlatformSwapOpen, setIsPlatformSwapOpen] = useState(false);
@@ -209,9 +186,8 @@ function UserDetailDrawerContent({
   const [editSchoolRolesSchoolId, setEditSchoolRolesSchoolId] = useState<
     string | null
   >(null);
-  const [editSchoolRolesSchoolName, setEditSchoolRolesSchoolName] = useState<
-    string
-  >("");
+  const [editSchoolRolesSchoolName, setEditSchoolRolesSchoolName] =
+    useState<string>("");
   const [editSchoolRolesSelected, setEditSchoolRolesSelected] = useState<
     Set<string>
   >(new Set());
@@ -241,22 +217,22 @@ function UserDetailDrawerContent({
         ? true
         : canManageIntradarkDevScopedUser(
             realViewer?.platformRoles,
-            user.platformRoles
+            user.platformRoles,
           ),
-    [realViewer?.platformRoles, user]
+    [realViewer?.platformRoles, user],
   );
 
   const viewerIsIntradarkDev = useMemo(
     () => profileHasIntradarkDevPlatformRole(realViewer?.platformRoles),
-    [realViewer?.platformRoles]
+    [realViewer?.platformRoles],
   );
 
   const allowSchoolOrPlatformAddTab = useMemo(
     () =>
       Boolean(
-        viewerIsIntradarkDev && user && canTargetReceiveFirstPlatformRole(user)
+        viewerIsIntradarkDev && user && canTargetReceiveFirstPlatformRole(user),
       ),
-    [viewerIsIntradarkDev, user]
+    [viewerIsIntradarkDev, user],
   );
 
   // Context-aware params: schools page uses "tab" for school section, so we use userTab/userHistoryTab
@@ -277,7 +253,9 @@ function UserDetailDrawerContent({
   const rawTab = searchParams.get(tabParam) as TabType | null;
   const activeTab =
     rawTab && VALID_TAB_TYPES.includes(rawTab) ? rawTab : "details";
-  const rawHistoryTab = searchParams.get(historyParam) as HistorySubTabType | null;
+  const rawHistoryTab = searchParams.get(
+    historyParam,
+  ) as HistorySubTabType | null;
   const historySubTab =
     rawHistoryTab && VALID_HISTORY_SUB_TABS.includes(rawHistoryTab)
       ? rawHistoryTab
@@ -380,7 +358,7 @@ function UserDetailDrawerContent({
 
       // Filter out user IDs we already have
       const userIdsToFetch = Array.from(uniqueUserIds).filter(
-        (userId) => !updateLogUsers[userId]
+        (userId) => !updateLogUsers[userId],
       );
 
       if (userIdsToFetch.length === 0) {
@@ -450,7 +428,7 @@ function UserDetailDrawerContent({
 
   // Get the platform role name for display (if user has one)
   const userPlatformRoleKey = user?.platformRoles?.find((key) =>
-    PLATFORM_ROLE_KEYS.includes(key)
+    PLATFORM_ROLE_KEYS.includes(key),
   );
   const platformRole = userPlatformRoleKey
     ? roles.find((r) => r.key === userPlatformRoleKey)
@@ -462,7 +440,7 @@ function UserDetailDrawerContent({
     roleName: string,
     isPlatform: boolean,
     schoolId?: string,
-    schoolName?: string
+    schoolName?: string,
   ) => {
     if (!user) return;
 
@@ -522,7 +500,7 @@ function UserDetailDrawerContent({
             // Check if user already has STAFF at this school
             const hasStaffAtSchool = user.schoolRoles.some(
               (sr) =>
-                sr.roleKey === "SCHOOL_STAFF" && sr.schoolId === role.schoolId
+                sr.roleKey === "SCHOOL_STAFF" && sr.schoolId === role.schoolId,
             );
             if (!hasStaffAtSchool) {
               await rolesApi.post.assignRole({
@@ -562,11 +540,11 @@ function UserDetailDrawerContent({
           // If removing STAFF and user has TEACHER or SCHOOL_ADMIN, remove all roles
           if (role.willRemoveAll && role.schoolId) {
             const rolesToRemove = user.schoolRoles.filter(
-              (sr) => sr.schoolId === role.schoolId
+              (sr) => sr.schoolId === role.schoolId,
             );
             for (const schoolRole of rolesToRemove) {
               const roleToDelete = roles.find(
-                (r) => r.key === schoolRole.roleKey
+                (r) => r.key === schoolRole.roleKey,
               );
               if (roleToDelete) {
                 await rolesApi.delete.removeRole({
@@ -596,17 +574,17 @@ function UserDetailDrawerContent({
             if (role.roleKey === "TEACHER" || role.roleKey === "SCHOOL_ADMIN") {
               const remainingRoles = user.schoolRoles.filter(
                 (sr) =>
-                  sr.schoolId === role.schoolId && sr.roleKey !== role.roleKey
+                  sr.schoolId === role.schoolId && sr.roleKey !== role.roleKey,
               );
               const hasOtherNonStaffRoles = remainingRoles.some(
                 (sr) =>
-                  sr.roleKey === "TEACHER" || sr.roleKey === "SCHOOL_ADMIN"
+                  sr.roleKey === "TEACHER" || sr.roleKey === "SCHOOL_ADMIN",
               );
               if (!hasOtherNonStaffRoles) {
                 const staffRole = roles.find((r) => r.key === "SCHOOL_STAFF");
                 if (staffRole) {
                   const hasStaff = remainingRoles.some(
-                    (sr) => sr.roleKey === "SCHOOL_STAFF"
+                    (sr) => sr.roleKey === "SCHOOL_STAFF",
                   );
                   if (hasStaff) {
                     await rolesApi.delete.removeRole({
@@ -711,7 +689,7 @@ function UserDetailDrawerContent({
 
         // Check if user already has this role at this school
         const hasRole = user.schoolRoles.some(
-          (sr) => sr.roleKey === role.key && sr.schoolId === addRoleSchoolId
+          (sr) => sr.roleKey === role.key && sr.schoolId === addRoleSchoolId,
         );
 
         if (!hasRole) {
@@ -737,7 +715,8 @@ function UserDetailDrawerContent({
           ) {
             const hasStaffAtSchool = user.schoolRoles.some(
               (sr) =>
-                sr.roleKey === "SCHOOL_STAFF" && sr.schoolId === addRoleSchoolId
+                sr.roleKey === "SCHOOL_STAFF" &&
+                sr.schoolId === addRoleSchoolId,
             );
             if (!hasStaffAtSchool) {
               await rolesApi.post.assignRole({
@@ -787,7 +766,7 @@ function UserDetailDrawerContent({
     } catch (err: unknown) {
       console.error("Failed to assign platform role:", err);
       setToggleRoleError(
-        err instanceof Error ? err.message : "Failed to assign role"
+        err instanceof Error ? err.message : "Failed to assign role",
       );
     } finally {
       setIsSavingRoles(false);
@@ -797,11 +776,11 @@ function UserDetailDrawerContent({
   const handleOpenEditSchoolRoles = (
     schoolId: string,
     schoolName: string,
-    schoolRoles: Array<{ roleKey: string | null }>
+    schoolRoles: Array<{ roleKey: string | null }>,
   ) => {
     const roleOrder = ["SCHOOL_STAFF", "SCHOOL_ADMIN", "TEACHER"];
     const assignedRoleKeys = new Set(
-      schoolRoles.map((sr) => sr.roleKey || "").filter(Boolean)
+      schoolRoles.map((sr) => sr.roleKey || "").filter(Boolean),
     );
     const selectedRoleIds = new Set<string>();
     roleOrder.forEach((roleKey) => {
@@ -819,7 +798,7 @@ function UserDetailDrawerContent({
   const removeAllRolesAtSchool = async (schoolId: string) => {
     if (!user || !canMutateTargetUser) return;
     const rolesToRemove = user.schoolRoles.filter(
-      (sr) => sr.schoolId === schoolId
+      (sr) => sr.schoolId === schoolId,
     );
     for (const schoolRole of rolesToRemove) {
       const roleToDelete = roles.find((r) => r.key === schoolRole.roleKey);
@@ -869,8 +848,8 @@ function UserDetailDrawerContent({
         .filter((sr) => sr.schoolId === editSchoolRolesSchoolId)
         .map((sr) => sr.roleKey || "")
         .filter((key) =>
-          ["SCHOOL_STAFF", "SCHOOL_ADMIN", "TEACHER"].includes(key)
-        )
+          ["SCHOOL_STAFF", "SCHOOL_ADMIN", "TEACHER"].includes(key),
+        ),
     );
     const selectedRoleKeys = new Set<string>();
     roleOrder.forEach((role) => {
@@ -924,7 +903,7 @@ function UserDetailDrawerContent({
               const hasStaff = user.schoolRoles.some(
                 (sr) =>
                   sr.roleKey === "SCHOOL_STAFF" &&
-                  sr.schoolId === editSchoolRolesSchoolId
+                  sr.schoolId === editSchoolRolesSchoolId,
               );
               if (hasStaff) {
                 await rolesApi.delete.removeRole({
@@ -942,7 +921,7 @@ function UserDetailDrawerContent({
       await onUserUpdate?.(
         removingFromSchool
           ? { removedSchoolId: editSchoolRolesSchoolId }
-          : undefined
+          : undefined,
       );
     } catch (err: unknown) {
       console.error("Failed to save school roles:", err);
@@ -974,9 +953,7 @@ function UserDetailDrawerContent({
             activeTab={activeTab}
             onTabChange={updateTab}
             canManageFeatures={canManageFeatures}
-            onDeleteClick={
-              canMutateTargetUser ? onDeleteUserClick : undefined
-            }
+            onDeleteClick={canMutateTargetUser ? onDeleteUserClick : undefined}
           />
 
           {/* Right Content Area */}
@@ -1064,7 +1041,7 @@ function UserDetailDrawerContent({
                     !userHasSchoolRole &&
                     (() => {
                       const assignedPlatformRoleKeys = new Set(
-                        user.platformRoles || []
+                        user.platformRoles || [],
                       );
 
                       // Define platform role order
@@ -1075,19 +1052,24 @@ function UserDetailDrawerContent({
                           <Card className="border">
                             <CardContent className="px-4 py-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                <h3 className="text-lg font-semibold">Platform</h3>
-                                {viewerIsIntradarkDev && canMutateTargetUser && (
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setIsPlatformSwapOpen(true)}
-                                    className="h-8"
-                                  >
-                                    <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                                    Change role
-                                  </Button>
-                                )}
+                                <h3 className="text-lg font-semibold">
+                                  Platform
+                                </h3>
+                                {viewerIsIntradarkDev &&
+                                  canMutateTargetUser && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() =>
+                                        setIsPlatformSwapOpen(true)
+                                      }
+                                      className="h-8"
+                                    >
+                                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                                      Change role
+                                    </Button>
+                                  )}
                               </div>
 
                               {/* All Platform Role Badges on Right */}
@@ -1096,7 +1078,7 @@ function UserDetailDrawerContent({
                                   const isAssigned =
                                     assignedPlatformRoleKeys.has(roleKey);
                                   const role = roles.find(
-                                    (r) => r.key === roleKey
+                                    (r) => r.key === roleKey,
                                   );
 
                                   if (!role) return null;
@@ -1140,7 +1122,7 @@ function UserDetailDrawerContent({
                                             "cursor-default",
                                           !canMutateTargetUser &&
                                             "cursor-not-allowed opacity-60",
-                                          getBadgeClasses(roleKey)
+                                          getBadgeClasses(roleKey),
                                         )}
                                         onClick={() => {
                                           if (
@@ -1162,7 +1144,8 @@ function UserDetailDrawerContent({
                                         <RoleIcon
                                           className={cn(
                                             "h-4 w-4",
-                                            !viewerIsIntradarkDev && "group-hover:hidden"
+                                            !viewerIsIntradarkDev &&
+                                              "group-hover:hidden",
                                           )}
                                         />
                                         {!viewerIsIntradarkDev && (
@@ -1189,7 +1172,7 @@ function UserDetailDrawerContent({
                                           canMutateTargetUser &&
                                             "cursor-pointer hover:animate-pulse",
                                           !canMutateTargetUser &&
-                                            "cursor-not-allowed opacity-60"
+                                            "cursor-not-allowed opacity-60",
                                         )}
                                         onMouseEnter={(e) => {
                                           if (!canMutateTargetUser) return;
@@ -1200,7 +1183,7 @@ function UserDetailDrawerContent({
                                           e.currentTarget.style.borderColor = `${roleColor}40`;
                                           const icon =
                                             e.currentTarget.querySelector(
-                                              "svg"
+                                              "svg",
                                             ) as SVGElement | null;
                                           if (icon) {
                                             icon.style.color = roleColor;
@@ -1215,7 +1198,7 @@ function UserDetailDrawerContent({
                                             "";
                                           const icon =
                                             e.currentTarget.querySelector(
-                                              "svg"
+                                              "svg",
                                             ) as SVGElement | null;
                                           if (icon) {
                                             icon.style.color = "";
@@ -1271,7 +1254,7 @@ function UserDetailDrawerContent({
                       // Sort school entries by creation date (oldest first)
                       // Schools without createdAt or not found will be sorted to the end
                       const schoolEntries = Array.from(
-                        rolesBySchool.entries()
+                        rolesBySchool.entries(),
                       ).sort(([schoolIdA], [schoolIdB]) => {
                         const schoolA = schools.find((s) => s.id === schoolIdA);
                         const schoolB = schools.find((s) => s.id === schoolIdB);
@@ -1294,7 +1277,7 @@ function UserDetailDrawerContent({
                                 schoolRoles[0]?.schoolName || "Unknown School";
 
                               const school = schools.find(
-                                (s) => s.id === schoolId
+                                (s) => s.id === schoolId,
                               );
                               const { stateText, sectorText, levelsText } =
                                 extractSchoolMetadata(school || null);
@@ -1330,7 +1313,7 @@ function UserDetailDrawerContent({
                                                     <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full" />
                                                   )}
                                                 </div>
-                                              )
+                                              ),
                                             )}
                                           </div>
                                         )}
@@ -1340,7 +1323,7 @@ function UserDetailDrawerContent({
                                       <div className="flex items-center gap-3 flex-wrap justify-end">
                                         {(() => {
                                           const getBadgeClasses = (
-                                            roleKey: string
+                                            roleKey: string,
                                           ) => {
                                             if (roleKey === "TEACHER") {
                                               return "bg-[var(--role-teacher)] text-[var(--role-teacher-text)] border-[var(--role-teacher)]/50";
@@ -1360,13 +1343,15 @@ function UserDetailDrawerContent({
                                           const sortedRoles = [
                                             ...schoolRoles,
                                           ].sort((a, b) => {
-                                            const order: Record<string, number> =
-                                              {
-                                                SCHOOL_STAFF: 1,
-                                                SCHOOL_ADMIN: 2,
-                                                TEACHER: 3,
-                                                SCHOOL_LICENCE: 4,
-                                              };
+                                            const order: Record<
+                                              string,
+                                              number
+                                            > = {
+                                              SCHOOL_STAFF: 1,
+                                              SCHOOL_ADMIN: 2,
+                                              TEACHER: 3,
+                                              SCHOOL_LICENCE: 4,
+                                            };
                                             return (
                                               (order[a.roleKey || ""] ?? 5) -
                                               (order[b.roleKey || ""] ?? 5)
@@ -1414,7 +1399,7 @@ function UserDetailDrawerContent({
                                                           badgeClasses,
                                                           !isLast &&
                                                             "border-r-0 -mr-[1px]",
-                                                          borderRadiusClass
+                                                          borderRadiusClass,
                                                         )}
                                                       >
                                                         {roleKey ===
@@ -1429,7 +1414,7 @@ function UserDetailDrawerContent({
                                                           roleKey}
                                                       </Badge>
                                                     );
-                                                  }
+                                                  },
                                                 )}
                                               </div>
                                               <Separator
@@ -1444,8 +1429,9 @@ function UserDetailDrawerContent({
                                                     handleOpenEditSchoolRoles(
                                                       schoolId,
                                                       schoolName,
-                                                      schoolRoles
-                                                    )}
+                                                      schoolRoles,
+                                                    )
+                                                  }
                                                   disabled={
                                                     userHasPlatformRole ||
                                                     !canMutateTargetUser
@@ -1505,10 +1491,7 @@ function UserDetailDrawerContent({
 
               {activeTab === "features" && (
                 <FeatureGuard feature="/admin/features">
-                  <UserFeaturesTab
-                    user={user}
-                    canEdit={canMutateTargetUser}
-                  />
+                  <UserFeaturesTab user={user} canEdit={canMutateTargetUser} />
                 </FeatureGuard>
               )}
             </div>
@@ -1733,7 +1716,7 @@ function UserDetailDrawerContent({
               className={cn(
                 roleToToggle?.isAdding
                   ? "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]/90"
-                  : "bg-destructive text-secondary hover:bg-destructive/90 focus:ring-destructive"
+                  : "bg-destructive text-secondary hover:bg-destructive/90 focus:ring-destructive",
               )}
             >
               {isTogglingRole ? (

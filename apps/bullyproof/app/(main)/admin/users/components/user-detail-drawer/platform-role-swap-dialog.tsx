@@ -1,5 +1,7 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -21,12 +23,11 @@ import {
   AlertTitle,
 } from "@workspace/ui/components/alert";
 import { AlertCircle, Loader2 } from "lucide-react";
-import type { roles } from "@/server/db/schema";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { INTRADARK_DEV_PLATFORM_ROLE_KEY } from "@/lib/intradark-dev-protection";
 import { PLATFORM_ROLE_KEYS } from "./utils";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 export type PlatformRoleSwapDialogProps = {
   open: boolean;

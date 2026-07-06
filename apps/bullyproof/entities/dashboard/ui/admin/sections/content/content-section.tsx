@@ -1,16 +1,17 @@
 "use client";
 
+import type { CurriculumStageRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { StageCards } from "@/entities/curriculum/ui/stage-cards";
-import type { curriculumStages } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, Plus } from "lucide-react";
 import { AddStageSheet } from "./add-stage-sheet";
 import { useStages, useInvalidateStage } from "@/entities/stages/model/store";
 
-type Stage = typeof curriculumStages.$inferSelect & {
+type Stage = CurriculumStageRow & {
   years?: Array<{
     id: string;
     code: string;

@@ -1,7 +1,7 @@
+import type { SchoolInviteRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { schoolInvites } from "@/server/db/schema";
 
-type Invite = typeof schoolInvites.$inferSelect;
+type Invite = SchoolInviteRow;
 
 export const invitesApi = {
   get: {

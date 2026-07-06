@@ -1,5 +1,6 @@
 "use client";
 
+import type { TopicRow, TopicSlideRow } from "@/types/db";
 import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
@@ -33,9 +34,8 @@ import {
 import {
   compareSlidesByPosition,
   generatePositionBetween,
-} from "@/server/lib/fractional-position";
+} from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import type { topics, topicSlides } from "@/server/db/schema";
 import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { VimeoPlayer } from "@/components/organisms/vimeo-player";
@@ -48,12 +48,12 @@ import {
 } from "@workspace/ui/components/select";
 import { Label } from "@workspace/ui/components/label";
 
-type Topic = typeof topics.$inferSelect & {
+type Topic = TopicRow & {
   stage?: any;
-  slides?: Array<typeof topicSlides.$inferSelect>;
+  slides?: Array<TopicSlideRow>;
 };
 
-type Slide = typeof topicSlides.$inferSelect;
+type Slide = TopicSlideRow;
 
 interface TopicEditDialogProps {
   topicId: string | null;

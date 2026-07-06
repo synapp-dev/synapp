@@ -1,5 +1,7 @@
 "use client";
 
+import type { CourseTopicRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -30,9 +32,8 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { courseTopics } from "@/server/db/schema";
 
-type Topic = typeof courseTopics.$inferSelect & {
+type Topic = CourseTopicRow & {
   slides?: any[];
 };
 
@@ -53,7 +54,7 @@ export function EditCertificationTopicDrawer({
 }: EditCertificationTopicDrawerProps) {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<"draft" | "published" | "archived">(
-    "draft"
+    "draft",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -65,7 +66,7 @@ export function EditCertificationTopicDrawer({
     if (open && topic) {
       setTitle(topic.title || "");
       setStatus(
-        (topic.status as "draft" | "published" | "archived") || "draft"
+        (topic.status as "draft" | "published" | "archived") || "draft",
       );
       setError(null);
     }

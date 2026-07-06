@@ -1,8 +1,9 @@
 "use client";
 
+import type { CertificationCourseRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import type { certificationCourses } from "@/server/db/schema";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { Loader2, Plus } from "lucide-react";
@@ -13,7 +14,7 @@ import {
 } from "@/entities/certification/model/store";
 import { StageCards } from "@/entities/curriculum/ui/stage-cards";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 

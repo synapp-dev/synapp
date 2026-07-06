@@ -1,10 +1,10 @@
+import type { TopicRow } from "@/types/db";
 import {
   apiFetch,
   type ApiResult,
 } from "@/lib/api/fetcher.client";
-import type { topics } from "@/server/db/schema";
 
-type Topic = typeof topics.$inferSelect;
+type Topic = TopicRow;
 
 export const topicsApi = {
   get: {

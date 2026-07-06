@@ -21,7 +21,7 @@ import { FileText, Play, AlertTriangle, Loader2 } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { useMeStore } from "@/entities/me/model/store";

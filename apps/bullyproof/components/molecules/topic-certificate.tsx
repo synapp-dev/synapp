@@ -1,12 +1,12 @@
 "use client";
 
+import type { UserProfileExpandedRow } from "@/types/db";
 import Image from "next/image";
 import { Card } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
-import type { vUserProfileExpanded } from "@/drizzle/schema";
 import { Badge } from "@workspace/ui/components/badge";
 
-type UserProfile = typeof vUserProfileExpanded.$inferSelect;
+type UserProfile = UserProfileExpandedRow;
 
 interface TopicCertificateProps {
   user: UserProfile | null;

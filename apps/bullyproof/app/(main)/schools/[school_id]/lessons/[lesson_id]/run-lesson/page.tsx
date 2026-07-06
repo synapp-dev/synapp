@@ -33,11 +33,17 @@ import { useMeStore } from "@/entities/me/model/store";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { TakeOverLessonDialog } from "@/components/molecules/take-over-lesson-dialog";
+import { useFeaturesAccess } from "@/hooks/use-features-access";
+import { ACTION_FEATURES } from "@/lib/feature-keys";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@workspace/ui/components/separator";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { SlideRenderer, type SlideData } from "@/components/organisms/slide-renderer";
+import {
+  getLessonDetailRefreshKeys,
+  resolveRunLessonStatusRedirect,
+} from "@/lib/lesson-lifecycle";
 
 // Live countdown component for scheduled lessons
 function LiveCountdown({ scheduledFor }: { scheduledFor: string }) {
@@ -139,10 +145,17 @@ export default function LessonRunLessonPage({
   })();
 
   const takeOverableStatuses = ["preparing", "ready", "in_progress"];
+  const takeOverFeatureAccess = useFeaturesAccess(
+    [ACTION_FEATURES.TAKE_OVER_LESSON],
+    lessonData?.schoolId
+  );
+  const hasTakeOverFeature =
+    takeOverFeatureAccess[ACTION_FEATURES.TAKE_OVER_LESSON]?.hasAccess ?? false;
   const canShowTakeOver =
     !isLessonCreator &&
-    lessonData?.status &&
-    takeOverableStatuses.includes(lessonData.status);
+    !!lessonData?.status &&
+    takeOverableStatuses.includes(lessonData.status) &&
+    hasTakeOverFeature;
 
   // Fetch live state when lesson is ready or in progress (for "Continue from slide X" label and dialog preview)
   const { data: liveStateData, isLoading: isSlideLoading } = useQuery({
@@ -155,10 +168,11 @@ export default function LessonRunLessonPage({
   // so we always show fresh data (e.g. after status updates in presentation mode)
   useEffect(() => {
     const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: lessonsKeys.detail(lesson_id) });
-      queryClient.invalidateQueries({ queryKey: ["lesson", lesson_id, "live-state"] });
+      for (const queryKey of getLessonDetailRefreshKeys(lesson_id)) {
+        queryClient.invalidateQueries({ queryKey });
+      }
     };
-    invalidate(); // on mount
+    invalidate();
     const handleVisibilityChange = () => {
       if (document.visibilityState === "visible") invalidate();
     };
@@ -174,11 +188,17 @@ export default function LessonRunLessonPage({
     }
   }, [searchParams, isLessonCreator]);
 
-  // Fallback: when lesson status becomes feedback (e.g. from visibility refetch if realtime missed it),
-  // auto-navigate to feedback page. Primary path is LessonStatusRedirect realtime listener in layout.
   useEffect(() => {
-    if (!lessonData || !isLessonCreator || lessonData.status !== "feedback") return;
-    router.replace(`/schools/${school_id}/lessons/${lesson_id}/feedback`);
+    if (!lessonData || !isLessonCreator) return;
+    const target = resolveRunLessonStatusRedirect({
+      schoolSlug: school_id,
+      lessonId: lesson_id,
+      status: lessonData.status,
+      isLessonCreator,
+    });
+    if (target) {
+      router.replace(target);
+    }
   }, [lessonData?.status, isLessonCreator, router, school_id, lesson_id]);
 
   // Show loading state while checking permissions
@@ -206,6 +226,7 @@ export default function LessonRunLessonPage({
         queryClient.invalidateQueries({ queryKey: lessonsKeys.all() });
         toast.success("You have taken over this lesson");
         setShowTakeOverDialog(false);
+        router.replace(`/schools/${school_id}/lessons/${lesson_id}/run-lesson`);
       } catch (err) {
         toast.error("Failed to take over lesson", {
           description: err instanceof Error ? err.message : "Unknown error",
@@ -218,7 +239,7 @@ export default function LessonRunLessonPage({
       <div className="space-y-6">
         <Button
           variant="ghost"
-          onClick={() => router.push(`/schools/${school_id}/lessons/${lesson_id}`)}
+          onClick={() => router.push(`/schools/${school_id}/lessons/${lesson_id}/prepare`)}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to lesson

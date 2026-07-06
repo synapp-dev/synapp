@@ -1,5 +1,6 @@
 "use client";
 
+import type { CurriculumStageRow, TopicRow } from "@/types/db";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,10 +24,9 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import type { curriculumStages, topics } from "@/server/db/schema";
 import {
   useStageBySlug,
   useInvalidateStage,
@@ -679,7 +679,7 @@ function TopicCard({
   );
 }
 
-type Stage = typeof curriculumStages.$inferSelect & {
+type Stage = CurriculumStageRow & {
   years?: Array<{
     id: string;
     code: string;
@@ -693,7 +693,7 @@ type Stage = typeof curriculumStages.$inferSelect & {
   }>;
 };
 
-type Topic = typeof topics.$inferSelect;
+type Topic = TopicRow;
 
 type TopicSlide = {
   id: string;

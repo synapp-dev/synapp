@@ -27,20 +27,11 @@ import {
   Settings,
 } from "lucide-react";
 
-type TabId =
-  | "onboarding"
-  | "activation"
-  | "details"
-  | "users"
-  | "classes"
-  | "activity"
-  | "culture"
-  | "license"
-  | "features";
+import type { SchoolDetailTabId } from "../school-detail/types";
 
 interface SchoolDetailSidebarProps {
-  activeTab: TabId;
-  onTabChange: (tab: TabId) => void;
+  activeTab: SchoolDetailTabId;
+  onTabChange: (tab: SchoolDetailTabId) => void;
   onDeleteClick: () => void;
 }
 
@@ -92,7 +83,7 @@ export function SchoolDetailSidebar({
                             isActive={activeTab === item.id}
                             onClick={() => {
                               if (!isDisabled) {
-                                onTabChange(item.id as TabId);
+                                onTabChange(item.id as SchoolDetailTabId);
                               }
                             }}
                             disabled={isDisabled}

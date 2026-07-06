@@ -1,13 +1,13 @@
+import type { SchoolRow } from "@/types/db";
 import {
   useQuery,
   queryOptions,
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
-import type { schools } from "@/drizzle/schema";
 import { schoolKeys } from "@/entities/school/model/keys";
 
-type School = typeof schools.$inferSelect;
+type School = SchoolRow;
 
 export const getAllSchoolsOptions = () =>
   queryOptions<School[]>({

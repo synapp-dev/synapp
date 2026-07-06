@@ -36,13 +36,17 @@ import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 import { checkFeatureAccess } from "@/server/features/features.service";
 import { db } from "@/server/db/drizzle";
-import {
-  certificationCourses,
-  courseTopics,
-  courseTopicSlides,
-} from "@/server/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
+import { certificationCourses, courseTopics } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
+import {
+  buildNewSlidePositionsFromIndexMap,
+  resolveFinalSlideOrder,
+} from "@/lib/slide-editing";
+import {
+  applySlideReorderOrNormalize,
+  createCertificationSlideEditingDeps,
+} from "@/server/slides/slide-editing.service";
 
 export async function POST(
   request: Request,
@@ -461,103 +465,33 @@ export async function POST(
     }
 
     // Step 5: Reorder slides
-    let finalOrder: string[] | null = null;
+    const newSlidePositions =
+      createdSlideIds.length > 0 && reorder?.length
+        ? buildNewSlidePositionsFromIndexMap(newSlideIndexMap)
+        : undefined;
 
-    // Prefer desiredOrder when present: canonical list (existing + temp IDs) in final order
-    if (desiredOrder && Array.isArray(desiredOrder) && desiredOrder.length > 0) {
-      finalOrder = desiredOrder
-        .map((id: string) => tempIdToSlideIdMap.get(id) ?? id)
-        .filter((id: string) => !deletedSlideIds.has(id));
-    } else if (reorder && Array.isArray(reorder) && reorder.length > 0) {
-      const validReorderIds = reorder.filter((id) => !deletedSlideIds.has(id));
+    const finalOrder = resolveFinalSlideOrder({
+      desiredOrder,
+      reorder,
+      deletedSlideIds,
+      tempIdToSlideIdMap,
+      newSlidePositions,
+    });
 
-      const newSlidePositions: Array<[number, string]> = [];
-      for (const slideId of createdSlideIds) {
-        const intendedIndex = newSlideIndexMap.get(slideId);
-        if (intendedIndex !== undefined) {
-          newSlidePositions.push([intendedIndex, slideId]);
-        }
-      }
-      newSlidePositions.sort((a, b) => a[0] - b[0]);
+    const reorderResult = await applySlideReorderOrNormalize(
+      topicId,
+      finalOrder,
+      createCertificationSlideEditingDeps()
+    );
 
-      const totalSlides = validReorderIds.length + newSlidePositions.length;
-      finalOrder = [];
-      let existingIndex = 0;
-      let newSlideIndex = 0;
-
-      for (
-        let currentPosition = 0;
-        currentPosition < totalSlides;
-        currentPosition++
-      ) {
-        if (
-          newSlideIndex < newSlidePositions.length &&
-          newSlidePositions[newSlideIndex][0] === currentPosition
-        ) {
-          finalOrder.push(newSlidePositions[newSlideIndex][1]);
-          newSlideIndex++;
-        } else if (existingIndex < validReorderIds.length) {
-          finalOrder.push(validReorderIds[existingIndex]);
-          existingIndex++;
-        }
-      }
+    if (reorderResult.ok === false) {
+      return NextResponse.json(
+        {
+          error: `Some slides do not belong to this topic: ${reorderResult.invalidSlideIds.join(", ")}`,
+        },
+        { status: 400 }
+      );
     }
-
-    if (finalOrder && finalOrder.length > 0) {
-        // Validate that all slides belong to this topic (security check)
-        console.log(
-          "[bulk-save] Validating slide ownership before reordering..."
-        );
-
-        // Get current slides after creates/deletes to validate ownership
-        // Use a targeted query to check only the slides in finalOrder
-        const slidesToValidate = await db
-          .select({ id: courseTopicSlides.id })
-          .from(courseTopicSlides)
-          .where(
-            and(
-              eq(courseTopicSlides.topicId, topicId),
-              inArray(courseTopicSlides.id, finalOrder)
-            )
-          );
-
-        const validSlideIds = new Set(slidesToValidate.map((s) => s.id));
-
-        // Check if all slides in finalOrder belong to this topic
-        const invalidSlideIds = finalOrder.filter(
-          (slideId) => !validSlideIds.has(slideId)
-        );
-
-        if (invalidSlideIds.length > 0) {
-          console.error(
-            `[bulk-save] ERROR: Found ${invalidSlideIds.length} slide(s) that do not belong to topic ${topicId}:`,
-            invalidSlideIds
-          );
-          return NextResponse.json(
-            {
-              error: `Some slides do not belong to this topic: ${invalidSlideIds.join(", ")}`,
-            },
-            { status: 400 }
-          );
-        }
-
-        console.log(
-          "[bulk-save] Validation passed - all slides belong to topic"
-        );
-
-        try {
-          await courseTopicSlidesRepo.bulkUpdateOrder(topicId, finalOrder);
-        } catch (error: any) {
-          console.error("Failed to reorder slides:", error);
-          throw error;
-        }
-    } else {
-      // Normalize order if no explicit reorder provided
-      // This will ensure all slides (including new ones) are sequentially ordered
-      await courseTopicSlidesRepo.normalizeSlideOrder(topicId);
-    }
-
-    // Step 6: Fetch final topic data with slides
     const finalSlides = await courseTopicSlidesRepo.getByTopicId(topicId);
 
     // Fetch full topic data to include title and other fields

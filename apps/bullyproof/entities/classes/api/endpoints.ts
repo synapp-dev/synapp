@@ -1,7 +1,7 @@
+import type { ClassRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { classes } from "@/server/db/schema";
 
-type Class = typeof classes.$inferSelect;
+type Class = ClassRow;
 type ClassWithYearCodes = Class & { yearCodes?: string[]; yearNames?: string[] };
 
 export const classesApi = {

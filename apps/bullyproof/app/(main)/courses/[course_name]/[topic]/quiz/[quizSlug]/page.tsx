@@ -1,5 +1,7 @@
 "use client";
 
+import type { CertificationCourseRow, CourseTopicQuizRow, CourseTopicRow, QuizAnswerRow, QuizQuestionRow } from "@/types/db";
+
 import { useEffect, useState, useCallback, Suspense, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -37,23 +39,16 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type {
-  certificationCourses,
-  courseTopics,
-  courseTopicQuizzes,
-  quizQuestions,
-  quizAnswers,
-} from "@/server/db/schema";
 import { useMeStore } from "@/entities/me/model/store";
 import { StarRating } from "@/components/atoms/star-rating";
 import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
 import { Separator } from "@workspace/ui/components/separator";
 
-type Course = typeof certificationCourses.$inferSelect;
-type Topic = typeof courseTopics.$inferSelect;
-type Quiz = typeof courseTopicQuizzes.$inferSelect;
-type QuizQuestion = typeof quizQuestions.$inferSelect;
-type QuizAnswer = typeof quizAnswers.$inferSelect;
+type Course = CertificationCourseRow;
+type Topic = CourseTopicRow;
+type Quiz = CourseTopicQuizRow;
+type QuizQuestion = QuizQuestionRow;
+type QuizAnswer = QuizAnswerRow;
 
 type QuestionWithAnswers = QuizQuestion & {
   answers: QuizAnswer[];

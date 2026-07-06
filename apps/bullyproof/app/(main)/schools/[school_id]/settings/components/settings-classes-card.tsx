@@ -1,12 +1,12 @@
 "use client";
 
+import type { SchoolYearRow } from "@/types/db";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { classesApi } from "@/entities/classes/api/endpoints";
 import { ClassesTable } from "@/entities/classes/ui/classes-table";
 import type { ClassWithYearCodes } from "@/entities/classes/model/store";
 import { schoolApi } from "@/entities/school/api/endpoints";
-import type { schoolYears } from "@/server/db/schema";
 import { ImportClassesDialog } from "@/entities/dashboard/ui/admin/sections/schools/components/import-classes-dialog";
 import { BulkYearLevelDialog } from "@/entities/dashboard/ui/admin/sections/schools/components/bulk-year-level-dialog";
 import type { School as AdminSchool } from "@/entities/dashboard/ui/admin/sections/schools/components/schools-table-columns";
@@ -231,8 +231,6 @@ function buildClassesListSearchParams(
 
 const MAX_VISIBLE_SCHOOL_YEAR_BADGES = 4;
 
-type SchoolYearRow = typeof schoolYears.$inferSelect;
-
 function SelectedSchoolYearsTrigger({
   yearIds,
   availableYears,
@@ -302,7 +300,7 @@ export function SettingsClassesCard({
   const appliedClassesFiltersFromUrlSigRef = useRef<string | null>(null);
 
   const [availableYears, setAvailableYears] = useState<
-    Array<typeof schoolYears.$inferSelect>
+    Array<SchoolYearRow>
   >([]);
   const [loadingYears, setLoadingYears] = useState(false);
 
@@ -375,7 +373,7 @@ export function SettingsClassesCard({
       const result = await schoolApi.get.years(schoolId);
       if (!result.error && result.data) {
         const years = result.data
-          .map((item: { year: typeof schoolYears.$inferSelect }) => item.year)
+          .map((item: { year: SchoolYearRow }) => item.year)
           .filter(Boolean);
         const sorted = [...years].sort((a, b) => {
           if (a.sortIndex != null && b.sortIndex != null) {

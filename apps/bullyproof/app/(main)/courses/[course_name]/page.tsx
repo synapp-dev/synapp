@@ -1,5 +1,10 @@
 "use client";
 
+import type {
+  CertificationCourseRow,
+  CourseTopicRow,
+  CourseTopicSlideRow,
+} from "@/types/db";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -40,13 +45,8 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@workspace/ui/components/chart";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type {
-  certificationCourses,
-  courseTopics,
-  courseTopicSlides,
-} from "@/server/db/schema";
 import { useMeStore } from "@/entities/me/model/store";
 import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
 import { createSlug } from "@/utils/slug";
@@ -57,12 +57,12 @@ import Image from "next/image";
 import { StarRating } from "@/components/atoms/star-rating";
 import { TopicCertificate } from "@/components/molecules/topic-certificate";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 
-type Topic = typeof courseTopics.$inferSelect & {
-  slides?: Array<typeof courseTopicSlides.$inferSelect>;
+type Topic = CourseTopicRow & {
+  slides?: Array<CourseTopicSlideRow>;
 };
 
 type TopicProgress = {

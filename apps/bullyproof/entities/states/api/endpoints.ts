@@ -1,7 +1,7 @@
+import type { StateRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { states } from "@/server/db/schema";
 
-type State = typeof states.$inferSelect;
+type State = StateRow;
 
 export const statesApi = {
   get: {

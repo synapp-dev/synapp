@@ -1,9 +1,9 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { rolesApi } from "@/entities/roles/api/endpoints";
-import type { roles } from "@/server/db/schema";
 import {
   useGlobalPermissionsQuery,
   useRolePermissionsQuery,
@@ -29,7 +29,7 @@ import {
 import { Globe, Unlock, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import type { Feature } from "./global-tab";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 type RoleTabProps = {
   features: Feature[];

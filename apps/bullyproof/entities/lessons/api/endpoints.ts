@@ -1,7 +1,9 @@
+import type { LessonRow } from "@/types/db";
+import type { CreateLessonRequest } from "@/types/lesson-create";
+import type { LessonRecommendationsResult } from "@/types/lesson-recommendations";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { lessons } from "@/server/db/schema";
 
-type Lesson = typeof lessons.$inferSelect;
+type Lesson = LessonRow;
 
 export type OutstandingFeedbackLesson = {
   id: string;
@@ -54,61 +56,9 @@ export const lessonsApi = {
     byId(id: string): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
       return apiFetch<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>(`/lessons/${encodeURIComponent(id)}`);
     },
-    recommendations(params: { classIds: string[] }): Promise<ApiResult<{
-      recommendedTopicId: string | null;
-      recommendedTopic: {
-        id: string;
-        title: string;
-        stageId: string;
-        stageName: string;
-        stageOrder: number | null;
-      } | null;
-      warning: {
-        show: boolean;
-        classes: Array<{
-          classId: string;
-          className: string;
-          topicTitle: string;
-          stageName: string;
-        }>;
-        multipleStages?: Array<{
-          stageId: string;
-          stageName: string;
-          stageCode: string;
-          stageSortIndex: number;
-          classes: Array<{
-            classId: string;
-            className: string;
-            yearCodes: string[];
-          }>;
-          firstTopic: {
-            id: string;
-            title: string;
-            stageOrder: number | null;
-          } | null;
-        }>;
-      } | null;
-      reason: "next_topic" | "fallback_year_match" | "final_fallback" | null;
-      completedLessonInfo: {
-        lessonTitle: string;
-        topicTitle: string;
-        completedAt: string;
-      } | null;
-      activeLessons: Array<{
-        lessonId: string;
-        title: string;
-        status: "preparing" | "ready" | "in_progress" | "feedback";
-        topicId: string;
-        topicTitle: string;
-        classIds: string[];
-        className: string;
-        schoolId: string;
-        schoolSlug: string | null;
-        createdByUserId: string;
-        ownerName: string | null;
-        ownerEmail: string | null;
-      }>;
-    }>> {
+    recommendations(params: {
+      classIds: string[];
+    }): Promise<ApiResult<LessonRecommendationsResult>> {
       return apiFetch(`/lessons/recommendations`, {
         method: "POST",
         body: JSON.stringify({ classIds: params.classIds }),
@@ -122,16 +72,7 @@ export const lessonsApi = {
         { method: "POST" }
       );
     },
-    create(payload: {
-      schoolId: string;
-      topicId: string;
-      createdByUserId?: string;
-      title?: string;
-      description?: string;
-      scheduledFor?: string;
-      status?: string;
-      classIds?: string[];
-    }): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
+    create(payload: CreateLessonRequest): Promise<ApiResult<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>> {
       return apiFetch<Lesson & { topic?: any; teacher?: any; assignedClasses?: any[] }>("/lessons", {
         method: "POST",
         body: JSON.stringify(payload),

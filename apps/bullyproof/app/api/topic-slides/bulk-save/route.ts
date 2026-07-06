@@ -42,6 +42,14 @@ import { eq, and, inArray } from "drizzle-orm";
 import { getTopicSlideStoragePath } from "@/server/lib/slide-storage-path";
 import { generateNKeysBetween } from "fractional-indexing";
 import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import {
+  buildAppendNewSlidePositions,
+  resolveFinalSlideOrder,
+} from "@/lib/slide-editing";
+import {
+  applySlideReorderOrNormalize,
+  createCurriculumSlideEditingDeps,
+} from "@/server/slides/slide-editing.service";
 
 // Configure route to handle large payloads
 export const runtime = "nodejs";
@@ -605,166 +613,55 @@ export async function POST(request: Request) {
     // Step 5: Reorder slides (assigns positions to all slides)
     console.log("[bulk-save] Step 5: Reordering slides...");
 
-    let finalOrder: string[] | null = null;
+    const newSlidePositions =
+      reorder?.length && filteredCreates.length > 0 && createdSlideIds.length > 0
+        ? buildAppendNewSlidePositions(
+            reorder.filter((slideId: string) => !deletedSlideIds.has(slideId))
+              .length,
+            createdSlideIds
+          )
+        : undefined;
 
-    // Prefer desiredOrder when present: canonical list of IDs (existing + temp) in final order.
-    // Resolve temp IDs and filter deleted for a single source of truth.
-    if (desiredOrder && Array.isArray(desiredOrder) && desiredOrder.length > 0) {
-      console.log(`[bulk-save] Using desiredOrder with ${desiredOrder.length} slide(s)`);
-      finalOrder = desiredOrder
-        .map((id: string) => tempIdToSlideIdMap.get(id) ?? id)
-        .filter((id: string) => !deletedSlideIds.has(id));
-      console.log(
-        `[bulk-save] After resolving temp IDs and filtering deleted, ${finalOrder.length} slide(s) remain`
-      );
-    } else if (reorder && Array.isArray(reorder) && reorder.length > 0) {
-      // Fallback: legacy merge of reorder + creates
-      console.log(`[bulk-save] Reorder array has ${reorder.length} slide(s)`);
-      const validReorderIds = reorder.filter(
-        (slideId: string) => !deletedSlideIds.has(slideId)
-      );
+    const finalOrder = resolveFinalSlideOrder({
+      desiredOrder,
+      reorder,
+      deletedSlideIds,
+      tempIdToSlideIdMap,
+      newSlidePositions,
+    });
 
-      const newSlidePositions: Array<[number, string]> = [];
-      if (filteredCreates.length > 0 && createdSlideIds.length > 0) {
-        filteredCreates.forEach((_, index: number) => {
-          if (index < createdSlideIds.length) {
-            newSlidePositions.push([
-              validReorderIds.length + index,
-              createdSlideIds[index],
-            ]);
-          }
-        });
-        newSlidePositions.sort((a, b) => a[0] - b[0]);
+    if (finalOrder?.length) {
+      const expectedCount =
+        (currentTopicData?.slides?.length || 0) +
+        createdSlideIds.length -
+        deletedSlideIds.size;
+      if (finalOrder.length !== expectedCount) {
+        console.warn(
+          `[bulk-save] WARNING: Final order count (${finalOrder.length}) does not match expected count (${expectedCount}). Proceeding anyway.`
+        );
       }
-
-      const totalSlides = validReorderIds.length + newSlidePositions.length;
-      finalOrder = [];
-      let existingIndex = 0;
-      let newSlideIndex = 0;
-
-      for (
-        let currentPosition = 0;
-        currentPosition < totalSlides;
-        currentPosition++
-      ) {
-        if (
-          newSlideIndex < newSlidePositions.length &&
-          newSlidePositions[newSlideIndex][0] === currentPosition
-        ) {
-          finalOrder.push(newSlidePositions[newSlideIndex][1]);
-          newSlideIndex++;
-        } else if (existingIndex < validReorderIds.length) {
-          finalOrder.push(validReorderIds[existingIndex]);
-          existingIndex++;
-        }
-      }
-      console.log(`[bulk-save] Final order has ${finalOrder.length} slide(s)`);
     }
 
-    if (finalOrder && finalOrder.length > 0) {
+    const reorderResult = await applySlideReorderOrNormalize(
+      topicId,
+      finalOrder,
+      createCurriculumSlideEditingDeps()
+    );
 
-      // Validate that all slides belong to this topic (security check)
-      if (finalOrder.length > 0) {
-        console.log(
-          "[bulk-save] Validating slide ownership before reordering..."
-        );
-
-        // Get current slides after creates/deletes to validate ownership
-        // Use a targeted query to check only the slides in finalOrder
-        const slidesToValidate = await db
-          .select({ id: topicSlides.id })
-          .from(topicSlides)
-          .where(
-            and(
-              eq(topicSlides.topicId, topicId),
-              inArray(topicSlides.id, finalOrder)
-            )
-          );
-
-        const validSlideIds = new Set(slidesToValidate.map((s) => s.id));
-
-        // Check if all slides in finalOrder belong to this topic
-        const invalidSlideIds = finalOrder.filter(
-          (slideId) => !validSlideIds.has(slideId)
-        );
-
-        if (invalidSlideIds.length > 0) {
-          console.error(
-            `[bulk-save] ERROR: Found ${invalidSlideIds.length} slide(s) that do not belong to topic ${topicId}:`,
-            invalidSlideIds
-          );
-          return NextResponse.json(
-            {
-              error: `Some slides do not belong to this topic: ${invalidSlideIds.join(", ")}`,
-            },
-            { status: 400 }
-          );
-        }
-
-        // Verify that finalOrder length matches expected count (existing + new - deleted)
-        // We already have currentTopicData from earlier, but need to account for creates/deletes
-        const expectedCount =
-          (currentTopicData?.slides?.length || 0) +
-          createdSlideIds.length -
-          deletedSlideIds.size;
-
-        if (finalOrder.length !== expectedCount) {
-          console.warn(
-            `[bulk-save] WARNING: Final order count (${finalOrder.length}) does not match expected count (${expectedCount}). Proceeding anyway.`
-          );
-        }
-
-        console.log(
-          "[bulk-save] Validation passed - all slides belong to topic"
-        );
-      }
-
-      console.log(
-        `[bulk-save] Calling topicsService.reorderSlides with topicId: ${topicId}`
+    if (reorderResult.ok === false) {
+      console.error(
+        `[bulk-save] ERROR: Found ${reorderResult.invalidSlideIds.length} slide(s) that do not belong to topic ${topicId}:`,
+        reorderResult.invalidSlideIds
       );
-      try {
-        await topicsService.reorderSlides({ userId }, {
-          topicId,
-          slideIds: finalOrder,
-        });
-        console.log("[bulk-save] Successfully reordered slides");
-      } catch (error: any) {
-        console.error("[bulk-save] ERROR: Failed to reorder slides:", {
-          error: error,
-          message: error?.message,
-          stack: error?.stack,
-        });
-        throw error;
-      }
-    } else {
-      // If no explicit reorder provided, normalize order based on current state
-      console.log(
-        "[bulk-save] No explicit reorder provided, normalizing order..."
+      return NextResponse.json(
+        {
+          error: `Some slides do not belong to this topic: ${reorderResult.invalidSlideIds.join(", ")}`,
+        },
+        { status: 400 }
       );
-      try {
-        const topicDataAfterOps = await topicsRepo.getWithDetails(topicId);
-        if (topicDataAfterOps?.slides && topicDataAfterOps.slides.length > 0) {
-          const slideIds = topicDataAfterOps.slides
-            .sort(compareSlidesByPosition)
-            .map((s) => s.id);
-          console.log(
-            `[bulk-save] Normalizing order for ${slideIds.length} slide(s)`
-          );
-          await topicsService.reorderSlides({ userId }, {
-            topicId,
-            slideIds,
-          });
-          console.log("[bulk-save] Successfully normalized slide order");
-        }
-      } catch (error: any) {
-        console.error("[bulk-save] ERROR: Failed to normalize order:", {
-          error: error,
-          message: error?.message,
-          stack: error?.stack,
-        });
-        throw error;
-      }
     }
+
+    console.log("[bulk-save] Successfully reordered slides");
 
     // Step 6: Cleanup - Remove empty slides
     // SAFETY: Only delete slides that are CLEARLY empty (no content at all)

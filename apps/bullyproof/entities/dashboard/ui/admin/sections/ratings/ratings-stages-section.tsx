@@ -1,5 +1,7 @@
 "use client";
 
+import type { CurriculumStageRow } from "@/types/db";
+
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -15,9 +17,8 @@ import {
 import { useStages } from "@/entities/stages/model/store";
 import { ratingsApi, type RatingsStageSummary } from "@/entities/ratings/api/endpoints";
 import { usePageTitle } from "@/hooks/use-page-title";
-import type { curriculumStages } from "@/server/db/schema";
 
-type RatingsStageCardStage = typeof curriculumStages.$inferSelect & {
+type RatingsStageCardStage = CurriculumStageRow & {
   years?: Array<{
     id: string;
     code: string;

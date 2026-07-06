@@ -31,7 +31,8 @@ import { AlertTriangle, CheckCircle2, Info, Star, ChevronsRight, ChevronsUp, Che
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { ClassOption } from "@/types/lesson-wizard";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import type { LessonRecommendationsResult } from "@/types/lesson-recommendations";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
@@ -41,64 +42,8 @@ import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useRouter } from "next/navigation";
 import { getDisplayStatus, getStatusColors } from "@/utils/lesson-status";
 
-interface RecommendationData {
-  recommendedTopicId: string | null;
-  recommendedTopic: {
-    id: string;
-    title: string;
-    stageId: string;
-    stageName: string;
-    stageOrder: number | null;
-  } | null;
-  warning: {
-    show: boolean;
-    classes: Array<{
-      classId: string;
-      className: string;
-      topicTitle: string;
-      stageName: string;
-    }>;
-    multipleStages?: Array<{
-      stageId: string;
-      stageName: string;
-      stageCode: string;
-      stageSortIndex: number;
-      classes: Array<{
-        classId: string;
-        className: string;
-        yearCodes: string[];
-      }>;
-      firstTopic: {
-        id: string;
-        title: string;
-        stageOrder: number | null;
-      } | null;
-    }>;
-  } | null;
-  reason: "next_topic" | "fallback_year_match" | "final_fallback" | null;
-  completedLessonInfo: {
-    lessonTitle: string;
-    topicTitle: string;
-    completedAt: string;
-  } | null;
-  activeLessons: Array<{
-    lessonId: string;
-    title: string;
-    status: "preparing" | "ready" | "in_progress" | "feedback";
-    topicId: string;
-    topicTitle: string;
-    classIds: string[];
-    className: string;
-    schoolId: string;
-    schoolSlug: string | null;
-    createdByUserId: string;
-    ownerName: string | null;
-    ownerEmail: string | null;
-  }>;
-}
-
 interface LessonWizardRecommendationProps {
-  recommendationData: RecommendationData | null;
+  recommendationData: LessonRecommendationsResult | null;
   isLoading: boolean;
   selectedClasses: ClassOption[];
   schoolSlug: string;
@@ -106,6 +51,7 @@ interface LessonWizardRecommendationProps {
   onChooseDifferentLesson: () => void;
   onGoToLiveLesson: (lessonId: string) => void;
   onBack: () => void;
+  onSelectSingleClass?: (classId: string) => void;
   onSelectStage?: (stageId: string) => void;
   onAddClassesToLesson?: (lessonId: string, classIds: string[]) => Promise<void>;
   onCancelLessons?: (lessonIds: string[]) => Promise<void>;
@@ -220,36 +166,11 @@ function TopicProgressList({
     return null;
   }
 
-  // Find the index of the recommended topic
-  const recommendedIndex = topics.findIndex((topic: any) => topic.id === recommendedTopicId);
-  
-  // Calculate the sliding window
-  let startIndex: number;
-  let endIndex: number;
-  let remainingCount = 0;
-
-  if (recommendedIndex === -1) {
-    // If no recommended topic found, show first 5
-    startIndex = 0;
-    endIndex = Math.min(5, topics.length);
-    remainingCount = topics.length - endIndex;
-  } else if (recommendedIndex === 0) {
-    // If recommended is first, show next 4 after it
-    startIndex = 0;
-    endIndex = Math.min(5, topics.length);
-    remainingCount = topics.length - endIndex;
-  } else {
-    // Show 2 before, recommended, 2 after (total 5 visible)
-    startIndex = Math.max(0, recommendedIndex - 2);
-    endIndex = Math.min(topics.length, recommendedIndex + 3);
-    remainingCount = topics.length - endIndex;
-  }
-
-  const visibleTopics = topics.slice(startIndex, endIndex);
-  const remainingTopics = remainingCount > 0 ? topics.slice(endIndex) : [];
+  // Show full topic list for the stage (Sprint 2: no sliding window)
+  const visibleTopics = topics;
 
   return (
-    <div className={`flex gap-2 overflow-x-auto ${className || ""}`}>
+    <div className={`flex flex-wrap gap-2 ${className || ""}`}>
       {visibleTopics.map((topic: any) => {
         const isRecommended = topic.id === recommendedTopicId;
         const isCompleted = completedTopicIds.includes(topic.id);
@@ -284,39 +205,6 @@ function TopicProgressList({
           </Tooltip>
         );
       })}
-      
-      {remainingCount > 0 && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="flex items-center gap-1 px-2 py-1 rounded text-xs cursor-default transition-colors flex-shrink-0 border-2 border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground">
-              +{remainingCount} more
-            </div>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">
-            <div className="space-y-1">
-              <p className="font-semibold mb-2">Remaining Lessons:</p>
-              {remainingTopics.map((topic: any) => {
-                const isCompleted = completedTopicIds.includes(topic.id);
-                return (
-                  <div key={topic.id} className="text-sm">
-                    {topic.stageOrder !== null && topic.stageOrder !== undefined ? (
-                      <span className={isCompleted ? "text-green-600" : ""}>
-                        L{topic.stageOrder}: {topic.title}
-                        {isCompleted && " ✓"}
-                      </span>
-                    ) : (
-                      <span className={isCompleted ? "text-green-600" : ""}>
-                        {topic.title}
-                        {isCompleted && " ✓"}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
     </div>
   );
 }
@@ -330,6 +218,7 @@ export function LessonWizardRecommendation({
   onChooseDifferentLesson,
   onGoToLiveLesson,
   onBack,
+  onSelectSingleClass,
   onSelectStage,
   onAddClassesToLesson,
   onCancelLessons,
@@ -726,7 +615,13 @@ export function LessonWizardRecommendation({
     );
   }
 
-  const { warning, reason, completedLessonInfo } = recommendationData;
+  const { warning, reason, completedLessonInfo, incompatibleClasses, stageComplete, invalidSelection } =
+    recommendationData;
+
+  const showIncompatiblePanel = !!incompatibleClasses && !hasConflict;
+  const showStageCompletePanel = !!stageComplete && !hasConflict;
+  const showInvalidPanel =
+    !!invalidSelection && !hasConflict && !showIncompatiblePanel && !showStageCompletePanel;
   
   // Group active lessons by status
   const liveLessons = activeLessons.filter(l => l.status === "in_progress" || l.status === "feedback");
@@ -894,9 +789,87 @@ export function LessonWizardRecommendation({
           </div>
         </div>
       )}
+
+      {showStageCompletePanel && stageComplete && (
+        <Alert className="bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertTitle>Program complete for this class</AlertTitle>
+          <AlertDescription className="space-y-3 mt-2">
+            <p>
+              <span className="font-medium">{stageComplete.className}</span> has completed all{" "}
+              {stageComplete.completedCount} lessons in{" "}
+              <span className="font-medium">{stageComplete.stageName}</span>. Lessons will reset at
+              the start of the new calendar year. Previous lesson history is retained in audit logs.
+            </p>
+            <Button variant="outline" size="sm" onClick={onBack}>
+              Back to class selection
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showInvalidPanel && invalidSelection && (
+        <Alert className="bg-amber-50 border-amber-300">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Selection needs attention</AlertTitle>
+          <AlertDescription className="space-y-3 mt-2">
+            <p>{invalidSelection.message}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={onBack}>
+                Back
+              </Button>
+              <Button variant="secondary" size="sm" onClick={onChooseDifferentLesson}>
+                Choose a lesson manually
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {showIncompatiblePanel && incompatibleClasses && (
+        <Alert className="bg-amber-50 border-amber-300 text-amber-900">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Different levels or lessons selected</AlertTitle>
+          <AlertDescription className="space-y-4 mt-2 text-amber-900">
+            <p className="text-sm leading-relaxed">
+              You have selected more than one class, which are at different levels or lessons of the
+              program. If you choose a lesson for these classes it will appear in the audit logs of
+              these classes, which will impact the next recommended lesson. These are your options:
+            </p>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Select one class and take its recommended lesson:</p>
+              <div className="flex flex-col gap-2">
+                {incompatibleClasses.perClass.map((cls) => (
+                  <Button
+                    key={cls.classId}
+                    variant="outline"
+                    size="sm"
+                    className="justify-start h-auto py-2 text-left"
+                    onClick={() => onSelectSingleClass?.(cls.classId)}
+                  >
+                    <span className="font-medium">{cls.className}</span>
+                    <span className="text-muted-foreground ml-2">
+                      — {cls.stageName}
+                      {cls.nextTopicTitle ? `: ${cls.nextTopicTitle}` : " (stage complete)"}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button variant="outline" size="sm" onClick={onBack}>
+                Back
+              </Button>
+              <Button variant="secondary" size="sm" onClick={onChooseDifferentLesson}>
+                Choose a compromise lesson
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
       
       {/* Recommended Topic Card */}
-      {recommendedTopic && !hasConflict && (
+      {recommendedTopic && !hasConflict && !showIncompatiblePanel && !showStageCompletePanel && !showInvalidPanel && (
         <div className="space-y-3">
           <div className="flex items-center gap-2 pb-2 flex-wrap">
             <Badge
@@ -1547,7 +1520,7 @@ export function LessonWizardRecommendation({
       )}
 
       {/* Warning Alert - Classes on Different Topics */}
-      {!hasConflict && warning?.show && warning.classes.length > 0 && !warning.multipleStages && (
+      {!hasConflict && warning?.show && warning.classes.length > 0 && !warning.multipleStages && !incompatibleClasses && (
         <Alert className="bg-yellow-50 border-yellow-300 text-yellow-800">
           <AlertTriangle className="h-4 w-4 text-yellow-600" />
           <AlertTitle className="text-yellow-900">

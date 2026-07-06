@@ -1,3 +1,4 @@
+import type { SchoolReadableRow } from "@/types/db";
 import {
   useQuery,
   keepPreviousData,
@@ -5,10 +6,9 @@ import {
 } from "@tanstack/react-query";
 import { schoolApi } from "../api/endpoints";
 import { schoolKeys } from "./keys";
-import type { vSchoolsReadable } from "@/drizzle/schema";
 
 export type SchoolStatus = "onboarding" | "ready" | "active" | "certification";
-export type School = typeof vSchoolsReadable.$inferSelect & {
+export type School = SchoolReadableRow & {
   status?: SchoolStatus;
 };
 

@@ -8,17 +8,10 @@ import { userRepo } from "./user.repo";
 import { getUserScopedRoles } from "@/server/auth/rbac";
 import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
 import { createServerAdminClient } from "@/utils/supabase/admin";
-import { schoolRepo } from "@/server/school/school.repo";
+import { resolveSchoolId } from "@/server/school/resolve-school-ref";
 import { db } from "@/server/db/drizzle";
 import { userProfile, userSchoolPositions, userSessions } from "@/drizzle/schema";
 import { sql, desc, inArray, eq, and } from "drizzle-orm";
-
-// Helper to check if a string is a valid UUID
-function isValidUUID(str: string): boolean {
-  const uuidRegex =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -170,17 +163,13 @@ export const userService = {
   async listAllUsers(ctx: AuthContext, query: unknown) {
     const params: ListUsersParams = listUsersSchema.parse(query);
     
-    // Resolve schoolId if it's a slug (not a UUID)
     let resolvedSchoolId: string | undefined = params.schoolId;
-    if (params.schoolId && !isValidUUID(params.schoolId)) {
-      // It's a slug, resolve it to an ID
-      const schoolResults = await schoolRepo.getBySlug(params.schoolId);
-      if (schoolResults.length > 0) {
-        resolvedSchoolId = schoolResults[0].id;
-      } else {
-        // Slug not found, return empty results
+    if (params.schoolId) {
+      const schoolId = await resolveSchoolId(params.schoolId);
+      if (!schoolId) {
         return { users: [], totalCount: 0 };
       }
+      resolvedSchoolId = schoolId;
     }
 
     // Check permissions - platform admins or users with roles in the requested school

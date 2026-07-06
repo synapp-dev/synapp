@@ -76,11 +76,11 @@ import {
   Check,
   Trash2,
 } from "lucide-react";
+import type { SchoolYearRow } from "@/types/db";
 import { cn } from "@workspace/ui/lib/utils";
 import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { schoolApi } from "@/entities/school/api/endpoints";
-import { schoolYears } from "@/server/db/schema";
 import type { School as SchoolType } from "./schools-table-columns";
 
 interface ImportClassesDialogProps {
@@ -242,7 +242,7 @@ export function ImportClassesDialog({
   
   // Year levels state
   const [availableYears, setAvailableYears] = useState<
-    Array<typeof schoolYears.$inferSelect>
+    Array<SchoolYearRow>
   >([]);
   const [loadingYears, setLoadingYears] = useState(false);
 

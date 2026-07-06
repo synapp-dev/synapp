@@ -5,22 +5,24 @@ import { createBrowserClient } from "@/utils/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { useMeStore } from "@/entities/me/model/store";
+import {
+  getLessonStatusInvalidationKeys,
+  shouldRefetchLiveLessonStore,
+  shouldStopLiveLesson,
+} from "@/lib/lesson-lifecycle";
 
 interface LessonStatusRealtimeOptions {
   onStatusChange?: (newStatus: string, oldStatus: string) => void;
 }
 
 /**
- * Hook to listen for real-time changes to lesson status
- * This will invalidate relevant queries and update the live lesson store
- * when a lesson's status changes (e.g., from 'in_progress' to 'pending_review' or 'completed')
+ * Listen for real-time lesson status changes; invalidate queries and sync live store.
  */
 export function useLessonStatusRealtime(
   lessonId?: string,
   options?: LessonStatusRealtimeOptions
 ) {
   const queryClient = useQueryClient();
-  // Use useMemo to ensure stable reference (createBrowserClient is now a singleton)
   const supabase = useMemo(() => createBrowserClient(), []);
   const currentUser = useMeStore((s) => s.currentUser);
   const fetchInProgressLesson = useLiveLessonStore(
@@ -45,66 +47,38 @@ export function useLessonStatusRealtime(
           const updatedLesson = payload.new as { id: string; status: string };
           const oldLesson = payload.old as { id: string; status: string };
 
-          // Only react if status actually changed
-          if (updatedLesson.status !== oldLesson.status) {
-            console.log(
-              `Lesson ${lessonId} status changed from ${oldLesson.status} to ${updatedLesson.status}`
-            );
+          if (updatedLesson.status === oldLesson.status) {
+            return;
+          }
 
-            // Call the optional callback if provided
-            onStatusChange?.(updatedLesson.status, oldLesson.status);
+          onStatusChange?.(updatedLesson.status, oldLesson.status);
 
-            // Invalidate all lesson-related queries and refetch immediately
-            // Use pattern matching to catch all lesson queries
+          for (const queryKey of getLessonStatusInvalidationKeys(lessonId)) {
             queryClient.invalidateQueries({
-              queryKey: ["lessons", "detail", lessonId],
-              refetchType: "active", // Immediately refetch active queries
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["lesson", lessonId],
+              queryKey,
               refetchType: "active",
             });
-            queryClient.invalidateQueries({
-              queryKey: ["lesson-details", lessonId],
-              refetchType: "active",
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["live-lessons"],
-              refetchType: "active",
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["in-progress-lessons"],
-              refetchType: "active",
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["lesson-feedback", lessonId],
-              refetchType: "active",
-            });
+          }
 
-            // Check if this is the current live lesson
-            const currentLiveLessonId = useLiveLessonStore.getState().lessonId;
-            const isCurrentLiveLesson = currentLiveLessonId === lessonId;
+          const currentLiveLessonId = useLiveLessonStore.getState().lessonId;
 
-            // If the lesson became completed and it's the current live lesson, clear it immediately
-            if (updatedLesson.status === "completed" && isCurrentLiveLesson) {
-              useLiveLessonStore.getState().stopLiveLesson();
-            }
+          if (
+            shouldStopLiveLesson(
+              updatedLesson.status,
+              lessonId,
+              currentLiveLessonId
+            )
+          ) {
+            useLiveLessonStore.getState().stopLiveLesson();
+          }
 
-            // Always refetch live lesson when status changes to/from live states OR when it becomes completed
-            // This ensures we update the sidebar/dashboard correctly
-            const isLiveStatus = ["in_progress", "feedback"].includes(
+          if (
+            shouldRefetchLiveLessonStore(
+              oldLesson.status,
               updatedLesson.status
-            );
-            const wasLiveStatus = ["in_progress", "feedback"].includes(
-              oldLesson.status
-            );
-            const becameCompleted = updatedLesson.status === "completed";
-
-            if (isLiveStatus || wasLiveStatus || becameCompleted) {
-              // Refetch the live lesson store to get updated list
-              // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/feedback)
-              fetchInProgressLesson(currentUser?.id);
-            }
+            )
+          ) {
+            fetchInProgressLesson(currentUser?.id);
           }
         }
       )
@@ -113,16 +87,21 @@ export function useLessonStatusRealtime(
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [lessonId, queryClient, supabase, fetchInProgressLesson, currentUser?.id, onStatusChange]);
+  }, [
+    lessonId,
+    queryClient,
+    supabase,
+    fetchInProgressLesson,
+    currentUser?.id,
+    onStatusChange,
+  ]);
 }
 
 /**
- * Hook to listen for real-time changes to any lessons for the current user
- * This is useful for the dashboard and sidebar to update when any lesson status changes
+ * Listen for status changes on any lesson owned by the current user.
  */
 export function useUserLessonsStatusRealtime(userId?: string) {
   const queryClient = useQueryClient();
-  // Use useMemo to ensure stable reference (createBrowserClient is now a singleton)
   const supabase = useMemo(() => createBrowserClient(), []);
   const fetchInProgressLesson = useLiveLessonStore(
     (s) => s.fetchInProgressLesson
@@ -145,72 +124,46 @@ export function useUserLessonsStatusRealtime(userId?: string) {
           const updatedLesson = payload.new as {
             id: string;
             status: string;
-            createdByUserId: string;
           };
           const oldLesson = payload.old as {
             id: string;
             status: string;
-            createdByUserId: string;
           };
 
-          // Only react if status actually changed
-          if (updatedLesson.status !== oldLesson.status) {
-            console.log(
-              `User lesson ${updatedLesson.id} status changed from ${oldLesson.status} to ${updatedLesson.status}`
-            );
+          if (updatedLesson.status === oldLesson.status) {
+            return;
+          }
 
-            // Invalidate all lesson-related queries and refetch immediately
-            // Use pattern matching to catch all lesson queries
+          for (const queryKey of getLessonStatusInvalidationKeys(
+            updatedLesson.id,
+            userId
+          )) {
             queryClient.invalidateQueries({
-              queryKey: ["lessons", "detail", updatedLesson.id],
-              refetchType: "active", // Immediately refetch active queries
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["lesson", updatedLesson.id],
+              queryKey,
               refetchType: "active",
             });
-            queryClient.invalidateQueries({
-              queryKey: ["lesson-details", updatedLesson.id],
-              refetchType: "active",
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["live-lessons", userId],
-              refetchType: "active",
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["in-progress-lessons", userId],
-              refetchType: "active",
-            });
-            queryClient.invalidateQueries({
-              queryKey: ["lesson-feedback", updatedLesson.id],
-              refetchType: "active",
-            });
+          }
 
-            // Check if this is the current live lesson
-            const currentLiveLessonId = useLiveLessonStore.getState().lessonId;
-            const isCurrentLiveLesson =
-              currentLiveLessonId === updatedLesson.id;
+          const currentLiveLessonId = useLiveLessonStore.getState().lessonId;
+          const isCurrentLiveLesson = currentLiveLessonId === updatedLesson.id;
 
-            // If the lesson became completed and it's the current live lesson, clear it immediately
-            if (updatedLesson.status === "completed" && isCurrentLiveLesson) {
-              useLiveLessonStore.getState().stopLiveLesson();
-            }
+          if (
+            shouldStopLiveLesson(
+              updatedLesson.status,
+              updatedLesson.id,
+              isCurrentLiveLesson ? currentLiveLessonId : null
+            )
+          ) {
+            useLiveLessonStore.getState().stopLiveLesson();
+          }
 
-            // Always refetch live lesson when status changes to/from live states OR when it becomes completed
-            // This ensures we update the sidebar/dashboard correctly
-            const isLiveStatus = ["in_progress", "feedback"].includes(
+          if (
+            shouldRefetchLiveLessonStore(
+              oldLesson.status,
               updatedLesson.status
-            );
-            const wasLiveStatus = ["in_progress", "feedback"].includes(
-              oldLesson.status
-            );
-            const becameCompleted = updatedLesson.status === "completed";
-
-            if (isLiveStatus || wasLiveStatus || becameCompleted) {
-              // Refetch the live lesson store to get updated list
-              // This will clear the live lesson if it became completed (since fetchInProgressLesson only fetches in_progress/feedback)
-              fetchInProgressLesson(userId);
-            }
+            )
+          ) {
+            fetchInProgressLesson(userId);
           }
         }
       )

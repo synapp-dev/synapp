@@ -245,17 +245,17 @@ export function OverviewSection() {
         <div className="h-fit flex flex-col items-center justify-center w-full max-w-[30%]">
           <div className="flex-1 flex flex-col gap-2 w-full justify-center ">
             <QuickActionsCard
-              title="Invite School"
+              title="Manage Schools"
               icon={<Users className="w-4 h-4" />}
               link="/admin/schools?modal=add-new-school"
             />
             <QuickActionsCard
-              title="Edit Curriculum"
+              title="Manage Lessons"
               icon={<Book className="w-4 h-4" />}
               link="/admin/content/curriculum"
             />
             <QuickActionsCard
-              title="Edit Certification"
+              title="Manage AP Cert"
               icon={<Shield className="w-4 h-4" />}
               link="/admin/content/certification"
             />

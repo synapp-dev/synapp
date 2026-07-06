@@ -1,9 +1,9 @@
+import type { SchoolEnrichedRow } from "@/types/db";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { meApi } from "../api/endpoints";
 import { meKeys } from "./keys";
-import type { vSchoolsEnriched } from "@/drizzle/schema";
 
-export type School = typeof vSchoolsEnriched.$inferSelect;
+export type School = SchoolEnrichedRow;
 
 export function useMySchoolsQuery(
   params?: {

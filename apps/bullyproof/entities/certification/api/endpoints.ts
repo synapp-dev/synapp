@@ -1,22 +1,22 @@
+import type {
+  CertificationCourseRow,
+  CourseTopicQuizRow,
+  CourseTopicRow,
+  CourseTopicSlideRow,
+  QuizAnswerRow,
+  QuizQuestionRow,
+} from "@/types/db";
 import {
   apiFetch,
   type ApiResult,
 } from "@/lib/api/fetcher.client";
-import type {
-  certificationCourses,
-  courseTopics,
-  courseTopicSlides,
-  courseTopicQuizzes,
-  quizQuestions,
-  quizAnswers,
-} from "@/server/db/schema";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 
-type Topic = typeof courseTopics.$inferSelect & {
-  slides?: Array<typeof courseTopicSlides.$inferSelect>;
+type Topic = CourseTopicRow & {
+  slides?: Array<CourseTopicSlideRow>;
 };
 
 type EnrichedTopic = {
@@ -32,11 +32,11 @@ type EnrichedTopic = {
   quizScorePercentage: number | null;
 };
 
-type Slide = typeof courseTopicSlides.$inferSelect;
+type Slide = CourseTopicSlideRow;
 
-type Quiz = typeof courseTopicQuizzes.$inferSelect;
-type QuizQuestion = typeof quizQuestions.$inferSelect;
-type QuizAnswer = typeof quizAnswers.$inferSelect;
+type Quiz = CourseTopicQuizRow;
+type QuizQuestion = QuizQuestionRow;
+type QuizAnswer = QuizAnswerRow;
 
 export const certificationApi = {
   courses: {

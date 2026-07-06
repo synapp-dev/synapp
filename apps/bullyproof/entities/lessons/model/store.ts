@@ -1,10 +1,10 @@
+import type { LessonRow } from "@/types/db";
 import { useQuery, useQueryClient, useQueries } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { lessonsApi } from "../api/endpoints";
 import { lessonsKeys } from "./keys";
-import type { lessons } from "@/server/db/schema";
 
-type Lesson = typeof lessons.$inferSelect;
+type Lesson = LessonRow;
 
 export type LessonWithDetails = Lesson & {
   topic?: {

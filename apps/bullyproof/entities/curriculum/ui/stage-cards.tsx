@@ -1,5 +1,11 @@
 "use client";
 
+import type {
+  CertificationCourseRow,
+  CourseTopicRow,
+  CurriculumStageRow,
+  TopicRow,
+} from "@/types/db";
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -14,18 +20,17 @@ import { cn } from "@workspace/ui/lib/utils";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { BookOpen } from "lucide-react";
-import type { curriculumStages, certificationCourses, topics, courseTopics } from "@/server/db/schema";
 import {
   useTopicsByStage,
 } from "@/entities/topics/model/store-enhanced";
 import {
   useCertificationTopicsByStageCode,
 } from "@/entities/certification/model/topics-store";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { createSlug } from "@/utils/slug";
 
 // Base stage types
-type CurriculumStage = typeof curriculumStages.$inferSelect & {
+type CurriculumStage = CurriculumStageRow & {
   years?: Array<{
     id: string;
     code: string;
@@ -39,7 +44,7 @@ type CurriculumStage = typeof curriculumStages.$inferSelect & {
   }>;
 };
 
-type CertificationStage = typeof certificationCourses.$inferSelect & {
+type CertificationStage = CertificationCourseRow & {
   topicCount?: number;
 };
 
@@ -47,8 +52,8 @@ type CertificationStage = typeof certificationCourses.$inferSelect & {
 type Stage = CurriculumStage | CertificationStage;
 
 // Topic types
-type CurriculumTopic = typeof topics.$inferSelect;
-type CertificationTopic = typeof courseTopics.$inferSelect;
+type CurriculumTopic = TopicRow;
+type CertificationTopic = CourseTopicRow;
 
 // Generic topic type that works for both
 type TopicWithImage = (CurriculumTopic | CertificationTopic) & {

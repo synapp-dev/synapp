@@ -1,10 +1,8 @@
+import type { CurriculumStageRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
-import type {
-  curriculumStages,
-} from "@/server/db/schema";
 
-type Stage = typeof curriculumStages.$inferSelect & {
+type Stage = CurriculumStageRow & {
   years?: Array<{
     id: string;
     code: string;

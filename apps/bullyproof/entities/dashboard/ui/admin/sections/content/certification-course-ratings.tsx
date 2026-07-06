@@ -1,5 +1,7 @@
 "use client";
 
+import type { CertificationCourseRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import { Star, Loader2, MessageSquare, Calendar, Edit } from "lucide-react";
 import ReactTimeago from "react-timeago";
@@ -27,7 +29,6 @@ import { CourseRatingQuestionsEditor } from "@/components/organisms/course-ratin
 import { CourseRatingInput } from "@/components/molecules/course-rating-input";
 import { QuestionRenderer } from "@/components/molecules/question-renderer";
 import type { QuestionDefinition } from "@/types/course-ratings";
-import type { certificationCourses } from "@/server/db/schema";
 import { cn } from "@workspace/ui/lib/utils";
 import { toast } from "sonner";
 
@@ -46,7 +47,7 @@ interface CourseRating {
   schools?: string[];
 }
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 

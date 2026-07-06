@@ -1,8 +1,8 @@
+import type { CertificationCourseRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { certificationCourses } from "@/server/db/schema";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 

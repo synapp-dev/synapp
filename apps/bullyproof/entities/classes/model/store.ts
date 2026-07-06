@@ -1,10 +1,10 @@
+import type { ClassRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { classesApi } from "../api/endpoints";
 import { classesKeys } from "./keys";
-import type { classes } from "@/server/db/schema";
 
-type Class = typeof classes.$inferSelect;
+type Class = ClassRow;
 
 export type ClassWithYearCodes = Class & { yearCodes?: string[] | null; yearNames?: string[] | null };
 

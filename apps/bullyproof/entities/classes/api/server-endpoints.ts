@@ -1,8 +1,8 @@
+import type { ClassRow } from "@/types/db";
 // Server-side classes API endpoints
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher";
-import type { classes } from "@/server/db/schema";
 
-type Class = typeof classes.$inferSelect;
+type Class = ClassRow;
 type ClassWithYearCodes = Class & { yearCodes?: string[] | null };
 
 export const classesServerApi = {

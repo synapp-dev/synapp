@@ -1,5 +1,7 @@
 "use client";
 
+import type { CertificationCourseRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import { Calendar, Loader2, Save } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
@@ -8,10 +10,9 @@ import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
 import { Badge } from "@workspace/ui/components/badge";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { certificationCourses } from "@/server/db/schema";
 import { toast } from "sonner";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 

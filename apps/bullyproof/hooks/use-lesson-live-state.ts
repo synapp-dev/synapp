@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { SlideData } from "@/components/organisms/slide-renderer";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 

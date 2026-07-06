@@ -1,5 +1,6 @@
 "use client";
 
+import type { TopicRow, TopicSlideRow } from "@/types/db";
 import { useState, useEffect, useMemo } from "react";
 import {
   Sheet,
@@ -16,16 +17,15 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Loader2, FileText, Image, Video } from "lucide-react";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import type { topics, topicSlides } from "@/server/db/schema";
 import { isVideoUrl, getVideoEmbedUrl, isVimeoUrl, isYouTubeUrl } from "@/utils/video";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { VimeoPlayer } from "@/components/organisms/vimeo-player";
 
-type Topic = typeof topics.$inferSelect & {
+type Topic = TopicRow & {
   stage?: any;
-  slides?: Array<typeof topicSlides.$inferSelect>;
+  slides?: Array<TopicSlideRow>;
 };
 
 interface TopicSlidesDrawerProps {

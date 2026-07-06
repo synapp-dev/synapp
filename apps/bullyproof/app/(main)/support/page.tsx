@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Mail } from "lucide-react";
+import { SUPPORT_MAILTO } from "@/lib/support";
 
 export default function SupportPage() {
   return (
@@ -21,7 +22,7 @@ export default function SupportPage() {
         </CardHeader>
         <CardContent className="flex justify-center">
           <Button asChild>
-            <a href="mailto:support@bullyproofaustralia.org.au">
+            <a href={SUPPORT_MAILTO}>
               <Mail className="mr-2 h-4 w-4" />
               Email Support
             </a>

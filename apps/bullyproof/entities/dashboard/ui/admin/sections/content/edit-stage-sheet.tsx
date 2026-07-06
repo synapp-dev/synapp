@@ -1,5 +1,7 @@
 "use client";
 
+import type { CurriculumStageRow, SchoolYearRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -36,10 +38,8 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Loader2, Edit, Check, ChevronDown, Trash2 } from "lucide-react";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
-import type { schoolYears } from "@/server/db/schema";
-import type { curriculumStages } from "@/server/db/schema";
 
-type Stage = typeof curriculumStages.$inferSelect & {
+type Stage = CurriculumStageRow & {
   years?: Array<{
     id: string;
     code: string;
@@ -72,7 +72,7 @@ export function EditStageSheet({
   const [selectedYearIds, setSelectedYearIds] = useState<string[]>([]);
   const [availableYears, setAvailableYears] = useState<
     Array<
-      typeof schoolYears.$inferSelect & {
+      SchoolYearRow & {
         level?: { id: string; name: string; key: string };
       }
     >
@@ -172,7 +172,7 @@ export function EditStageSheet({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to update stage. Please try again."
+          : "Failed to update stage. Please try again.",
       );
     } finally {
       setIsSubmitting(false);
@@ -201,7 +201,7 @@ export function EditStageSheet({
       setError(
         err instanceof Error
           ? err.message
-          : "Failed to delete stage. Please try again."
+          : "Failed to delete stage. Please try again.",
       );
       setShowDeleteDialog(false);
     } finally {
@@ -308,7 +308,7 @@ export function EditStageSheet({
                           <CommandGroup>
                             {availableYears.map((year) => {
                               const isSelected = selectedYearIds.includes(
-                                year.id
+                                year.id,
                               );
                               return (
                                 <CommandItem
@@ -318,8 +318,8 @@ export function EditStageSheet({
                                     if (isSelected) {
                                       setSelectedYearIds(
                                         selectedYearIds.filter(
-                                          (id) => id !== year.id
-                                        )
+                                          (id) => id !== year.id,
+                                        ),
                                       );
                                     } else {
                                       setSelectedYearIds([
@@ -357,7 +357,7 @@ export function EditStageSheet({
                     <div className="flex flex-wrap gap-2 mt-2">
                       {selectedYearIds.map((yearId) => {
                         const year = availableYears.find(
-                          (y) => y.id === yearId
+                          (y) => y.id === yearId,
                         );
                         return year ? (
                           <div
@@ -369,7 +369,7 @@ export function EditStageSheet({
                               type="button"
                               onClick={() => {
                                 setSelectedYearIds(
-                                  selectedYearIds.filter((id) => id !== yearId)
+                                  selectedYearIds.filter((id) => id !== yearId),
                                 );
                               }}
                               className="ml-1 hover:bg-primary/20 rounded-full p-0.5"

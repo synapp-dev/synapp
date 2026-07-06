@@ -1,5 +1,11 @@
 "use client";
 
+import type {
+  CertificationCourseRow,
+  CourseTopicQuizRow,
+  CourseTopicRow,
+  QuizQuestionRow,
+} from "@/types/db";
 import { useEffect, useState, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -15,20 +21,14 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type {
-  certificationCourses,
-  courseTopics,
-  courseTopicQuizzes,
-  quizQuestions,
-} from "@/server/db/schema";
 import { createSlug } from "@/utils/slug";
 import { useMeStore } from "@/entities/me/model/store";
 import { StarRating } from "@/components/atoms/star-rating";
 
-type Course = typeof certificationCourses.$inferSelect;
-type Topic = typeof courseTopics.$inferSelect;
-type Quiz = typeof courseTopicQuizzes.$inferSelect;
-type QuizQuestion = typeof quizQuestions.$inferSelect;
+type Course = CertificationCourseRow;
+type Topic = CourseTopicRow;
+type Quiz = CourseTopicQuizRow;
+type QuizQuestion = QuizQuestionRow;
 
 type QuizWithDetails = Quiz & {
   questionCount: number;

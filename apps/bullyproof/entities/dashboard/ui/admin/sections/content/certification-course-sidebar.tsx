@@ -1,5 +1,7 @@
 "use client";
 
+import type { CertificationCourseRow } from "@/types/db";
+
 import {
   FileText,
   Info,
@@ -12,11 +14,10 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
-import type { certificationCourses } from "@/server/db/schema";
 
 export type CertificationCourseTab = "information" | "topics" | "results" | "rating";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 

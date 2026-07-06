@@ -659,3 +659,18 @@ Lesson lifecycle: `preparing` → `ready` → `in_progress` → `feedback` → `
 - TC-041 through TC-047 (UI states and permissions)
 - TC-048 through TC-055 (Year codes and button states)
 - TC-056 through TC-070 (Visual, integration, performance)
+
+---
+
+## Sprint 2 — Glenn scenarios (Jun 2026)
+
+| ID | Scenario | Expected |
+|----|----------|----------|
+| SC-2A | ½ Coral + ½ Gold selected together | Incompatible or invalid panel with Back + options — never blank step |
+| SC-2B | 10 Peach + 11 Denim | Three-option panel: Back / select one class / compromise lesson |
+| SC-2C | 12 Beige + 11 Denim (different progress) | Incompatible per-class recommendations — not shared L2 for both |
+| SC-2D | ½ Teal after completing all stage lessons | Stage complete message; no L1 recommendation; audit retained |
+| SC-2E | Take over with `lessons:take-over-lesson` feature | Non-owner with feature can take over; navigates to runnable lesson |
+| SC-2F | Back to lesson (non-owner run-lesson) | Navigates to `/prepare`, not redirect loop |
+| SC-2G | Topic progress list on recommendation | All L1–L10 visible for 10-lesson stage |
+| SC-2H | Choose another lesson stage list | Stages sorted ½ → 12 by year level |

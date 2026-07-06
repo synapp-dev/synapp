@@ -1,5 +1,7 @@
 "use client";
 
+import type { CourseTopicRow, TopicRow, TopicSlideRow } from "@/types/db";
+
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
@@ -27,11 +29,10 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   compareSlidesByPosition,
   computePositionsForOrder,
-} from "@/server/lib/fractional-position";
+} from "@/lib/fractional-position";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { topics, topicSlides, courseTopics } from "@/server/db/schema";
 import type { QuizData } from "@/components/organisms/quiz-slide-editor";
 import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
 import {
@@ -113,7 +114,10 @@ import {
   useTopicsByStage,
   useInvalidateTopics,
 } from "@/entities/topics/model/store-enhanced";
-import { useStageBySlug, useInvalidateStage } from "@/entities/stages/model/store";
+import {
+  useStageBySlug,
+  useInvalidateStage,
+} from "@/entities/stages/model/store";
 import { useMutationInvalidation } from "@/hooks/use-mutation-invalidation";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
 import { ConfirmChangesDialog } from "@/components/organisms/confirm-changes-dialog";
@@ -121,22 +125,32 @@ import { EditCertificationTopicDrawer } from "./edit-certification-topic-drawer"
 import { EditCurriculumTopicDrawer } from "./edit-curriculum-topic-drawer";
 import { createSlug } from "@/utils/slug";
 
-type Topic = typeof topics.$inferSelect & {
+type Topic = TopicRow & {
   stage?: any;
-  slides?: Array<typeof topicSlides.$inferSelect>;
+  slides?: Array<TopicSlideRow>;
 };
 
-type CertificationTopic = typeof courseTopics.$inferSelect & {
-  slides?: Array<typeof topicSlides.$inferSelect>;
+type CertificationTopic = CourseTopicRow & {
+  slides?: Array<TopicSlideRow>;
 };
 
 type TopicContext = "curriculum" | "certification";
 
 // Helper function to check if a slide has content
 function slideHasContent(
-  slide: SlideData | { id: string; kind: string; imageUrl?: string | null; videoUrl?: string | null; textHtml?: string | null; quizData?: any; signedUrl?: string | null },
+  slide:
+    | SlideData
+    | {
+        id: string;
+        kind: string;
+        imageUrl?: string | null;
+        videoUrl?: string | null;
+        textHtml?: string | null;
+        quizData?: any;
+        signedUrl?: string | null;
+      },
   isCertification: boolean,
-  pendingFileUploads?: Map<string, File>
+  pendingFileUploads?: Map<string, File>,
 ): boolean {
   // Check if imageUrl exists and is not just a placeholder/invalid URL
   // Blob URLs are temporary and valid (from file uploads)
@@ -149,18 +163,14 @@ function slideHasContent(
   // so they can be filtered on load and marked for deletion.
   const isBlobUrl = imageUrl?.startsWith("blob:");
   const hasStoragePath =
-    !!imageUrl &&
-    !imageUrl.startsWith("blob:") &&
-    imageUrl.trim() !== "";
+    !!imageUrl && !imageUrl.startsWith("blob:") && imageUrl.trim() !== "";
   const hasValidImageUrl =
-    isBlobUrl ||
-    hasStoragePath ||
-    (!!signedUrl && signedUrl.trim() !== "");
+    isBlobUrl || hasStoragePath || (!!signedUrl && signedUrl.trim() !== "");
   const hasPendingUpload = pendingFileUploads?.has(slide.id) || false;
   if (slide.kind === "image") {
     return hasValidImageUrl || hasPendingUpload;
   }
-  
+
   const hasVideoUrl = !!slide.videoUrl && slide.videoUrl.trim() !== "";
   const hasQuizData =
     isCertification &&
@@ -171,7 +181,12 @@ function slideHasContent(
   const hasTextHtml =
     !isCertification && slide.kind === "text" && !!slide.textHtml?.trim();
 
-  const hasContent = hasValidImageUrl || hasVideoUrl || hasQuizData || hasTextHtml || hasPendingUpload;
+  const hasContent =
+    hasValidImageUrl ||
+    hasVideoUrl ||
+    hasQuizData ||
+    hasTextHtml ||
+    hasPendingUpload;
 
   // Log detailed info for debugging empty slides
   if (!hasContent) {
@@ -246,9 +261,7 @@ function SortableSlideItem({
 
   // Show add button if this slide index matches showAddButton
   const showAddButtonForSlide =
-    showAddButton === index &&
-    !isDragging &&
-    !isReordering;
+    showAddButton === index && !isDragging && !isReordering;
 
   return (
     <div className="flex items-center relative" ref={setNodeRef} style={style}>
@@ -373,7 +386,7 @@ export function TopicDetailSection({
   // Detect if we're on a certification page by checking the URL path
   // Check if path contains "/admin/content/certification"
   const isCertificationFromUrl = pathname.includes(
-    "/admin/content/certification"
+    "/admin/content/certification",
   );
   const isCertification = context === "certification" || isCertificationFromUrl;
   const [stage, setStage] = useState<any | null>(null);
@@ -396,7 +409,7 @@ export function TopicDetailSection({
   const [activeSlideId, setActiveSlideId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [hoveredSlideIndex, setHoveredSlideIndex] = useState<number | null>(
-    null
+    null,
   );
   const [showAddButton, setShowAddButton] = useState<number | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -420,12 +433,12 @@ export function TopicDetailSection({
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [deletedSlideIds, setDeletedSlideIds] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] =
     useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(
-    null
+    null,
   );
   const [originalSlides, setOriginalSlides] = useState<ExtendedSlideData[]>([]);
   const [showValidationDialog, setShowValidationDialog] = useState(false);
@@ -439,7 +452,7 @@ export function TopicDetailSection({
       "showChangesDialog changed to:",
       showChangesDialog,
       "changesToShow:",
-      changesToShow.length
+      changesToShow.length,
     );
   }, [showChangesDialog, changesToShow]);
   const [pendingSave, setPendingSave] = useState(false);
@@ -450,7 +463,8 @@ export function TopicDetailSection({
   const [saveProgress, setSaveProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState<string>("");
   const [isEditTopicDrawerOpen, setIsEditTopicDrawerOpen] = useState(false);
-  const [isEditCurriculumTopicDrawerOpen, setIsEditCurriculumTopicDrawerOpen] = useState(false);
+  const [isEditCurriculumTopicDrawerOpen, setIsEditCurriculumTopicDrawerOpen] =
+    useState(false);
   const [showLessonPlanDialog, setShowLessonPlanDialog] = useState(false);
   const [lessonPlans, setLessonPlans] = useState<
     Array<{
@@ -465,7 +479,9 @@ export function TopicDetailSection({
   >([]);
   const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
   const [isUploadingLessonPlan, setIsUploadingLessonPlan] = useState(false);
-  const [isDeletingLessonPlan, setIsDeletingLessonPlan] = useState<string | null>(null);
+  const [isDeletingLessonPlan, setIsDeletingLessonPlan] = useState<
+    string | null
+  >(null);
   const lessonPlanFileInputRef = useRef<HTMLInputElement>(null);
 
   // @dnd-kit sensors
@@ -477,7 +493,7 @@ export function TopicDetailSection({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   // Cleanup timeouts on unmount
@@ -542,7 +558,7 @@ export function TopicDetailSection({
     if (slideGalleryRef.current && wheelHandlerRef.current) {
       slideGalleryRef.current.removeEventListener(
         "wheel",
-        wheelHandlerRef.current
+        wheelHandlerRef.current,
       );
     }
 
@@ -572,7 +588,7 @@ export function TopicDetailSection({
       if (slideGalleryRef.current && wheelHandlerRef.current) {
         slideGalleryRef.current.removeEventListener(
           "wheel",
-          wheelHandlerRef.current
+          wheelHandlerRef.current,
         );
       }
     };
@@ -588,7 +604,7 @@ export function TopicDetailSection({
         router.push(url);
       }
     },
-    [hasUnsavedChanges, router]
+    [hasUnsavedChanges, router],
   );
 
   // Handle navigation confirmation
@@ -611,13 +627,17 @@ export function TopicDetailSection({
   // No-op invalidation stubs – TQ invalidation handles freshness (must be stable:
   // fetchTopicData depends on invalidateCertificationSlide; unstable refs cause an infinite refetch loop)
   const invalidateSlide = useCallback((_slideId: string) => {}, []);
-  const invalidateCertificationSlide = useCallback((_slideId: string) => {}, []);
+  const invalidateCertificationSlide = useCallback(
+    (_slideId: string) => {},
+    [],
+  );
 
   // Resolve topic by slug: primary = createSlug(title), fallback = T1/T2 legacy format
   const isLegacyTopicSlug = topicSlug ? /^T\d+$/.test(topicSlug) : false;
-  const legacyTopicOrder = isLegacyTopicSlug && topicSlug
-    ? parseInt(topicSlug.substring(1), 10)
-    : null;
+  const legacyTopicOrder =
+    isLegacyTopicSlug && topicSlug
+      ? parseInt(topicSlug.substring(1), 10)
+      : null;
 
   // Use React Query hooks for caching (curriculum flow only)
   const {
@@ -639,7 +659,7 @@ export function TopicDetailSection({
       : {
           includeSlides: true,
           includeUrls: true,
-        }
+        },
   );
 
   // Invalidation hooks for curriculum topics
@@ -664,7 +684,7 @@ export function TopicDetailSection({
           if (!topicResult.data) {
             setError(
               topicResult.error?.message ??
-                "Failed to fetch certification topic"
+                "Failed to fetch certification topic",
             );
             return;
           }
@@ -685,8 +705,7 @@ export function TopicDetailSection({
                 };
                 // GET /certification/topics/:id/slides uses topicSlidesService → signedImageUrl / signedVideoUrl.
                 // SlideRenderer only paints storage-backed images from signed URLs (not raw imageUrl).
-                const imageSigned =
-                  s.signedUrl ?? s.signedImageUrl ?? null;
+                const imageSigned = s.signedUrl ?? s.signedImageUrl ?? null;
                 return {
                   id: slide.id,
                   kind: slide.kind as SlideData["kind"],
@@ -703,42 +722,56 @@ export function TopicDetailSection({
                   signedVideoUrl: s.signedVideoUrl ?? null,
                 };
               });
-            
+
             // Filter out empty slides (slides without any content)
             // Note: Image slides are always shown, even if empty, so users can add images to them
-            console.log("[topic-detail] [CERTIFICATION] Loading slides - total slides from DB:", allSlides.length);
+            console.log(
+              "[topic-detail] [CERTIFICATION] Loading slides - total slides from DB:",
+              allSlides.length,
+            );
             const validSlides = allSlides.filter((slide) => {
               const hasContent = slideHasContent(slide, isCertification);
               if (!hasContent) {
-                console.warn("[topic-detail] [CERTIFICATION] Found empty slide:", {
-                  id: slide.id,
-                  kind: slide.kind,
-                  imageUrl: slide.imageUrl,
-                  videoUrl: slide.videoUrl,
-                  textHtml: slide.textHtml?.substring(0, 50),
-                  quizData: (slide as any).quizData ? "exists" : "null",
-                });
+                console.warn(
+                  "[topic-detail] [CERTIFICATION] Found empty slide:",
+                  {
+                    id: slide.id,
+                    kind: slide.kind,
+                    imageUrl: slide.imageUrl,
+                    videoUrl: slide.videoUrl,
+                    textHtml: slide.textHtml?.substring(0, 50),
+                    quizData: (slide as any).quizData ? "exists" : "null",
+                  },
+                );
               }
               return hasContent;
             });
-            
-            console.log("[topic-detail] [CERTIFICATION] After filtering empty slides:", {
-              total: allSlides.length,
-              valid: validSlides.length,
-              empty: allSlides.length - validSlides.length,
-            });
-            
+
+            console.log(
+              "[topic-detail] [CERTIFICATION] After filtering empty slides:",
+              {
+                total: allSlides.length,
+                valid: validSlides.length,
+                empty: allSlides.length - validSlides.length,
+              },
+            );
+
             // Filter out quiz slides if excludeQuizSlides is true
             let filteredSlides = validSlides;
             if (excludeQuizSlides) {
-              filteredSlides = validSlides.filter((slide) => slide.kind !== "quiz");
-              console.log("[topic-detail] [CERTIFICATION] Filtered out quiz slides:", {
-                before: validSlides.length,
-                after: filteredSlides.length,
-                quizCount: validSlides.length - filteredSlides.length,
-              });
+              filteredSlides = validSlides.filter(
+                (slide) => slide.kind !== "quiz",
+              );
+              console.log(
+                "[topic-detail] [CERTIFICATION] Filtered out quiz slides:",
+                {
+                  before: validSlides.length,
+                  after: filteredSlides.length,
+                  quizCount: validSlides.length - filteredSlides.length,
+                },
+              );
             }
-            
+
             // Assign fractional positions for display order
             const validIds = filteredSlides.map((s) => s.id);
             const positions = computePositionsForOrder(validIds);
@@ -746,18 +779,25 @@ export function TopicDetailSection({
               ...slide,
               position: positions[index],
             }));
-            
+
             // If we filtered out any slides (non-image slides), mark them for deletion
             // Mark empty slides (including ghost image slides) for deletion
             const emptySlideIds = allSlides
               .filter((slide) => !slideHasContent(slide, isCertification))
               .map((slide) => slide.id);
-            
+
             if (emptySlideIds.length > 0) {
-              console.log("[topic-detail] [CERTIFICATION] Marking empty slides for deletion:", emptySlideIds);
+              console.log(
+                "[topic-detail] [CERTIFICATION] Marking empty slides for deletion:",
+                emptySlideIds,
+              );
             }
-            
-            console.log("[topic-detail] [CERTIFICATION] Setting local slides:", initialSlides.length, "slides");
+
+            console.log(
+              "[topic-detail] [CERTIFICATION] Setting local slides:",
+              initialSlides.length,
+              "slides",
+            );
             setLocalSlides(initialSlides);
             setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
             setHasUnsavedChanges(emptySlideIds.length > 0);
@@ -772,7 +812,7 @@ export function TopicDetailSection({
       } catch (err) {
         console.error("Failed to fetch topic:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to fetch topic details"
+          err instanceof Error ? err.message : "Failed to fetch topic details",
         );
       } finally {
         if (!skipLoading) {
@@ -780,7 +820,7 @@ export function TopicDetailSection({
         }
       }
     },
-    [isCertification, topicId, excludeQuizSlides, invalidateCertificationSlide]
+    [isCertification, topicId, excludeQuizSlides, invalidateCertificationSlide],
   );
 
   // Handle certification flow
@@ -807,7 +847,13 @@ export function TopicDetailSection({
         ? cachedTopics.find((t) => t.stageOrder === legacyTopicOrder)
         : cachedTopics.find((t) => createSlug(t.title) === topicSlug)
     ) as any;
-  }, [isCertification, cachedTopics, topicSlug, isLegacyTopicSlug, legacyTopicOrder]);
+  }, [
+    isCertification,
+    cachedTopics,
+    topicSlug,
+    isLegacyTopicSlug,
+    legacyTopicOrder,
+  ]);
 
   // Track the last processed topic ID to prevent infinite loops
   const lastProcessedTopicIdRef = useRef<string | null>(null);
@@ -873,7 +919,10 @@ export function TopicDetailSection({
     if (!isNewTopic) {
       // Same topic - sync title/status from TQ cache if it changed, but don't reset slides
       if (foundTopic && topic) {
-        if (foundTopic.title !== topic.title || foundTopic.status !== topic.status) {
+        if (
+          foundTopic.title !== topic.title ||
+          foundTopic.status !== topic.status
+        ) {
           setTopic({
             ...topic,
             title: foundTopic.title,
@@ -894,23 +943,24 @@ export function TopicDetailSection({
     // Topic already has slides and URLs from the cached data
     setTopic(foundTopic as Topic);
     const allSlides =
-      foundTopic.slides
-        ?.sort(compareSlidesByPosition)
-        .map((slide: any) => ({
-          id: slide.id,
-          kind: slide.kind as "text" | "image" | "video",
-          position: slide.position,
-          textHtml: slide.textHtml ?? null,
-          imageUrl: slide.imageUrl ?? null,
-          videoUrl: slide.videoUrl ?? null,
-          videoStartS: slide.videoStartS ?? null,
-          videoEndS: slide.videoEndS ?? null,
-          effectiveNotes: slide.officialNotes ?? null,
-          signedUrl: slide.signedUrl ?? null,
-        })) ?? [];
-    
+      foundTopic.slides?.sort(compareSlidesByPosition).map((slide: any) => ({
+        id: slide.id,
+        kind: slide.kind as "text" | "image" | "video",
+        position: slide.position,
+        textHtml: slide.textHtml ?? null,
+        imageUrl: slide.imageUrl ?? null,
+        videoUrl: slide.videoUrl ?? null,
+        videoStartS: slide.videoStartS ?? null,
+        videoEndS: slide.videoEndS ?? null,
+        effectiveNotes: slide.officialNotes ?? null,
+        signedUrl: slide.signedUrl ?? null,
+      })) ?? [];
+
     // Filter out empty slides (including ghost image slides with no valid URL/signedUrl)
-    console.log("[topic-detail] Loading slides - total slides from DB:", allSlides.length);
+    console.log(
+      "[topic-detail] Loading slides - total slides from DB:",
+      allSlides.length,
+    );
     const validSlides = allSlides.filter((slide) => {
       const hasContent = slideHasContent(slide, isCertification);
       if (!hasContent) {
@@ -924,7 +974,10 @@ export function TopicDetailSection({
         });
       } else {
         // Log details for the last slide to debug why it might appear empty
-        if (allSlides.length > 0 && allSlides[allSlides.length - 1]?.id === slide.id) {
+        if (
+          allSlides.length > 0 &&
+          allSlides[allSlides.length - 1]?.id === slide.id
+        ) {
           console.log("[topic-detail] Last slide content check:", {
             id: slide.id,
             kind: slide.kind,
@@ -939,13 +992,13 @@ export function TopicDetailSection({
       }
       return hasContent;
     });
-    
+
     console.log("[topic-detail] After filtering empty slides:", {
       total: allSlides.length,
       valid: validSlides.length,
       empty: allSlides.length - validSlides.length,
     });
-    
+
     // Assign fractional positions for display order
     const validIds = validSlides.map((s) => s.id);
     const positions = computePositionsForOrder(validIds);
@@ -953,13 +1006,16 @@ export function TopicDetailSection({
       ...slide,
       position: positions[index],
     }));
-    
+
     // If we filtered out any slides (including empty image slides / ghost slides), mark them for deletion
     if (allSlides.length !== validSlides.length) {
       const emptySlideIds = allSlides
         .filter((slide) => !slideHasContent(slide, isCertification))
         .map((slide) => slide.id);
-      console.log("[topic-detail] Marking empty slides for deletion:", emptySlideIds);
+      console.log(
+        "[topic-detail] Marking empty slides for deletion:",
+        emptySlideIds,
+      );
       setDeletedSlideIds(new Set(emptySlideIds));
       setHasUnsavedChanges(true);
     } else {
@@ -967,7 +1023,11 @@ export function TopicDetailSection({
       setDeletedSlideIds(new Set());
     }
 
-    console.log("[topic-detail] Setting local slides:", initialSlides.length, "slides");
+    console.log(
+      "[topic-detail] Setting local slides:",
+      initialSlides.length,
+      "slides",
+    );
     setLocalSlides(initialSlides);
     setOriginalSlides(JSON.parse(JSON.stringify(initialSlides)));
     setPendingFileUploads(new Map());
@@ -999,9 +1059,12 @@ export function TopicDetailSection({
   // Sync local topic state with TQ cache when topic is updated (for same topic ID)
   useEffect(() => {
     if (isCertification || !foundTopic || !topic) return;
-    
+
     if (foundTopic.id === topic.id) {
-      if (foundTopic.title !== topic.title || foundTopic.status !== topic.status) {
+      if (
+        foundTopic.title !== topic.title ||
+        foundTopic.status !== topic.status
+      ) {
         setTopic({
           ...topic,
           title: foundTopic.title,
@@ -1118,7 +1181,7 @@ export function TopicDetailSection({
     const updatedSlides = localSlides.map((slide) =>
       slide.id === currentSlide.id
         ? { ...slide, videoUrl: newUrl || null }
-        : slide
+        : slide,
     );
     setLocalSlides(updatedSlides);
     setHasUnsavedChanges(true);
@@ -1132,7 +1195,9 @@ export function TopicDetailSection({
 
     // Update local slide state
     const updatedSlides = localSlides.map((slide) =>
-      slide.id === currentSlide.id ? { ...slide, videoStartS: numValue } : slide
+      slide.id === currentSlide.id
+        ? { ...slide, videoStartS: numValue }
+        : slide,
     );
     setLocalSlides(updatedSlides);
     setHasUnsavedChanges(true);
@@ -1146,7 +1211,7 @@ export function TopicDetailSection({
 
     // Update local slide state
     const updatedSlides = localSlides.map((slide) =>
-      slide.id === currentSlide.id ? { ...slide, videoEndS: numValue } : slide
+      slide.id === currentSlide.id ? { ...slide, videoEndS: numValue } : slide,
     );
     setLocalSlides(updatedSlides);
     setHasUnsavedChanges(true);
@@ -1169,7 +1234,7 @@ export function TopicDetailSection({
     // Update local slide state with a preview URL (create object URL for preview)
     const previewUrl = URL.createObjectURL(file);
     const updatedSlides = localSlides.map((slide) =>
-      slide.id === currentSlide.id ? { ...slide, imageUrl: previewUrl } : slide
+      slide.id === currentSlide.id ? { ...slide, imageUrl: previewUrl } : slide,
     );
     setLocalSlides(updatedSlides);
     setImageUrlValue(previewUrl);
@@ -1201,7 +1266,7 @@ export function TopicDetailSection({
 
       // Update local slide state with preview URL
       const updatedSlides = localSlides.map((slide) =>
-        slide.id === currentSlide.id ? { ...slide, imageUrl: blobUrl } : slide
+        slide.id === currentSlide.id ? { ...slide, imageUrl: blobUrl } : slide,
       );
       setLocalSlides(updatedSlides);
       setImageUrlValue(blobUrl);
@@ -1216,13 +1281,13 @@ export function TopicDetailSection({
       setUploadError(
         error instanceof Error
           ? error.message
-          : "Failed to apply image. Please try again."
+          : "Failed to apply image. Please try again.",
       );
     }
   };
 
   const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -1311,7 +1376,7 @@ export function TopicDetailSection({
       } catch (err) {
         console.error("Update error:", err);
         setUploadError(
-          err instanceof Error ? err.message : "Failed to update URL"
+          err instanceof Error ? err.message : "Failed to update URL",
         );
       }
     }, 1000); // Wait 1 second after user stops typing
@@ -1451,7 +1516,7 @@ export function TopicDetailSection({
 
       // Update current slide index to track the dragged slide
       const newDraggedIndex = reorderedSlides.findIndex(
-        (s) => s.id === active.id
+        (s) => s.id === active.id,
       );
 
       if (newDraggedIndex !== -1) {
@@ -1460,7 +1525,7 @@ export function TopicDetailSection({
     } catch (err) {
       console.error("Failed to reorder slides:", err);
       setUploadError(
-        err instanceof Error ? err.message : "Failed to reorder slides"
+        err instanceof Error ? err.message : "Failed to reorder slides",
       );
     } finally {
       setIsReordering(false);
@@ -1484,16 +1549,18 @@ export function TopicDetailSection({
   // Handle inserting multiple slides at a specific position
   const handleInsertMultipleSlides = async (
     images: Array<{ imageData: Blob; blobUrl: string }>,
-    insertAfterIndex: number
+    insertAfterIndex: number,
   ) => {
     console.log("[topic-detail] handleInsertMultipleSlides called:", {
       imagesCount: images.length,
       insertAfterIndex,
       currentSlidesCount: localSlides.length,
     });
-    
+
     if (!topic || images.length === 0) {
-      console.warn("[topic-detail] handleInsertMultipleSlides: No topic or images, returning early");
+      console.warn(
+        "[topic-detail] handleInsertMultipleSlides: No topic or images, returning early",
+      );
       return;
     }
 
@@ -1508,7 +1575,7 @@ export function TopicDetailSection({
         `image-${Date.now()}-${index}.jpg`,
         {
           type: image.imageData.type || "image/jpeg",
-        }
+        },
       );
 
       // Store file for bulk upload (add to the same Map)
@@ -1526,18 +1593,22 @@ export function TopicDetailSection({
         effectiveNotes: null,
         quizData: null,
       };
-      
+
       console.log("[topic-detail] Creating new slide:", {
         id: slide.id,
         kind: slide.kind,
         hasImageUrl: !!slide.imageUrl,
         hasPendingUpload: true,
       });
-      
+
       return slide;
     });
-    
-    console.log("[topic-detail] Created", newSlides.length, "new slides with content");
+
+    console.log(
+      "[topic-detail] Created",
+      newSlides.length,
+      "new slides with content",
+    );
 
     // Update pending uploads once with all files
     setPendingFileUploads(newPendingUploads);
@@ -1559,7 +1630,7 @@ export function TopicDetailSection({
 
     // Navigate to the first newly created slide
     const firstNewSlideIndex = reorderedSlides.findIndex(
-      (s) => s.id === newSlides[0].id
+      (s) => s.id === newSlides[0].id,
     );
     if (firstNewSlideIndex !== -1) {
       setCurrentSlideIndex(firstNewSlideIndex);
@@ -1570,10 +1641,7 @@ export function TopicDetailSection({
   };
 
   // Handle inserting a video slide (YouTube or Vimeo) at a specific position
-  const handleInsertVideo = (
-    videoUrl: string,
-    insertAfterIndex: number
-  ) => {
+  const handleInsertVideo = (videoUrl: string, insertAfterIndex: number) => {
     if (!topic) return;
 
     // Generate temporary ID for new slide
@@ -1634,7 +1702,7 @@ export function TopicDetailSection({
     const remainingSlides = localSlides.filter((s) => !newDeletedIds.has(s.id));
     const newIndex = Math.max(
       0,
-      Math.min(currentSlideIndex, remainingSlides.length - 1)
+      Math.min(currentSlideIndex, remainingSlides.length - 1),
     );
     setCurrentSlideIndex(newIndex);
 
@@ -1644,7 +1712,7 @@ export function TopicDetailSection({
   // Validate that all new slides have images, videos, or quiz data
   const validateNewSlides = (): { isValid: boolean; message?: string } => {
     const newSlides = localSlides.filter(
-      (s) => s.id.startsWith("temp_") && !deletedSlideIds.has(s.id)
+      (s) => s.id.startsWith("temp_") && !deletedSlideIds.has(s.id),
     );
 
     for (const slide of newSlides) {
@@ -1710,9 +1778,7 @@ export function TopicDetailSection({
     const changes: ChangeItem[] = [];
 
     // Get original slides sorted by position
-    const originalSorted = [...originalSlides].sort(
-      compareSlidesByPosition
-    );
+    const originalSorted = [...originalSlides].sort(compareSlidesByPosition);
 
     // Get current slides sorted by position (excluding deleted)
     const currentSorted = localSlides
@@ -1721,12 +1787,12 @@ export function TopicDetailSection({
 
     // Find deleted slides (from original that are now deleted)
     const deletedSlides = originalSlides.filter((s) =>
-      deletedSlideIds.has(s.id)
+      deletedSlideIds.has(s.id),
     );
     for (const deletedSlide of deletedSlides) {
       // Find original position (1-indexed) in the original sorted list
       const originalIdx = originalSorted.findIndex(
-        (s) => s.id === deletedSlide.id
+        (s) => s.id === deletedSlide.id,
       );
       if (originalIdx >= 0) {
         changes.push({
@@ -1740,11 +1806,11 @@ export function TopicDetailSection({
 
     // Find replaced images (existing slides with changed imageUrl)
     const existingSlides = currentSorted.filter(
-      (s) => !s.id.startsWith("temp_")
+      (s) => !s.id.startsWith("temp_"),
     );
     for (const currentSlide of existingSlides) {
       const originalSlide = originalSlides.find(
-        (s) => s.id === currentSlide.id
+        (s) => s.id === currentSlide.id,
       );
       if (originalSlide) {
         // Check if image was replaced
@@ -1753,7 +1819,7 @@ export function TopicDetailSection({
           (originalSlide.imageUrl || currentSlide.imageUrl);
         if (imageReplaced) {
           const slideIndex = currentSorted.findIndex(
-            (s) => s.id === currentSlide.id
+            (s) => s.id === currentSlide.id,
           );
           const slideNumber = slideIndex + 1;
           changes.push({
@@ -1772,7 +1838,7 @@ export function TopicDetailSection({
 
     for (const newSlide of newSlides) {
       const newSlideIndex = currentSorted.findIndex(
-        (s) => s.id === newSlide.id
+        (s) => s.id === newSlide.id,
       );
       // Final slide number (1-indexed) in the final order
       const finalSlideNumber = newSlideIndex + 1;
@@ -1841,7 +1907,7 @@ export function TopicDetailSection({
       (s) =>
         !s.id.startsWith("temp_") &&
         !deletedSlideIds.has(s.id) &&
-        pendingFileUploads.has(s.id)
+        pendingFileUploads.has(s.id),
     );
     const hasDeletes = deletedSlideIds.size > 0;
     const hasReorder = (() => {
@@ -1900,7 +1966,7 @@ export function TopicDetailSection({
 
       // Step 1: Prepare operations
       const activeSlides = localSlides.filter(
-        (s) => !deletedSlideIds.has(s.id)
+        (s) => !deletedSlideIds.has(s.id),
       );
 
       // Filter out empty slides (slides without images, videos, quiz data, or text)
@@ -1909,7 +1975,7 @@ export function TopicDetailSection({
         totalActiveSlides: activeSlides.length,
         pendingFileUploads: pendingFileUploads.size,
       });
-      
+
       const validSlides: typeof activeSlides = [];
       const newDeletedIds = new Set(deletedSlideIds);
 
@@ -1945,20 +2011,32 @@ export function TopicDetailSection({
           hasPendingUpload
         ) {
           validSlides.push(slide);
-          console.log("[topic-detail] performSave: Keeping slide with content:", slideContent);
+          console.log(
+            "[topic-detail] performSave: Keeping slide with content:",
+            slideContent,
+          );
         } else {
           // Empty slide - mark for deletion if it's an existing slide (not a temp slide)
-          console.warn("[topic-detail] performSave: Found empty slide:", slideContent);
+          console.warn(
+            "[topic-detail] performSave: Found empty slide:",
+            slideContent,
+          );
           if (!slide.id.startsWith("temp_")) {
-            console.log("[topic-detail] performSave: Marking existing empty slide for deletion:", slide.id);
+            console.log(
+              "[topic-detail] performSave: Marking existing empty slide for deletion:",
+              slide.id,
+            );
             newDeletedIds.add(slide.id);
           } else {
-            console.log("[topic-detail] performSave: Skipping temp slide without content (won't be created):", slide.id);
+            console.log(
+              "[topic-detail] performSave: Skipping temp slide without content (won't be created):",
+              slide.id,
+            );
           }
           // Temp slides without content are simply not included (they won't be created)
         }
       }
-      
+
       console.log("[topic-detail] performSave: After filtering:", {
         validSlides: validSlides.length,
         emptySlidesMarkedForDeletion: newDeletedIds.size - deletedSlideIds.size,
@@ -2042,7 +2120,7 @@ export function TopicDetailSection({
           deletes: finalDeletedIds,
           reorder: slideIds,
           desiredOrder,
-        })
+        }),
       );
 
       // Add files for new slides (keyed by tempId)
@@ -2076,7 +2154,7 @@ export function TopicDetailSection({
       });
       const operationsSize = operationsJson.length;
       const totalPayloadSizeMB = (totalSize + operationsSize) / (1024 * 1024);
-      
+
       console.log("[topic-detail] Upload size check:", {
         fileCount,
         totalSizeMB: sizeInMB.toFixed(2),
@@ -2093,7 +2171,7 @@ export function TopicDetailSection({
         chunkCreates: typeof creates,
         chunkUpdates: typeof updates,
         chunkDeletes: string[],
-        chunkFiles: Map<string, File>
+        chunkFiles: Map<string, File>,
       ) => {
         const chunkFormData = new FormData();
         chunkFormData.append(
@@ -2104,7 +2182,7 @@ export function TopicDetailSection({
             updates: chunkUpdates,
             deletes: chunkDeletes,
             reorder: [], // We'll handle reorder at the end
-          })
+          }),
         );
 
         for (const [key, file] of chunkFiles.entries()) {
@@ -2122,7 +2200,7 @@ export function TopicDetailSection({
       const estimateChunkSize = (
         chunkCreates: typeof creates,
         chunkUpdates: typeof updates,
-        chunkFiles: Map<string, File>
+        chunkFiles: Map<string, File>,
       ): number => {
         let size = JSON.stringify({
           topicId: topic.id,
@@ -2164,7 +2242,7 @@ export function TopicDetailSection({
       } else {
         // Need to chunk - split into multiple requests
         console.log(
-          `[topic-detail] Payload too large (${totalPayloadSizeMB.toFixed(2)} MB), chunking into smaller batches...`
+          `[topic-detail] Payload too large (${totalPayloadSizeMB.toFixed(2)} MB), chunking into smaller batches...`,
         );
 
         const chunks: Array<{
@@ -2286,46 +2364,46 @@ export function TopicDetailSection({
               estimateChunkSize(c.creates, c.updates, c.files) /
               (1024 * 1024)
             ).toFixed(2),
-          }))
+          })),
         );
 
         // Process chunks sequentially; accumulate tempId->realId for desiredOrder resolution
         let lastResult: any = null;
         const tempToRealMap = new Map<string, string>();
         const totalChunks = chunks.length;
-        const progressPerChunk = hasFileUploads ? 60 / totalChunks : 80 / totalChunks;
+        const progressPerChunk = hasFileUploads
+          ? 60 / totalChunks
+          : 80 / totalChunks;
 
         for (let i = 0; i < chunks.length; i++) {
           const chunk = chunks[i];
           const chunkNum = i + 1;
 
           console.log(
-            `[topic-detail] Processing chunk ${chunkNum}/${totalChunks}...`
+            `[topic-detail] Processing chunk ${chunkNum}/${totalChunks}...`,
           );
 
-          setSaveStatus(
-            `Processing batch ${chunkNum} of ${totalChunks}...`
-          );
+          setSaveStatus(`Processing batch ${chunkNum} of ${totalChunks}...`);
           setSaveProgress(20 + progressPerChunk * i);
 
           const chunkFormData = createChunk(
             chunk.creates,
             chunk.updates,
             chunk.deletes,
-            chunk.files
+            chunk.files,
           );
 
           const chunkResult = isCertification
             ? await certificationApi.topics.slides.bulkSave(
                 topic.id,
-                chunkFormData
+                chunkFormData,
               )
             : await topicsApi.slides.bulkSave(chunkFormData);
 
           if (chunkResult.error) {
             throw new Error(
               chunkResult.error.message ||
-                `Failed to save chunk ${chunkNum} of ${totalChunks}`
+                `Failed to save chunk ${chunkNum} of ${totalChunks}`,
             );
           }
 
@@ -2337,7 +2415,7 @@ export function TopicDetailSection({
           )?.createdSlideMapping;
           if (mapping) {
             Object.entries(mapping).forEach(([tempId, realId]) =>
-              tempToRealMap.set(tempId, realId)
+              tempToRealMap.set(tempId, realId),
             );
           }
         }
@@ -2362,19 +2440,19 @@ export function TopicDetailSection({
               deletes: [],
               reorder: slideIds,
               desiredOrder: resolvedOrder,
-            })
+            }),
           );
 
           const reorderResult = isCertification
             ? await certificationApi.topics.slides.bulkSave(
                 topic.id,
-                reorderFormData
+                reorderFormData,
               )
             : await topicsApi.slides.bulkSave(reorderFormData);
 
           if (reorderResult.error) {
             throw new Error(
-              reorderResult.error.message || "Failed to reorder slides"
+              reorderResult.error.message || "Failed to reorder slides",
             );
           }
 
@@ -2443,7 +2521,7 @@ export function TopicDetailSection({
                 if (hadUpload && !slide.imageUrl) {
                   console.error(
                     `Slide ${slide.id} had a file upload but server response doesn't include imageUrl. Server slide data:`,
-                    slide
+                    slide,
                   );
                 }
 
@@ -2486,7 +2564,7 @@ export function TopicDetailSection({
           if (pendingFileUploads.size > 0) {
             console.error(
               "Server response doesn't include slides but we had file uploads. Response:",
-              result.data
+              result.data,
             );
             // Don't update localSlides - keep the current state with blobUrls for now
             // The user can try saving again
@@ -2499,14 +2577,14 @@ export function TopicDetailSection({
 
         // Batch invalidate cache for slides that had files uploaded
         const slideIdsToInvalidate = new Set<string>();
-        
+
         // For existing slides with file uploads
         for (const slideId of Array.from(pendingFileUploads.keys())) {
           if (!slideId.startsWith("temp_")) {
             slideIdsToInvalidate.add(slideId);
           }
         }
-        
+
         // For newly created slides, invalidate by matching tempId/position
         if (
           result.data &&
@@ -2514,18 +2592,19 @@ export function TopicDetailSection({
           result.data.topic?.slides
         ) {
           const tempSlidesWithFiles = localSlides.filter(
-            (s) => s.id.startsWith("temp_") && pendingFileUploads.has(s.id)
+            (s) => s.id.startsWith("temp_") && pendingFileUploads.has(s.id),
           );
           for (const tempSlide of tempSlidesWithFiles) {
             const createdSlide = result.data.topic.slides.find(
-              (s: any) => s.id === tempSlide.id || s.position === tempSlide.position
+              (s: any) =>
+                s.id === tempSlide.id || s.position === tempSlide.position,
             );
             if (createdSlide) {
               slideIdsToInvalidate.add(createdSlide.id);
             }
           }
         }
-        
+
         // Batch invalidate all slides with uploads at once
         slideIdsToInvalidate.forEach((slideId) => {
           if (isCertification) {
@@ -2552,7 +2631,7 @@ export function TopicDetailSection({
         // Also include slides from the response topic if available
         if (responseTopic?.slides) {
           responseTopic.slides.forEach((slide: any) =>
-            allSlideIds.add(slide.id)
+            allSlideIds.add(slide.id),
           );
         }
 
@@ -2601,7 +2680,7 @@ export function TopicDetailSection({
       }
     } catch (err) {
       console.error("Bulk save error:", err);
-      
+
       // Check for payload size errors
       let errorMessage = "Failed to save changes";
       if (err instanceof Error) {
@@ -2625,7 +2704,7 @@ export function TopicDetailSection({
           errorMessage = err.message;
         }
       }
-      
+
       setUploadError(errorMessage);
       setSaveProgress(0);
       setSaveStatus("Upload failed");
@@ -2689,7 +2768,7 @@ export function TopicDetailSection({
       // Flag says there are changes but calculateChanges found none
       // This can happen if changes were reverted - save anyway to sync state
       console.log(
-        "Flag says changes but calculateChanges found none, saving directly"
+        "Flag says changes but calculateChanges found none, saving directly",
       );
       performSave();
       return;
@@ -2698,7 +2777,7 @@ export function TopicDetailSection({
     // Step 3: Show changes confirmation dialog
     console.log(
       "Setting showChangesDialog to true, changes count:",
-      changes.length
+      changes.length,
     );
     // Store the changes before showing dialog to avoid recalculation issues
     if (changes.length > 0) {
@@ -3149,10 +3228,13 @@ export function TopicDetailSection({
                       {/* Question - Centered and Bold */}
                       <div className="text-center">
                         <h2 className="text-2xl font-bold">
-                          {(currentSlide as ExtendedSlideData).quizData?.question
+                          {(currentSlide as ExtendedSlideData).quizData
+                            ?.question
                             ? renderQuestionWithUrls(
-                                (currentSlide as ExtendedSlideData).quizData!.question,
-                                (currentSlide as ExtendedSlideData).quizData!.questionUrls
+                                (currentSlide as ExtendedSlideData).quizData!
+                                  .question,
+                                (currentSlide as ExtendedSlideData).quizData!
+                                  .questionUrls,
                               )
                             : "Question"}
                         </h2>
@@ -3182,7 +3264,7 @@ export function TopicDetailSection({
                                   {answer.text || `Answer ${index + 1}`}
                                 </Label>
                               </div>
-                            )
+                            ),
                           ) || []}
                         </RadioGroup>
                       </div>
@@ -3526,34 +3608,36 @@ export function TopicDetailSection({
                     })}
                   </div>
                   <DragOverlay>
-                    {activeSlideId ? (() => {
-                      const draggedIndex = slides.findIndex(
-                        (s) => s.id === activeSlideId
-                      );
-                      const draggedSlide = slides[draggedIndex];
-                      if (!draggedSlide) return null;
-                      return (
-                        <div
-                          className="flex-shrink-0 relative rounded-lg overflow-hidden shadow-lg bg-background opacity-90 rotate-3 scale-105"
-                          style={{
-                            width: "180px",
-                            aspectRatio: "16 / 9",
-                          }}
-                        >
-                          <div className="w-full h-full relative">
-                            <SlideRenderer
-                              slide={draggedSlide}
-                              className="w-full h-full"
-                              thumbnailOnly={true}
-                              isCertification={isCertification}
-                            />
-                          </div>
-                          <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
-                            Slide {draggedIndex + 1}
-                          </div>
-                        </div>
-                      );
-                    })() : null}
+                    {activeSlideId
+                      ? (() => {
+                          const draggedIndex = slides.findIndex(
+                            (s) => s.id === activeSlideId,
+                          );
+                          const draggedSlide = slides[draggedIndex];
+                          if (!draggedSlide) return null;
+                          return (
+                            <div
+                              className="flex-shrink-0 relative rounded-lg overflow-hidden shadow-lg bg-background opacity-90 rotate-3 scale-105"
+                              style={{
+                                width: "180px",
+                                aspectRatio: "16 / 9",
+                              }}
+                            >
+                              <div className="w-full h-full relative">
+                                <SlideRenderer
+                                  slide={draggedSlide}
+                                  className="w-full h-full"
+                                  thumbnailOnly={true}
+                                  isCertification={isCertification}
+                                />
+                              </div>
+                              <div className="absolute bottom-0 left-0 right-0 text-center text-xs font-medium py-1 px-2 bg-background/80 text-foreground">
+                                Slide {draggedIndex + 1}
+                              </div>
+                            </div>
+                          );
+                        })()
+                      : null}
                   </DragOverlay>
                 </SortableContext>
               </DndContext>
@@ -3651,7 +3735,7 @@ export function TopicDetailSection({
                       setBulkDeleteSelectedIds(new Set());
                     } else {
                       setBulkDeleteSelectedIds(
-                        new Set(slidesForBulk.map((s) => s.id))
+                        new Set(slidesForBulk.map((s) => s.id)),
                       );
                     }
                   }}
@@ -3659,7 +3743,7 @@ export function TopicDetailSection({
                 >
                   {(() => {
                     const slidesForBulk = localSlides.filter(
-                      (s) => !deletedSlideIds.has(s.id)
+                      (s) => !deletedSlideIds.has(s.id),
                     );
                     return bulkDeleteSelectedIds.size === slidesForBulk.length
                       ? "Deselect All"
@@ -3695,10 +3779,13 @@ export function TopicDetailSection({
                               next.add(slide.id);
                             }
                             return next;
-                          })}
-                        }
+                          });
+                        }}
                       >
-                        <div className="relative w-full overflow-hidden bg-muted" style={{ aspectRatio: "16/9" }}>
+                        <div
+                          className="relative w-full overflow-hidden bg-muted"
+                          style={{ aspectRatio: "16/9" }}
+                        >
                           <SlideRenderer
                             slide={slide}
                             className="w-full h-full [&_img]:object-cover [&_video]:object-cover"
@@ -3759,19 +3846,24 @@ export function TopicDetailSection({
                 setShowBulkDeleteDialog(false);
 
                 const remainingSlides = localSlides.filter(
-                  (s) => !newDeletedIds.has(s.id)
+                  (s) => !newDeletedIds.has(s.id),
                 );
                 const currentSlideId = currentSlide?.id;
                 // Always ensure currentSlideIndex is valid after bulk delete
-                if (currentSlideId && remainingSlides.some((s) => s.id === currentSlideId)) {
+                if (
+                  currentSlideId &&
+                  remainingSlides.some((s) => s.id === currentSlideId)
+                ) {
                   // Current slide survived: find its new index
-                  const newIndex = remainingSlides.findIndex((s) => s.id === currentSlideId);
+                  const newIndex = remainingSlides.findIndex(
+                    (s) => s.id === currentSlideId,
+                  );
                   if (newIndex >= 0) setCurrentSlideIndex(newIndex);
                 } else {
                   // Current slide was deleted or undefined: clamp to valid range
                   const newIndex = Math.max(
                     0,
-                    Math.min(currentSlideIndex, remainingSlides.length - 1)
+                    Math.min(currentSlideIndex, remainingSlides.length - 1),
                   );
                   setCurrentSlideIndex(newIndex);
                 }
@@ -3860,7 +3952,8 @@ export function TopicDetailSection({
               Saving Changes
             </DialogTitle>
             <DialogDescription>
-              {saveStatus || "Please wait while your changes are being saved..."}
+              {saveStatus ||
+                "Please wait while your changes are being saved..."}
             </DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
@@ -3923,13 +4016,15 @@ export function TopicDetailSection({
       />
 
       {/* Lesson Plan Dialog */}
-      <Dialog open={showLessonPlanDialog} onOpenChange={setShowLessonPlanDialog}>
+      <Dialog
+        open={showLessonPlanDialog}
+        onOpenChange={setShowLessonPlanDialog}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Lesson Plans</DialogTitle>
             <DialogDescription>
-              Manage lesson plan PDFs for{" "}
-              {topic?.title || "this topic"}
+              Manage lesson plan PDFs for {topic?.title || "this topic"}
             </DialogDescription>
           </DialogHeader>
 
@@ -3958,9 +4053,7 @@ export function TopicDetailSection({
                 )}
                 {isUploadingLessonPlan ? "Uploading..." : "Upload PDF"}
               </Button>
-              <p className="text-muted-foreground text-sm">
-                PDF files only
-              </p>
+              <p className="text-muted-foreground text-sm">PDF files only</p>
             </div>
 
             {/* Plans list */}
@@ -4100,7 +4193,9 @@ export function TopicDetailSection({
               invalidateAfterMutation(`/topics/${topic.id}`, { id: topic.id });
             }
             if (cachedStage.id) {
-              invalidateAfterMutation(`/stages/${cachedStage.id}`, { id: cachedStage.id });
+              invalidateAfterMutation(`/stages/${cachedStage.id}`, {
+                id: cachedStage.id,
+              });
             }
 
             // Trigger background refetch (non-blocking)
@@ -4110,7 +4205,9 @@ export function TopicDetailSection({
           onTopicDeleted={async () => {
             // Invalidate React Query cache
             if (cachedStage.id) {
-              invalidateAfterMutation(`/stages/${cachedStage.id}`, { id: cachedStage.id });
+              invalidateAfterMutation(`/stages/${cachedStage.id}`, {
+                id: cachedStage.id,
+              });
             }
             if (topic.id) {
               invalidateAfterMutation(`/topics/${topic.id}`, { id: topic.id });

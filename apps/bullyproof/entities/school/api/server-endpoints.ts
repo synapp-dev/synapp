@@ -1,8 +1,8 @@
+import type { SchoolReadableRow } from "@/types/db";
 // Server-side school API endpoints
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher";
-import type { vSchoolsReadable } from "@/drizzle/schema";
 
-type School = typeof vSchoolsReadable.$inferSelect;
+type School = SchoolReadableRow;
 
 export const schoolServerApi = {
   get: {

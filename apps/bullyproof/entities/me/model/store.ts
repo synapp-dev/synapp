@@ -1,7 +1,7 @@
+import type { UserProfileExpandedRow } from "@/types/db";
 import { create } from "zustand";
-import type { vUserProfileExpanded } from "@/drizzle/schema";
 
-type UserProfile = typeof vUserProfileExpanded.$inferSelect;
+type UserProfile = UserProfileExpandedRow;
 
 // Per-level permission: enabled = can use feature; visible = show in nav (null = follow enabled)
 export type FeaturePermissionLevel = {

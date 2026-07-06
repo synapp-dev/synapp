@@ -18,7 +18,7 @@ import {
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { Loader2, CheckCheck } from "lucide-react";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";

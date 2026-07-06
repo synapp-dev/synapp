@@ -1,5 +1,7 @@
 "use client";
 
+import type { SchoolYearRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -26,7 +28,6 @@ import {
 } from "@workspace/ui/components/command";
 import { Loader2, Plus, Check, ChevronDown } from "lucide-react";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
-import type { schoolYears } from "@/server/db/schema";
 
 interface AddStageSheetProps {
   open: boolean;
@@ -43,7 +44,7 @@ export function AddStageSheet({
   const [name, setName] = useState("");
   const [selectedYearIds, setSelectedYearIds] = useState<string[]>([]);
   const [availableYears, setAvailableYears] = useState<
-    Array<typeof schoolYears.$inferSelect & { level?: { id: string; name: string; key: string } }>
+    Array<SchoolYearRow & { level?: { id: string; name: string; key: string } }>
   >([]);
   const [loadingYears, setLoadingYears] = useState(false);
   const [yearComboboxOpen, setYearComboboxOpen] = useState(false);

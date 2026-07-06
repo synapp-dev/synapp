@@ -1,5 +1,7 @@
 "use client";
 
+import type { CertificationCourseRow, CourseTopicRow, TopicSlideRow } from "@/types/db";
+
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -22,18 +24,13 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { useCertificationCourses } from "@/entities/certification/model/store";
 import {
   useCertificationTopicsByCourseCode,
   useInvalidateCertificationTopics,
 } from "@/entities/certification/model/topics-store";
-import type {
-  certificationCourses,
-  courseTopics,
-  topicSlides,
-} from "@/server/db/schema";
 import {
   Card,
   CardContent,
@@ -92,13 +89,13 @@ import { CertificationCourseInformation } from "./certification-course-informati
 import { CertificationCourseRatings } from "./certification-course-ratings";
 import { CertificationCourseResults } from "./certification-course-results";
 
-type Course = typeof certificationCourses.$inferSelect & {
+type Course = CertificationCourseRow & {
   topicCount?: number;
 };
 
-type Topic = typeof courseTopics.$inferSelect & {
+type Topic = CourseTopicRow & {
   slides?: Array<
-    typeof topicSlides.$inferSelect & { signedUrl?: string | null }
+    TopicSlideRow & { signedUrl?: string | null }
   >;
 };
 

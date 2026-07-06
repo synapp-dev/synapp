@@ -1,13 +1,13 @@
+import type { UserProfileExpandedRow } from "@/types/db";
 import {
   useQuery,
   queryOptions,
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { meApi } from "./endpoints";
-import type { vUserProfileExpanded } from "@/drizzle/schema";
 import { meKeys } from "../model/keys";
 
-type UserProfile = typeof vUserProfileExpanded.$inferSelect;
+type UserProfile = UserProfileExpandedRow;
 
 export const getUserByIdOptions = (id: string) =>
   queryOptions<UserProfile | null>({

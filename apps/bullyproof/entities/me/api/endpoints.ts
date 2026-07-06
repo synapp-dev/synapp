@@ -1,10 +1,10 @@
+import type { SchoolEnrichedRow, UserProfileExpandedRow } from "@/types/db";
 // Client bundle should import the client fetcher; server-only code can use the server fetcher if needed
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { vUserProfileExpanded, vSchoolsEnriched } from "@/drizzle/schema";
 import type { UserProfileWithFeatures } from "@/entities/me/model/store";
 
-type UserProfile = typeof vUserProfileExpanded.$inferSelect;
-type School = typeof vSchoolsEnriched.$inferSelect;
+type UserProfile = UserProfileExpandedRow;
+type School = SchoolEnrichedRow;
 
 export type UpdateLogChange = {
   field: string;

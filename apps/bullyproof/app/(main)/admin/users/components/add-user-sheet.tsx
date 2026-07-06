@@ -1,5 +1,7 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -17,7 +19,6 @@ import { rolesApi } from "@/entities/roles/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { useUserEmailLookup } from "@/entities/users/hooks/use-user-email-lookup";
-import type { roles } from "@/server/db/schema";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
   Loader2,
@@ -59,7 +60,7 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 type UserType = "bullyproof" | "government" | "school" | null;
 
@@ -90,12 +91,8 @@ export function AddUserSheet({
   const [loadingSchools, setLoadingSchools] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [schoolComboboxOpen, setSchoolComboboxOpen] = useState(false);
-  const {
-    lookupByEmail,
-    lookupLoading,
-    resetLookup,
-    userExists,
-  } = useUserEmailLookup();
+  const { lookupByEmail, lookupLoading, resetLookup, userExists } =
+    useUserEmailLookup();
 
   const totalSteps = 4;
 
@@ -168,8 +165,7 @@ export function AddUserSheet({
         return (
           email.trim() !== "" &&
           /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) &&
-          (userExists ||
-            (firstName.trim() !== "" && lastName.trim() !== ""))
+          (userExists || (firstName.trim() !== "" && lastName.trim() !== ""))
         );
       case 2:
         return userType !== null;
@@ -218,7 +214,7 @@ export function AddUserSheet({
     switch (userType) {
       case "bullyproof":
         return roles.filter(
-          (r) => r.key === "PLATFORM_ADMIN" || r.key === "PLATFORM_STAFF"
+          (r) => r.key === "PLATFORM_ADMIN" || r.key === "PLATFORM_STAFF",
         );
       case "government":
         return roles.filter((r) => r.key === "GOVERNMENT_VIEWER");
@@ -227,7 +223,7 @@ export function AddUserSheet({
           (r) =>
             r.key === "SCHOOL_ADMIN" ||
             r.key === "TEACHER" ||
-            r.key === "SCHOOL_STAFF"
+            r.key === "SCHOOL_STAFF",
         );
       default:
         return [];
@@ -269,7 +265,7 @@ export function AddUserSheet({
       const levelNames = lvls.map((lvl) =>
         typeof lvl === "string"
           ? lvl
-          : (lvl as any)?.name || (lvl as any)?.key || ""
+          : (lvl as any)?.name || (lvl as any)?.key || "",
       );
       const lower = levelNames.map((s) => s.toLowerCase());
       const hasPrimary = lower.some((s) => s.includes("primary"));
@@ -385,61 +381,61 @@ export function AddUserSheet({
               </Alert>
             )}
             <>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && canProceedToNext()) {
+                      e.preventDefault();
+                      goNext();
+                    }
+                  }}
+                  autoFocus
+                  disabled={loading || lookupLoading}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="firstName">First Name *</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    placeholder="user@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="firstName"
+                    placeholder="John"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && canProceedToNext()) {
                         e.preventDefault();
                         goNext();
                       }
                     }}
-                    autoFocus
-                    disabled={loading || lookupLoading}
+                    disabled={loading || lookupLoading || userExists}
+                    className={userExists ? "bg-muted" : ""}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name *</Label>
-                    <Input
-                      id="firstName"
-                      placeholder="John"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && canProceedToNext()) {
-                          e.preventDefault();
-                          goNext();
-                        }
-                      }}
-                      disabled={loading || lookupLoading || userExists}
-                      className={userExists ? "bg-muted" : ""}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name *</Label>
-                    <Input
-                      id="lastName"
-                      placeholder="Doe"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && canProceedToNext()) {
-                          e.preventDefault();
-                          goNext();
-                        }
-                      }}
-                      disabled={loading || lookupLoading || userExists}
-                      className={userExists ? "bg-muted" : ""}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Last Name *</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Doe"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && canProceedToNext()) {
+                        e.preventDefault();
+                        goNext();
+                      }
+                    }}
+                    disabled={loading || lookupLoading || userExists}
+                    className={userExists ? "bg-muted" : ""}
+                  />
                 </div>
-              </>
+              </div>
+            </>
           </div>
         );
 
@@ -468,12 +464,14 @@ export function AddUserSheet({
                   <BicepsFlexed className="h-5 w-5 mt-0.5 flex-shrink-0" />
                   <div className="flex flex-col items-start gap-1">
                     <span className="font-semibold">Bullyproof</span>
-                    <span className={cn(
-                      "text-xs",
-                      userType === "bullyproof"
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground"
-                    )}>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        userType === "bullyproof"
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground",
+                      )}
+                    >
                       Platform admin or staff
                     </span>
                   </div>
@@ -494,12 +492,14 @@ export function AddUserSheet({
                   <Landmark className="h-5 w-5 mt-0.5 flex-shrink-0" />
                   <div className="flex flex-col items-start gap-1">
                     <span className="font-semibold">Government</span>
-                    <span className={cn(
-                      "text-xs",
-                      userType === "government"
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground"
-                    )}>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        userType === "government"
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground",
+                      )}
+                    >
                       Government admin
                     </span>
                   </div>
@@ -520,12 +520,14 @@ export function AddUserSheet({
                   <SchoolIcon className="h-5 w-5 mt-0.5 flex-shrink-0" />
                   <div className="flex flex-col items-start gap-1">
                     <span className="font-semibold">School Member</span>
-                    <span className={cn(
-                      "text-xs",
-                      userType === "school"
-                        ? "text-primary-foreground/70"
-                        : "text-muted-foreground"
-                    )}>
+                    <span
+                      className={cn(
+                        "text-xs",
+                        userType === "school"
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground",
+                      )}
+                    >
                       School admin, teacher, or staff
                     </span>
                   </div>
@@ -544,7 +546,11 @@ export function AddUserSheet({
             ? extractSchoolMetadata(selectedSchoolObj)
             : null;
           const selectedParts = selectedMeta
-            ? [selectedMeta.stateText, selectedMeta.sectorText, selectedMeta.levelsText].filter(Boolean)
+            ? [
+                selectedMeta.stateText,
+                selectedMeta.sectorText,
+                selectedMeta.levelsText,
+              ].filter(Boolean)
             : [];
 
           // Define the order: Staff first (always on), then optional upgrades
@@ -565,7 +571,11 @@ export function AddUserSheet({
               {/* School Combobox */}
               <div className="space-y-2 shrink-0">
                 <Label>School *</Label>
-                <Popover open={schoolComboboxOpen} onOpenChange={setSchoolComboboxOpen} modal={true}>
+                <Popover
+                  open={schoolComboboxOpen}
+                  onOpenChange={setSchoolComboboxOpen}
+                  modal={true}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -599,12 +609,17 @@ export function AddUserSheet({
                           </div>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">Select a school...</span>
+                        <span className="text-muted-foreground">
+                          Select a school...
+                        </span>
                       )}
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                  >
                     <Command>
                       <CommandInput placeholder="Search schools..." />
                       <CommandList>
@@ -613,9 +628,11 @@ export function AddUserSheet({
                           {schools.map((school) => {
                             const { stateText, sectorText, levelsText } =
                               extractSchoolMetadata(school);
-                            const parts = [stateText, sectorText, levelsText].filter(
-                              Boolean
-                            );
+                            const parts = [
+                              stateText,
+                              sectorText,
+                              levelsText,
+                            ].filter(Boolean);
                             const isSelected = schoolId === school.id;
 
                             return (
@@ -625,7 +642,9 @@ export function AddUserSheet({
                                 onSelect={() => {
                                   setSchoolId(isSelected ? "" : school.id);
                                   // Default to staff when selecting a new school
-                                  setSelectedRoleKey(isSelected ? "" : "SCHOOL_STAFF");
+                                  setSelectedRoleKey(
+                                    isSelected ? "" : "SCHOOL_STAFF",
+                                  );
                                   setSchoolComboboxOpen(false);
                                 }}
                                 className="cursor-pointer py-2"
@@ -666,7 +685,10 @@ export function AddUserSheet({
                   {loadingRoles ? (
                     <div className="space-y-3 py-2">
                       {[1, 2, 3].map((i) => (
-                        <div key={i} className="flex items-center gap-3 px-3 py-2">
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 px-3 py-2"
+                        >
                           <div className="w-4 h-4 bg-muted rounded" />
                           <div className="h-4 w-32 bg-muted rounded" />
                         </div>
@@ -716,7 +738,7 @@ export function AddUserSheet({
                               checked && !disabled && "bg-primary/5",
                               disabled
                                 ? "opacity-60 cursor-default"
-                                : "cursor-pointer hover:bg-muted/50"
+                                : "cursor-pointer hover:bg-muted/50",
                             )}
                             onClick={() => {
                               if (!disabled) {
@@ -724,7 +746,10 @@ export function AddUserSheet({
                               }
                             }}
                             onKeyDown={(e) => {
-                              if (!disabled && (e.key === "Enter" || e.key === " ")) {
+                              if (
+                                !disabled &&
+                                (e.key === "Enter" || e.key === " ")
+                              ) {
                                 e.preventDefault();
                                 handleSchoolRoleToggle(roleKey);
                               }
@@ -733,13 +758,19 @@ export function AddUserSheet({
                             <Checkbox
                               checked={checked}
                               disabled={disabled}
-                              onCheckedChange={() => handleSchoolRoleToggle(roleKey)}
+                              onCheckedChange={() =>
+                                handleSchoolRoleToggle(roleKey)
+                              }
                               onClick={(e) => e.stopPropagation()}
                               className="shrink-0"
                             />
                             <div
                               className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
-                              style={{ backgroundColor: disabled ? "#9ca3af" : "#008993" }}
+                              style={{
+                                backgroundColor: disabled
+                                  ? "#9ca3af"
+                                  : "#008993",
+                              }}
                             >
                               <RoleIcon className="w-3.5 h-3.5 text-white" />
                             </div>
@@ -765,8 +796,12 @@ export function AddUserSheet({
                               <TooltipTrigger asChild>
                                 {rowContent}
                               </TooltipTrigger>
-                              <TooltipContent side="top" className="max-w-[260px]">
-                                Every user assigned to a school will always have the staff role at a minimum
+                              <TooltipContent
+                                side="top"
+                                className="max-w-[260px]"
+                              >
+                                Every user assigned to a school will always have
+                                the staff role at a minimum
                               </TooltipContent>
                             </Tooltip>
                           );
@@ -828,7 +863,7 @@ export function AddUserSheet({
                           "px-4 py-2.5 cursor-pointer transition-all hover:shadow-md",
                           isSelected
                             ? "border-primary shadow-md bg-primary/5"
-                            : "hover:border-primary/50"
+                            : "hover:border-primary/50",
                         )}
                         onClick={() => {
                           setSelectedRoleKey(isSelected ? "" : roleKey);
@@ -970,10 +1005,11 @@ export function AddUserSheet({
                   key={index}
                   className={cn(
                     "flex flex-col items-center relative flex-1",
-                    index < stepLabels.length - 1 && "after:content-[''] after:absolute after:top-4 after:left-[calc(50%+16px)] after:w-[calc(100%-32px)] after:h-[2px]",
+                    index < stepLabels.length - 1 &&
+                      "after:content-[''] after:absolute after:top-4 after:left-[calc(50%+16px)] after:w-[calc(100%-32px)] after:h-[2px]",
                     index < stepLabels.length - 1 && isCompleted
                       ? "after:bg-[var(--brand-bullyproof-primary)]"
-                      : "after:bg-border"
+                      : "after:bg-border",
                   )}
                 >
                   <div
@@ -985,14 +1021,10 @@ export function AddUserSheet({
                         "bg-[var(--brand-bullyproof-primary)] text-white ring-4 ring-[var(--brand-bullyproof-primary)]/20",
                       !isCompleted &&
                         !isCurrent &&
-                        "bg-muted text-muted-foreground border-2 border-border"
+                        "bg-muted text-muted-foreground border-2 border-border",
                     )}
                   >
-                    {isCompleted ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      stepNumber
-                    )}
+                    {isCompleted ? <Check className="h-4 w-4" /> : stepNumber}
                   </div>
                   <span
                     className={cn(
@@ -1001,7 +1033,7 @@ export function AddUserSheet({
                         ? "text-foreground"
                         : isCompleted
                           ? "text-[var(--brand-bullyproof-primary)]"
-                          : "text-muted-foreground"
+                          : "text-muted-foreground",
                     )}
                   >
                     {label}
@@ -1035,7 +1067,7 @@ export function AddUserSheet({
                 type="button"
                 variant="ghost"
                 onClick={() => {
-                  goBack()
+                  goBack();
                 }}
                 disabled={loading}
               >

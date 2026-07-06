@@ -7,6 +7,7 @@ import {
   type UpdateSchoolParams,
 } from "./school.validators";
 import { schoolRepo } from "./school.repo";
+import { resolveSchoolId } from "./resolve-school-ref";
 import { curriculumRepo } from "../curriculum/curriculum.repo";
 import { permissionTemplatesService } from "../permission-templates/permission-templates.service";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -197,29 +198,15 @@ export const schoolService = {
   },
 
   async getSchoolStats(ctx: AuthContext, schoolIdOrSlug: string) {
-    let schoolId = schoolIdOrSlug;
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(schoolIdOrSlug)) {
-      const rows = await schoolRepo.getBySlug(schoolIdOrSlug);
-      const school = rows[0];
-      if (!school) return null;
-      schoolId = school.id;
-    }
+    const schoolId = await resolveSchoolId(schoolIdOrSlug);
+    if (!schoolId) return null;
     await assertCanViewSchool(ctx, schoolId);
     return schoolRepo.getSchoolStats(schoolId);
   },
 
   async getKeyStaff(ctx: AuthContext, schoolIdOrSlug: string) {
-    let schoolId = schoolIdOrSlug;
-    const uuidRegex =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(schoolIdOrSlug)) {
-      const rows = await schoolRepo.getBySlug(schoolIdOrSlug);
-      const school = rows[0];
-      if (!school) return null;
-      schoolId = school.id;
-    }
+    const schoolId = await resolveSchoolId(schoolIdOrSlug);
+    if (!schoolId) return null;
     await assertCanViewSchool(ctx, schoolId);
     return schoolRepo.getKeyStaff(schoolId);
   },

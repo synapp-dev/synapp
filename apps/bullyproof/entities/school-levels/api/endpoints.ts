@@ -1,7 +1,7 @@
+import type { SchoolLevelRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { schoolLevels } from "@/server/db/schema";
 
-type SchoolLevel = typeof schoolLevels.$inferSelect;
+type SchoolLevel = SchoolLevelRow;
 
 export const schoolLevelsApi = {
   get: {

@@ -43,6 +43,7 @@ import { useFeaturesAccess } from "@/hooks/use-features-access";
 import { MAINTENANCE_FEATURE_KEY } from "@/lib/feature-keys";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { useUserLessonsStatusRealtime } from "@/hooks/use-lesson-status-realtime";
+import { openSupportEmail } from "@/lib/support";
 
 // This is sample data.
 const data = {
@@ -108,14 +109,14 @@ const data = {
   ],
   navCurriculum: [
     {
-      title: "Lessons",
+      title: "Teach Lessons",
       url: "/lessons",
       icon: Presentation,
       isActive: false,
       feature: "/school/lessons", // Feature key for access control
     },
     {
-      title: "Content",
+      title: "Preview Lessons",
       url: "/content",
       icon: BookOpenText,
       isActive: false,
@@ -325,6 +326,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           if (access?.visible && !access?.hasAccess) {
             return { ...item, disabled: true, disabledMessage: "Locked" };
           }
+        }
+        if (item.title === "Support") {
+          return { ...item, onClick: () => openSupportEmail() };
         }
         return item;
       });

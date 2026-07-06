@@ -23,9 +23,9 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { cn } from "@workspace/ui/lib/utils";
-import type { classes } from "@/server/db/schema";
+import type { ClassRow } from "@/types/db";
 
-type Class = typeof classes.$inferSelect;
+type Class = ClassRow;
 type ClassWithYearCodes = Class & {
   yearCodes?: string[] | null;
   yearNames?: string[] | null;
@@ -93,7 +93,7 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
           className={cn(
             "border-0 font-normal",
             active &&
-              "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]"
+              "bg-[var(--brand-bullyproof-primary)] text-white hover:bg-[var(--brand-bullyproof-primary)]",
           )}
         >
           {active ? "Active" : "Inactive"}
@@ -146,9 +146,7 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
       const startYear = row.getValue("startYear") as string | null;
       if (startYear) {
         const year = new Date(startYear).getFullYear();
-        return (
-          <span className="text-sm text-muted-foreground">{year}</span>
-        );
+        return <span className="text-sm text-muted-foreground">{year}</span>;
       }
       return <span className="text-sm text-muted-foreground">—</span>;
     },
@@ -160,7 +158,9 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
       const cap = row.getValue("studentCap") as number | null | undefined;
       if (cap != null && cap !== undefined && !Number.isNaN(Number(cap))) {
         return (
-          <span className="text-sm text-muted-foreground tabular-nums">{Number(cap)}</span>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {Number(cap)}
+          </span>
         );
       }
       return <span className="text-sm text-muted-foreground">—</span>;
@@ -193,8 +193,9 @@ export function ClassesTable({
   fillHeight = false,
 }: ClassesTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] =
-    React.useState<ColumnFiltersState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    [],
+  );
   const [columnVisibility, setColumnVisibility] =
     React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
@@ -285,14 +286,14 @@ export function ClassesTable({
     <div
       className={cn(
         "flex min-h-0 flex-col overflow-hidden rounded-md border",
-        fillHeight ? "min-h-0 flex-1" : "max-h-[600px]"
+        fillHeight ? "min-h-0 flex-1" : "max-h-[600px]",
       )}
     >
       <div
         className={cn(
           fillHeight
             ? "min-h-0 flex-1 overflow-x-auto overflow-y-auto"
-            : "overflow-auto"
+            : "overflow-auto",
         )}
       >
         <table className="w-full caption-bottom text-sm">
@@ -306,14 +307,14 @@ export function ClassesTable({
                       key={header.id}
                       className={cn(
                         "sticky top-0 z-10 border-b bg-background shadow-sm",
-                        layout
+                        layout,
                       )}
                     >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
                             header.column.columnDef.header,
-                            header.getContext()
+                            header.getContext(),
                           )}
                     </TableHead>
                   );
@@ -328,7 +329,7 @@ export function ClassesTable({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   className={cn(
-                    onClassClick && "cursor-pointer hover:bg-muted/50"
+                    onClassClick && "cursor-pointer hover:bg-muted/50",
                   )}
                   onClick={() => onClassClick?.(row.original)}
                 >
@@ -339,7 +340,7 @@ export function ClassesTable({
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
-                        cell.getContext()
+                        cell.getContext(),
                       )}
                     </TableCell>
                   ))}

@@ -24,6 +24,13 @@ import { LessonWizardConfirm } from "./lesson-wizard-confirm";
 import { LessonCard, type Lesson } from "@/entities/lessons/ui/lesson-card";
 import type { ClassOption, TopicOption } from "@/types/lesson-wizard";
 import {
+  WIZARD_TOTAL_STEPS,
+  buildCreateLessonPayload,
+  canProceedFromWizardStep,
+  clampWizardStep,
+  initialWizardState,
+} from "@/entities/lessons/lesson-creation";
+import {
   ChevronLeft,
   ChevronsRight,
   Loader2,
@@ -48,7 +55,7 @@ import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
 import { Alert, AlertTitle } from "@workspace/ui/components/alert";
 import { classesApi } from "@/entities/classes/api/endpoints";
-import { useIsAdminRestrictedForLessons } from "@/hooks/use-is-admin-restricted-for-lessons";
+import { useLessonAccess } from "@/hooks/use-lesson-access";
 
 interface LessonWizardProps {
   schoolId: string; // This is actually the school slug from the URL
@@ -89,11 +96,7 @@ export function LessonWizard({
       });
   }, [schoolId]);
 
-  const [state, setState] = useState({
-    step: 0,
-    selectedClasses: [] as ClassOption[],
-    selectedTopic: null as TopicOption | null,
-  });
+  const [state, setState] = useState(initialWizardState);
   const [showHelp, setShowHelp] = useState(false);
   const [shouldPreSelectTopic, setShouldPreSelectTopic] = useState(false);
   const [shouldFetchRecommendations, setShouldFetchRecommendations] = useState(false);
@@ -102,7 +105,9 @@ export function LessonWizard({
   const [onBehalfOfUserId, setOnBehalfOfUserId] = useState<string | null>(null);
   const [showFeedbackGate, setShowFeedbackGate] = useState(false);
 
-  const isAdminRestricted = useIsAdminRestrictedForLessons();
+  const { isAdminRestrictedForCreate: isAdminRestricted } = useLessonAccess(
+    schoolUuid ?? undefined
+  );
 
   // Ref to track if we're intentionally closing the drawer (to prevent URL sync loop)
   const isIntentionallyClosingRef = useRef(false);
@@ -175,11 +180,7 @@ export function LessonWizard({
   // Reset state when drawer closes to ensure clean state on next open
   useEffect(() => {
     if (!open) {
-      setState({
-        step: 0,
-        selectedClasses: [],
-        selectedTopic: null,
-      });
+      setState(initialWizardState());
       setError(null);
       setLoading(false);
       setShowHelp(false);
@@ -436,10 +437,10 @@ export function LessonWizard({
     };
   }, []);
 
-  const totalSteps = 5;
+  const totalSteps = WIZARD_TOTAL_STEPS;
 
   const goToStep = (step: number) => {
-    const newStep = Math.max(0, Math.min(totalSteps - 1, step));
+    const newStep = clampWizardStep(step);
     // Update state - this is the source of truth
     // The useEffect will automatically sync to URL after state updates
     setState((prev) => ({
@@ -475,50 +476,15 @@ export function LessonWizard({
     goToStep(state.step - 1);
   };
 
-  const canProceed = () => {
-    switch (state.step) {
-      case 0:
-        return true; // Initial step - user selects an option
-      case 1:
-        return state.selectedClasses.length > 0;
-      case 2:
-        // Recommendation step - can proceed if:
-        // 1. Classes are selected (mandatory)
-        // 2. No active lessons (preparing, ready, in_progress, feedback) that share a class with selected classes AND
-        // 3. Either we have a recommended topic OR we've selected a stage (for multiple stages case)
-        // Each class can only have ONE active lesson at a time
-        if (state.selectedClasses.length === 0) {
-          return false; // Cannot proceed without classes
-        }
-        const hasMultipleStages = recommendationData?.warning?.multipleStages && recommendationData.warning.multipleStages.length > 1;
-        const selectedClassIds = state.selectedClasses.map(c => c.id);
-        // Check if any active lesson shares a class with selected classes (conflict)
-        const conflictingLessons = (recommendationData?.activeLessons || []).filter(lesson => {
-          return lesson.classIds.some(classId => selectedClassIds.includes(classId));
-        });
-        const canProceedFromRecommendation = conflictingLessons.length === 0 &&
-          (recommendationData?.recommendedTopicId !== null || (hasMultipleStages && selectedStageId !== null));
-        return canProceedFromRecommendation ?? false;
-      case 3:
-        // Cannot proceed to topic selection without classes
-        if (state.selectedClasses.length === 0) {
-          return false;
-        }
-        return state.selectedTopic !== null;
-      case 4:
-        // Cannot proceed to confirmation without classes
-        if (state.selectedClasses.length === 0) {
-          return false;
-        }
-        // Admin must select a user to create on behalf of
-        if (isAdminRestricted) {
-          return onBehalfOfUserId !== null;
-        }
-        return true; // Confirmation step
-      default:
-        return false;
-    }
-  };
+  const canProceed = () =>
+    canProceedFromWizardStep({
+      step: state.step,
+      state,
+      recommendation: recommendationData,
+      selectedStageId,
+      isAdminRestricted,
+      onBehalfOfUserId,
+    });
 
   const handleOptionSelect = async (option: "teach" | "view") => {
     if (loading) return;
@@ -714,13 +680,13 @@ export function LessonWizard({
     setError(null);
 
     try {
-      const payload = {
+      const payload = buildCreateLessonPayload({
         schoolId: schoolUuid,
         topicId: state.selectedTopic.id,
         classIds: state.selectedClasses.map((c) => c.id),
         status,
-        ...(onBehalfOfUserId && { createdByUserId: onBehalfOfUserId }),
-      };
+        onBehalfOfUserId,
+      });
 
       const result = await lessonsApi.post.create(payload);
 
@@ -1036,6 +1002,15 @@ export function LessonWizard({
                   handleOpenChange(false);
                 }}
                 onBack={() => goToStep(1)}
+                onSelectSingleClass={(classId) => {
+                  setState((prev) => ({
+                    ...prev,
+                    selectedClasses: prev.selectedClasses.filter((c) => c.id === classId),
+                  }));
+                  setSelectedStageId(null);
+                  setShouldFetchRecommendations(true);
+                  queryClient.invalidateQueries({ queryKey: ["lesson-recommendations"] });
+                }}
                 onSelectStage={handleSelectStage}
                 onAddClassesToLesson={async (lessonId: string, classIds: string[]) => {
                   try {
@@ -1103,13 +1078,13 @@ export function LessonWizard({
                       throw new Error("Missing lesson or school information");
                     }
                     
-                    const payload = {
+                    const payload = buildCreateLessonPayload({
                       schoolId: schoolUuid,
                       topicId: state.selectedTopic.id,
                       classIds: allClassIds,
-                      status: "preparing" as const,
-                      ...(onBehalfOfUserId && { createdByUserId: onBehalfOfUserId }),
-                    };
+                      status: "preparing",
+                      onBehalfOfUserId,
+                    });
                     
                     const createResult = await lessonsApi.post.create(payload);
                     if (createResult.error || !createResult.data) {

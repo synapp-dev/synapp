@@ -1,10 +1,10 @@
+import type { CourseTopicRow, TopicSlideRow } from "@/types/db";
 import { useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { courseTopics, topicSlides } from "@/server/db/schema";
 
-type CertificationTopic = typeof courseTopics.$inferSelect;
-type CertificationSlide = typeof topicSlides.$inferSelect & {
+type CertificationTopic = CourseTopicRow;
+type CertificationSlide = TopicSlideRow & {
   signedUrl?: string | null;
 };
 

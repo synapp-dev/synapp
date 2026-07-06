@@ -1,13 +1,9 @@
+import type { CurriculumStageRow, SchoolLevelRow, SchoolYearRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type {
-  curriculumStages,
-  schoolYears,
-  schoolLevels,
-} from "@/server/db/schema";
 
-type Stage = typeof curriculumStages.$inferSelect;
-type Year = typeof schoolYears.$inferSelect;
-type Level = typeof schoolLevels.$inferSelect;
+type Stage = CurriculumStageRow;
+type Year = SchoolYearRow;
+type Level = SchoolLevelRow;
 
 type StageWithYears = Stage & {
   years?: Array<{

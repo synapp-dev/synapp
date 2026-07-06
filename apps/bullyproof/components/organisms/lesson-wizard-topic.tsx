@@ -11,13 +11,14 @@ import { Star, FileText, AlertTriangle, BookOpen, ChevronLeft } from "lucide-rea
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { TopicOption, ClassOption } from "@/types/lesson-wizard";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { classesApi } from "@/entities/classes/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { useStages } from "@/entities/stages/model/store";
 import { Alert, AlertTitle, AlertDescription } from "@workspace/ui/components/alert";
+import { getMinYearCodeSortIndex } from "@/lib/year-code-sort";
 
 interface LessonWizardTopicProps {
   selectedTopic: TopicOption | null;
@@ -335,9 +336,27 @@ export function LessonWizardTopic({
     >
   );
 
-  // Sort stages by sortIndex, then sort topics within each stage by stageOrder
+  const sortStagesByYear = (
+    a: { stageId: string; stageSortIndex: number },
+    b: { stageId: string; stageSortIndex: number }
+  ) => {
+    const stageA = stages.find((s) => s.id === a.stageId);
+    const stageB = stages.find((s) => s.id === b.stageId);
+    const aCodes = (stageA?.years ?? [])
+      .map((y) => y.code)
+      .filter((c): c is string => !!c);
+    const bCodes = (stageB?.years ?? [])
+      .map((y) => y.code)
+      .filter((c): c is string => !!c);
+    const aMin = getMinYearCodeSortIndex(aCodes);
+    const bMin = getMinYearCodeSortIndex(bCodes);
+    if (aMin !== bMin) return aMin - bMin;
+    return a.stageSortIndex - b.stageSortIndex;
+  };
+
+  // Sort stages by year level (½ → 12), then topics within each stage by stageOrder
   const sortedStages = Object.values(topicsByStage)
-    .sort((a, b) => a.stageSortIndex - b.stageSortIndex)
+    .sort(sortStagesByYear)
     .map((stage) => ({
       ...stage,
       topics: stage.topics.sort((a, b) => {
@@ -369,7 +388,18 @@ export function LessonWizardTopic({
         ...stage,
         topicCount: stageTopics.length,
       };
-    }).sort((a, b) => (a.sortIndex ?? 999999) - (b.sortIndex ?? 999999));
+    }).sort((a, b) => {
+      const aCodes = (a.years ?? [])
+        .map((y) => y.code)
+        .filter((c): c is string => !!c);
+      const bCodes = (b.years ?? [])
+        .map((y) => y.code)
+        .filter((c): c is string => !!c);
+      const aMin = getMinYearCodeSortIndex(aCodes);
+      const bMin = getMinYearCodeSortIndex(bCodes);
+      if (aMin !== bMin) return aMin - bMin;
+      return (a.sortIndex ?? 999999) - (b.sortIndex ?? 999999);
+    });
   }, [stages, topics]);
 
   const renderTopicCard = (topic: TopicWithSlides, isRecommended = false) => {

@@ -1,3 +1,4 @@
+import type { RoleRow } from "@/types/db";
 import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { useState, useEffect, useMemo } from "react";
@@ -9,9 +10,6 @@ import { useEffectiveUser } from "@/hooks/use-effective-user";
 import { HeroCard } from "@/entities/dashboard/ui/shared/hero-card";
 import type { RoleBadgeItem } from "@/components/atoms/role-badges";
 import { useRoles } from "@/entities/users/model/store";
-import type { roles } from "@/server/db/schema";
-
-type RoleRow = typeof roles.$inferSelect;
 
 function normalizePlatformRoles(platformRoles: unknown): string[] {
   if (Array.isArray(platformRoles)) {

@@ -1,5 +1,6 @@
 "use client";
 
+import type { CertificationCourseRow, CourseTopicRow } from "@/types/db";
 import {
   useEffect,
   useState,
@@ -34,12 +35,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type {
-  courseTopics,
-  certificationCourses,
-} from "@/server/db/schema";
 import {
   SlideRenderer,
   type SlideData,
@@ -48,8 +45,8 @@ import { usePreloadAllSlideImages } from "@/hooks/use-preload-all-slide-images";
 import { createSlug } from "@/utils/slug";
 import { cn } from "@workspace/ui/lib/utils";
 
-type Course = typeof certificationCourses.$inferSelect;
-type Topic = typeof courseTopics.$inferSelect;
+type Course = CertificationCourseRow;
+type Topic = CourseTopicRow;
 
 type ExtendedSlideData = SlideData & {
   signedUrl?: string | null;

@@ -1,7 +1,7 @@
+import type { RoleRow } from "@/types/db";
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
-import type { roles } from "@/server/db/schema";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 export const rolesApi = {
   get: {

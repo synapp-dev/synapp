@@ -20,6 +20,7 @@ import {
 import { Button } from "@workspace/ui/components/button";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSearchParams, useRouter } from "next/navigation";
+import { getDefaultPagePath } from "@/lib/lesson-lifecycle";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
 import { useMeStore } from "@/entities/me/model/store";
 import { Loader2 } from "lucide-react";
@@ -45,7 +46,9 @@ export default function LessonRunLessonPage({
   useEffect(() => {
     if (!isLoadingLesson && lessonData && currentUser) {
       if (!isLessonCreator) {
-        router.replace(`/schools/${school_id}/lessons/${lesson_id}`);
+        router.replace(
+          getDefaultPagePath(school_id, lesson_id, lessonData.status)
+        );
       }
     }
   }, [isLoadingLesson, lessonData, currentUser, isLessonCreator, router, school_id, lesson_id]);

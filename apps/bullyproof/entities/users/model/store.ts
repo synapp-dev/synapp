@@ -1,10 +1,10 @@
+import type { RoleRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { rolesApi } from "@/entities/roles/api/endpoints";
-import type { roles } from "@/server/db/schema";
 import { userKeys } from "./keys";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 // React Query hooks for users with pagination and filters
 export function useUsers(filters?: {

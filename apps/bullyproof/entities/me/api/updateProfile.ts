@@ -1,14 +1,14 @@
+import type { UserProfileExpandedRow } from "@/types/db";
 import {
   useMutation,
   useQueryClient,
   type UseMutationResult,
 } from "@tanstack/react-query";
 import { meApi } from "./endpoints";
-import type { vUserProfileExpanded } from "@/drizzle/schema";
 import { meKeys } from "../model/keys";
 import { useMeStore } from "../model/store";
 
-type UserProfile = typeof vUserProfileExpanded.$inferSelect;
+type UserProfile = UserProfileExpandedRow;
 
 type UpdateProfilePayload = {
   firstName?: string;

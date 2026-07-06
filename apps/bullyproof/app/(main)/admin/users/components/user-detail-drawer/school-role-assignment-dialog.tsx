@@ -1,5 +1,7 @@
 "use client";
 
+import type { RoleRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Dialog,
@@ -43,13 +45,12 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { AlertCircle, Check, ChevronsUpDown, Loader2, ShieldCheck, Users as UsersIcon } from "lucide-react";
 import type { School } from "@/entities/school/model/useListSchoolsQuery";
-import type { roles } from "@/server/db/schema";
 import { INTRADARK_DEV_PLATFORM_ROLE_KEY } from "@/lib/intradark-dev-protection";
 import { extractSchoolMetadata, PLATFORM_ROLE_KEYS } from "./utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group";
 
-type Role = typeof roles.$inferSelect;
+type Role = RoleRow;
 
 export interface SchoolRoleAssignmentDialogProps {
   mode: "add" | "edit";

@@ -1,8 +1,8 @@
+import type { RoleRow } from "@/types/db";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import type { UserUpdateContext } from "@/entities/users/lib/refresh-selected-user";
-import type { roles } from "@/server/db/schema";
 
-export type Role = typeof roles.$inferSelect;
+export type Role = RoleRow;
 
 export interface UserDetailDrawerProps {
   user: UserWithRolesAndSchools | null;

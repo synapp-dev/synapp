@@ -120,8 +120,13 @@ export function LessonSidebarNav({
   const canRunLesson = isLessonCreator;
 
   // Cancel lesson: feature access + (owner OR platform admin/dev)
-  const featuresAccess = useFeaturesAccess([CANCEL_LESSON_FEATURE_KEY], schoolId);
+  const featuresAccess = useFeaturesAccess(
+    [CANCEL_LESSON_FEATURE_KEY, TAKE_OVER_LESSON_FEATURE_KEY],
+    schoolId
+  );
   const hasCancelFeature = featuresAccess[CANCEL_LESSON_FEATURE_KEY]?.hasAccess ?? false;
+  const hasTakeOverFeature =
+    featuresAccess[TAKE_OVER_LESSON_FEATURE_KEY]?.hasAccess ?? false;
   const platformRoles = Array.isArray(currentUser?.platformRoles)
     ? currentUser.platformRoles
     : [];
@@ -162,7 +167,8 @@ export function LessonSidebarNav({
   const canShowTakeOver =
     !isLessonCreator &&
     lessonData?.status &&
-    takeOverableStatuses.includes(lessonData.status);
+    takeOverableStatuses.includes(lessonData.status) &&
+    hasTakeOverFeature;
 
   // Debug logging (can be removed later)
   if (process.env.NODE_ENV === "development") {

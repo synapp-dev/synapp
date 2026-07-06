@@ -1,5 +1,7 @@
 "use client";
 
+import type { TopicRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -30,13 +32,10 @@ import {
 } from "@workspace/ui/components/alert-dialog";
 import { Loader2, Trash2 } from "lucide-react";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import type { topics } from "@/server/db/schema";
-import {
-  useInvalidateTopics,
-} from "@/entities/topics/model/store-enhanced";
+import { useInvalidateTopics } from "@/entities/topics/model/store-enhanced";
 import { useQueryClient } from "@tanstack/react-query";
 
-type Topic = typeof topics.$inferSelect & {
+type Topic = TopicRow & {
   slides?: any[];
 };
 
@@ -57,13 +56,13 @@ export function EditCurriculumTopicDrawer({
 }: EditCurriculumTopicDrawerProps) {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState<"draft" | "published" | "archived">(
-    "draft"
+    "draft",
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
+
   // TQ invalidation hooks
   const { invalidateTopic, invalidateTopicsByStage } = useInvalidateTopics();
   const queryClient = useQueryClient();
@@ -73,7 +72,7 @@ export function EditCurriculumTopicDrawer({
     if (open && topic) {
       setTitle(topic.title || "");
       setStatus(
-        (topic.status as "draft" | "published" | "archived") || "draft"
+        (topic.status as "draft" | "published" | "archived") || "draft",
       );
       setError(null);
     }

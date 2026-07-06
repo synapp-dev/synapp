@@ -1,5 +1,7 @@
 "use client";
 
+import type { CourseTopicRow } from "@/types/db";
+
 import { useState, useEffect } from "react";
 import {
   Sheet,
@@ -33,9 +35,8 @@ import {
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { courseTopics } from "@/server/db/schema";
 
-type Topic = typeof courseTopics.$inferSelect;
+type Topic = CourseTopicRow;
 
 interface EditTopicSettingsDrawerProps {
   open: boolean;

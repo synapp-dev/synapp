@@ -1,5 +1,6 @@
 "use client";
 
+import type { TopicRow, TopicSlideRow } from "@/types/db";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -33,16 +34,15 @@ import {
   useTopicsByStage,
 } from "@/entities/topics/model/store-enhanced";
 import { useStageBySlug } from "@/entities/stages/model/store";
-import { compareSlidesByPosition } from "@/server/lib/fractional-position";
+import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import type { topics, topicSlides } from "@/server/db/schema";
 import { createSlug } from "@/utils/slug";
 import { getAuthHeaders } from "@/lib/api/fetcher.client";
 import { toast } from "sonner";
 
-type Topic = typeof topics.$inferSelect & {
+type Topic = TopicRow & {
   stage?: any;
-  slides?: Array<typeof topicSlides.$inferSelect & { signedUrl?: string | null }>;
+  slides?: Array<TopicSlideRow & { signedUrl?: string | null }>;
 };
 
 interface TopicDetailSectionReadonlyProps {

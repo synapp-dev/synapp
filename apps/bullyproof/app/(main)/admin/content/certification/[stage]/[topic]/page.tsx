@@ -1,15 +1,15 @@
 "use client";
 
+import type { CourseTopicRow } from "@/types/db";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2, FileText, FileQuestion, Pencil } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { courseTopics } from "@/server/db/schema";
 import { EditTopicSettingsDrawer } from "@/entities/certification/ui/edit-topic-settings-drawer";
 
-type Topic = typeof courseTopics.$inferSelect;
+type Topic = CourseTopicRow;
 
 export default function CertificationTopicPage() {
   const params = useParams();

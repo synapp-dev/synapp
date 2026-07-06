@@ -1,5 +1,6 @@
 "use client";
 
+import type { SchoolReadableRow } from "@/types/db";
 import { useState, useEffect } from "react";
 import {
   Command,
@@ -17,9 +18,8 @@ import { useRouter } from "next/navigation";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { useSchoolStore } from "@/stores/school-store";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
-import type { vSchoolsReadable } from "@/drizzle/schema";
 
-type School = typeof vSchoolsReadable.$inferSelect;
+type School = SchoolReadableRow;
 
 export function CommandMenu() {
   const [open, setOpen] = useState(false);

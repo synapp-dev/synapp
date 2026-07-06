@@ -1,10 +1,11 @@
 "use client";
 
+import type { CertificationCourseRow, CourseTopicRow, QuizAnswerRow, QuizQuestionRow } from "@/types/db";
+
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type { quizQuestions, quizAnswers } from "@/server/db/schema";
 import {
   Card,
   CardContent,
@@ -23,10 +24,9 @@ import {
   Trash,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
-import type { courseTopics, certificationCourses } from "@/server/db/schema";
 
-type Topic = typeof courseTopics.$inferSelect;
-type Course = typeof certificationCourses.$inferSelect;
+type Topic = CourseTopicRow;
+type Course = CertificationCourseRow;
 import {
   Dialog,
   DialogContent,
@@ -42,8 +42,8 @@ import {
 import { EditQuizSettingsDrawer } from "./edit-quiz-settings-drawer";
 import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
 
-type QuizQuestion = typeof quizQuestions.$inferSelect;
-type QuizAnswer = typeof quizAnswers.$inferSelect;
+type QuizQuestion = QuizQuestionRow;
+type QuizAnswer = QuizAnswerRow;
 
 type QuizQuestionWithAnswers = QuizQuestion & {
   answers: QuizAnswer[];

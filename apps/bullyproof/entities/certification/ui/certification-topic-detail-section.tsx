@@ -1,5 +1,7 @@
 "use client";
 
+import type { CourseTopicRow, CourseTopicSlideRow } from "@/types/db";
+
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -7,12 +9,8 @@ import {
   compareSlidesByPosition,
   computePositionsForOrder,
   generatePositionBetween,
-} from "@/server/lib/fractional-position";
+} from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import type {
-  courseTopics,
-  courseTopicSlides,
-} from "@/server/db/schema";
 import {
   Card,
   CardContent,
@@ -57,8 +55,8 @@ import {
   type SlideData,
 } from "@/components/organisms/slide-renderer";
 
-type Topic = typeof courseTopics.$inferSelect & {
-  slides?: Array<typeof courseTopicSlides.$inferSelect>;
+type Topic = CourseTopicRow & {
+  slides?: Array<CourseTopicSlideRow>;
 };
 
 interface CertificationTopicDetailSectionProps {
