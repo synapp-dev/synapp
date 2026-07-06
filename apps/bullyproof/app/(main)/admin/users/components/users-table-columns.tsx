@@ -102,7 +102,10 @@ function formatLastLogin(lastLoginAt: string | null): string {
 
 export const columns: ColumnDef<User>[] = [
   {
-    accessorKey: "name",
+    // No `name` field exists on the row; sort on the rendered display name.
+    id: "name",
+    accessorFn: (row) =>
+      [row.firstName, row.lastName].filter(Boolean).join(" ") || row.email,
     header: ({ column }) => {
       return (
         <div className="text-left pl-4">

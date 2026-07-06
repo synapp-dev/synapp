@@ -13,6 +13,8 @@ export function useUsers(filters?: {
   schoolId?: string;
   limit?: number;
   offset?: number;
+  sortBy?: "name" | "createdAt" | "lastActive";
+  sortDir?: "asc" | "desc";
   enabled?: boolean;
 }) {
   // Extract pagination params with defaults
@@ -20,7 +22,9 @@ export function useUsers(filters?: {
   const offset = filters?.offset ?? 0;
   const fetchAll = limit === -1;
   const enabled = filters?.enabled ?? true;
-  
+  const sortBy = filters?.sortBy;
+  const sortDir = filters?.sortDir;
+
   // Normalize filters for query key
   const normalizedFilters = filters
     ? (() => {
@@ -33,7 +37,10 @@ export function useUsers(filters?: {
     : undefined;
 
   const query = useQuery({
-    queryKey: [...userKeys.list(normalizedFilters), { limit, offset, fetchAll }],
+    queryKey: [
+      ...userKeys.list(normalizedFilters),
+      { limit, offset, fetchAll, sortBy, sortDir },
+    ],
     queryFn: async () => {
       if (fetchAll) {
         const allUsers: UserWithRolesAndSchools[] = [];
@@ -49,6 +56,8 @@ export function useUsers(filters?: {
             search: normalizedFilters?.search,
             role: normalizedFilters?.role,
             schoolId: normalizedFilters?.schoolId,
+            sortBy,
+            sortDir,
           });
           
           if (result.error) {
@@ -83,6 +92,8 @@ export function useUsers(filters?: {
           search: normalizedFilters?.search,
           role: normalizedFilters?.role,
           schoolId: normalizedFilters?.schoolId,
+          sortBy,
+          sortDir,
         });
         if (result.error) {
           throw new Error(result.error.message || "Failed to fetch users");

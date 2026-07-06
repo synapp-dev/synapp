@@ -66,6 +66,9 @@ interface UsersTableProps {
   totalCount?: number;
   onPageChange?: (pageIndex: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
+  /** Controlled sorting: when provided, rows are assumed server-sorted. */
+  sorting?: SortingState;
+  onSortingChange?: (sorting: SortingState) => void;
   /** When it returns true, the row cannot be bulk-selected (e.g. Intradark dev rows for non-dev admins). */
   isRowSelectionLocked?: (user: User) => boolean;
 }
@@ -84,9 +87,25 @@ export function UsersTable({
   totalCount = 0,
   onPageChange,
   onPageSizeChange,
+  sorting: controlledSorting,
+  onSortingChange: onControlledSortingChange,
   isRowSelectionLocked,
 }: UsersTableProps) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [internalSorting, setInternalSorting] = React.useState<SortingState>([]);
+  const isSortingControlled = controlledSorting !== undefined;
+  const sorting = isSortingControlled ? controlledSorting : internalSorting;
+  const setSorting = React.useCallback(
+    (updater: SortingState | ((old: SortingState) => SortingState)) => {
+      const next =
+        typeof updater === "function" ? updater(sorting) : updater;
+      if (isSortingControlled) {
+        onControlledSortingChange?.(next);
+      } else {
+        setInternalSorting(next);
+      }
+    },
+    [isSortingControlled, onControlledSortingChange, sorting]
+  );
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
     []
   );
@@ -295,6 +314,8 @@ export function UsersTable({
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    // Controlled sorting means rows arrive server-sorted across all pages.
+    manualSorting: isSortingControlled,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: (updater) => {
       const newSelection =

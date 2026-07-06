@@ -98,6 +98,8 @@ export const meApi = {
       search?: string;
       role?: string;
       schoolId?: string;
+      sortBy?: "name" | "createdAt" | "lastActive";
+      sortDir?: "asc" | "desc";
     }): Promise<ApiResult<{ users: UserWithRolesAndSchools[]; totalCount: number }>> {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", params.limit.toString());
@@ -105,6 +107,8 @@ export const meApi = {
       if (params?.search) searchParams.set("search", params.search);
       if (params?.role) searchParams.set("role", params.role);
       if (params?.schoolId) searchParams.set("schoolId", params.schoolId);
+      if (params?.sortBy) searchParams.set("sortBy", params.sortBy);
+      if (params?.sortDir) searchParams.set("sortDir", params.sortDir);
 
       const query = searchParams.toString();
       return apiFetch<{ users: UserWithRolesAndSchools[]; totalCount: number }>(

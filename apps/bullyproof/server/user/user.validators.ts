@@ -23,6 +23,8 @@ export const listUsersSchema = z
     search: z.string().trim().max(100).optional(),
     role: z.string().trim().max(100).optional(),
     schoolId: z.string().trim().max(200).optional(), // Accept UUID or slug
+    sortBy: z.enum(["name", "createdAt", "lastActive"]).optional(),
+    sortDir: z.enum(["asc", "desc"]).optional(),
   })
   .transform((v) => ({
     limit: v.limit ?? 50,
@@ -30,6 +32,8 @@ export const listUsersSchema = z
     search: v.search,
     role: v.role,
     schoolId: v.schoolId,
+    sortBy: v.sortBy,
+    sortDir: v.sortDir,
   }));
 
 export type ListUsersParams = z.infer<typeof listUsersSchema>;

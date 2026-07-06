@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { vUsersWithRolesAndSchools } from "@/drizzle/schema";
-import { asc, sql, ilike, or, and } from "drizzle-orm";
+import { asc, desc, sql, ilike, or, and } from "drizzle-orm";
 
 export const userRepo = {
   getAllUsersWithRolesAndSchools: async (params: {
@@ -9,6 +9,8 @@ export const userRepo = {
     search?: string;
     role?: string;
     schoolId?: string;
+    sortBy?: "name" | "createdAt" | "lastActive";
+    sortDir?: "asc" | "desc";
   }) => {
     // Build where conditions for filtering
     const whereConditions: any[] = [];
@@ -85,12 +87,33 @@ export const userRepo = {
     const countResult = await countQueryWithFilters;
     const totalCount = Number(countResult[0]?.count || 0);
 
+    // Server-side sort: pagination spans many pages, so client sorting alone
+    // cannot honour the column headers (item 28 defect: arrows did nothing).
+    const direction = params.sortDir === "desc" ? desc : asc;
+    const orderColumns = (() => {
+      switch (params.sortBy) {
+        case "createdAt":
+          return [direction(vUsersWithRolesAndSchools.createdAt)];
+        case "lastActive": {
+          const lastSeen = sql`(SELECT up.last_seen_at FROM user_profile up WHERE up.id = ${vUsersWithRolesAndSchools.id})`;
+          return [
+            params.sortDir === "desc"
+              ? sql`${lastSeen} DESC NULLS LAST`
+              : sql`${lastSeen} ASC NULLS FIRST`,
+          ];
+        }
+        default:
+          return [
+            direction(vUsersWithRolesAndSchools.firstName),
+            direction(vUsersWithRolesAndSchools.lastName),
+            direction(vUsersWithRolesAndSchools.email),
+          ];
+      }
+    })();
+
     // Get paginated users from the view with filters
     const users = await queryWithFilters
-      .orderBy(
-        asc(vUsersWithRolesAndSchools.firstName),
-        asc(vUsersWithRolesAndSchools.lastName)
-      )
+      .orderBy(...orderColumns)
       .limit(params.limit)
       .offset(params.offset);
 
