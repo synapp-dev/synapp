@@ -28,7 +28,9 @@
 - [ ] /admin/features tabs: Platform Access Levels
 - [ ] School portal headers + breadcrumbs: Preview Lessons, Teach Lessons (admin breadcrumbs unchanged)
 - [ ] School settings classes: Student Numbers label (and table header)
-- [ ] No Ctrl+K button in header; the shortcut does nothing; theme toggle intact
+- [ ] As a teacher or school admin: no Ctrl+K button in the header and the shortcut does nothing; theme toggle intact
+- [ ] As a Bullyproof platform admin: the Ctrl+K command menu button and shortcut still work
+- [ ] View-as a teacher (impersonate): the command menu disappears while viewing as the school user
 
 ## 4. Culture rating (item 15)
 

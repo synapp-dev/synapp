@@ -79,6 +79,8 @@ The left sidebar is the main navigation. What you see depends on your access lev
 
 As a platform administrator you can open any school through Admin > Schools, or switch into a school context with the school switcher at the top of the sidebar.
 
+Platform administrators also have a quick-navigation command menu: press Ctrl+K (Cmd+K on Mac) or click the search button in the header to jump straight to any admin area. School users do not see this menu.
+
 The Admin entry takes you to the admin home at /admin, a grid of cards, one per administration area:
 
 | Card | Address | Purpose |

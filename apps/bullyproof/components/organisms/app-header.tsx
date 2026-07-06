@@ -15,12 +15,14 @@ import {
 } from "@workspace/ui/components/tooltip";
 
 import { Breadcrumb } from "@/components/molecules/breadcrumb";
+import { CommandMenu } from "@/components/molecules/command-menu";
 import { ImpersonateMenu } from "@/components/molecules/impersonate-menu";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { FeedbackDialog } from "@/components/organisms/feedback-dialog";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { useMeStore } from "@/entities/me/model/store";
 import { useEffectiveUser } from "@/hooks/use-effective-user";
+import { BULLYPROOF_PLATFORM_ROLE_KEYS } from "@/lib/role-keys";
 import {
   getTutorialForPathname,
   type TutorialConfig,
@@ -31,6 +33,14 @@ export function AppHeader() {
   const pathname = usePathname();
   const currentUser = useEffectiveUser();
   const viewAsUser = useMeStore((s) => s.viewAsUser);
+  // Ctrl+K command menu is internal tooling: Bullyproof platform roles only,
+  // never school-scoped users (item 44). Follows the effective (view-as) user.
+  const effectivePlatformRoles = Array.isArray(currentUser?.platformRoles)
+    ? (currentUser.platformRoles as string[])
+    : [];
+  const showCommandMenu = effectivePlatformRoles.some((key) =>
+    (BULLYPROOF_PLATFORM_ROLE_KEYS as readonly string[]).includes(key)
+  );
   const [tutorialConfig, setTutorialConfig] = useState<TutorialConfig | null>(
     null
   );
@@ -186,6 +196,7 @@ export function AppHeader() {
               <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             </>
           )}
+          {showCommandMenu && <CommandMenu />}
           <FeatureGuard feature="system:feedback-button">
             <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             <Tooltip>
