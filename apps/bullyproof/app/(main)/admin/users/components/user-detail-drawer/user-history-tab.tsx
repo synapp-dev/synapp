@@ -52,7 +52,7 @@ export function UserHistoryTab({
         >
           <TabsList className="mb-4">
             <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="roles">Roles</TabsTrigger>
+            <TabsTrigger value="roles">Access Levels</TabsTrigger>
           </TabsList>
 
           <TabsContent value="details" className="mt-0">

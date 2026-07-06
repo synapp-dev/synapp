@@ -617,7 +617,7 @@ export default function LessonsPage({
         <SchoolPageCompactHeader
           bannerUrl={banner.url}
           avatarUrl={avatar.url}
-          title="Lessons"
+          title="Teach Lessons"
           description="View, manage and create all of your lessons here."
           isLoading={!headerReady}
           onAnimationComplete={() => setShowContentAnimation(true)}

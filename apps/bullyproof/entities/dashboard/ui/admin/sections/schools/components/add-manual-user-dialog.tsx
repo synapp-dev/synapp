@@ -517,7 +517,7 @@ export function AddManualUserDialog({
                   </div>
 
                   <div className="w-full border-t pt-4">
-                    <p className="text-xs text-muted-foreground mb-3">Roles</p>
+                    <p className="text-xs text-muted-foreground mb-3">Access Levels</p>
                     <div className="flex flex-wrap gap-2 justify-center">
                       {selectedRoles.map((role) => {
                         const badgeClasses = getBadgeClasses(role.key);

@@ -58,7 +58,7 @@ export default function ContentPage({
         <SchoolPageCompactHeader
           bannerUrl={banner.url}
           avatarUrl={avatar.url}
-          title="Content"
+          title="Preview Lessons"
           description="Browse lesson levels and topics for the platform."
           isLoading={!headerReady}
           onAnimationComplete={() => setShowContentAnimation(true)}

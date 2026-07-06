@@ -144,7 +144,7 @@ function FeatureSubGroup({
             </TabsTrigger>
             <TabsTrigger value="role" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Platform Roles
+              Platform Access Levels
             </TabsTrigger>
             <TabsTrigger value="school" className="flex items-center gap-2">
               <School className="h-4 w-4" />
@@ -618,7 +618,7 @@ function SectionPageContent({ sectionSlug }: { sectionSlug: string }) {
               </TabsTrigger>
               <TabsTrigger value="role" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
-                Platform Roles
+                Platform Access Levels
               </TabsTrigger>
               <TabsTrigger value="school" className="flex items-center gap-2">
                 <School className="h-4 w-4" />

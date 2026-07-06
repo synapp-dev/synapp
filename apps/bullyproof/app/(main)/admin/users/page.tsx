@@ -413,7 +413,7 @@ function AdminUsersPageContent() {
                   <TableRow>
                     <TableHead className="text-left pl-2"></TableHead>
                     <TableHead className="text-left pl-4">User</TableHead>
-                    <TableHead className="text-left">Roles</TableHead>
+                    <TableHead className="text-left">Access Levels</TableHead>
                     <TableHead className="text-left">Created</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -585,7 +585,7 @@ function AdminUsersPageContent() {
                 )}
                 disabled={loading && users.length === 0}
               >
-                <SelectValue placeholder="Role" />
+                <SelectValue placeholder="Access Level" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>

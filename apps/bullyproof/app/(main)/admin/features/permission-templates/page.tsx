@@ -168,7 +168,7 @@ export default function PermissionTemplatesPage() {
         <Tabs defaultValue="school" className="space-y-4">
           <TabsList>
             <TabsTrigger value="school">Schools</TabsTrigger>
-            <TabsTrigger value="platform_role">Platform Roles</TabsTrigger>
+            <TabsTrigger value="platform_role">Platform Access Levels</TabsTrigger>
           </TabsList>
           <TabsContent value="school">
             {schoolTemplates.length === 0 ? (

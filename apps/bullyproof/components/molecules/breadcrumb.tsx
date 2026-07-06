@@ -107,7 +107,11 @@ export function Breadcrumb() {
       // Format the segment: split by hyphens, capitalize each word, join with spaces
       // Special cases for course routes
       let label = "";
-      if (segment === "courses") {
+      if (isSchoolRoute && segment === "content") {
+        label = "Preview Lessons";
+      } else if (isSchoolRoute && segment === "lessons") {
+        label = "Teach Lessons";
+      } else if (segment === "courses") {
         label = "Courses";
       } else if (segment === "ap-certification") {
         label = "AP Certification";

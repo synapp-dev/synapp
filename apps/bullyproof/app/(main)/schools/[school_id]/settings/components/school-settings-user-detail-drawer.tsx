@@ -415,7 +415,7 @@ export function SchoolSettingsUserDetailDrawer({
         mode="edit"
         open={editSchoolRolesDialogOpen}
         onOpenChange={setEditSchoolRolesDialogOpen}
-        title="Edit Roles"
+        title="Edit Access Levels"
         description="Edit roles for this user at your school."
         schools={
           school

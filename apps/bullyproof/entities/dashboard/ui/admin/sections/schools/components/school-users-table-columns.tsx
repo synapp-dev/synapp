@@ -124,7 +124,7 @@ export const createSchoolUsersColumns = (
   {
     accessorKey: "role",
     header: () => {
-      return <div className="text-left">Roles</div>;
+      return <div className="text-left">Access Levels</div>;
     },
     cell: ({ row }) => {
       const user = row.original;

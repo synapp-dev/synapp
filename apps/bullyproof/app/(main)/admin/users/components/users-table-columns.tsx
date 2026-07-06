@@ -160,7 +160,7 @@ export const columns: ColumnDef<User>[] = [
   {
     accessorKey: "roles",
     header: () => {
-      return <div className="text-left">Roles</div>;
+      return <div className="text-left">Access Levels</div>;
     },
     cell: ({ row }) => {
       const user = row.original;

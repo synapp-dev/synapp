@@ -1183,7 +1183,7 @@ export function SettingsClassesCard({
             <div className="grid grid-cols-4 gap-4">
               <div className="col-span-1 space-y-1.5">
                 <Label htmlFor="edit-class-student-cap" className="text-xs text-muted-foreground ml-2">
-                  Class Size
+                  Student Numbers
                 </Label>
                 <Input
                   id="edit-class-student-cap"

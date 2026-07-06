@@ -153,7 +153,7 @@ const columns: ColumnDef<ClassWithYearCodes>[] = [
   },
   {
     accessorKey: "studentCap",
-    header: "Class Size",
+    header: "Student Numbers",
     cell: ({ row }) => {
       const cap = row.getValue("studentCap") as number | null | undefined;
       if (cap != null && cap !== undefined && !Number.isNaN(Number(cap))) {

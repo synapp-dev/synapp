@@ -34,7 +34,7 @@ const TAB_CONFIG: Array<{
   label: string;
 }> = [
   { tab: "details", icon: User, label: "Details" },
-  { tab: "roles", icon: ShieldCheck, label: "Roles" },
+  { tab: "roles", icon: ShieldCheck, label: "Access Levels" },
   { tab: "positions", icon: Briefcase, label: "Positions" },
   { tab: "classes", icon: GraduationCap, label: "Classes" },
   { tab: "history", icon: History, label: "History" },

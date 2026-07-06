@@ -1558,7 +1558,7 @@ function UserDetailDrawerContent({
             setEditSchoolRolesSelected(new Set());
           }
         }}
-        title={`Edit Roles for ${editSchoolRolesSchoolName || "School"}`}
+        title={`Edit Access Levels for ${editSchoolRolesSchoolName || "School"}`}
         description="Manage roles at this school. Unchecking Staff will remove this user from the school entirely."
         schools={schools}
         initialSchoolId={editSchoolRolesSchoolId}
@@ -1591,7 +1591,7 @@ function UserDetailDrawerContent({
             setToggleRoleError(null);
           }
         }}
-        title="Add Role"
+        title="Add Access Level"
         description={
           allowSchoolOrPlatformAddTab
             ? `Add school roles or assign a platform role to ${getDisplayName(user)}.`

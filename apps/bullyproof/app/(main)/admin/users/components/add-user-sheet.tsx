@@ -99,7 +99,7 @@ export function AddUserSheet({
   const stepLabels = [
     "Details",
     "User Type",
-    userType === "school" ? "School & Role" : "Role",
+    userType === "school" ? "School & Access Level" : "Access Level",
     "Confirm",
   ];
 

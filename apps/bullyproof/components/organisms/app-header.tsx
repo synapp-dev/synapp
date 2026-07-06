@@ -14,7 +14,6 @@ import {
   TooltipContent,
 } from "@workspace/ui/components/tooltip";
 
-import { CommandMenu } from "@/components/molecules/command-menu";
 import { Breadcrumb } from "@/components/molecules/breadcrumb";
 import { ImpersonateMenu } from "@/components/molecules/impersonate-menu";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
@@ -187,7 +186,6 @@ export function AppHeader() {
               <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             </>
           )}
-          <CommandMenu />
           <FeatureGuard feature="system:feedback-button">
             <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
             <Tooltip>
