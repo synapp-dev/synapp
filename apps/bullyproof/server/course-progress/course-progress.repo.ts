@@ -140,8 +140,15 @@ export const courseProgressRepo = {
         completedTopics: completedTopicsCount,
         progressPercentage,
         status,
+        // Preserve the first completion and issuance timestamps across re-runs.
         completedAt:
-          status === "completed" ? sql`now()` : undefined,
+          status === "completed"
+            ? sql`COALESCE(${courseProgress.completedAt}, now())`
+            : undefined,
+        certificateIssuedAt:
+          status === "completed"
+            ? sql`COALESCE(${courseProgress.certificateIssuedAt}, now())`
+            : undefined,
         updatedAt: sql`now()`,
       })
       .where(

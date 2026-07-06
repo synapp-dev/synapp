@@ -737,6 +737,7 @@ export default function CoursePage() {
             user={currentUser}
             completedAt={lastCompletedTopicDate}
             className="lg:w-2/3"
+            courseId={course?.id}
           />
         ) : currentTopic ? (
           <Card className="lg:w-2/3 flex flex-row overflow-hidden h-full gap-0 py-0">

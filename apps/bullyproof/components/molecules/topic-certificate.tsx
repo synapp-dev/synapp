@@ -5,6 +5,8 @@ import Image from "next/image";
 import { Card } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { Badge } from "@workspace/ui/components/badge";
+import { Button } from "@workspace/ui/components/button";
+import { Download } from "lucide-react";
 
 type UserProfile = UserProfileExpandedRow;
 
@@ -13,6 +15,8 @@ interface TopicCertificateProps {
   completedAt: string | null | undefined;
   className?: string;
   compact?: boolean;
+  /** When provided, shows a Download button for the PDF certificate. */
+  courseId?: string;
 }
 
 export function TopicCertificate({
@@ -20,6 +24,7 @@ export function TopicCertificate({
   completedAt,
   className,
   compact = false,
+  courseId,
 }: TopicCertificateProps) {
   if (!user || !completedAt) {
     return null;
@@ -88,6 +93,19 @@ export function TopicCertificate({
         >
           AP Certified
         </Badge>
+        {courseId && (
+          <Button
+            asChild
+            variant="outline"
+            size={compact ? "sm" : "default"}
+            className="mt-2"
+          >
+            <a href={`/api/certification/courses/${courseId}/certificate`}>
+              <Download className={cn("mr-1.5", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+              Download
+            </a>
+          </Button>
+        )}
       </div>
     </Card>
   );
