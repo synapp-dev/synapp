@@ -7,11 +7,17 @@ import { FileText, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { Combobox } from "@/components/molecules/combobox";
+import { ReportExportMenu } from "@/components/molecules/report-export-menu";
+import type { ExportTable } from "@/lib/report-export";
 import {
   ReportsOverviewProvider,
   useReportsOverview,
 } from "@/entities/dashboard/ui/admin/sections/reports/reports-overview-context";
-import { pathWithSchool } from "@/entities/dashboard/ui/admin/sections/reports/reports-utils";
+import {
+  formatDate,
+  formatTeacherName,
+  pathWithSchool,
+} from "@/entities/dashboard/ui/admin/sections/reports/reports-utils";
 const NAV = [
   { href: "/admin/reports", label: "Overview" },
   { href: "/admin/reports/certification", label: "Certification" },
@@ -50,6 +56,95 @@ function ReportsLayoutInner({ children }: { children: ReactNode }) {
     [schoolOptions],
   );
 
+  const activeNav =
+    NAV.find(({ href }) => isNavActive(pathname ?? "", href)) ?? NAV[0];
+  const scopeLabel = schoolIdFromUrl
+    ? (schoolOptions.find((s) => s.id === schoolIdFromUrl)?.name ?? "School")
+    : "All schools";
+
+  const buildExportTables = (): ExportTable[] => {
+    if (!overview) return [];
+
+    const scopeRow = { Metric: "Scope", Value: scopeLabel };
+    const summaryTable: ExportTable = {
+      title: "Summary",
+      rows: [
+        scopeRow,
+        { Metric: "Total schools", Value: overview.schoolsTotal },
+        {
+          Metric: "Schools with active licence",
+          Value: overview.schoolsWithActiveLicence,
+        },
+        { Metric: "Lessons", Value: overview.lessonsTotal },
+        { Metric: "Lesson ratings", Value: overview.lessonRatingsTotal },
+        {
+          Metric: "AMAYDA certifications complete",
+          Value: overview.certificationsCompletedTotal,
+        },
+        {
+          Metric: "Idle active schools",
+          Value: overview.idleActiveSchoolsCount ?? "n/a",
+        },
+      ],
+    };
+    const idleSchoolsTable: ExportTable = {
+      title: "Idle active schools",
+      rows: overview.idleSchools.map((school) => ({
+        School: school.name,
+        Status: school.activationStatus,
+        "Days since licence start": school.daysSinceActiveLicenceStart ?? "",
+        Classes: school.classCount,
+        Teachers: school.teacherCount,
+      })),
+    };
+    const recentLessonsTable: ExportTable = {
+      title: "Recent lessons",
+      rows: overview.recentLessons.map((lesson) => ({
+        Lesson: lesson.topicTitle,
+        Classes: lesson.classNames ?? "",
+        Teacher: formatTeacherName(
+          lesson.teacherFirstName,
+          lesson.teacherLastName,
+        ),
+        School: lesson.schoolName,
+        Status: lesson.status,
+        Created: formatDate(lesson.createdAt),
+      })),
+    };
+
+    switch (activeNav.href) {
+      case "/admin/reports/certification":
+        return [
+          {
+            title: "Certification",
+            rows: [
+              scopeRow,
+              {
+                Metric: "AMAYDA certifications complete",
+                Value: overview.certificationsCompletedTotal,
+              },
+            ],
+          },
+        ];
+      case "/admin/reports/onboarding":
+        return [summaryTable, idleSchoolsTable];
+      case "/admin/reports/lessons":
+        return [
+          {
+            title: "Lessons",
+            rows: [
+              scopeRow,
+              { Metric: "Lessons", Value: overview.lessonsTotal },
+              { Metric: "Lesson ratings", Value: overview.lessonRatingsTotal },
+            ],
+          },
+          recentLessonsTable,
+        ];
+      default:
+        return [summaryTable, idleSchoolsTable, recentLessonsTable];
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -57,6 +152,12 @@ function ReportsLayoutInner({ children }: { children: ReactNode }) {
           <FileText className="h-4 w-4 mr-2" />
           <h2 className="text-2xl font-bold tracking-tight">Reports</h2>
         </div>
+        <ReportExportMenu
+          filename={`bullyproof-report-${activeNav.label.toLowerCase()}`}
+          documentTitle={`Bullyproof Reports - ${activeNav.label} (${scopeLabel})`}
+          getTables={buildExportTables}
+          disabled={!overview}
+        />
       </div>
 
       <div className="flex gap-4 w-full">
