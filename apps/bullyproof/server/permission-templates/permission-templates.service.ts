@@ -393,7 +393,38 @@ export const permissionTemplatesService = {
       return statusBySchoolId;
     }
 
-    const templateWithRules = await permissionTemplatesRepo.getWithRules(template.id);
+    return this.computeTemplateActiveBySchoolIds(template.id, uniqueSchoolIds);
+  },
+
+  /** Admin surface: per-school active status + count across all schools. */
+  async getSchoolActiveStatus(ctx: AuthContext, templateId: string) {
+    await assertCanManageFeatures(ctx);
+    const [template] = await permissionTemplatesRepo.getById(templateId);
+    if (!template) throw new Error("Template not found");
+    if (template.scope !== "school") {
+      return { statusBySchoolId: {} as Record<string, boolean>, activeCount: 0 };
+    }
+    const schoolRows = await permissionTemplatesRepo.getAllSchoolIds();
+    const statusBySchoolId = await this.computeTemplateActiveBySchoolIds(
+      templateId,
+      schoolRows.map((row) => row.id)
+    );
+    const activeCount = Object.values(statusBySchoolId).filter(Boolean).length;
+    return { statusBySchoolId, activeCount };
+  },
+
+  /** True per school when every rule in the template matches its live permissions. */
+  async computeTemplateActiveBySchoolIds(templateId: string, schoolIds: string[]) {
+    const uniqueSchoolIds = [...new Set(schoolIds.filter(Boolean))];
+    const statusBySchoolId: Record<string, boolean> = Object.fromEntries(
+      uniqueSchoolIds.map((schoolId) => [schoolId, false])
+    );
+
+    if (uniqueSchoolIds.length === 0) {
+      return statusBySchoolId;
+    }
+
+    const templateWithRules = await permissionTemplatesRepo.getWithRules(templateId);
     const rules = templateWithRules?.rules ?? [];
     if (rules.length === 0) {
       return statusBySchoolId;

@@ -5,6 +5,7 @@ import {
   features,
   roles,
   featurePermissions,
+  schools,
 } from "@/server/db/schema";
 import { eq, and, inArray, or } from "drizzle-orm";
 
@@ -51,6 +52,8 @@ export type SchoolTemplatePermission = {
 export const permissionTemplatesRepo = {
   getAll: () =>
     db.select().from(permissionTemplates).orderBy(permissionTemplates.name),
+
+  getAllSchoolIds: () => db.select({ id: schools.id }).from(schools),
 
   getById: (id: string) =>
     db

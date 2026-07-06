@@ -29,7 +29,9 @@ import {
   School,
   Users,
   Pencil,
+  CheckCircle2,
 } from "lucide-react";
+import { Badge } from "@workspace/ui/components/badge";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { toast } from "sonner";
@@ -259,6 +261,25 @@ async function fetchTemplateWithRules(
   return result.data;
 }
 
+type TemplateSchoolStatus = {
+  statusBySchoolId: Record<string, boolean>;
+  activeCount: number;
+};
+
+function useTemplateSchoolStatus(templateId: string, enabled: boolean) {
+  return useQuery<TemplateSchoolStatus>({
+    queryKey: ["permission-templates", templateId, "school-status"],
+    enabled,
+    queryFn: async () => {
+      const result = await apiFetch<TemplateSchoolStatus>(
+        `/permission-templates/${templateId}/status`
+      );
+      if (result.error) throw new Error(result.error.message);
+      return result.data ?? { statusBySchoolId: {}, activeCount: 0 };
+    },
+  });
+}
+
 function TemplateCard({
   template,
   onApply,
@@ -271,6 +292,10 @@ function TemplateCard({
   onOpen: () => void;
 }) {
   const isSchoolTemplate = template.scope === "school";
+  const { data: schoolStatus } = useTemplateSchoolStatus(
+    template.id,
+    isSchoolTemplate
+  );
   return (
     <div
       className="border rounded-lg p-5 flex flex-col gap-3 cursor-pointer hover:bg-accent/30 transition-colors"
@@ -285,7 +310,16 @@ function TemplateCard({
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="font-semibold">{template.name}</h3>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold">{template.name}</h3>
+            {isSchoolTemplate && (schoolStatus?.activeCount ?? 0) > 0 && (
+              <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Active on {schoolStatus?.activeCount} school
+                {schoolStatus?.activeCount === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5">
             {isSchoolTemplate ? "School template" : "Platform role template"}
           </p>
@@ -355,6 +389,10 @@ function ApplyRevokeDialog({
   const { data: schools = [], isLoading } = useListSchoolsQuery(
     { limit: 100 },
     { enabled: isSchoolMode }
+  );
+  const { data: schoolStatus } = useTemplateSchoolStatus(
+    template.id,
+    isSchoolMode
   );
   const { data: platformRoles = [], isLoading: isLoadingRoles } = useQuery({
     queryKey: ["roles", "platform", "permission-template-dialog"],
@@ -498,24 +536,35 @@ function ApplyRevokeDialog({
               ) : !isSchoolMode && isLoadingRoles ? (
                 <Skeleton className="h-24 w-full" />
               ) : (
-                (isSchoolMode ? schools : platformRoles).map((target) => (
-                  <div
-                    key={target.id}
-                    className="flex items-center gap-2 py-1.5 hover:bg-accent/50 rounded px-2 cursor-pointer"
-                    onClick={() => toggleSchool(target.id)}
-                  >
-                    <Checkbox
-                      checked={selectedIds.has(target.id)}
-                      onCheckedChange={() => toggleSchool(target.id)}
-                    />
-                    {isSchoolMode ? (
-                      <School className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    )}
-                    <span className="text-sm">{target.name}</span>
-                  </div>
-                ))
+                (isSchoolMode ? schools : platformRoles).map((target) => {
+                  const isActive =
+                    isSchoolMode &&
+                    (schoolStatus?.statusBySchoolId?.[target.id] ?? false);
+                  return (
+                    <div
+                      key={target.id}
+                      className="flex items-center gap-2 py-1.5 hover:bg-accent/50 rounded px-2 cursor-pointer"
+                      onClick={() => toggleSchool(target.id)}
+                    >
+                      <Checkbox
+                        checked={selectedIds.has(target.id)}
+                        onCheckedChange={() => toggleSchool(target.id)}
+                      />
+                      {isSchoolMode ? (
+                        <School className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm flex-1">{target.name}</span>
+                      {isActive && (
+                        <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
