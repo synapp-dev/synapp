@@ -292,45 +292,67 @@ function TemplateCard({
   onOpen: () => void;
 }) {
   const isSchoolTemplate = template.scope === "school";
-  const { data: schoolStatus } = useTemplateSchoolStatus(
-    template.id,
-    isSchoolTemplate
-  );
+  const { data: schoolStatus, isLoading: isLoadingStatus } =
+    useTemplateSchoolStatus(template.id, isSchoolTemplate);
+  const activeCount = schoolStatus?.activeCount ?? 0;
   return (
     <div
-      className="border rounded-lg p-5 flex flex-col gap-3 cursor-pointer hover:bg-accent/30 transition-colors"
+      className="group border rounded-xl bg-card p-5 flex flex-col gap-4 cursor-pointer transition-all hover:shadow-md hover:border-primary/40"
       onClick={onOpen}
     >
-      <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+      {/* Status row: badge always sits above the title */}
+      <div className="flex items-center justify-between gap-2">
+        {isSchoolTemplate ? (
+          isLoadingStatus ? (
+            <Skeleton className="h-6 w-32 rounded-full" />
+          ) : activeCount > 0 ? (
+            <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800">
+              <CheckCircle2 className="h-3 w-3 mr-1" />
+              Active on {activeCount} school{activeCount === 1 ? "" : "s"}
+            </Badge>
+          ) : (
+            <Badge
+              variant="secondary"
+              className="text-muted-foreground font-normal"
+            >
+              Not active on any school
+            </Badge>
+          )
+        ) : (
+          <Badge
+            variant="secondary"
+            className="text-muted-foreground font-normal"
+          >
+            <Users className="h-3 w-3 mr-1" />
+            Platform
+          </Badge>
+        )}
+        <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0 transition-colors group-hover:bg-primary/15">
           {isSchoolTemplate ? (
             <School className="h-5 w-5" />
           ) : (
             <Users className="h-5 w-5" />
           )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-semibold">{template.name}</h3>
-            {isSchoolTemplate && (schoolStatus?.activeCount ?? 0) > 0 && (
-              <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                Active on {schoolStatus?.activeCount} school
-                {schoolStatus?.activeCount === 1 ? "" : "s"}
-              </Badge>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {isSchoolTemplate ? "School template" : "Platform role template"}
-          </p>
-          {template.description && (
-            <p className="text-sm text-muted-foreground mt-0.5 line-clamp-2">
-              {template.description}
-            </p>
-          )}
-        </div>
       </div>
-      <div className="flex gap-2 mt-auto">
+
+      {/* Title block */}
+      <div className="min-w-0">
+        <h3 className="font-semibold text-base leading-tight">
+          {template.name}
+        </h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          {isSchoolTemplate ? "School template" : "Platform role template"}
+        </p>
+        {template.description && (
+          <p className="text-sm text-muted-foreground mt-2 line-clamp-2 leading-relaxed">
+            {template.description}
+          </p>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 mt-auto pt-4 border-t">
         <Button asChild size="sm" variant="outline" className="flex-1">
           <Link
             href={`/admin/features/permission-templates/${template.id}`}
@@ -557,7 +579,7 @@ function ApplyRevokeDialog({
                       )}
                       <span className="text-sm flex-1">{target.name}</span>
                       {isActive && (
-                        <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
+                        <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Active
                         </Badge>
