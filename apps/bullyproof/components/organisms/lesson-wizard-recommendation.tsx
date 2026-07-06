@@ -868,6 +868,35 @@ export function LessonWizardRecommendation({
         </Alert>
       )}
       
+      {/* No-recommendation fallback - never show a blank screen */}
+      {!recommendedTopic &&
+        !hasConflict &&
+        !showIncompatiblePanel &&
+        !showStageCompletePanel &&
+        !showInvalidPanel &&
+        activeLessons.length === 0 && (
+          <Alert className="bg-amber-50 border-amber-300">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle>No recommended lesson for this selection</AlertTitle>
+            <AlertDescription className="space-y-3 mt-2">
+              <p>
+                We couldn&apos;t find a recommended lesson for the selected
+                classes. This can happen when class year levels don&apos;t match a
+                program level yet. You can go back and change your selection, or
+                choose a lesson manually.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={onBack}>
+                  Back
+                </Button>
+                <Button variant="secondary" size="sm" onClick={onChooseDifferentLesson}>
+                  Choose a lesson manually
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
       {/* Recommended Topic Card */}
       {recommendedTopic && !hasConflict && !showIncompatiblePanel && !showStageCompletePanel && !showInvalidPanel && (
         <div className="space-y-3">

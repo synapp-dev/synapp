@@ -41,6 +41,7 @@ import { Separator } from "@workspace/ui/components/separator";
 import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { SlideRenderer, type SlideData } from "@/components/organisms/slide-renderer";
 import {
+  getDefaultPagePath,
   getLessonDetailRefreshKeys,
   resolveRunLessonStatusRedirect,
 } from "@/lib/lesson-lifecycle";
@@ -239,7 +240,13 @@ export default function LessonRunLessonPage({
       <div className="space-y-6">
         <Button
           variant="ghost"
-          onClick={() => router.push(`/schools/${school_id}/lessons/${lesson_id}/prepare`)}
+          onClick={() => {
+            const target = getDefaultPagePath(school_id, lesson_id, lessonData.status);
+            // This page is the default for ready/in_progress; back means the lessons list then.
+            router.push(
+              target.endsWith("/run-lesson") ? `/schools/${school_id}/lessons` : target
+            );
+          }}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to lesson
