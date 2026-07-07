@@ -2,8 +2,15 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Sparkles } from "lucide-react";
+import { motion, type Variants } from "framer-motion";
+import {
+  ArrowRight,
+  CalendarCheck2,
+  ClipboardCheck,
+  Sparkles,
+} from "lucide-react";
 import { format, isToday, parseISO, startOfDay } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
@@ -12,23 +19,71 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { PageHeader } from "@/components/page-header";
 import { TaskRow } from "@/components/molecules/task-row";
 import { TaskDetailDialog } from "@/components/organisms/task-detail-dialog";
-import {
-  isTouchOverdue,
-  lastTouchLabel,
-  personInitials,
-} from "@/components/molecules/person-card";
+import { GymTodayCard } from "@/components/dashboard/gym-today-card";
+import { ScoreHero } from "@/components/dashboard/score-hero";
+import { TouchBaseCard } from "@/components/dashboard/touch-base-card";
 import { useTasks, useUpdateTask } from "@/hooks/tasks/use-tasks";
-import { usePeople, useUpdatePerson } from "@/hooks/people/use-people";
+import { scoreQueryKey } from "@/hooks/scoring/use-score";
+import { useCheckin } from "@/hooks/checkin/use-checkin";
+import { useCheckinStore } from "@/entities/checkin/model/store";
 import type { Task } from "@/entities/tasks/model/types";
+
+const container: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09 } },
+};
+
+const section: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
+  },
+};
+
+function TasksSkeleton() {
+  return (
+    <div className="space-y-2">
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-12 w-full" />
+      <Skeleton className="h-12 w-full" />
+    </div>
+  );
+}
+
+function GroupLabel({
+  children,
+  tone,
+}: {
+  children: React.ReactNode;
+  tone?: "destructive";
+}) {
+  return (
+    <p
+      className={
+        tone === "destructive"
+          ? "text-xs font-medium uppercase tracking-wider text-destructive"
+          : "text-xs font-medium uppercase tracking-wider text-muted-foreground"
+      }
+    >
+      {children}
+    </p>
+  );
+}
 
 export default function DashboardPage() {
   const { data: tasks, isLoading } = useTasks();
   const updateTask = useUpdateTask();
-  const { data: people } = usePeople();
-  const updatePerson = useUpdatePerson();
-  const touchBaseDue = (people ?? []).filter(isTouchOverdue);
+  const queryClient = useQueryClient();
+  const { data: checkin } = useCheckin();
+  const openWizard = useCheckinStore((state) => state.openWizard);
+  const unresolvedCount =
+    checkin?.groups.reduce((count, group) => count + group.items.length, 0) ??
+    0;
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const selectedTask =
     tasks?.find((task) => task.id === selectedTaskId) ?? null;
@@ -41,150 +96,162 @@ export default function DashboardPage() {
     (task) => task.dueDate && isToday(parseISO(task.dueDate)),
   );
   const overdue = openTasks.filter(
-    (task) => task.dueDate && parseISO(task.dueDate) < today && !isToday(parseISO(task.dueDate)),
+    (task) =>
+      task.dueDate &&
+      parseISO(task.dueDate) < today &&
+      !isToday(parseISO(task.dueDate)),
   );
   const upNext = openTasks
     .filter((task) => !dueToday.includes(task) && !overdue.includes(task))
     .slice(0, 5);
 
   function handleToggle(task: Task) {
-    updateTask.mutate({
-      taskId: task.id,
-      input: { status: task.status === "open" ? "done" : "open" },
-    });
+    updateTask.mutate(
+      {
+        taskId: task.id,
+        input: { status: task.status === "open" ? "done" : "open" },
+      },
+      {
+        // Completions move the ring, so refresh the score straight away.
+        onSettled: () =>
+          queryClient.invalidateQueries({ queryKey: scoreQueryKey }),
+      },
+    );
   }
+
+  const needsAttention = overdue.length + dueToday.length;
 
   return (
     <section className="mx-auto w-full max-w-7xl space-y-6">
-      <div className="flex items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {format(new Date(), "EEEE, d MMMM")}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            {isLoading
-              ? "Loading..."
-              : overdue.length + dueToday.length > 0
-                ? `${overdue.length + dueToday.length} task${overdue.length + dueToday.length === 1 ? "" : "s"} need attention today`
-                : "Nothing urgent on the books"}
-          </p>
-        </div>
-        <Button asChild variant="outline" size="sm" className="gap-1.5">
-          <Link href="/agent">
-            <Sparkles className="h-3.5 w-3.5" />
-            Ask the Agent
-          </Link>
-        </Button>
-      </div>
+      <PageHeader
+        title={format(new Date(), "EEEE, d MMMM")}
+        subtitle={
+          isLoading
+            ? "Loading..."
+            : needsAttention > 0
+              ? `${needsAttention} task${needsAttention === 1 ? "" : "s"} need attention today`
+              : "Nothing urgent on the books"
+        }
+        actions={
+          <>
+            {unresolvedCount > 0 ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={openWizard}
+              >
+                <ClipboardCheck className="h-3.5 w-3.5" />
+                Check in
+                <span className="rounded-full bg-primary/10 px-1.5 text-[11px] font-semibold tabular-nums text-primary">
+                  {unresolvedCount}
+                </span>
+              </Button>
+            ) : null}
+            <Button asChild variant="outline" size="sm" className="gap-1.5">
+              <Link href="/agent">
+                <Sparkles className="h-3.5 w-3.5" />
+                Ask the Agent
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      {isLoading ? (
-        <div className="space-y-2">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {overdue.length > 0 ? (
-            <Card className="border-destructive/40">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Overdue</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {overdue.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onToggle={handleToggle}
-                    onOpen={openTask}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="space-y-4"
+      >
+        <motion.div variants={section}>
+          <ScoreHero />
+        </motion.div>
 
+        <motion.div variants={section}>
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Due today</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarCheck2 className="h-4 w-4 text-muted-foreground" />
+                Today&apos;s plan
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {dueToday.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nothing due today.
-                </p>
+            <CardContent className="space-y-4">
+              <GymTodayCard />
+
+              {isLoading ? (
+                <TasksSkeleton />
               ) : (
-                dueToday.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onToggle={handleToggle}
-                    onOpen={openTask}
-                  />
-                ))
+                <>
+                  {overdue.length > 0 ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <GroupLabel tone="destructive">
+                          Needs a decision
+                        </GroupLabel>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                          onClick={openWizard}
+                        >
+                          <ClipboardCheck className="h-3.5 w-3.5" />
+                          Review now
+                        </Button>
+                      </div>
+                      {overdue.map((task) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          onToggle={handleToggle}
+                          onOpen={openTask}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    <GroupLabel>Due today</GroupLabel>
+                    {dueToday.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-border/60 px-4 py-6 text-center text-sm text-muted-foreground">
+                        Nothing scheduled today.
+                      </p>
+                    ) : (
+                      dueToday.map((task) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          onToggle={handleToggle}
+                          onOpen={openTask}
+                        />
+                      ))
+                    )}
+                  </div>
+
+                  {upNext.length > 0 ? (
+                    <div className="space-y-2">
+                      <GroupLabel>Up next</GroupLabel>
+                      {upNext.map((task) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          onToggle={handleToggle}
+                          onOpen={openTask}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </>
               )}
             </CardContent>
           </Card>
+        </motion.div>
 
-          {upNext.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Up next</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {upNext.map((task) => (
-                  <TaskRow
-                    key={task.id}
-                    task={task}
-                    onToggle={handleToggle}
-                    onOpen={openTask}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
+        <motion.div variants={section}>
+          <TouchBaseCard />
+        </motion.div>
 
-          {touchBaseDue.length > 0 ? (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Touch base</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {touchBaseDue.map((person) => (
-                  <div
-                    key={person.id}
-                    className="flex items-center gap-3 rounded-md border border-border/60 bg-card px-3 py-2"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold">
-                      {personInitials(person)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-foreground">
-                        {person.fullName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Last contact {lastTouchLabel(person)}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() =>
-                        updatePerson.mutate({
-                          personId: person.id,
-                          input: { lastTouchAt: new Date().toISOString() },
-                        })
-                      }
-                    >
-                      Log touch
-                    </Button>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          ) : null}
-
+        <motion.div variants={section}>
           <Button
             asChild
             variant="ghost"
@@ -196,8 +263,8 @@ export default function DashboardPage() {
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
-        </div>
-      )}
+        </motion.div>
+      </motion.div>
 
       <TaskDetailDialog
         task={selectedTask}
