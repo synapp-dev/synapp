@@ -1,4 +1,4 @@
-export type TaskStatus = "open" | "done" | "skipped";
+export type TaskStatus = "open" | "done" | "skipped" | "missed";
 
 export const TASK_DOMAINS = [
   "identity",
@@ -21,6 +21,8 @@ export type Task = {
   priority: TaskPriority;
   domains: TaskDomain[];
   dueDate: string | null;
+  /** Optional link to a work project. */
+  projectId: string | null;
   /** ISO timestamp to push a reminder, or null for none. */
   remindAt: string | null;
   completedAt: string | null;
@@ -32,6 +34,7 @@ export type CreateTaskInput = {
   title: string;
   notes?: string | null;
   dueDate?: string | null;
+  projectId?: string | null;
   remindAt?: string | null;
   priority?: TaskPriority;
   domains?: TaskDomain[];
@@ -42,6 +45,7 @@ export type UpdateTaskInput = {
   notes?: string | null;
   status?: TaskStatus;
   dueDate?: string | null;
+  projectId?: string | null;
   remindAt?: string | null;
   priority?: TaskPriority;
   domains?: TaskDomain[];

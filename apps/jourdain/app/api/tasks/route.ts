@@ -12,6 +12,7 @@ const createTaskSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
     .nullish(),
+  projectId: z.string().uuid().nullish(),
   remindAt: z.string().datetime({ offset: true }).nullish(),
   priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   domains: z.array(z.enum(TASK_DOMAINS)).max(TASK_DOMAINS.length).optional(),

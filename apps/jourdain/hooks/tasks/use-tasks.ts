@@ -29,6 +29,7 @@ function applyTaskPatch(task: Task, input: UpdateTaskInput): Task {
   if (input.domains !== undefined) next.domains = input.domains;
   if (input.priority !== undefined) next.priority = input.priority;
   if (input.dueDate !== undefined) next.dueDate = input.dueDate ?? null;
+  if (input.projectId !== undefined) next.projectId = input.projectId ?? null;
   if (input.remindAt !== undefined) next.remindAt = input.remindAt ?? null;
   if (input.status !== undefined) {
     next.status = input.status;
@@ -58,6 +59,7 @@ export function useCreateTask() {
         priority: input.priority ?? 4,
         domains: input.domains ?? [],
         dueDate: input.dueDate ?? null,
+        projectId: input.projectId ?? null,
         remindAt: input.remindAt ?? null,
         completedAt: null,
         createdAt: now,

@@ -16,6 +16,7 @@ type TaskRow = {
   priority: TaskPriority;
   domains: TaskDomain[];
   due_date: string | null;
+  project_id: string | null;
   remind_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -23,7 +24,7 @@ type TaskRow = {
 };
 
 const TASK_COLUMNS =
-  "id, title, notes, status, priority, domains, due_date, remind_at, completed_at, created_at, updated_at";
+  "id, title, notes, status, priority, domains, due_date, project_id, remind_at, completed_at, created_at, updated_at";
 
 function toTask(row: TaskRow): Task {
   return {
@@ -34,6 +35,7 @@ function toTask(row: TaskRow): Task {
     priority: row.priority,
     domains: row.domains ?? [],
     dueDate: row.due_date,
+    projectId: row.project_id,
     remindAt: row.remind_at,
     completedAt: row.completed_at,
     createdAt: row.created_at,
@@ -77,6 +79,7 @@ export async function createTask(
       title: input.title,
       notes: input.notes ?? null,
       due_date: input.dueDate ?? null,
+      project_id: input.projectId ?? null,
       remind_at: input.remindAt ?? null,
       priority: input.priority ?? 4,
       domains: input.domains ?? [],
@@ -97,6 +100,7 @@ export async function updateTask(
   if (input.title !== undefined) patch.title = input.title;
   if (input.notes !== undefined) patch.notes = input.notes;
   if (input.dueDate !== undefined) patch.due_date = input.dueDate;
+  if (input.projectId !== undefined) patch.project_id = input.projectId;
   if (input.remindAt !== undefined) {
     patch.remind_at = input.remindAt;
     // A new or changed reminder should fire again — clear the sent marker.

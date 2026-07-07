@@ -27,7 +27,7 @@ import type { Task, TaskDomain, TaskPriority } from "@/entities/tasks/model/type
 
 type TaskRowProps = {
   task: Task;
-  onToggle: (task: Task) => void;
+  onToggle?: (task: Task) => void;
   onDelete?: (task: Task) => void;
   onOpen?: (task: Task) => void;
 };
@@ -81,13 +81,15 @@ function dueMeta(dueDate: string): { label: string; className: string } {
 
 export function TaskRow({ task, onToggle, onDelete, onOpen }: TaskRowProps) {
   const done = task.status === "done";
-  const due = task.dueDate && !done ? dueMeta(task.dueDate) : null;
+  const missed = task.status === "missed";
+  const due = task.dueDate && !done && !missed ? dueMeta(task.dueDate) : null;
 
   return (
     <div
       className={cn(
         "group flex items-start gap-3 rounded-xl border border-border/60 bg-card px-4 py-3 shadow-sm transition-colors hover:border-border",
         onOpen && "cursor-pointer",
+        missed && "opacity-60",
       )}
       role={onOpen ? "button" : undefined}
       tabIndex={onOpen ? 0 : undefined}
@@ -103,32 +105,55 @@ export function TaskRow({ task, onToggle, onDelete, onOpen }: TaskRowProps) {
           : undefined
       }
     >
-      <span
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={(event) => event.stopPropagation()}
-      >
-        <Checkbox
-          checked={done}
-          onCheckedChange={() => onToggle(task)}
-          aria-label={done ? `Reopen "${task.title}"` : `Complete "${task.title}"`}
-          className={cn(
-            "mt-0.5 h-[18px] w-[18px] rounded-full border-2 data-[state=checked]:text-white",
-            PRIORITY_CHECKBOX[task.priority],
-          )}
-        />
-      </span>
+      {missed ? (
+        <span
+          className="mt-0.5 flex h-[18px] w-[18px] items-center justify-center"
+          aria-hidden
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-rose-500/70" />
+        </span>
+      ) : (
+        <span
+          onClick={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
+        >
+          <Checkbox
+            checked={done}
+            onCheckedChange={() => onToggle?.(task)}
+            aria-label={done ? `Reopen "${task.title}"` : `Complete "${task.title}"`}
+            className={cn(
+              "mt-0.5 h-[18px] w-[18px] rounded-full border-2 data-[state=checked]:text-white",
+              PRIORITY_CHECKBOX[task.priority],
+            )}
+          />
+        </span>
+      )}
 
       <div className="min-w-0 flex-1">
         <p
           className={cn(
             "truncate text-sm",
-            done ? "text-muted-foreground line-through" : "text-foreground",
+            done || missed ? "text-muted-foreground" : "text-foreground",
+            done && "line-through",
           )}
         >
           {task.title}
         </p>
-        {due || task.notes ? (
+        {due || missed || task.notes ? (
           <div className="mt-0.5 flex items-center gap-3 text-xs">
+            {missed ? (
+              <span className="flex items-center gap-1.5">
+                <span className="rounded-full bg-rose-500/10 px-1.5 py-px text-[10px] font-medium text-rose-500">
+                  Missed
+                </span>
+                {task.dueDate ? (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    {format(parseISO(task.dueDate), "EEE d MMM")}
+                  </span>
+                ) : null}
+              </span>
+            ) : null}
             {due ? (
               <span className={cn("flex items-center gap-1", due.className)}>
                 <Calendar className="h-3 w-3" />
