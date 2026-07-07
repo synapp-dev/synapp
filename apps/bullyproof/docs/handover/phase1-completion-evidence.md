@@ -31,10 +31,21 @@
 | 36 - Government dashboard (live verification) | - | verified live | View-as Gov Viewer Test on /dashboard renders Government Reporting: 5 aggregate cards matching admin numbers (57/56/1,461/1,199/549), view-only, no command menu, CSV export works |
 | 15 - Culture zero-input weighting (live verification) | - | verified live | Admin > Culture ratings on St4s Test School: benchmark (Term 1 2025) entered with exclusions = 0, then two comparatives. Term 2 with exclusions 0 -> headline 11.1% (zero-to-zero counted as 0% change, full weight kept; per-metric deltas +1.06/+25.49/+38.73/0 match the hand-computed weighted sum 11.0958). Term 3 with exclusions 1 -> exclusion delta uncomputable from a zero base, metric drops out and its 0.2 weight redistributes over the remaining 0.8 -> headline 5.7256, matching (0.47x0.53 + 0.165x12.87 + 0.165x13.37)/0.8 exactly. Both rows previously rendered a null headline. Test data left in place (source note marks it UAT) as a worked example; deletable via the row trash action |
 
+## Acceptance package (assembled 7 July 2026)
+
+All in docs/handover/ unless noted:
+
+- Completion Register FINAL: `Bullyproof-SOW-Completion-Register-FINAL.docx` (built from the 29 June original by `scripts/build-final-completion-register.py`; every row Delivered, Sections 2/3 rewritten past-tense, UAT-found fixes recorded)
+- D6 Word copies: `admin-user-guide.docx`, `system-administrator-guide.docx` (via `scripts/convert-handover-docs.py`)
+- D7 BoM regenerated at final delivery: 640 packages incl. the OFL-1.1 certificate font added on this branch
+- Final Acceptance letter: `final-acceptance-letter.{md,docx}` (cl 7.1 UAT delivery, 15-business-day window, cl 7.5 handover list, cl 4(b) payment; production URL placeholder to fill)
+- Tax invoice draft: `invoice-phase1-completion.{md,docx}` ($100,000 + $10,000 GST = $110,000 per cl 4(b); invoice number, Amayda ABN, bank details to fill)
+- Cover email draft: `final-acceptance-email-draft.md` (includes the Woodford ask and a bracketed salary-component note for Aaron to confirm)
+
 ## Still open (tracked)
 
-- D6 Administrator User Guide + System Administrator Guide: markdown drafts complete at docs/handover/{admin-user-guide,system-administrator-guide}.md; convert to Word at packaging
-- D7 Bill of Materials (scripted at handover)
-- Woodford weighting constants (blocked on Glenn confirming the 25 April mapping)
-- Production Supabase auth settings spot-check at deploy (sessions not timeboxed)
-- Goodwill items (BP -> BA rebrand, certificate template) sequenced after the acceptance-critical path
+- Fill letter/invoice placeholders (production URL, invoice number, Amayda ABN, bank details), then send the package
+- Woodford weighting constants (blocked on Glenn confirming the 25 April mapping; does not block acceptance)
+- Real-teacher login pass over the school Reports page (view-as proves the UI, not the API token path); or leave for Glenn's UAT
+- On acceptance: merge fixes/phase1-completion to master (production deploy), spot-check production Supabase auth settings per auth-session-expiry.md, execute handover (repo control, credentials)
+- Goodwill items (BP -> BA rebrand, uploadable certificate template) sequenced after the acceptance-critical path

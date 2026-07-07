@@ -1,9 +1,9 @@
 # Bullyproof - Open Source Bill of Materials (D7)
 
-> Production dependencies of apps/bullyproof. Generated 2026-07-06 via
+> Production dependencies of apps/bullyproof. Generated 2026-07-07 via
 > `node scripts/generate-bill-of-materials.mjs`. Regenerate at Final Delivery.
 
-Total packages: 639
+Total packages: 640
 
 | Package | Version(s) | Licence | Homepage |
 |---------|------------|---------|----------|
@@ -68,6 +68,7 @@ Total packages: 639
 | @next/env | 15.5.9 | MIT | https://github.com/vercel/next.js#readme |
 | @next/swc-win32-x64-msvc | 15.5.7 | MIT | https://github.com/vercel/next.js#readme |
 | @opentelemetry/api | 1.9.0 | Apache-2.0 | https://github.com/open-telemetry/opentelemetry-js/tree/main/api |
+| @pdf-lib/fontkit | 1.1.1 | MIT | https://github.com/Hopding/fontkit |
 | @pdf-lib/standard-fonts | 1.0.0 | MIT | https://github.com/Hopding/standard-fonts |
 | @pdf-lib/upng | 1.0.1 | MIT | https://github.com/Hopding/upng#readme |
 | @pkgjs/parseargs | 0.11.0 | MIT | https://github.com/pkgjs/parseargs#readme |
