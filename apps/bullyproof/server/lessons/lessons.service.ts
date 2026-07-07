@@ -30,6 +30,11 @@ import {
   createLesson as orchestrateCreateLesson,
   createServerCreateLessonDeps,
 } from "./create-lesson";
+import {
+  buildLessonUpdateMetadata,
+  evaluateLessonStatusChange,
+  statusChangeRequiresPlatformAdmin,
+} from "@/lib/lesson-lifecycle";
 import { classes, lessons, userProfile } from "@/server/db/schema";
 import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
@@ -172,32 +177,29 @@ export const lessonsService = {
       }
     }
 
-    // Owner-only check for status → feedback
-    if (data.status === "feedback") {
-      if (ctx.userId !== existingLesson[0].createdByUserId) {
-        throw new Error("Only the lesson owner can transition the lesson to feedback.");
-      }
-    }
-
-    // Cancel from feedback/completed: only platform admins, not owners
-    if (data.status === "cancelled") {
-      const currentStatus = existingLesson[0].status;
-      if (currentStatus === "feedback" || currentStatus === "completed") {
-        const roles = await getUserScopedRoles(ctx.userId!);
-        const isPlatformAdmin = hasPlatformRole(roles, "PLATFORM_ADMIN", "INTRADARK_DEV");
-        if (!isPlatformAdmin) {
-          throw new Error(
-            "Only platform admins can cancel a lesson that is in feedback or completed."
-          );
-        }
-      }
-    }
-
-    // Build update payload with event history
-    const updateData: Record<string, unknown> = { ...data };
+    // Status-change permissions: pure rules in lib/lesson-lifecycle, roles
+    // fetched only when the change actually needs the platform-admin check.
     const existing = existingLesson[0]!;
-    const currentMeta = (existing.metadata as Record<string, unknown>) || {};
-    let history = Array.isArray(currentMeta.eventHistory) ? [...currentMeta.eventHistory] : [];
+    const transitionInput = {
+      requestedStatus: data.status,
+      currentStatus: existing.status ?? "",
+    };
+    let actorIsPlatformAdmin = false;
+    if (statusChangeRequiresPlatformAdmin(transitionInput)) {
+      const roles = await getUserScopedRoles(ctx.userId!);
+      actorIsPlatformAdmin = hasPlatformRole(roles, "PLATFORM_ADMIN", "INTRADARK_DEV");
+    }
+    const verdict = evaluateLessonStatusChange({
+      ...transitionInput,
+      actorIsOwner: ctx.userId === existing.createdByUserId,
+      actorIsPlatformAdmin,
+    });
+    if (verdict.allowed === false) {
+      throw new Error(verdict.reason);
+    }
+
+    // Build update payload with event history (pure construction).
+    const updateData: Record<string, unknown> = { ...data };
 
     const actorProfile = await db
       .select({ firstName: userProfile.firstName, lastName: userProfile.lastName })
@@ -209,34 +211,19 @@ export const lessonsService = {
         ? `${actorProfile[0].firstName} ${actorProfile[0].lastName}`
         : undefined;
 
-    if (data.status !== undefined && data.status !== existing.status) {
-      history.push({
-        type: "status_transition",
-        userId: ctx.userId,
-        userName: actorName,
-        timestamp: new Date().toISOString(),
-        payload: { fromStatus: existing.status, toStatus: data.status },
-      });
-    }
-    if (data.scheduledFor !== undefined && data.scheduledFor !== existing.scheduledFor) {
-      history.push({
-        type: "scheduled",
-        userId: ctx.userId,
-        userName: actorName,
-        timestamp: new Date().toISOString(),
-        payload: {
-          previousScheduledFor: existing.scheduledFor ?? undefined,
-          scheduledFor: data.scheduledFor,
-        },
-      });
-    }
-
-    if (history.length > 0) {
-      const newMeta: Record<string, unknown> = { ...currentMeta, eventHistory: history };
-      if (data.status === "feedback") {
-        newMeta.feedbackOwnerUserId = existing.createdByUserId;
-      }
-      updateData.metadata = newMeta;
+    const nextMetadata = buildLessonUpdateMetadata({
+      existing: {
+        status: existing.status ?? "",
+        scheduledFor: existing.scheduledFor,
+        createdByUserId: existing.createdByUserId,
+        metadata: existing.metadata,
+      },
+      changes: { status: data.status, scheduledFor: data.scheduledFor },
+      actor: { userId: ctx.userId, userName: actorName },
+      timestamp: new Date().toISOString(),
+    });
+    if (nextMetadata) {
+      updateData.metadata = nextMetadata;
     }
 
     await lessonsRepo.update(id, updateData as UpdateLessonParams & { metadata?: Record<string, unknown> });

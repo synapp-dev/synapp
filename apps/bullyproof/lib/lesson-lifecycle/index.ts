@@ -28,3 +28,13 @@ export {
   shouldRefetchLiveLessonStore,
   shouldStopLiveLesson,
 } from "./live-store-effects";
+
+export {
+  buildLessonUpdateMetadata,
+  evaluateLessonStatusChange,
+  statusChangeRequiresPlatformAdmin,
+  type LessonEventActor,
+  type LessonSnapshotForEvents,
+  type LessonStatusChangeVerdict,
+  type LessonUpdateChanges,
+} from "./update-rules";
