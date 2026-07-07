@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import * as chrono from "chrono-node";
-import { format } from "date-fns";
+import { differenceInDays, format, parseISO } from "date-fns";
 import { z } from "zod/v4";
 import { createServerClient } from "@/utils/supabase/server";
 import { createTask, listTasks, updateTask } from "@/lib/tasks/service";
@@ -16,10 +16,13 @@ import { syncTaskCalendarEvent } from "@/lib/google/task-sync";
 import { getGmailContext } from "@/lib/google/client";
 import { listPersonEmailThreads } from "@/lib/google/gmail";
 import {
+  getActiveSession,
   getAllStandards,
   getExerciseBests,
+  getSchedule,
   listBodyWeights,
   listExercises,
+  listSessions,
 } from "@/lib/gym/service";
 import { G20_CATALOG } from "@/lib/gym/catalog";
 import { assessLift, STRENGTH_LEVEL_META } from "@/lib/gym/standards";
@@ -37,15 +40,43 @@ import {
   type MuscleSubgroup,
   type Sex,
 } from "@/entities/gym/model/types";
+import {
+  addDays,
+  computeScoreHistory,
+  type ScoreTask,
+} from "@/lib/scoring/compute";
+import {
+  categoryBreakdown,
+  detectRecurring,
+  isSpend,
+  inMonth,
+  monthKey,
+  monthLabel,
+  round2,
+  topMerchants,
+} from "@/lib/finance/stats";
+import {
+  getFinanceTransactions,
+  setTransactionCategory,
+} from "@/lib/finance/service";
+import { CATEGORIES } from "@/lib/finance/categorise";
+import { createEntry, listEntries } from "@/lib/identity/service";
+import { IDENTITY_SECTIONS } from "@/entities/identity/model/types";
+import { upcomingBirthdays } from "@/lib/people/birthdays";
+import { followupOverdueDays } from "@/lib/people/followups";
 import type { AgentWorkoutExercise } from "@/entities/agent/model/types";
 import type { AgentCard, AgentReply } from "@/entities/agent/model/types";
 import type { PersonCircle } from "@/entities/people/model/types";
+import type { TaskDomain, TaskStatus } from "@/entities/tasks/model/types";
 
 export const maxDuration = 60;
 
 // Tool calling + short text interpretation only — Haiku handles this at ~1/5
 // the cost of Opus. Bump to "claude-sonnet-4-6" if inference quality slips.
 const AGENT_MODEL = "claude-haiku-4-5";
+
+// Days of history behind the score card's trend strip.
+const SCORE_TREND_DAYS = 7;
 
 const requestSchema = z.object({
   messages: z
@@ -57,6 +88,11 @@ const requestSchema = z.object({
     )
     .min(1)
     .max(30),
+  // The client's local calendar day; defaults to the server's when absent.
+  clientDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 // Deterministic natural-language date resolution — the model passes the user's
@@ -103,12 +139,28 @@ function resolveBirthday(phrase: string | undefined): {
   };
 }
 
+// Month phrases ("May", "last month", "2026-05") to a YYYY-MM key; defaults to
+// the current month when nothing was given or nothing parses.
+function resolveMonthKey(phrase: string | undefined): string {
+  if (!phrase) return monthKey(new Date());
+  const trimmed = phrase.trim();
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return trimmed;
+  const parsed = chrono.parseDate(trimmed, new Date());
+  return parsed ? monthKey(parsed) : monthKey(new Date());
+}
+
 function buildSystemPrompt(): string {
   const now = new Date();
   const today = format(now, "yyyy-MM-dd");
   const weekday = format(now, "EEEE");
 
-  return `You are Jourdain, the user's personal AI operating system. You manage their tasks, their personal CRM, and their gym training; more life domains (finance, and more) are coming.
+  return `You are Jourdain, the user's personal AI operating system. You can see every module of their life app:
+- Tasks and routines: to-dos, recurring reminders, push notifications.
+- Life score: a daily /100 built from that day's scheduled tasks across five pillars (identity, health, work, social, finance).
+- Personal CRM: people, circles, facts, birthdays, and follow-up cadences.
+- Finance: imported bank transactions, categorised spend, budgets, subscriptions.
+- Identity: who they want to be, in 12 sections (vision, values, standards, goals with target dates, and more).
+- Gym: exercise library, programs, a weekday schedule, and logged sessions with strength ratings.
 
 Today's date is ${today} (${weekday}).
 
@@ -126,15 +178,32 @@ You also keep the user's personal CRM — people in their life, grouped into cir
 - get_person_emails: when the user asks about email with someone — recent threads, what a contact said, or what they're waiting on. Call find_person first to get the id, then summarise the threads in a sentence or two; don't dump them verbatim.
 If the user shares a fact about someone who doesn't exist yet, create them first, then log the fact. Don't ask permission for this — capturing people-context silently is your job.
 
+You track their social health beyond the CRM basics:
+- get_birthdays: when the user asks whose birthday is coming up, or wants gift/planning lead time. Renders as a card; keep your text to one line.
+- get_followups: when the user asks who they should catch up with, who they've been neglecting, or wants to stay on top of relationships. Renders as a card; call out the one or two most overdue people by name and stop there.
+
+You keep their daily life score:
+- get_score: when the user asks how their day, week, or life is going, how they're tracking, or about a pillar (health, work, social, finance, identity). Returns today's /100, the pillar breakdown, and a 7-day trend, rendered as a card; your text should read the story in one or two sentences (e.g. which pillar is dragging today, or that the week is trending up), not repeat the numbers.
+
+You watch their money:
+- get_spending: when the user asks what they spent, where the money went, a category or merchant total, or about a specific month. Pass the user's month words verbatim in "month" ("May", "last month"); omit for the current month. Returns the category breakdown, top merchants, and recent transactions (with ids), rendered as a card; answer the actual question in a sentence rather than reciting the rows.
+- get_subscriptions: when the user asks about subscriptions, recurring payments, or what's quietly draining their account. Summarise the total annualised cost and the biggest one or two.
+- set_transaction_category: when the user says a transaction is miscategorised ("that Uber charge was actually dining"). Find the transaction id via get_spending first. Set remember=true (with a short pattern like "uber") when the fix should apply to future matching transactions too.
+
+You hold their identity work:
+- add_identity_entry: when the user states a goal, value, belief, boundary, or any "who I want to be" material worth keeping. Pick the closest section; use "goals" for anything with an outcome, and pass their date words verbatim in "target_date" when a deadline was given.
+- list_goals: when the user asks about their goals, what they're working toward, or how long is left on something.
+
 You also help with the user's gym training:
-- build_workout: call this when the user asks for a workout, a gym session, or what to train. It builds a Push/Pull/Legs day — a few exercises across that day's muscle groups. If the user names a day ("push day", "leg session", "back and biceps"), pass the matching focus; otherwise omit focus and let it pick. The session renders as a card, so DON'T list the exercises, weights, or sets in your text — the card already shows them. Instead, open with one or two sentences explaining the THINKING: if "weakAreas" is non-empty, say you leaned the session toward those areas because they're lagging (name one or two naturally, e.g. "your chest and triceps are lagging so I've front-loaded those"); if "needs1rm" is non-empty, add that you'll need a fresh 1RM logged on those lift(s) to track real progress. If both are empty, just give a short, encouraging one-liner about the session.
+- get_gym_today: when the user asks what's on at the gym today, whether they've trained, or about their schedule. Returns today's scheduled program, any session in progress, and whether they've already finished one.
+- build_workout: call this when the user asks for a workout, a gym session, or what to train. It builds a Push/Pull/Legs day — a few exercises across that day's muscle groups. If the user names a day ("push day", "leg session", "back and biceps"), pass the matching focus; otherwise omit focus and let it pick. The session renders as a card, so DON'T list the exercises, weights, or sets in your text — the card already shows them. Instead, open with one or two sentences explaining the THINKING: if "weakAreas" is non-empty, say you leaned the session toward those areas because they're lagging (name one or two naturally, e.g. "your chest and triceps are lagging so I've front-loaded those"); if "needs1rm" is non-empty, add that you'll need a fresh 1RM logged on those lift(s) to track real progress. If both are empty, just give a short, encouraging one-liner about the session. When the user asks about TODAY's plan specifically, prefer get_gym_today over building a fresh workout.
 
 When creating tasks, always categorize:
 - priority: 1 = urgent/critical (words like "urgent", "asap", "must", deadlines with consequences), 2 = high, 3 = medium, 4 = default when nothing signals importance.
 - domains: tag each task with the life domains it belongs to — "identity" (personal growth, values, goals, habits of self), "health" (fitness, nutrition, sleep, medical), "work" (job, projects, meetings, career), "social" (family, friends, relationships, events, birthdays), "finance" (money, bills, budget, investments, insurance, tax). A task can have multiple domains (e.g. "book dinner for mum's birthday" is social; "gym membership renewal" is health and finance). Leave domains empty only when nothing fits — it then lands in the inbox.
 
 Style:
-- Keep replies to one or two sentences. The UI renders rich cards for task data returned by your tools — never repeat full task lists in your text.
+- Keep replies to one or two sentences. The UI renders rich cards for the data returned by your tools — never repeat full lists in your text.
 - For minor ambiguities (exact wording of a task title, no due date given), pick a sensible interpretation and note it briefly rather than asking.`;
 }
 
@@ -169,6 +238,9 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const clientDate =
+    parsed.data.clientDate ?? format(new Date(), "yyyy-MM-dd");
 
   const cards: AgentCard[] = [];
 
@@ -673,6 +745,407 @@ export async function POST(request: NextRequest) {
     },
   });
 
+  const getScoreTool = betaZodTool({
+    name: "get_score",
+    description:
+      "Get today's life score out of 100, the five-pillar breakdown, and the 7-day trend. Call this when the user asks how their day, week, or life is going.",
+    inputSchema: z.object({}),
+    run: async () => {
+      try {
+        const endDate = clientDate;
+        const startDate = addDays(endDate, -(SCORE_TREND_DAYS - 1));
+        const { data, error } = await supabase
+          .from("tasks")
+          .select("status, domains, due_date, occurrence_date")
+          .or(
+            [
+              `and(occurrence_date.gte.${startDate},occurrence_date.lte.${endDate})`,
+              `and(occurrence_date.is.null,due_date.gte.${startDate},due_date.lte.${endDate})`,
+            ].join(",")
+          );
+        if (error) throw new Error(error.message);
+
+        const tasks: ScoreTask[] = (
+          (data as {
+            status: TaskStatus;
+            domains: TaskDomain[] | null;
+            due_date: string | null;
+            occurrence_date: string | null;
+          }[]) ?? []
+        ).map((row) => ({
+          status: row.status,
+          domains: row.domains ?? [],
+          dueDate: row.due_date,
+          occurrenceDate: row.occurrence_date,
+        }));
+
+        const history = computeScoreHistory(endDate, SCORE_TREND_DAYS, tasks);
+        const today = history.at(-1)!;
+        cards.push({
+          type: "score",
+          title: "Today's score",
+          date: today.date,
+          score: today.score,
+          pillars: today.pillars,
+          trend: history.map((day) => ({ date: day.date, score: day.score })),
+        });
+        return JSON.stringify({
+          ok: true,
+          today,
+          trend: history.map((day) => ({ date: day.date, score: day.score })),
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "score failed",
+        });
+      }
+    },
+  });
+
+  const getSpendingTool = betaZodTool({
+    name: "get_spending",
+    description:
+      "Get spending for one month: total, per-category breakdown, top merchants, and recent transactions with ids. Call this when the user asks what they spent, where the money went, or about a merchant or category.",
+    inputSchema: z.object({
+      month: z
+        .string()
+        .max(50)
+        .optional()
+        .describe(
+          'The user\'s month words verbatim, e.g. "May", "last month", "2026-05". Omit for the current month.'
+        ),
+    }),
+    run: async (input) => {
+      try {
+        const key = resolveMonthKey(input.month);
+        const transactions = await getFinanceTransactions(user.id);
+        const categories = categoryBreakdown(transactions, key);
+        const merchants = topMerchants(transactions, key);
+        const total = round2(
+          categories.reduce((sum, entry) => sum + entry.total, 0)
+        );
+        const recent = transactions
+          .filter((t) => isSpend(t) && inMonth(t, key))
+          .slice(0, 25)
+          .map((t) => ({
+            id: t.id,
+            date: t.date,
+            amount: round2(-t.amount),
+            description: t.description,
+            category: t.category,
+          }));
+        const label = monthLabel(key, "long");
+        cards.push({
+          type: "spending",
+          title: `Spending in ${label}`,
+          monthLabel: label,
+          total,
+          categories,
+          merchants,
+        });
+        return JSON.stringify({
+          ok: true,
+          month: key,
+          total,
+          categories,
+          merchants,
+          recentTransactions: recent,
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "spending failed",
+        });
+      }
+    },
+  });
+
+  const getSubscriptionsTool = betaZodTool({
+    name: "get_subscriptions",
+    description:
+      "Detect recurring payments (subscriptions, memberships, bills) from the user's transactions, with cadence and annualised cost. Call this when the user asks about subscriptions or recurring charges.",
+    inputSchema: z.object({}),
+    run: async () => {
+      try {
+        const transactions = await getFinanceTransactions(user.id);
+        const recurring = detectRecurring(transactions);
+        const totalAnnualised = round2(
+          recurring.reduce((sum, entry) => sum + entry.annualised, 0)
+        );
+        return JSON.stringify({
+          ok: true,
+          count: recurring.length,
+          totalAnnualised,
+          recurring,
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "subscriptions failed",
+        });
+      }
+    },
+  });
+
+  const setTransactionCategoryTool = betaZodTool({
+    name: "set_transaction_category",
+    description:
+      "Recategorise one transaction. Requires the transaction id from get_spending. Set remember=true with a short pattern to also save a rule and fix every other matching transaction.",
+    inputSchema: z.object({
+      transaction_id: z.uuid().describe("The transaction id from get_spending"),
+      category: z.enum(CATEGORIES),
+      remember: z
+        .boolean()
+        .optional()
+        .describe("true to save a rule so future matches get this category"),
+      pattern: z
+        .string()
+        .max(100)
+        .optional()
+        .describe(
+          'Substring the rule matches on, e.g. "uber eats". Required when remember is true.'
+        ),
+    }),
+    run: async (input) => {
+      try {
+        const pattern = input.remember ? input.pattern?.trim() : undefined;
+        if (input.remember && !pattern) {
+          return JSON.stringify({
+            ok: false,
+            error: "remember=true needs a pattern",
+          });
+        }
+        const result = await setTransactionCategory(
+          user.id,
+          input.transaction_id,
+          input.category,
+          pattern
+        );
+        return JSON.stringify({ ok: true, updated: result.updated });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "recategorise failed",
+        });
+      }
+    },
+  });
+
+  const addIdentityEntryTool = betaZodTool({
+    name: "add_identity_entry",
+    description:
+      "Add an entry to the user's identity document (vision, values, goals, and more). Call this when the user states a goal, value, belief, or boundary worth keeping.",
+    inputSchema: z.object({
+      section: z.enum(IDENTITY_SECTIONS),
+      title: z.string().min(1).max(300).describe("Short headline for the entry"),
+      body: z.string().max(5000).optional().describe("Longer detail, if any"),
+      target_date: z
+        .string()
+        .max(100)
+        .optional()
+        .describe(
+          'For goals with a deadline: the user\'s date words verbatim, e.g. "end of the year", "June 20". Do not calculate dates yourself.'
+        ),
+    }),
+    run: async (input) => {
+      try {
+        const targetDate =
+          input.section === "goals" ? resolveDueDate(input.target_date) : null;
+        const entry = await createEntry(supabase, user.id, {
+          section: input.section,
+          title: input.title,
+          body: input.body ?? null,
+          extras: targetDate ? { targetDate } : {},
+        });
+        return JSON.stringify({ ok: true, entry });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "add entry failed",
+        });
+      }
+    },
+  });
+
+  const listGoalsTool = betaZodTool({
+    name: "list_goals",
+    description:
+      "List the user's open identity goals with days remaining to their target dates. Call this when the user asks about their goals or what they're working toward.",
+    inputSchema: z.object({}),
+    run: async () => {
+      try {
+        const today = format(new Date(), "yyyy-MM-dd");
+        const goals = (await listEntries(supabase, "goals"))
+          .filter((entry) => !entry.extras.done)
+          .map((entry) => ({
+            id: entry.id,
+            title: entry.title,
+            body: entry.body,
+            targetDate: entry.extras.targetDate ?? null,
+            daysLeft: entry.extras.targetDate
+              ? differenceInDays(
+                  parseISO(entry.extras.targetDate),
+                  parseISO(today)
+                )
+              : null,
+          }));
+        return JSON.stringify({ ok: true, count: goals.length, goals });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "list goals failed",
+        });
+      }
+    },
+  });
+
+  const getBirthdaysTool = betaZodTool({
+    name: "get_birthdays",
+    description:
+      "Get the next upcoming birthdays among the user's people. Call this when the user asks whose birthday is coming up.",
+    inputSchema: z.object({
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .describe("How many to return; defaults to 5"),
+    }),
+    run: async (input) => {
+      try {
+        const people = await listPeople(supabase, {});
+        const entries = upcomingBirthdays(people)
+          .slice(0, input.limit ?? 5)
+          .map((entry) => ({
+            person: entry.person,
+            date: format(entry.date, "yyyy-MM-dd"),
+            daysAway: entry.daysAway,
+            turns: entry.turns,
+          }));
+        cards.push({
+          type: "birthday_list",
+          title: "Upcoming birthdays",
+          entries,
+        });
+        return JSON.stringify({
+          ok: true,
+          count: entries.length,
+          birthdays: entries.map((entry) => ({
+            name: entry.person.fullName,
+            date: entry.date,
+            daysAway: entry.daysAway,
+            turns: entry.turns,
+          })),
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "birthdays failed",
+        });
+      }
+    },
+  });
+
+  const getFollowupsTool = betaZodTool({
+    name: "get_followups",
+    description:
+      "Get the people most overdue for a catch-up, based on each person's touch-base cadence. Call this when the user asks who they should reach out to or who they've been neglecting.",
+    inputSchema: z.object({
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .describe("How many to return; defaults to 5"),
+    }),
+    run: async (input) => {
+      try {
+        const people = await listPeople(supabase, {});
+        const entries = people
+          .map((person) => ({ person, overdue: followupOverdueDays(person) }))
+          .filter((entry) => entry.overdue !== null && entry.overdue > 0)
+          .sort((a, b) => (b.overdue ?? 0) - (a.overdue ?? 0))
+          .slice(0, input.limit ?? 5)
+          .map((entry) => ({
+            person: entry.person,
+            overdueDays: Number.isFinite(entry.overdue)
+              ? (entry.overdue as number)
+              : null,
+          }));
+        cards.push({
+          type: "followup_list",
+          title: "Overdue catch-ups",
+          entries,
+        });
+        return JSON.stringify({
+          ok: true,
+          count: entries.length,
+          followups: entries.map((entry) => ({
+            name: entry.person.fullName,
+            overdueDays: entry.overdueDays,
+            neverContacted: entry.person.lastTouchAt === null,
+            lastTouchAt: entry.person.lastTouchAt,
+          })),
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "followups failed",
+        });
+      }
+    },
+  });
+
+  const getGymTodayTool = betaZodTool({
+    name: "get_gym_today",
+    description:
+      "Get today's gym state: the scheduled program (if any), a session in progress, and whether a session was already completed today. Call this when the user asks what's on at the gym today or whether they've trained.",
+    inputSchema: z.object({}),
+    run: async () => {
+      try {
+        const today = clientDate;
+        const [schedule, active, sessions] = await Promise.all([
+          getSchedule(supabase, user.id),
+          getActiveSession(supabase, user.id),
+          listSessions(supabase, user.id, 20),
+        ]);
+        // Parse at local noon so the weekday can't slip a day at DST edges.
+        const day = schedule.days[new Date(`${today}T12:00:00`).getDay()];
+        const completedToday = sessions.filter(
+          (session) =>
+            session.performedOn === today && session.status === "completed"
+        );
+        return JSON.stringify({
+          ok: true,
+          date: today,
+          scheduledProgram: day?.programName ?? null,
+          scheduledMuscleGroups: day?.muscleGroups ?? [],
+          activeSession: active
+            ? {
+                id: active.id,
+                title: active.title,
+                startedAt: active.startedAt,
+                exercises: active.exercises.map((ex) => ex.exerciseName),
+              }
+            : null,
+          completedToday: completedToday.map((session) => ({
+            title: session.title,
+            setCount: session.setCount,
+          })),
+          done: completedToday.length > 0,
+        });
+      } catch (err) {
+        return JSON.stringify({
+          ok: false,
+          error: err instanceof Error ? err.message : "gym today failed",
+        });
+      }
+    },
+  });
+
   try {
     const anthropic = new Anthropic();
     const finalMessage = await anthropic.beta.messages.toolRunner({
@@ -690,6 +1163,15 @@ export async function POST(request: NextRequest) {
         listPeopleTool,
         getPersonEmailsTool,
         buildWorkoutTool,
+        getScoreTool,
+        getSpendingTool,
+        getSubscriptionsTool,
+        setTransactionCategoryTool,
+        addIdentityEntryTool,
+        listGoalsTool,
+        getBirthdaysTool,
+        getFollowupsTool,
+        getGymTodayTool,
       ],
       messages: parsed.data.messages.map((message) => ({
         role: message.role,

@@ -1,5 +1,13 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { Pill } from "lucide-react";
+import { ComingSoon } from "@/components/coming-soon";
 
 export default function HealthMedicationSupplementsPage() {
-  return <SectionPlaceholder title="Medication & Supplements" />;
+  return (
+    <ComingSoon
+      title="Medication & Supplements"
+      description="Every medication and supplement with doses, schedules, and adherence in a single view."
+      icon={Pill}
+      bullets={["Dose schedule", "Adherence tracking", "Refill reminders"]}
+    />
+  );
 }
