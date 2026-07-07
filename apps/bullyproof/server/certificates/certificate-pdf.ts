@@ -1,10 +1,29 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFFont, StandardFonts, degrees, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
+import { CERTIFICATE_TEMPLATE_BASE64 } from "./assets/certificate-template";
+import { SCRIPT_FONT_BASE64 } from "./assets/script-font";
 
-/** Brand palette mirrored from packages/ui globals.css. */
-const BRAND_PRIMARY = rgb(0x03 / 255, 0x84 / 255, 0x93 / 255); // #038493
-const BRAND_SECONDARY = rgb(0xea / 255, 0x6f / 255, 0x4d / 255); // #ea6f4d
-const INK = rgb(0.13, 0.15, 0.18);
-const MUTED = rgb(0.42, 0.45, 0.5);
+/**
+ * Renders the client-supplied Certificate of Completion artwork with the
+ * recipient's name and completion date overlaid.
+ *
+ * The template page is 612x792 with /Rotate 90 (landscape display), so all
+ * overlay text is drawn rotated 90 degrees in raw page space. Calibration
+ * anchors come from the sample recipient text the artwork shipped with:
+ *   name  (48pt script):  x 301.2-356.8, advance y 401.2-611.6 (centre 506.4)
+ *   date  (11.3pt Arial): x 486.2-498.7, advance y 202.7-291.6 (centre 247.2)
+ */
+
+const INK = rgb(0x23 / 255, 0x1f / 255, 0x20 / 255); // matches artwork text
+
+const NAME_BASELINE_X = 348;
+const NAME_CENTER_Y = 506.4;
+const NAME_MAX_ADVANCE = 420; // stay inside the underline
+const NAME_SIZE = 48;
+
+const DATE_BASELINE_X = 496;
+const DATE_CENTER_Y = 247.2;
+const DATE_SIZE = 11.5;
 
 export type CourseCertificateInput = {
   firstName: string;
@@ -22,127 +41,62 @@ function formatCompletionDate(completedAt: string): string {
   return `${day} ${month} ${year}`;
 }
 
-/**
- * Renders the AP completion certificate as an A4 landscape PDF.
- * Layout mirrors the on-screen TopicCertificate card.
- */
+function base64ToBytes(base64: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(base64, "base64"));
+}
+
+async function embedNameFont(doc: PDFDocument): Promise<PDFFont> {
+  if (SCRIPT_FONT_BASE64.length > 0) {
+    doc.registerFontkit(fontkit);
+    return doc.embedFont(base64ToBytes(SCRIPT_FONT_BASE64), { subset: true });
+  }
+  // Fallback until a script font is provided: closest built-in to the artwork.
+  return doc.embedFont(StandardFonts.TimesRomanItalic);
+}
+
 export async function renderCourseCertificatePdf(
   input: CourseCertificateInput
 ): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  // A4 landscape in points
-  const page = doc.addPage([841.89, 595.28]);
-  const { width, height } = page.getSize();
+  const doc = await PDFDocument.load(base64ToBytes(CERTIFICATE_TEMPLATE_BASE64));
+  const page = doc.getPage(0);
 
-  const helvetica = await doc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const helveticaLight = await doc.embedFont(StandardFonts.Helvetica);
+  const nameFont = await embedNameFont(doc);
+  const dateFont = await doc.embedFont(StandardFonts.Helvetica);
 
-  doc.setTitle(`AP Certificate - ${input.firstName} ${input.lastName}`.trim());
+  const fullName = `${input.firstName} ${input.lastName}`.trim();
+  doc.setTitle(`Certificate of Completion - ${fullName}`);
   doc.setAuthor("Bullyproof Australia");
   doc.setSubject(input.courseName);
 
-  // Outer border frame
-  const margin = 28;
-  page.drawRectangle({
-    x: margin,
-    y: margin,
-    width: width - margin * 2,
-    height: height - margin * 2,
-    borderColor: BRAND_PRIMARY,
-    borderWidth: 2.5,
-  });
-  page.drawRectangle({
-    x: margin + 8,
-    y: margin + 8,
-    width: width - (margin + 8) * 2,
-    height: height - (margin + 8) * 2,
-    borderColor: BRAND_PRIMARY,
-    borderWidth: 0.75,
-    opacity: 0.55,
-  });
-
-  const centerX = width / 2;
-  const drawCentered = (
-    text: string,
-    y: number,
-    size: number,
-    font = helvetica,
-    color = INK
-  ) => {
-    const textWidth = font.widthOfTextAtSize(text, size);
-    page.drawText(text, { x: centerX - textWidth / 2, y, size, font, color });
-  };
-
-  // Header
-  drawCentered("BULLYPROOF AUSTRALIA", height - 110, 16, helveticaBold, BRAND_PRIMARY);
-  drawCentered("Certificate of Completion", height - 160, 34, helveticaBold, INK);
-
-  // Recipient
-  drawCentered("This certifies that", height - 215, 13, helvetica, MUTED);
-  const fullName = `${input.firstName} ${input.lastName}`.trim();
-  drawCentered(fullName, height - 262, 40, helveticaBold, INK);
-
-  // Divider
-  page.drawLine({
-    start: { x: centerX - 140, y: height - 282 },
-    end: { x: centerX + 140, y: height - 282 },
-    thickness: 1,
-    color: BRAND_SECONDARY,
-  });
-
-  // Program line
-  drawCentered(
-    `has successfully completed the ${input.courseName}`,
-    height - 312,
-    15,
-    helveticaLight,
-    INK
-  );
-  if (input.certificateType) {
-    drawCentered(input.certificateType, height - 334, 12, helvetica, MUTED);
+  // Shrink long names so they stay on the underline.
+  let nameSize = NAME_SIZE;
+  let nameWidth = nameFont.widthOfTextAtSize(fullName, nameSize);
+  if (nameWidth > NAME_MAX_ADVANCE) {
+    nameSize = Math.max(24, (NAME_SIZE * NAME_MAX_ADVANCE) / nameWidth);
+    nameWidth = nameFont.widthOfTextAtSize(fullName, nameSize);
   }
 
-  // AP Certified chip
-  const chipText = "AP CERTIFIED";
-  const chipTextSize = 13;
-  const chipTextWidth = helveticaBold.widthOfTextAtSize(chipText, chipTextSize);
-  const chipPaddingX = 16;
-  const chipWidth = chipTextWidth + chipPaddingX * 2;
-  const chipHeight = 30;
-  const chipY = height - 396;
-  page.drawRectangle({
-    x: centerX - chipWidth / 2,
-    y: chipY,
-    width: chipWidth,
-    height: chipHeight,
-    color: BRAND_SECONDARY,
-  });
-  page.drawText(chipText, {
-    x: centerX - chipTextWidth / 2,
-    y: chipY + (chipHeight - chipTextSize) / 2 + 1.5,
-    size: chipTextSize,
-    font: helveticaBold,
-    color: rgb(1, 1, 1),
+  // Rotated 90 degrees: text advances along +y, baseline is a vertical line
+  // at constant x. Centre the advance on the sample text's centre.
+  page.drawText(fullName, {
+    x: NAME_BASELINE_X,
+    y: NAME_CENTER_Y - nameWidth / 2,
+    size: nameSize,
+    font: nameFont,
+    color: INK,
+    rotate: degrees(90),
   });
 
-  // Completion date
-  drawCentered(
-    `Completed on ${formatCompletionDate(input.completedAt)}`,
-    height - 434,
-    12,
-    helvetica,
-    MUTED
-  );
-
-  // Footer
-  drawCentered(
-    "Amayda Program  |  Bullyproof Australia",
-    margin + 34,
-    11,
-    helvetica,
-    MUTED
-  );
+  const dateText = formatCompletionDate(input.completedAt);
+  const dateWidth = dateFont.widthOfTextAtSize(dateText, DATE_SIZE);
+  page.drawText(dateText, {
+    x: DATE_BASELINE_X,
+    y: DATE_CENTER_Y - dateWidth / 2,
+    size: DATE_SIZE,
+    font: dateFont,
+    color: INK,
+    rotate: degrees(90),
+  });
 
   return doc.save();
 }
