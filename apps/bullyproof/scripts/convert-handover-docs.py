@@ -10,9 +10,10 @@ markdown subset the handover docs use: headings, paragraphs, bullet and
 numbered lists (one nesting level), GFM pipe tables, fenced code blocks,
 horizontal rules, bold / italic / inline code / links.
 
-House style: ink headings with a teal accent (the client's corporate teal),
-numbered top-level sections always start on a new page, teal table headers,
-and a branded footer with page numbers.
+House style: the Intradark wordmark on the cover and in the running header,
+ink headings with a teal accent (the client's corporate teal), numbered
+top-level sections always start on a new page, teal table headers, and a
+branded footer with page numbers.
 """
 
 import re
@@ -24,7 +25,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Emu, Pt, RGBColor
 
 INK = RGBColor(0x1F, 0x29, 0x37)
 TEAL = RGBColor(0x00, 0x84, 0x90)
@@ -33,6 +34,11 @@ CODE_INK = RGBColor(0x3E, 0x45, 0x4E)
 TEAL_HEX = "008490"
 
 FOOTER_TEXT = "Intradark Pty Ltd  ·  ABN 38 696 182 457  ·  Commercial in confidence"
+
+WORDMARK = Path(__file__).resolve().parent / "assets" / "intradark-wordmark.png"
+# Sizes lifted from the 29 June proposal set so the whole package matches.
+WORDMARK_COVER_WIDTH = Emu(1952625)  # ~5.4 cm on the first page
+WORDMARK_HEADER_WIDTH = Emu(904875)  # ~2.5 cm in the running header
 
 INLINE_TOKEN = re.compile(
     r"(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))"
@@ -108,9 +114,8 @@ def add_page_number_field(paragraph, instruction):
     return run
 
 
-def build_footer(doc):
-    section = doc.sections[0]
-    footer_paragraph = section.footer.paragraphs[0]
+def fill_footer(footer, section):
+    footer_paragraph = footer.paragraphs[0]
     footer_paragraph.text = ""
     tab_stops = footer_paragraph.paragraph_format.tab_stops
     tab_stops.add_tab_stop(
@@ -130,6 +135,31 @@ def build_footer(doc):
     of_label.font.color.rgb = GREY
     add_page_number_field(footer_paragraph, "NUMPAGES")
     set_paragraph_border(footer_paragraph, "top", TEAL_HEX, size=4, space=6)
+
+
+def build_branding(doc):
+    """Footer on every page; wordmark in the header of every page but the
+    first (the first page carries the large cover wordmark in the body)."""
+    section = doc.sections[0]
+    section.different_first_page_header_footer = True
+    fill_footer(section.footer, section)
+    fill_footer(section.first_page_footer, section)
+
+    if WORDMARK.exists():
+        header_paragraph = section.header.paragraphs[0]
+        header_paragraph.text = ""
+        header_paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        header_paragraph.add_run().add_picture(
+            str(WORDMARK), width=WORDMARK_HEADER_WIDTH
+        )
+
+
+def add_cover_wordmark(doc):
+    if not WORDMARK.exists():
+        return
+    paragraph = doc.add_paragraph()
+    paragraph.paragraph_format.space_after = Pt(18)
+    paragraph.add_run().add_picture(str(WORDMARK), width=WORDMARK_COVER_WIDTH)
 
 
 def style_heading(paragraph, level, text_is_numbered):
@@ -189,7 +219,8 @@ def convert(md_path: Path) -> Path:
         section.left_margin = Cm(2.4)
         section.right_margin = Cm(2.4)
 
-    build_footer(doc)
+    build_branding(doc)
+    add_cover_wordmark(doc)
 
     lines = md_path.read_text(encoding="utf-8").splitlines()
     i = 0
