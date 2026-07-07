@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { IdentitySectionPage } from "@/components/identity/section-page";
 
 export default function IdentityArchetypesPage() {
-  return <SectionPlaceholder title="Archetypes" />;
+  return <IdentitySectionPage section="archetypes" />;
 }

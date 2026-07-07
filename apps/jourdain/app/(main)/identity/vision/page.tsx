@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { IdentitySectionPage } from "@/components/identity/section-page";
 
 export default function IdentityVisionPage() {
-  return <SectionPlaceholder title="Vision" />;
+  return <IdentitySectionPage section="vision" />;
 }

@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { IdentitySectionPage } from "@/components/identity/section-page";
 
 export default function IdentityStrengthsWeaknessesPage() {
-  return <SectionPlaceholder title="Strengths & Weaknesses" />;
+  return <IdentitySectionPage section="strengths-weaknesses" />;
 }
