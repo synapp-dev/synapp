@@ -4,6 +4,7 @@ import {
   listLessonsSchema,
   getLessonByIdSchema,
   getRecommendationsSchema,
+  getClassProgressSchema,
   type CreateLessonParams,
   type UpdateLessonParams,
   type ListLessonsParams,
@@ -22,6 +23,7 @@ import {
 } from "./lesson-access-policy";
 import {
   createServerRecommendationDeps,
+  orchestrateClassProgress,
   orchestrateRecommendations,
 } from "./recommendation-orchestrator";
 import {
@@ -302,6 +304,19 @@ export const lessonsService = {
 
     return orchestrateRecommendations(
       { classIds, viewerUserId: ctx.userId },
+      createServerRecommendationDeps(ctx)
+    );
+  },
+
+  /** Per-class level + next lesson, for the wizard class-selection step. */
+  async getClassProgress(ctx: AuthContext, params: unknown) {
+    const { classIds } = getClassProgressSchema.parse(params);
+    if (!ctx.userId) {
+      throw new Error("Unauthorized");
+    }
+
+    return orchestrateClassProgress(
+      { classIds },
       createServerRecommendationDeps(ctx)
     );
   },

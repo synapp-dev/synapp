@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Input } from "@workspace/ui/components/input";
 import { Badge } from "@workspace/ui/components/badge";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
@@ -49,6 +49,45 @@ type UserClass = {
   active: boolean;
 };
 
+type ClassProgressInfo = {
+  classId: string;
+  stageName: string;
+  topicTitle: string | null;
+  stageOrder: number | null;
+  status: "next_topic" | "fallback_year_match" | "stage_complete" | "no_match";
+};
+
+/** Scrolls its text when it overflows; static otherwise. */
+function MarqueeText({ text }: { text: string }) {
+  const containerRef = useRef<HTMLSpanElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const inner = textRef.current;
+    if (!container || !inner) return;
+    setIsOverflowing(inner.scrollWidth > container.clientWidth + 2);
+  }, [text]);
+
+  return (
+    <span
+      ref={containerRef}
+      className="block max-w-[170px] overflow-hidden whitespace-nowrap"
+    >
+      <style>{`@keyframes bp-marquee { from { transform: translateX(0); } to { transform: translateX(calc(-50% - 12px)); } }`}</style>
+      {isOverflowing ? (
+        <span className="inline-flex w-max gap-6 animate-[bp-marquee_9s_linear_infinite]">
+          <span>{text}</span>
+          <span aria-hidden>{text}</span>
+        </span>
+      ) : (
+        <span ref={textRef}>{text}</span>
+      )}
+    </span>
+  );
+}
+
 export function LessonWizardClasses({
   schoolId,
   selectedClasses,
@@ -58,6 +97,9 @@ export function LessonWizardClasses({
   const [yearLevelFilter, setYearLevelFilter] = useState<string>("all");
   const [classes, setClasses] = useState<ClassWithYearCodes[]>([]);
   const [userClasses, setUserClasses] = useState<UserClass[]>([]);
+  const [classProgress, setClassProgress] = useState<
+    Map<string, ClassProgressInfo>
+  >(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const currentUser = useMeStore((s) => s.currentUser);
@@ -116,6 +158,33 @@ export function LessonWizardClasses({
         setLoading(false);
       });
   }, [schoolId, currentUser?.id]);
+
+  // Fetch each class's curriculum position (level + next lesson) so the
+  // selection step can explain level mismatches instead of just flagging them.
+  useEffect(() => {
+    if (classes.length === 0) {
+      setClassProgress(new Map());
+      return;
+    }
+    let alive = true;
+    apiFetch<{ classes: ClassProgressInfo[] }>("/lessons/class-progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ classIds: classes.map((c) => c.id) }),
+    })
+      .then((result) => {
+        if (!alive || result.error || !result.data) return;
+        setClassProgress(
+          new Map(result.data.classes.map((row) => [row.classId, row]))
+        );
+      })
+      .catch(() => {
+        // Non-fatal: rows just fall back to the generic warning tooltip.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [classes]);
 
   // Split classes into "My Classes" and "All Classes", and create a Set for quick lookup
   const { myClasses, allClasses, userClassIds } = useMemo(() => {
@@ -275,6 +344,14 @@ export function LessonWizardClasses({
     const isSelected = selectedClasses.some((c) => c.id === classItem.id);
     const isMyClass = userClassIds.has(classItem.id);
     const showsStageWarning = hasDifferentStage(classItem);
+    const progress = classProgress.get(classItem.id);
+    const progressLabel = progress
+      ? progress.status === "stage_complete"
+        ? `${progress.stageName} complete`
+        : progress.topicTitle
+          ? `${progress.stageName}${progress.stageOrder != null ? ` · L${progress.stageOrder}` : ""} ${progress.topicTitle}`
+          : progress.stageName
+      : null;
 
     return (
       <button
@@ -293,12 +370,37 @@ export function LessonWizardClasses({
               <TooltipTrigger asChild>
                 <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mb-0.5 animate-pulse" />
               </TooltipTrigger>
-              <TooltipContent>
-                <p>This class's lesson level differs from the class you've already selected</p>
+              <TooltipContent className="max-w-[280px]">
+                {progress ? (
+                  <p>
+                    <span className="font-semibold">{classItem.name}</span> is on{" "}
+                    <span className="font-semibold">{progress.stageName}</span>
+                    {progress.status === "stage_complete"
+                      ? " (all lessons complete)"
+                      : progress.topicTitle
+                        ? `, next lesson: ${progress.stageOrder != null ? `L${progress.stageOrder} ` : ""}${progress.topicTitle}`
+                        : ""}
+                    {" "}- a different level from the class you&apos;ve already
+                    selected.
+                  </p>
+                ) : (
+                  <p>
+                    This class&apos;s lesson level differs from the class
+                    you&apos;ve already selected
+                  </p>
+                )}
               </TooltipContent>
             </Tooltip>
           )}
           <span className="font-medium">{classItem.name}</span>
+          {showsStageWarning && progressLabel && (
+            <Badge
+              variant="outline"
+              className="hidden sm:flex text-[10px] py-0 px-1.5 h-5 border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300 font-normal min-w-0"
+            >
+              <MarqueeText text={progressLabel} />
+            </Badge>
+          )}
           {isMyClass && (
             <Tooltip>
               <TooltipTrigger asChild>

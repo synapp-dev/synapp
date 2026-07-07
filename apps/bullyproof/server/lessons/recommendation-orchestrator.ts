@@ -20,7 +20,9 @@ import {
 } from "./lesson-access-policy";
 import {
   buildRecommendationResult,
+  computePerClassRecommendation,
   type ClassInput,
+  type PerClassRecommendation,
   type RecommendationEngineResult,
   type StageWithYears,
   type TopicRow,
@@ -255,6 +257,47 @@ export async function orchestrateRecommendations(
   );
 
   return shapeRecommendationResponse(engineResult, activeLessons);
+}
+
+/**
+ * Per-class progress for the wizard's class-selection step: which level each
+ * class is on and its next lesson. Unknown ids are skipped rather than
+ * throwing, since the list step shows every class in the school.
+ */
+export async function orchestrateClassProgress(
+  input: { classIds: string[] },
+  deps: RecommendationOrchestratorDeps
+): Promise<PerClassRecommendation[]> {
+  const classRows = await deps.getClassRows(input.classIds);
+  if (classRows.length === 0) return [];
+
+  const schoolIds = [...new Set(classRows.map((c) => c.schoolId))];
+  await deps.assertCanAccessSchools(schoolIds);
+
+  const foundIds = classRows.map((c) => c.id);
+  const recommendationData = await deps.getRecommendationData(foundIds);
+  if (!recommendationData) return [];
+
+  const [allStages, allTopics, completedTopicIdsByClass] = await Promise.all([
+    deps.getStagesWithYears().then((rows) => rows || []),
+    deps.getAllTopics().then((rows) => rows || []),
+    deps.getCompletedTopicIdsByClass(foundIds),
+  ]);
+
+  const classInputs = buildRecommendationClassInputs(
+    foundIds,
+    classRows,
+    recommendationData
+  );
+
+  return classInputs.map((classInput) =>
+    computePerClassRecommendation(
+      classInput,
+      allStages,
+      allTopics,
+      completedTopicIdsByClass.get(classInput.classId) ?? new Set()
+    )
+  );
 }
 
 export function createServerRecommendationDeps(
