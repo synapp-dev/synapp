@@ -42,18 +42,20 @@ Under clause 7.2 you have 15 Business Days from the date of this letter to eithe
 
 The culture-rating calculation engine is delivered, unit-tested, and verified live, including the re-weighting behaviour when a metric has no measurable change. The final Woodford weighting constants are applied the day you supply the official mapping from the 25 April workbook; until then the register documents the interim constants in use. This is an input owed by Amayda, not an outstanding deliverable, and it does not affect acceptance of the delivered system.
 
-### 5. Handover on Acceptance (clause 7.5)
+### 5. Handover (clauses 6 and 7.5)
 
-On written Acceptance I will complete handover, being:
+Clause 6 provides that full source code, documentation, credentials and repository control are delivered upon completion of the project and receipt of final payment. Accordingly, the handover set is prepared and ready:
 
-- full source code and build scripts, with repository control transferred to you (clause 4(b)(ii));
+- full source code and build scripts, with repository control transferred to you;
 - configuration and deployment instructions (contained in the System Administrator Guide);
 - administrator and user documentation (enclosed now);
 - all credentials and keys, delivered securely.
 
+The documentation is enclosed with this letter. The source code, credentials and repository control transfer are executed on the day final payment is received, per clause 6. In the meantime you have, as clause 6 also requires, full access to the running platform for review and validation.
+
 ### 6. Payment (clause 4(b))
 
-Clause 4(b) provides that $100,000 plus GST is payable on completion of all deliverables, full handover including source code and repository control, and acceptance under clause 7. All deliverables are complete and handover is ready to execute on your acceptance. The enclosed tax invoice for $110,000 (inclusive of GST) is payable accordingly.
+Clause 4(b) provides that $100,000 plus GST is payable on completion of all deliverables, handover, and acceptance under clause 7. All deliverables are complete, and the handover set is prepared for same-day transfer against payment as clause 6 provides. The enclosed tax invoice for $110,000 (inclusive of GST) is payable on your written Acceptance (or deemed Acceptance under clause 7.4).
 
 I am glad to walk you and Jeff through any part of the delivered platform before or during the UAT window. Please send written acceptance, or any defect list, to agirton@intradark.com.
 
