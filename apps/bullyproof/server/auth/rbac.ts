@@ -34,14 +34,8 @@ export async function getUserScopedRoles(
   return result;
 }
 
-/** All platform-level role keys that grant admin panel access. */
-export const ALL_PLATFORM_ADMIN_KEYS = [
-  "INTRADARK_DEV",
-  "PLATFORM_ADMIN",
-  "PLATFORM_MODERATOR",
-  "PLATFORM_STAFF",
-  "GOVERNMENT_VIEWER",
-] as const;
+/** All platform-level role keys that grant admin panel access. Alias into the role catalog. */
+export { PLATFORM_ROLE_KEYS as ALL_PLATFORM_ADMIN_KEYS } from "@/lib/role-keys";
 
 /** Re-export for server use; source of truth in lib/role-keys.ts */
 export { ADMIN_CANNOT_CREATE_LESSON_KEYS } from "@/lib/role-keys";

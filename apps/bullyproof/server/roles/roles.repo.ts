@@ -1,6 +1,10 @@
 import { db } from "@/server/db/drizzle";
 import { roles, userRoles, userProfile, schools, scopes } from "@/server/db/schema";
 import { eq, and, inArray, desc, asc, isNull } from "drizzle-orm";
+import {
+  ROLE_EXCLUSIVITY_PLATFORM_KEYS,
+  SCHOOL_ROLE_KEYS,
+} from "@/lib/role-keys";
 
 export const rolesRepo = {
   getAll: () => db.select().from(roles),
@@ -58,7 +62,7 @@ export const rolesRepo = {
       .where(
         and(
           eq(userRoles.userId, userId),
-          inArray(roles.key, ["PLATFORM_ADMIN", "GOVERNMENT_VIEWER", "PLATFORM_STAFF"]),
+          inArray(roles.key, [...ROLE_EXCLUSIVITY_PLATFORM_KEYS]),
           isNull(userRoles.schoolId)
         )
       )
@@ -93,7 +97,7 @@ export const rolesRepo = {
       .where(
         and(
           eq(roles.id, roleId),
-          inArray(roles.key, ["PLATFORM_ADMIN", "GOVERNMENT_VIEWER", "PLATFORM_STAFF"])
+          inArray(roles.key, [...ROLE_EXCLUSIVITY_PLATFORM_KEYS])
         )
       )
       .limit(1);
@@ -110,7 +114,7 @@ export const rolesRepo = {
       .where(
         and(
           eq(roles.id, roleId),
-          inArray(roles.key, ["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF", "SCHOOL_LICENCE"])
+          inArray(roles.key, [...SCHOOL_ROLE_KEYS])
         )
       )
       .limit(1);

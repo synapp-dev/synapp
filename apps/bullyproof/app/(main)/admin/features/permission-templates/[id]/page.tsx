@@ -9,7 +9,7 @@ import { apiFetch } from "@/lib/api/fetcher.client";
 import { useRoles } from "@/entities/users/model/store";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { RoleBadges } from "@/components/atoms/role-badges";
-import { sortPlatformRoles } from "@/lib/platform-role-order";
+import { sortPlatformRoles } from "@/lib/role-keys";
 import { Button } from "@workspace/ui/components/button";
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Input } from "@workspace/ui/components/input";

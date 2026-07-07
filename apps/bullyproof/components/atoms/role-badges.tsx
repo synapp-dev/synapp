@@ -5,6 +5,7 @@ import { cn } from "@workspace/ui/lib/utils";
 import { Award, FileBadge2, Shield, ShieldCheck, Users as UsersIcon } from "lucide-react";
 import Image from "next/image";
 import type { ComponentType } from "react";
+import { ROLE_KEYS, getRolePriority } from "@/lib/role-keys";
 
 export interface RoleBadgeItem {
   roleKey: string;
@@ -12,22 +13,17 @@ export interface RoleBadgeItem {
   isPlatform?: boolean;
 }
 
-/** Display order: school admin, then teacher/AP, then staff, then licence, then platform/other. */
-const ROLE_PRIORITY: Record<string, number> = {
-  SCHOOL_ADMIN: 1,
-  TEACHER: 2,
-  SCHOOL_STAFF: 3,
-  SCHOOL_LICENCE: 4,
-  PLATFORM_ADMIN: 5,
-};
-
-function getRolePriority(roleKey: string): number {
+/**
+ * Display order comes from the role catalog (school roles, then platform).
+ * Keeps the historic fuzzy match: any key containing TEACHER ranks with
+ * TEACHER so AP-teacher style variants group correctly.
+ */
+function getBadgePriority(roleKey: string): number {
   const k = roleKey || "";
-  if (k === "SCHOOL_ADMIN") return 1;
-  if (k === "TEACHER" || k.includes("TEACHER")) return 2;
-  if (k === "SCHOOL_STAFF") return 3;
-  if (k === "SCHOOL_LICENCE") return 4;
-  return ROLE_PRIORITY[k] ?? 6;
+  const exact = getRolePriority(k);
+  if (exact !== Number.MAX_SAFE_INTEGER) return exact;
+  if (k.includes("TEACHER")) return getRolePriority(ROLE_KEYS.TEACHER);
+  return Number.MAX_SAFE_INTEGER;
 }
 
 function getBadgeClasses(roleKey: string, isPlatform: boolean): string {
@@ -109,8 +105,8 @@ export function RoleBadges({
   if (roles.length === 0) return null;
 
   const prioritised = [...roles].sort((a, b) => {
-    const aPriority = getRolePriority(a.roleKey);
-    const bPriority = getRolePriority(b.roleKey);
+    const aPriority = getBadgePriority(a.roleKey);
+    const bPriority = getBadgePriority(b.roleKey);
     if (aPriority !== bPriority) return aPriority - bPriority;
     return (a.roleName || a.roleKey).localeCompare(b.roleName || b.roleKey);
   });

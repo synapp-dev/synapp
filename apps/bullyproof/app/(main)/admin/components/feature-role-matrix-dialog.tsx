@@ -29,7 +29,7 @@ import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Badge } from "@workspace/ui/components/badge";
 import { Key, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { sortPlatformRoles } from "@/lib/platform-role-order";
+import { sortPlatformRoles } from "@/lib/role-keys";
 
 const EMPTY_FEATURES: FeatureRow[] = [];
 const EMPTY_PERMISSIONS: FeaturePermissionRow[] = [];
