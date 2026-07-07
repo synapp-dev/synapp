@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 import { useEffectiveUser } from "@/hooks/use-effective-user";
+import { useMeStore } from "@/entities/me/model/store";
 
 /**
  * TutorialGuard component
@@ -17,6 +18,7 @@ export function TutorialGuard() {
   const router = useRouter();
   const pathname = usePathname();
   const currentUser = useEffectiveUser();
+  const viewAsUser = useMeStore((s) => s.viewAsUser);
   const { isLoading } = useCurrentUser();
 
   useEffect(() => {
@@ -28,6 +30,13 @@ export function TutorialGuard() {
       pathname === "/logout";
 
     if (isPublicRoute || isLoading) {
+      return;
+    }
+
+    // Never enforce the tutorial while impersonating: the admin cannot
+    // complete it on the target user's behalf, and the welcome page checks
+    // the REAL user, which would ping-pong /welcome <-> /dashboard forever.
+    if (viewAsUser) {
       return;
     }
 
@@ -44,7 +53,7 @@ export function TutorialGuard() {
     if (!isWelcomeCompleted) {
       router.replace("/welcome");
     }
-  }, [currentUser, pathname, router, isLoading]);
+  }, [currentUser, viewAsUser, pathname, router, isLoading]);
 
   return null;
 }
