@@ -130,9 +130,11 @@ SECTION2_BULLETS = {
 
 SECTION3_EDITS = {
     "School Address & Email Domain not saving": (
-        "School Address & Email Domain not saving on edit (39): the "
-        "persistence chain was verified intact and the behaviour confirmed "
-        "resolved on regression."
+        "School Address & Email Domain not saving on edit (39): reproduced, "
+        "root-caused and fixed. The save always persisted; the admin school "
+        "drawer then failed to display the saved values, which reads as a "
+        "failed save. The display fault is fixed and the exact flow verified: "
+        "edit, save, reload, values shown."
     ),
     "Wrong recommended lesson for mixed-level classes": (
         "Wrong recommended lesson for mixed-level classes, and the list "

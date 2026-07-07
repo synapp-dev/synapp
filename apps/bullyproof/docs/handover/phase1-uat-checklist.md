@@ -10,14 +10,14 @@
 - [ ] Back link, completed lesson: as the non-owner, open another teacher's completed/feedback lesson at /run-lesson, click "Back to lesson", land on Feedback (no Prepare loop)
 - [ ] Back link, preparing lesson: same path lands on Prepare
 - [ ] Back link, ready lesson: same path lands on the school lessons list
-- [ ] Mixed-level selection: two classes at different levels show the amber guidance panel (per-class options + Back + compromise), never a blank screen
-- [ ] Per-class pick continues the wizard with that class's recommendation
+- [x] Mixed-level selection: two classes at different levels show the amber guidance panel (per-class options + Back + compromise), never a blank screen (re-verified live 7 Jul)
+- [x] Per-class pick continues the wizard with that class's recommendation (re-verified live 7 Jul)
 - [ ] Null-recommendation fallback: a class with no matching published content shows "No recommended lesson for this selection" with Back + choose manually
-- [ ] No 3-item cap: levels with many topics list all of them
+- [x] No 3-item cap: levels with many topics list all of them (re-verified live 7 Jul: all 10 Early Primary lessons render)
 
 ## 2. Apply Template confirmation (item 40)
 
-- [ ] Template cards show green "Active on N schools" when fully applied
+- [x] Template cards show green "Active on N schools" when fully applied (re-verified live 7 Jul: 1/43/1)
 - [ ] Unlock dialog shows a green Active chip on schools that already have the template
 - [ ] Applying to a school updates the badge and the dialog on reopen
 
@@ -27,7 +27,7 @@
 - [ ] School settings users drawer: Edit Access Levels
 - [ ] /admin/features tabs: Platform Access Levels
 - [ ] School portal headers + breadcrumbs: Preview Lessons, Teach Lessons (admin breadcrumbs unchanged)
-- [ ] School settings classes: Student Numbers label (and table header)
+- [x] School settings classes: Student Numbers label (and table header) (verified live 7 Jul, incl. search placeholder)
 - [ ] As a teacher or school admin: no Ctrl+K button in the header and the shortcut does nothing; theme toggle intact
 - [ ] As a Bullyproof platform admin: the Ctrl+K command menu button and shortcut still work
 - [ ] View-as a teacher (impersonate): the command menu disappears while viewing as the school user
@@ -52,24 +52,24 @@
 
 ## 5. AP certificate (item 32)
 
-- [ ] Completed course page: Download button on the certificate card produces a branded PDF with correct name and completion date
-- [ ] /profile shows real user data plus a Certificates card with working downloads
+- [x] Completed course page: Download button on the certificate card produces a branded PDF with correct name and completion date (re-verified 7 Jul, user-confirmed download)
+- [x] /profile shows real user data plus a Certificates card with working downloads (verified live 7 Jul)
 - [ ] Empty state for users with no completed courses
 - [ ] Optional: course_progress.certificate_issued_at set after first download
 - [ ] Incomplete course: certificate URL returns 403, not a PDF
 
 ## 6. Reports export (items 34/35)
 
-- [ ] /admin/reports Export: CSV downloads with Summary, Idle active schools, Recent lessons
+- [x] /admin/reports Export: CSV downloads with Summary, Idle active schools, Recent lessons (verified 7 Jul by inspecting the downloaded file)
 - [ ] PDF export: titled, dated, tabular
 - [ ] Tab switch changes export contents and filename
 - [ ] School scope filter is reflected in the export Scope row
 
 ## 6b. Export packs (SOW 15.1.5)
 
-- [ ] /admin/reports all-schools Export: CSV now includes Schools register (every school with counts, licence, AP certified, culture benchmark) + Culture trends sections
+- [x] /admin/reports all-schools Export: CSV now includes Schools register (every school with counts, licence, AP certified, culture benchmark) + Culture trends sections (verified 7 Jul from file contents, 57 schools, culture trends incl. St4s 5.7)
 - [ ] /admin/reports with a school selected: export includes that school's Classes, Staff, Lesson history, Culture rating periods
-- [ ] School portal /reports as school admin: page shows Classes / Staff / Lesson history / Culture tables + Export works (CSV + PDF)
+- [x] School portal /reports as school admin: page shows Classes / Staff / Lesson history / Culture tables + Export works (verified 7 Jul on St4s and Collinsville; day's test lesson appeared live in Classes and Lesson history)
 - [ ] School portal /reports as TEACHER: page shows only My progress / My certification / My lesson history (no other staff visible) + Export works
 - [ ] Teacher cannot see school-wide data anywhere in their export file
 
@@ -82,7 +82,7 @@
 
 ## 8. Regressions
 
-- [ ] Single-class lesson flow end to end unchanged
-- [ ] Item 39: school Address + Email Domain edit persists after reload
+- [x] Single-class lesson flow end to end unchanged (7 Jul: created on behalf of school admin, prepare access-policy correct, cancel transition PUT 200, appears in history/exports)
+- [x] Item 39: school Address + Email Domain edit persists after reload (7 Jul: defect REPRODUCED, root-caused as display-side field drop, FIXED in 7c7bf90, re-verified on the exact flow)
 - [ ] Admin slide editing and reorder unchanged
-- [ ] Admin report pages render as before beyond the new Export button
+- [x] Admin report pages render as before beyond the new Export button (verified 7 Jul)
