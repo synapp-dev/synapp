@@ -59,7 +59,7 @@ Applying your categories to the M2-M8 proposal as of today:
 
 On your specific module notes: M2 agreed as new. M3 presents data the platform already holds, but a program-health home page, term calendars, a schedule calculation engine and nine drill-downs are new construction, not display changes; the register's Section 4 maps each item. M4: the baseline reports and exports you describe are delivered (verify above); M4 prices only the four renamed report types with percentage builds, filter panels, Excel and export scopes. M5: ST4S security posture is documented in the handover pack; content audit logs, versioning and step-up MFA were never in the SOW and are quoted. M6: the Variation culture scope is delivered and live-verified; M6 prices the signed speedometer and the expanded page. M7: the defect list you cite is fixed free (above); M7 prices the new scheduling flows and redesigned pages only. M8: platform user management is delivered (above); M8 prices the Amayda tier, onboarding checklist extensions and getting-started video management.
 
-The tabulated line-by-line is attached: every numbered item from your 22 June document tagged A, B, C or D, with where each one stands today. Then let us do the Teams session you proposed with the SOW open. Any line where you show me the SOW or Variation already says it, I will re-tag it without argument.
+The tabulated line-by-line is attached: every numbered item from your 22 June document tagged A, B, C or D, with where each one stands today. Then let us do the Teams session you proposed with the SOW open. Any line where you show me the SOW or Variation already says it, I will re-tag it without argument. Once the tags are agreed, I will reissue the Category D quotes in exactly the format you asked for: deliverable, estimated hours, rate, personnel, commencement and completion dates, acceptance criteria, and the payment milestone for each item.
 
 ## The Phase 1 account
 
@@ -86,9 +86,9 @@ In the meantime the Administrator User Guide is attached now because your team n
 
 ## To keep everything moving
 
-1. M1 deposit invoice attached; build starts on receipt.
+1. M1 deposit invoice attached; build starts on receipt. The two goodwill items from my June email, the BA rebrand and the uploadable certificate template, remain committed at no charge and are unaffected by the M2-M8 reconciliation.
 2. Phase 1 UAT starts today: the checklist walks every item, the register maps every deliverable to evidence, and the test school (St4s Test School) is loaded with worked examples including culture data and the government viewer account.
-3. The A, B, C, D tabulation lands within two business days; Teams after that whenever suits you both.
+3. The A, B, C, D tabulation is attached; Teams whenever suits you both to work through any line where we read the SOW differently.
 4. Payroll schedule and the 10 July cessation confirmation from your side close the account maths.
 5. Two small confirmations still open from my June email: the ACT Term 3 dates in your table duplicate Term 2, and please confirm the 25 April email is the final culture rating weighting (the engine is live with the interim constants and I will apply yours the day they arrive; it does not hold up acceptance).
 
