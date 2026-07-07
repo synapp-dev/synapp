@@ -1,5 +1,7 @@
 import { createAdminClient } from "@/utils/supabase/admin";
 import { parseOfx } from "@/lib/import/ofx";
+import { categoriseDescription } from "@/lib/finance/categorise";
+import { getCategoryRules } from "@/lib/finance/service";
 
 export type ImportSummary = {
   accounts: number;
@@ -49,6 +51,8 @@ export async function importOfx(
   const statements = parseOfx(content);
   const admin = createAdminClient();
   const nowIso = new Date().toISOString();
+  // Categorise at ingestion so new rows land with a category in one write.
+  const rules = statements.length > 0 ? await getCategoryRules(userId) : [];
   let accounts = 0;
   let inserted = 0;
   let duplicates = 0;
@@ -87,6 +91,7 @@ export async function importOfx(
         type: t.type,
         description: t.description,
         memo: t.memo,
+        category: categoriseDescription(t.description, rules),
       }));
     if (rows.length === 0) continue;
 
