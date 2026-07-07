@@ -5,6 +5,7 @@ import { createRoutine, updateRoutine } from "@/lib/routines/service";
 import { assessSubgroups } from "@/lib/gym/muscle-status";
 import { generateSmartSession } from "@/lib/gym/smart-fill";
 import {
+  SESSION_DEFAULTS,
   SUBGROUP_TO_GROUP,
   expandGroups,
   rollupSubgroups,
@@ -26,6 +27,7 @@ import {
   type ProgramExercise,
   type Session,
   type SessionExercise,
+  type SessionPreviewExercise,
   type SessionSummary,
   type StartSessionInput,
   type GymSchedule,
@@ -401,6 +403,10 @@ type SessionExerciseRow = {
   exercise_name: string;
   order_index: number;
   target_sets: number | null;
+  warmup_sets: number | null;
+  working_sets: number | null;
+  drop_sets: number | null;
+  rest_seconds: number | null;
   gym_sets: SetRow[] | null;
 };
 
@@ -422,7 +428,7 @@ type SessionRow = {
 
 const SESSION_SELECT =
   "id, program_id, task_id, intensity, title, performed_on, started_at, ended_at, status, notes, created_at, updated_at, " +
-  "gym_session_exercises ( id, exercise_id, exercise_name, order_index, target_sets, gym_sets ( id, set_index, weight, reps, rpe, is_warmup, kind, completed, created_at ) )";
+  "gym_session_exercises ( id, exercise_id, exercise_name, order_index, target_sets, warmup_sets, working_sets, drop_sets, rest_seconds, gym_sets ( id, set_index, weight, reps, rpe, is_warmup, kind, completed, created_at ) )";
 
 function toSet(row: SetRow): GymSet {
   return {
@@ -445,6 +451,10 @@ function toSessionExercise(row: SessionExerciseRow): SessionExercise {
     exerciseName: row.exercise_name,
     orderIndex: row.order_index,
     targetSets: row.target_sets,
+    warmupSets: row.warmup_sets,
+    workingSets: row.working_sets,
+    dropSets: row.drop_sets,
+    restSeconds: row.rest_seconds,
     sets: (row.gym_sets ?? []).map(toSet).sort((a, b) => a.setIndex - b.setIndex),
   };
 }
@@ -544,7 +554,7 @@ async function generateSmartSeed(
   supabase: SupabaseClient,
   userId: string,
   program: Program
-): Promise<{ exerciseId: string; name: string; targetSets: number | null }[]> {
+): Promise<{ exerciseId: string; name: string; subgroup: MuscleSubgroup; targetSets: number | null }[]> {
   const [exercises, summaries, recent] = await Promise.all([
     listExercises(supabase, userId),
     getMuscleSummary(supabase, userId),
@@ -574,9 +584,54 @@ async function generateSmartSeed(
   return picks.map((p) => ({
     exerciseId: p.exerciseId,
     name: byId.get(p.exerciseId)?.name ?? "Exercise",
+    subgroup: p.subgroup,
     targetSets: p.targetSets,
   }));
 }
+
+/**
+ * The exercise list a session WOULD start with for this program, without
+ * persisting anything. Smart programs run the generator; fixed programs use
+ * the stored list. Each row carries its prescribed working sets (falling back
+ * to the app default) and rest null, meaning auto per-kind rest.
+ */
+export async function previewSessionPlan(
+  supabase: SupabaseClient,
+  userId: string,
+  programId: string
+): Promise<SessionPreviewExercise[] | null> {
+  const program = await getProgram(supabase, programId);
+  if (!program) return null;
+
+  const rows = program.isSmart
+    ? await generateSmartSeed(supabase, userId, program)
+    : program.exercises.map((e) => ({
+        exerciseId: e.exerciseId,
+        name: e.name,
+        subgroup: e.subgroup,
+        targetSets: e.targetSets,
+      }));
+
+  return rows.map((r) => ({
+    exerciseId: r.exerciseId,
+    name: r.name,
+    subgroup: r.subgroup,
+    warmupSets: SESSION_DEFAULTS.warmupSets,
+    workingSets: r.targetSets ?? SESSION_DEFAULTS.workingSets,
+    dropSets: SESSION_DEFAULTS.dropSets,
+    restSeconds: null,
+  }));
+}
+
+type SeedExercise = {
+  exerciseId: string;
+  name: string;
+  targetSets: number | null;
+  warmupSets?: number;
+  workingSets?: number;
+  dropSets?: number;
+  restSeconds?: number | null;
+};
 
 export async function startSession(
   supabase: SupabaseClient,
@@ -584,9 +639,31 @@ export async function startSession(
   input: StartSessionInput
 ): Promise<Session> {
   let title = input.title?.trim() || "Workout";
-  let seedExercises: { exerciseId: string; name: string; targetSets: number | null }[] = [];
+  let seedExercises: SeedExercise[] = [];
 
-  if (input.programId) {
+  if (input.plan && input.plan.length > 0) {
+    // Wizard plan: the ordered list + per-exercise structure wins outright.
+    if (input.programId) {
+      const program = await getProgram(supabase, input.programId);
+      if (program) title = input.title?.trim() || program.name;
+    }
+    const { data } = await supabase
+      .from("gym_exercises")
+      .select("id, name")
+      .in("id", input.plan.map((p) => p.exerciseId));
+    const byId = new Map(
+      ((data as { id: string; name: string }[] | null) ?? []).map((r) => [r.id, r.name])
+    );
+    seedExercises = input.plan.map((p) => ({
+      exerciseId: p.exerciseId,
+      name: byId.get(p.exerciseId) ?? "Exercise",
+      targetSets: p.workingSets,
+      warmupSets: p.warmupSets,
+      workingSets: p.workingSets,
+      dropSets: p.dropSets,
+      restSeconds: p.restSeconds,
+    }));
+  } else if (input.programId) {
     const program = await getProgram(supabase, input.programId);
     if (program) {
       title = input.title?.trim() || program.name;
@@ -637,6 +714,10 @@ export async function startSession(
       exercise_name: e.name,
       order_index: i,
       target_sets: e.targetSets,
+      warmup_sets: e.warmupSets ?? null,
+      working_sets: e.workingSets ?? null,
+      drop_sets: e.dropSets ?? null,
+      rest_seconds: e.restSeconds ?? null,
     }));
     const { error: seErr } = await supabase.from("gym_session_exercises").insert(rows);
     if (seErr) throw new Error(seErr.message);
@@ -1363,10 +1444,11 @@ async function syncReminderDays(supabase: SupabaseClient, userId: string): Promi
 }
 
 /**
- * Enable or disable the weekly "go to gym" reminder. Enabling creates the
- * routine (weekly, on the scheduled training days) the first time and stores it
- * in gym_preferences; disabling just deactivates it (kept so re-enabling is
- * cheap and history is preserved).
+ * Enable or disable the weekly "go to gym" reminder. Idempotent: resolves the
+ * routine via gym_preferences first, then adopts any existing "Gym" routine
+ * (e.g. created before preferences existed, or orphaned by a stale prefs row)
+ * before ever creating one, so a second Gym routine can never appear.
+ * Disabling just deactivates it so re-enabling is cheap and history is kept.
  */
 export async function setTrainingReminder(
   supabase: SupabaseClient,
@@ -1375,13 +1457,32 @@ export async function setTrainingReminder(
 ): Promise<GymSchedule> {
   const existing = await getReminderRoutine(supabase, userId);
   const days = await trainingDays(supabase, userId);
+  const patch = {
+    active: input.enabled,
+    daysOfWeek: days,
+    ...(input.remindTime ? { remindTime: input.remindTime } : {}),
+  };
 
   if (existing) {
-    await updateRoutine(supabase, existing.id, {
-      active: input.enabled,
-      daysOfWeek: days,
-      ...(input.remindTime ? { remindTime: input.remindTime } : {}),
-    });
+    await updateRoutine(supabase, existing.id, patch);
+    return getSchedule(supabase, userId);
+  }
+
+  // Prefs missing or pointing at a deleted routine: adopt the oldest existing
+  // gym routine rather than minting a duplicate.
+  const { data: orphan, error: findErr } = await supabase
+    .from("routines")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("title", GYM_ROUTINE_TITLE)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (findErr) throw new Error(findErr.message);
+
+  let routineId = (orphan as { id: string } | null)?.id ?? null;
+  if (routineId) {
+    await updateRoutine(supabase, routineId, patch);
   } else if (input.enabled) {
     const routine = await createRoutine(supabase, userId, {
       title: GYM_ROUTINE_TITLE,
@@ -1391,9 +1492,13 @@ export async function setTrainingReminder(
       daysOfWeek: days,
       remindTime: input.remindTime ?? DEFAULT_REMIND_TIME,
     });
+    routineId = routine.id;
+  }
+
+  if (routineId) {
     const { error } = await supabase
       .from("gym_preferences")
-      .upsert({ user_id: userId, routine_id: routine.id }, { onConflict: "user_id" });
+      .upsert({ user_id: userId, routine_id: routineId }, { onConflict: "user_id" });
     if (error) throw new Error(error.message);
   }
 

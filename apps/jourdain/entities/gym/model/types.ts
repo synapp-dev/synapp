@@ -346,6 +346,12 @@ export type SessionExercise = {
   exerciseName: string;
   orderIndex: number;
   targetSets: number | null;
+  /** Planned structure from the start wizard; null falls back to app defaults. */
+  warmupSets: number | null;
+  workingSets: number | null;
+  dropSets: number | null;
+  /** Planned rest between sets in seconds; null falls back to per-kind defaults. */
+  restSeconds: number | null;
   sets: GymSet[];
 };
 
@@ -382,12 +388,38 @@ export type SessionSummary = {
   createdAt: string;
 };
 
+/** Default set structure and rest times, shared by the wizard, API and runner. */
+export const SESSION_DEFAULTS = {
+  warmupSets: 1,
+  workingSets: 3,
+  dropSets: 1,
+  restSecondsByKind: { warmup: 45, working: 90, drop: 120 } satisfies Record<SetKind, number>,
+} as const;
+
+/** One row of the start-wizard plan: ordered exercise + chosen set structure. */
+export type SessionPlanExercise = {
+  exerciseId: string;
+  warmupSets: number;
+  workingSets: number;
+  dropSets: number;
+  /** null ⇒ auto: fall back to per-kind rest defaults. */
+  restSeconds: number | null;
+};
+
+/** A plan row enriched for the wizard preview (name + badge data). */
+export type SessionPreviewExercise = SessionPlanExercise & {
+  name: string;
+  subgroup: MuscleSubgroup;
+};
+
 export type StartSessionInput = {
   programId?: string | null;
   title?: string;
   /** Ad-hoc: start with these exercises instead of a program. */
   exerciseIds?: string[];
   intensity?: SessionIntensity;
+  /** Ordered wizard plan; when present it overrides the program's exercise list. */
+  plan?: SessionPlanExercise[];
 };
 
 // ── Weekly schedule (the PPL rotation) ───────────────────────────────────────

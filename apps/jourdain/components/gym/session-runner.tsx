@@ -20,20 +20,19 @@ import {
 import { suggestNextLoad } from "@/lib/gym/recommend";
 import { evaluateBenchmark, evaluateRetry, proposeBenchmark, roundToPlate } from "@/lib/gym/benchmark";
 import { useMeStore } from "@/entities/me/model/store";
-import type {
-  Session,
-  SessionExercise,
-  SessionIntensity,
-  SetKind,
+import {
+  SESSION_DEFAULTS,
+  type Session,
+  type SessionExercise,
+  type SessionIntensity,
+  type SetKind,
 } from "@/entities/gym/model/types";
 
 const DEFAULT_REP_MIN = 8;
 const DEFAULT_REP_MAX = 12;
 const WORKING_REPS = 10;
-const WORKING_SETS = 3;
 const WARMUP_FACTOR = 0.6;
 const DROP_FACTOR = 0.8;
-const REST_SECONDS: Record<SetKind, number> = { warmup: 45, working: 90, drop: 120 };
 
 function num(value: string): number | null {
   const t = value.trim();
@@ -62,6 +61,9 @@ function computeNext(p: {
   warmups: number;
   workingCount: number;
   dropCount: number;
+  warmupTarget: number;
+  workingTarget: number;
+  dropTarget: number;
 }): PlannedSet | null {
   const { isFirstTime, calibrated, benchmarkWeight, retryWeight, retryMessage, W } = p;
   if (isFirstTime && !calibrated) {
@@ -77,34 +79,34 @@ function computeNext(p: {
           : retryMessage ?? "Retry — one all-out set at the adjusted weight.",
     };
   }
-  if (!isFirstTime && p.warmups === 0) {
+  if (!isFirstTime && p.warmups < p.warmupTarget) {
     return {
       role: "warmup",
       weight: W != null ? roundToPlate(W * WARMUP_FACTOR) : null,
       reps: WORKING_REPS,
       amrap: false,
-      label: "Warm-up",
-      instruction: "Warm-up — light, ~10 easy reps to groove the movement.",
+      label: p.warmupTarget > 1 ? `Warm-up ${p.warmups + 1} of ${p.warmupTarget}` : "Warm-up",
+      instruction: "Warm-up: light, ~10 easy reps to groove the movement.",
     };
   }
-  if (p.workingCount < WORKING_SETS) {
+  if (p.workingCount < p.workingTarget) {
     return {
       role: "working",
       weight: W,
       reps: WORKING_REPS,
       amrap: false,
-      label: `Working set ${p.workingCount + 1} of ${WORKING_SETS}`,
-      instruction: `Working set ${p.workingCount + 1} of ${WORKING_SETS} — ~${WORKING_REPS} controlled reps.`,
+      label: `Working set ${p.workingCount + 1} of ${p.workingTarget}`,
+      instruction: `Working set ${p.workingCount + 1} of ${p.workingTarget}: ~${WORKING_REPS} controlled reps.`,
     };
   }
-  if (p.dropCount === 0) {
+  if (p.dropCount < p.dropTarget) {
     return {
       role: "drop",
       weight: W != null ? roundToPlate(W * DROP_FACTOR) : null,
       reps: null,
       amrap: true,
-      label: "Drop set",
-      instruction: "Final drop set — ~20% lighter, push to failure.",
+      label: p.dropTarget > 1 ? `Drop set ${p.dropCount + 1} of ${p.dropTarget}` : "Drop set",
+      instruction: "Final drop set: ~20% lighter, push to failure.",
     };
   }
   return null;
@@ -301,6 +303,11 @@ function ExerciseRunner({
   const baseWorking = isFirstTime ? finalVerdict?.workingWeight ?? null : suggestion?.weight ?? lastWorking;
   const W = workingOverride ?? baseWorking ?? null;
 
+  // Structure planned in the start wizard, falling back to the app defaults.
+  const warmupTarget = sessionExercise.warmupSets ?? SESSION_DEFAULTS.warmupSets;
+  const workingTarget = sessionExercise.workingSets ?? SESSION_DEFAULTS.workingSets;
+  const dropTarget = sessionExercise.dropSets ?? SESSION_DEFAULTS.dropSets;
+
   const next = computeNext({
     isFirstTime,
     calibrated,
@@ -311,6 +318,9 @@ function ExerciseRunner({
     warmups: warmupSets.length,
     workingCount: sets.filter((s) => s.kind === "working").length,
     dropCount: sets.filter((s) => s.kind === "drop").length,
+    warmupTarget,
+    workingTarget,
+    dropTarget,
   });
 
   // Once the plan is exhausted, surface the exercise-complete state.
@@ -319,14 +329,15 @@ function ExerciseRunner({
   }, [next, phase]);
 
   const completedSets = sets.length;
-  const planTotal = WORKING_SETS + 2; // warm-up + working + drop (approx, retries add)
+  const planTotal = warmupTarget + workingTarget + dropTarget; // approx, retries add
 
   const complete = (vals: { weight: number | null; reps: number | null; rpe: number | null }) => {
     if (!next) return;
     if (next.role === "working" && vals.weight != null) setWorkingOverride(vals.weight);
+    const restSeconds = sessionExercise.restSeconds ?? SESSION_DEFAULTS.restSecondsByKind[next.role];
     logSet.mutate(
       { sessionExerciseId: sessionExercise.id, weight: vals.weight, reps: vals.reps, rpe: vals.rpe, kind: next.role },
-      { onSuccess: () => setRestUntil(Date.now() + REST_SECONDS[next.role] * 1000) }
+      { onSuccess: () => setRestUntil(Date.now() + restSeconds * 1000) }
     );
     setPhase("rest");
   };
@@ -345,8 +356,8 @@ function ExerciseRunner({
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               {isFirstTime
-                ? "First time — your warm-up doubles as a benchmark, then 3 working sets and a drop set."
-                : "Warm-up, 3 working sets, then a drop set to failure."}
+                ? `First time: your warm-up doubles as a benchmark, then ${workingTarget} working set${workingTarget === 1 ? "" : "s"}${dropTarget > 0 ? " and a drop set" : ""}.`
+                : `${warmupTarget > 0 ? "Warm-up, then " : ""}${workingTarget} working set${workingTarget === 1 ? "" : "s"}${dropTarget > 0 ? ", then a drop set to failure" : ""}.`}
             </p>
             {needsBodyweight ? (
               <div className="space-y-2 rounded-md border border-primary/30 bg-primary/5 p-3">

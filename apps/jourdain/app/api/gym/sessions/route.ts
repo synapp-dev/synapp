@@ -3,11 +3,20 @@ import { z } from "zod";
 import { getActiveSession, listSessions, startSession } from "@/lib/gym/service";
 import { badRequest, ok, requireUser, serverError } from "@/lib/gym/http";
 
+const planItemSchema = z.object({
+  exerciseId: z.string().uuid(),
+  warmupSets: z.number().int().min(0).max(10),
+  workingSets: z.number().int().min(1).max(20),
+  dropSets: z.number().int().min(0).max(10),
+  restSeconds: z.number().int().min(0).max(900).nullable().default(null),
+});
+
 const startSchema = z.object({
   programId: z.string().uuid().nullish(),
   title: z.string().trim().min(1).max(200).optional(),
   exerciseIds: z.array(z.string().uuid()).max(40).optional(),
   intensity: z.enum(["normal", "hard"]).optional(),
+  plan: z.array(planItemSchema).max(40).optional(),
 });
 
 export async function GET(request: NextRequest) {
