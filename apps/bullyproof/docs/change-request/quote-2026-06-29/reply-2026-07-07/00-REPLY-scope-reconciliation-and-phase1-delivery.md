@@ -7,11 +7,13 @@
 **Attachments:**
 - Bullyproof-SOW-Completion-Register-FINAL.docx
 - Final acceptance letter (clause 7.1 delivery)
-- Administrator User Guide (Word) and System Administrator Guide (Word)
+- Administrator User Guide (Word)
 - Bill of Materials (CSV)
 - Variation deliverables verification register
 - Phase 1 UAT checklist
 - Tax invoices: Phase 1 completion; M1 deposit
+
+*(The System Administrator Guide, covering configuration, deployment and credentials, is complete and is delivered with the clause 6 handover set on payment, together with the source code and repository control.)*
 
 ---
 
@@ -32,7 +34,7 @@ This matters for your letter because every example you listed as incomplete or n
 | Admin Reports page requiring completion | Complete: four report tabs with live data, CSV and PDF export on every tab, plus the full export pack (schools register, per school classes, staff, lesson history, culture periods) | Admin > Reports > Export |
 | Culture Rating inputs, formulas, rules, comparative periods | Complete and verified live, including the zero-input weighting from your document (a zero entry re-weights across the remaining inputs; verified against hand-computed values). A worked example is loaded on the St4s Test School | Admin > Culture ratings > St4s Test School; School portal > Performance and Reports |
 | School address and email domain not saving | Reproduced, root-caused and fixed this week. The save was persisting; the admin drawer then failed to display the saved values, which reads exactly as "did not save". Fixed and verified on your exact flow: edit, save, reload | Admin > Schools > any school > Details |
-| Activation status not displayed | Complete: applied templates show a green card with a "Template active" badge and the button changes to "Re-apply template", plus "Active on N schools" on the template cards | Admin > Schools > school > Activation; Admin > Features > Permission Templates |
+| Activation status not displayed | Complete: on the school's Activation tab the applied template shows a green card with a "Template active" badge and the button changes to "Re-apply template" | Admin > Schools > school > Activation |
 | Lesson selection producing blank screens | Fixed: a blank screen is no longer possible. Mismatched selections show the guidance panel built from the wording in your document, with a per-class pick, Back, and a compromise option | Teach Lessons > select two classes at different levels |
 | Incorrect recommendations, list capped at three, ordering | Fixed: composite classes resolve correctly, every lesson in a level lists (all ten), and levels order by year from 1/2 up to 12 | Teach Lessons > Choose another lesson |
 | Lesson takeover not working | Working and verified: takeover is available to teachers at the school on preparing, ready and in progress lessons. What you hit in June was the permission gate doing its job on an account without access at that school | Teachers page > a teacher's unfinished lesson |
@@ -64,17 +66,22 @@ We are aligned on the frame, which is the one from my proposal's Section 7: $250
 
 Three things to pin down so the numbers close cleanly:
 
-1. **Salary figure.** My records show $72,348.50 gross to 10 June. Your $96,482.57 to 10 July is a $24,134.07 movement; if that is the June and July runs plus accrued leave paid out on cessation, it will reconcile in minutes. Could you send the payroll schedule (gross, super, leave per run) so we lock the figure?
+1. **Salary figure.** Your $96,482.57 reconciles closely against my payslips on the agreed basis (gross plus super, with accrued leave counting): gross to 10 June was $72,348.50 with $8,681.82 super, and adding the 10 July run (gross $8,333.33 plus super) and the accrued annual leave balance paid out on cessation lands within a few hundred dollars of your figure. Could you send the short schedule (gross, super and leave per run) so we adopt one exact number? Naturally the 10 July run and the leave payout count toward the component only once actually paid; if either does not proceed, the completion balance adjusts up by the same amount, so we are both whole either way.
 2. **Cessation date.** Let us fix the salary arrangement as ending with the 10 July run, in writing, so the component stops moving and the completion balance is a fixed number for both of us.
 3. **GST.** The salary component carries no GST, but the fee balance and M1 do. So on your own figures the position is: fee balance $100,000 + GST = $110,000, plus the salary component remainder of $100,000 less the verified salary figure (on your number, $3,517.43, no GST), plus M1 at $19,112.50 + GST. Your $122,629.93 is the ex-GST arithmetic of the same position, so we are agreeing on substance; the invoices just need to show GST correctly.
 
 The Phase 1 completion invoice is attached and is payable on Acceptance under clause 7 (including deemed acceptance under 7.4), exactly as clause 4(b) provides. It is not contingent on the M2-M8 reconciliation, and your letter reads the same way, so I do not think we disagree: Phase 1 completes on its own contractual track while we agree the new work in parallel.
 
-## Source code and repositories
+## Source code, repositories and what transfers
 
-Everything except the code itself is in your hands today: the administrator and system administrator guides, configuration and deployment documentation, the database schema and migration set (documented in the System Administrator Guide), and the bill of materials.
+Clause 6 of the Variation governs the sequence: full source code, documentation, credentials and repository control are delivered on completion and receipt of final payment, and until then you have full access to the running platform for review and validation. That is exactly what will happen, and here is the concrete shape so there are no surprises on the day:
 
-For the repositories, clause 6 of the Variation governs: full source code, credentials and repository control transfer on completion and receipt of final payment. I will execute the transfer to Amayda-controlled repositories the same day the Phase 1 completion payment clears, and I am glad to keep working in those repositories under your control for M1 and any commissioned modules from that day, exactly as you proposed. Until then you have, as clause 6 also provides, full access to the running platform for review and validation, plus the complete documentation set.
+- **What you receive on payment, same day it clears:** a dedicated Bullyproof repository under Amayda's control containing the complete platform: application source, the shared component packages the build requires, database schema and the full migration set, seed and configuration templates, deployment instructions, and the System Administrator Guide, together with all credentials and keys delivered securely. It builds and deploys as documented, independently of me.
+- **What it does not include:** Intradark's internal development environment sits in a company monorepo alongside unrelated Intradark projects and internal tooling; those are not part of the Bullyproof platform and do not transfer. The delivered repository is the platform, complete and self-sufficient.
+- **Clause 5 boundaries, marked in the code:** as the Variation records, the platform embeds Intradark's Underlying Systems (reusable architecture, libraries and non-client-specific components), which remain Intradark's property. They are delivered with the platform so it runs and can be maintained, and the repository will include a short schedule identifying them, mirroring clause 5: they are for use within the Bullyproof platform, and not for extraction, isolation or repurposing into other products, just as I am bound not to replicate Bullyproof for anyone else.
+- **Ongoing work:** from transfer day I am glad to keep working in the Amayda-controlled repository for M1 and any commissioned modules, exactly as you proposed.
+
+In the meantime the Administrator User Guide is attached now because your team needs it for UAT; the System Administrator Guide travels with the handover set, since deployment instructions and credentials are part of what clause 6 delivers on payment.
 
 ## To keep everything moving
 

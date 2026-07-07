@@ -18,11 +18,12 @@ This letter gives formal notice of Final Delivery of the Bullyproof platform und
 ### 1. What accompanies this letter
 
 1. Completion and Deliverables Register, FINAL issue dated 7 July 2026 (all items Delivered).
-2. Administrator User Guide (Word), deliverable D6.
-3. System Administrator Guide (Word), deliverable D6. This includes configuration and deployment instructions per clause 7.5(b).
-4. Bill of Materials of open-source components and licences (CSV and Markdown, 640 packages generated from the production dependency tree), deliverable D7 under SDA 4.4.
-5. UAT checklist covering the completed items, with the checks already verified during my own testing marked as such.
-6. Tax invoice for the clause 4(b) completion and handover payment, payable on acceptance and handover.
+2. Administrator User Guide (Word), deliverable D6, enclosed now for use during UAT.
+3. Bill of Materials of open-source components and licences (CSV and Markdown, 640 packages generated from the production dependency tree), deliverable D7 under SDA 4.4.
+4. UAT checklist covering the completed items, with the checks already verified during my own testing marked as such.
+5. Tax invoice for the clause 4(b) completion and handover payment, payable on acceptance and handover.
+
+The System Administrator Guide (deliverable D6, complete), covering configuration, deployment and credentials, is delivered with the clause 6 handover set on receipt of final payment, together with the source code and repository control.
 
 ### 2. Delivery for User Acceptance Testing (clause 7.1)
 
@@ -46,12 +47,12 @@ The culture-rating calculation engine is delivered, unit-tested, and verified li
 
 Clause 6 provides that full source code, documentation, credentials and repository control are delivered upon completion of the project and receipt of final payment. Accordingly, the handover set is prepared and ready:
 
-- full source code and build scripts, with repository control transferred to you;
-- configuration and deployment instructions (contained in the System Administrator Guide);
-- administrator and user documentation (enclosed now);
+- a dedicated Bullyproof repository under your control containing the complete platform (application source, required shared packages, database schema and migrations, configuration templates and build scripts);
+- configuration and deployment instructions (the System Administrator Guide);
+- administrator and user documentation (the Administrator User Guide is enclosed now for UAT);
 - all credentials and keys, delivered securely.
 
-The documentation is enclosed with this letter. The source code, credentials and repository control transfer are executed on the day final payment is received, per clause 6. In the meantime you have, as clause 6 also requires, full access to the running platform for review and validation.
+The source code, System Administrator Guide, credentials and repository control transfer are executed on the day final payment is received, per clause 6. The delivered repository also carries a short schedule identifying the Underlying Systems that remain Intradark property under clause 5, embedded for use within the Bullyproof platform. In the meantime you have, as clause 6 also requires, full access to the running platform for review and validation.
 
 ### 6. Payment (clause 4(b))
 

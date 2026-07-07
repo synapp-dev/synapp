@@ -88,7 +88,7 @@ The Admin entry takes you to the admin home at /admin, a grid of cards, one per 
 | Content | /admin/content | Curriculum and certification content |
 | Schools | /admin/schools | School accounts |
 | Users | /admin/users | User accounts and access levels |
-| Features | /admin/features | Feature access control and permission templates |
+| Features | /admin/features | Feature access control (day-to-day school activation is on each school's Activation tab) |
 | Resources | /admin/resources | Folder-based resource documents |
 | Reports | /admin/reports | Platform reporting dashboards |
 | Ratings | /admin/ratings | Teacher lesson ratings by curriculum stage |
@@ -285,17 +285,17 @@ Each override table shows what is inherited from the level above, so you can see
 
 ### 8.3 Permission templates
 
-Setting dozens of switches per school would be tedious, so the platform has Permission Templates: saved bundles of Access and Visible settings per access level. Find them via the "Permission Templates" card ("One-click unlock or lock permission bundles for schools and platform roles") or at /admin/features/permission-templates.
+Setting dozens of switches per school would be tedious, so the platform ships with Permission Templates: pre-built bundles of Access and Visible settings (for example the standard school activation bundle, certification-only, and locked states). Templates are built and maintained at the platform engineering level; as a Bullyproof administrator you select and apply them rather than author them.
 
-- Templates are grouped into two tabs: Schools (templates applied to schools) and Platform Access Levels (templates applied to platform roles).
-- Each template card shows its name, description, and buttons: "Edit matrix", "Unlock" (apply), and "Lock" (revoke).
-- School templates that are currently in force somewhere show a green badge reading "Active on N schools". Inside the Unlock or Lock dialog, each school that already matches the template shows a green "Active" chip.
-- "Unlock" opens a dialog where you review the template's permission matrix, tick the target schools (or roles), and confirm. "Lock" is the same in reverse: it removes the template's permissions from the selected schools.
-- "Edit matrix" opens the template editor: a grid of features (rows) against access levels (columns), with Access and Visible checkboxes in every cell, plus column controls to tick a whole column at once and an import tool to copy rules from another template.
+You work with templates on each school's Activation tab (section 5.6):
 
-[Screenshot: Permission Templates page with an Active on N schools badge]
+- The tab lists the available templates as cards with name, description and rule count.
+- A green "Template active" badge shows when the school's current permissions already match that template; otherwise the card reads "Not active".
+- Click "Apply template" (or "Re-apply template" on an already-active card) and confirm. The card turns green once applied.
 
-The everyday workflow is: onboard the school (section 5.4), then apply the standard school template from the Activation tab or the Unlock dialog. Reserve the per-feature switches for one-off adjustments.
+[Screenshot: a school's Activation tab with a Template active badge on the applied card]
+
+The everyday workflow is: onboard the school (section 5.4), then apply the standard school template from the Activation tab. Reserve the per-feature switches (section 8.2) for one-off adjustments. If a new template or a change to an existing bundle is needed, raise it with the platform team.
 
 ## 9. Culture ratings
 
@@ -362,7 +362,7 @@ At the top of the section a scope selector lets you switch between "All schools"
 
 - Overview: headline cards for Schools (total school accounts), Active licences (schools with an ACTIVE licence), Lessons (lesson records), Lesson ratings (feedback submissions), and AMAYDA complete (users who finished the AMAYDA Program). A "Go deeper" row links to the other three tabs.
 - Certification: AMAYDA completion for the scope. For per-user progress, open the individual school under Admin > Schools.
-- Onboarding: school readiness: accounts and licences, plus (in all-schools scope) the "Active schools with no lessons yet" table listing schools with an active licence but no lessons, with days since licence start, class and teacher counts, and their activation status (Active, Certification, or Locked, based on which permission template is applied).
+- Onboarding: school readiness: accounts and licences, plus (in all-schools scope) the "Active schools with no lessons yet" table listing schools with an active licence but no lessons, with days since licence start, class and teacher counts, and their activation status (Active, Certification, or Locked, based on the school's activation status).
 - Lessons: lesson and rating totals plus a table of all lessons in scope, newest first, with the topic, classes, teacher, school, status, and date.
 
 [Screenshot: Reports Overview tab with the scope filter and Export button]

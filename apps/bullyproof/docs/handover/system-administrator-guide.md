@@ -171,7 +171,7 @@ Grants live in feature_permissions with a level enum of global, role, school, sc
 
 If no row exists at any level the feature is denied (allow-list model). One special case: "/ap-certification" falls back to "/courses" when it has no explicit rows. Server code enforces access with assertFeature; client code mirrors it with the useFeaturesAccess hooks so navigation hides what a user cannot reach. "enabled" controls function, "visible" controls whether the UI element renders (visible-but-disabled renders locked).
 
-Permission templates (migration 0022) store reusable bundles of these grants; admins apply or revoke them per school or per platform role from /admin/features/permission-templates. scripts/seed-features.ts seeds the base features and default grants on a fresh database.
+Permission templates (migration 0022) store reusable bundles of these grants. Template authoring and the root management surface (/admin/features/permission-templates) are restricted to the platform engineering role; Bullyproof administrators apply existing templates from each school's Activation tab. scripts/seed-features.ts seeds the base features and default grants on a fresh database.
 
 ### 6.3 Maintenance mode
 

@@ -17,15 +17,13 @@
 
 ## 2. Apply Template confirmation (item 40)
 
-- [x] Template cards show green "Active on N schools" when fully applied (re-verified live 7 Jul: 1/43/1)
-- [ ] Unlock dialog shows a green Active chip on schools that already have the template
-- [ ] Applying to a school updates the badge and the dialog on reopen
+- [x] School's Activation tab: the applied template shows a green card with a "Template active" badge; other templates read "Not active" (re-verified live 7 Jul)
+- [ ] Applying a template turns its card green and the button changes to "Re-apply template"; the state persists on reopen
 
 ## 3. Labels (items 28/44/45/57)
 
 - [ ] /admin/users: Access Levels header, Access Level filter, Access Levels drawer tab, Add Access Level dialog, School & Access Level step
 - [ ] School settings users drawer: Edit Access Levels
-- [ ] /admin/features tabs: Platform Access Levels
 - [ ] School portal headers + breadcrumbs: Preview Lessons, Teach Lessons (admin breadcrumbs unchanged)
 - [x] School settings classes: Student Numbers label (and table header) (verified live 7 Jul, incl. search placeholder)
 - [ ] As a teacher or school admin: no Ctrl+K button in the header and the shortcut does nothing; theme toggle intact
