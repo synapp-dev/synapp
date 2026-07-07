@@ -4,7 +4,9 @@ import Link from "next/link";
 import { Activity, Dumbbell, Moon } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { HealthImportCard } from "@/components/health/health-import-card";
+import { PageHeader } from "@/components/page-header";
 import { METRICS, formatMetric } from "@/lib/health/metrics";
+import { formatHours } from "@/lib/format";
 import { useHealthMetrics, useSleepNights } from "@/hooks/health/use-health";
 
 const HEADLINE_NAMES = [
@@ -18,14 +20,6 @@ function latest(samples: { qty: number | null }[]): number | null {
     if (qty != null) return qty;
   }
   return null;
-}
-
-function formatHours(hours: number | null | undefined): string {
-  if (hours == null) return "—";
-  const total = Math.round(hours * 60);
-  const h = Math.floor(total / 60);
-  const m = total % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
 }
 
 function ModuleTile({
@@ -73,7 +67,7 @@ export default function HealthPage() {
 
   return (
     <section className="mx-auto w-full max-w-7xl space-y-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Health</h1>
+      <PageHeader title="Health" />
 
       <p className="text-sm text-muted-foreground">
         Import your Apple Health data from the iOS{" "}
@@ -88,7 +82,11 @@ export default function HealthPage() {
           href="/health/sleep"
           icon={Moon}
           title="Sleep"
-          value={formatHours(lastNight?.totalSleep)}
+          value={
+            lastNight?.totalSleep == null
+              ? "\u2014"
+              : formatHours(lastNight.totalSleep * 60)
+          }
           caption="Last night"
         />
         <ModuleTile

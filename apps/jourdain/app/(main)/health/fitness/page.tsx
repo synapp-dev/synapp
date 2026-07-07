@@ -5,6 +5,7 @@ import { Activity } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { MetricCard } from "@/components/health/metric-card";
 import { METRICS } from "@/lib/health/metrics";
+import { formatHours } from "@/lib/format";
 import {
   useHealthMetrics,
   useWorkouts,
@@ -23,10 +24,8 @@ const NAMES = [
 ] as const;
 
 function duration(seconds: number | null): string {
-  if (seconds == null) return "—";
-  const mins = Math.round(seconds / 60);
-  if (mins < 60) return `${mins}m`;
-  return `${Math.floor(mins / 60)}h ${mins % 60}m`;
+  if (seconds == null) return "\u2014";
+  return formatHours(seconds / 60);
 }
 
 function workoutDate(iso: string | null): string {

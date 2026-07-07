@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { BedDouble, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -72,7 +73,7 @@ function shortDate(iso: string): string {
 
 /** Hours (e.g. 7.07) -> "7h 4m". */
 function formatHours(hours: number | null | undefined): string {
-  if (hours == null) return "—";
+  if (hours == null) return "–";
   const total = Math.round(hours * 60);
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -80,11 +81,11 @@ function formatHours(hours: number | null | undefined): string {
 }
 
 function clockTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "–";
   try {
     return format(parseISO(iso), "h:mm a");
   } catch {
-    return "—";
+    return "–";
   }
 }
 
@@ -118,7 +119,7 @@ function averageClockMinutes(isos: (string | null)[]): number | null {
 
 /** Minutes-of-day (0–1439) -> "11:07 PM". */
 function formatClockMinutes(mins: number | null): string {
-  if (mins == null) return "—";
+  if (mins == null) return "–";
   const rounded = Math.round(mins);
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
@@ -163,7 +164,7 @@ function useCountUp(target: number, duration = COUNTUP_MS): number {
 }
 
 /** Count-up wrapper: animates `value` from 0 and renders it through `format`.
- *  A null value short-circuits to the formatter's empty state (e.g. "—"). */
+ *  A null value short-circuits to the formatter's empty state (e.g. "–"). */
 function CountUp({
   value,
   format: fmt,
@@ -174,10 +175,10 @@ function CountUp({
   duration?: number;
 }) {
   const animated = useCountUp(value ?? 0, duration);
-  return <>{value == null ? "—" : fmt(animated)}</>;
+  return <>{value == null ? "–" : fmt(animated)}</>;
 }
 
-/** The stages that "bloom in" during the colour pass — core is the green base. */
+/** The stages that "bloom in" during the colour pass; core is the green base. */
 const REVEAL_KEYS = ["deep", "rem", "awake"] as const;
 
 // Reveal timeline. Phase A fades every bar in (green) left→right; only once it
@@ -216,7 +217,7 @@ const config = {
 
 type ScheduleDatum = {
   date: string;
-  /** No (or negligible) sleep recorded — renders as an empty column. */
+  /** No (or negligible) sleep recorded; renders as an empty column. */
   empty: boolean;
   /** Transparent offset (minutes since 6pm) up to bedtime, floats the stack. */
   base: number;
@@ -619,7 +620,7 @@ export default function HealthSleepPage() {
         // With the 6pm anchor a real night is always an ascending
         // evening→morning span; a non-positive span is a garbage entry
         // (e.g. an afternoon "night") that would otherwise render across
-        // the whole axis — fall back to an empty column.
+        // the whole axis, so fall back to an empty column.
         const span = wake - bed;
         if (span <= 0) return empty;
 
@@ -631,7 +632,7 @@ export default function HealthSleepPage() {
         if (asleepMin < 15) return empty;
 
         // Scale the stage durations so they exactly fill the bed→wake
-        // window — we only have per-stage totals, not their ordering,
+        // window; we only have per-stage totals, not their ordering,
         // so they render as proportional bands inside the floating bar.
         const deepM = (n.deep ?? 0) * 60;
         const coreM = (n.core ?? 0) * 60;
@@ -708,7 +709,7 @@ export default function HealthSleepPage() {
 
   // Two-phase reveal driven by a single time-based clock (smooth, not snapping).
   // Phase A: every bar grows in green, left→right, finishing before Phase B.
-  // Phase B: deep/REM/awake bloom in at randomised times — the segments are
+  // Phase B: deep/REM/awake bloom in at randomised times; the segments are
   // continuously renormalised to fill the window so the percentages readjust
   // smoothly as each colour "calculates" in.
   const revealRef = useRef<Record<number, RevealEvent[]>>({});
@@ -718,7 +719,7 @@ export default function HealthSleepPage() {
   const [cardsReady, setCardsReady] = useState(false);
 
   useEffect(() => {
-    // Don't burn the clock down while data is still loading — otherwise the
+    // Don't burn the clock down while data is still loading, otherwise the
     // animation can finish before the chart is even mounted/visible. Likewise
     // hold until the intro loader has exited, since this effect runs via hooks
     // even while the loader is the only thing rendered; otherwise the reveal
@@ -751,7 +752,6 @@ export default function HealthSleepPage() {
     setClock(0);
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleData, loaderDone]);
 
   const displayData = useMemo<ScheduleDatum[]>(() => {
@@ -791,7 +791,6 @@ export default function HealthSleepPage() {
         awake: curAwake * scale,
       };
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduleData, clock]);
 
   const latest = nights.length ? nights[nights.length - 1] : null;
@@ -805,7 +804,7 @@ export default function HealthSleepPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-7xl space-y-4">
+    <section className="mx-auto w-full max-w-7xl space-y-6">
       <style>{`
         @keyframes cardInLeft {
           from { opacity: 0; transform: translateX(-24px); }
@@ -855,6 +854,17 @@ export default function HealthSleepPage() {
         </p>
       ) : null}
 
+      {isFetching && allNights.length === 0 ? (
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Skeleton className="h-36 w-full rounded-xl" />
+            <Skeleton className="h-36 w-full rounded-xl" />
+          </div>
+          <Skeleton className="aspect-[3/1] w-full rounded-xl" />
+        </div>
+      ) : null}
+
+      {nights.length > 0 ? (
       <div
         className="grid gap-3 sm:grid-cols-2"
         style={{ opacity: cardsReady ? 1 : 0 }}
@@ -904,6 +914,7 @@ export default function HealthSleepPage() {
           </CardContent>
         </Card>
       </div>
+      ) : null}
 
       {scheduleData.length > 0 ? (
         <Card>

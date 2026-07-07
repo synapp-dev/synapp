@@ -4,6 +4,7 @@ import { createContext, useContext, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Dumbbell } from "lucide-react";
 
+import { PageHeader } from "@/components/page-header";
 import { GymTabNav } from "./gym-tab-nav";
 
 // The header exposes a right-hand slot that pages fill with their own actions
@@ -17,14 +18,16 @@ export function GymHeader({ children }: { children: ReactNode }) {
   return (
     <SlotContext.Provider value={slot}>
       <div className="flex min-h-0 flex-col gap-6">
-        <div className="flex items-center gap-4">
-          <div className="flex flex-1 items-center gap-2">
-            <Dumbbell className="h-6 w-6" />
-            <h1 className="text-2xl font-semibold tracking-tight">Gym</h1>
-          </div>
-          <GymTabNav />
-          <div ref={setSlot} className="flex flex-1 items-center justify-end gap-2" />
-        </div>
+        <PageHeader
+          title="Gym"
+          icon={<Dumbbell className="h-6 w-6" />}
+          actions={
+            <>
+              <GymTabNav />
+              <div ref={setSlot} className="flex items-center gap-2" />
+            </>
+          }
+        />
         <div className="min-h-0 flex-1">{children}</div>
       </div>
     </SlotContext.Provider>
