@@ -4,9 +4,9 @@
 |---|---|
 | Supplier: | Intradark Pty Ltd |
 | ABN: | 38 696 182 457 |
-| Invoice number: | [INV-2026-___] |
+| Invoice number: | ITRDRK-AMYD-A04 |
 | Invoice date: | 7 July 2026 |
-| Bill to: | Amayda Pty Ltd, Attn: Glenn Rushton, Director [insert ABN / address] |
+| Bill to: | Amayda Pty Ltd, Attn: Glenn Rushton, Director. ABN 45 629 524 769. glenn@rushtonmanagement.com.au |
 
 ## Items
 
@@ -24,9 +24,9 @@ Payable on receipt. Work on the M1 Content Type module commences on receipt of t
 
 | | |
 |---|---|
-| Account name: | [insert] |
-| BSB: | [insert] |
-| Account number: | [insert] |
-| Reference: | [invoice number] |
+| Account name: | Intradark Pty Ltd |
+| BSB: | 067-873 |
+| Account number: | 22986353 |
+| Reference: | ITRDRK-AMYD-A04 |
 
 Enquiries: agirton@intradark.com
