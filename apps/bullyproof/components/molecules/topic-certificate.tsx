@@ -6,7 +6,13 @@ import { Card } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Download, Eye } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
+import { BadgeCheck, Download, Eye } from "lucide-react";
 
 type UserProfile = UserProfileExpandedRow;
 
@@ -73,6 +79,72 @@ export function TopicCertificate({
             Has successfully completed the <span className="font-bold">Amayda Program</span>
           </p>
         </div>
+        {courseId && (
+          <TooltipProvider delayDuration={200}>
+            <div
+              className={cn(
+                "flex items-center justify-between gap-3 rounded-lg border bg-background/70 w-full",
+                "border-[color:var(--brand-bullyproof-primary)]/25",
+                compact ? "mt-2 max-w-[220px] px-2.5 py-1" : "mt-4 max-w-xs px-3 py-1.5"
+              )}
+            >
+              <span
+                className={cn(
+                  "flex items-center gap-1.5 font-semibold text-foreground",
+                  compact ? "text-xs" : "text-sm"
+                )}
+              >
+                <BadgeCheck
+                  className={cn(
+                    "text-[color:var(--brand-bullyproof-primary)]",
+                    compact ? "h-3.5 w-3.5" : "h-4 w-4"
+                  )}
+                />
+                Certificate Ready
+              </span>
+              <div className="flex items-center">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="icon"
+                      className={compact ? "h-7 w-7" : "h-8 w-8"}
+                    >
+                      <a
+                        href={`/api/certification/courses/${courseId}/certificate?view=1`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label="View certificate"
+                      >
+                        <Eye className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View certificate</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="icon"
+                      className={compact ? "h-7 w-7" : "h-8 w-8"}
+                    >
+                      <a
+                        href={`/api/certification/courses/${courseId}/certificate`}
+                        aria-label="Download certificate"
+                      >
+                        <Download className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Download PDF</TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          </TooltipProvider>
+        )}
       </div>
 
       {/* Right side - Certificate info */}
@@ -93,34 +165,6 @@ export function TopicCertificate({
         >
           AP Certified
         </Badge>
-        {courseId && (
-          <div className={cn("mt-2 flex items-center", compact ? "gap-1.5" : "gap-2")}>
-            <Button
-              asChild
-              variant="ghost"
-              size={compact ? "sm" : "default"}
-            >
-              <a
-                href={`/api/certification/courses/${courseId}/certificate?view=1`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Eye className={cn("mr-1.5", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-                View
-              </a>
-            </Button>
-            <Button
-              asChild
-              variant="outline"
-              size={compact ? "sm" : "default"}
-            >
-              <a href={`/api/certification/courses/${courseId}/certificate`}>
-                <Download className={cn("mr-1.5", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-                Download
-              </a>
-            </Button>
-          </div>
-        )}
       </div>
     </Card>
   );
