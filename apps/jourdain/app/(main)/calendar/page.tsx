@@ -39,8 +39,10 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Input } from "@workspace/ui/components/input";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { Switch } from "@workspace/ui/components/switch";
 import { cn } from "@workspace/ui/lib/utils";
+import { PageHeader } from "@/components/page-header";
 import { TaskDetailDialog } from "@/components/organisms/task-detail-dialog";
 import {
   useCalendarEvents,
@@ -64,12 +66,12 @@ const PRIORITY_DOT: Record<TaskPriority, string> = {
 
 const GOOGLE_ERROR_MESSAGES: Record<string, string> = {
   not_configured:
-    "Google credentials are missing — add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.local.",
+    "Google credentials are missing. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to .env.local.",
   denied: "Google access was declined.",
-  state_mismatch: "The sign-in flow expired — try connecting again.",
+  state_mismatch: "The sign-in flow expired. Try connecting again.",
   no_refresh_token:
-    "Google didn't return a refresh token — remove Jourdain's access at myaccount.google.com/permissions and reconnect.",
-  exchange_failed: "Connecting to Google failed — check the server logs.",
+    "Google didn't return a refresh token. Remove Jourdain's access at myaccount.google.com/permissions and reconnect.",
+  exchange_failed: "Connecting to Google failed. Check the server logs.",
 };
 
 const MAX_ITEMS_PER_DAY = 3;
@@ -141,56 +143,56 @@ export default function CalendarPage() {
     setCreateOpen(true);
   }
 
+  const eventsLoading = connected && eventsFetching && events == null;
+
   return (
-    <section className="mx-auto w-full max-w-7xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {format(cursor, "MMMM yyyy")}
-          </h1>
-          {eventsFetching ? (
-            <span className="text-xs text-muted-foreground">Syncing...</span>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Previous month"
-            onClick={() => setCursor((current) => addMonths(current, -1))}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={() => setCursor(new Date())}
-          >
-            Today
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-8 w-8"
-            aria-label="Next month"
-            onClick={() => setCursor((current) => addMonths(current, 1))}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          {connected ? (
+    <section className="mx-auto w-full max-w-7xl space-y-6">
+      <PageHeader
+        title={format(cursor, "MMMM yyyy")}
+        actions={
+          <>
+            {eventsFetching ? (
+              <span className="text-xs text-muted-foreground">Syncing...</span>
+            ) : null}
             <Button
-              size="sm"
-              className="h-8 gap-1.5"
-              onClick={() => openCreate(new Date())}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Previous month"
+              onClick={() => setCursor((current) => addMonths(current, -1))}
             >
-              <CalendarPlus className="h-3.5 w-3.5" />
-              New event
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-          ) : null}
-        </div>
-      </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setCursor(new Date())}
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Next month"
+              onClick={() => setCursor((current) => addMonths(current, 1))}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            {connected ? (
+              <Button
+                size="sm"
+                className="h-8 gap-1.5"
+                onClick={() => openCreate(new Date())}
+              >
+                <CalendarPlus className="h-3.5 w-3.5" />
+                New event
+              </Button>
+            ) : null}
+          </>
+        }
+      />
 
       {googleError ? (
         <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
@@ -200,7 +202,7 @@ export default function CalendarPage() {
 
       {status && !connected ? (
         <Card>
-          <CardHeader className="pb-2">
+          <CardHeader className="pb-3">
             <CardTitle className="text-base">Connect Google Calendar</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center justify-between gap-3">
@@ -220,6 +222,7 @@ export default function CalendarPage() {
           Connected as {status?.email}
           <button
             type="button"
+            aria-label="Disconnect Google Calendar"
             className="inline-flex items-center gap-1 text-muted-foreground/70 underline-offset-2 hover:text-foreground hover:underline"
             onClick={() => disconnect.mutate()}
           >
@@ -275,6 +278,14 @@ export default function CalendarPage() {
                   </span>
                 </div>
                 <div className="space-y-1">
+                  {eventsLoading ? (
+                    <>
+                      <Skeleton className="h-[18px] w-full rounded" />
+                      {day.getDate() % 3 === 0 ? (
+                        <Skeleton className="h-[18px] w-2/3 rounded" />
+                      ) : null}
+                    </>
+                  ) : null}
                   {(birthdaysByDay.get(format(day, "MM-dd")) ?? []).map(
                     (person) => (
                       <div

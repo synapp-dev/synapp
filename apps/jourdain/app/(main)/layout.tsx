@@ -3,8 +3,10 @@
 import { Suspense } from "react";
 import { AppHeader } from "@/components/organisms/app-header";
 import { AppSidebar } from "@/components/organisms/app-sidebar";
+import { DocumentTitle } from "@/components/document-title";
 import { MeLoader } from "@/components/molecules/me-loader";
 import { ReminderResponder } from "@/components/organisms/reminder-responder";
+import { CheckinWizard } from "@/components/checkin/checkin-wizard";
 
 import {
   SidebarInset,
@@ -21,10 +23,12 @@ export default function MainLayout({
   // scrolling an inner pane within a viewport-locked shell.
   return (
     <SidebarProvider className="flex min-h-svh w-full">
+      <DocumentTitle />
       <MeLoader />
       <Suspense fallback={null}>
         <ReminderResponder />
       </Suspense>
+      <CheckinWizard />
       <AppSidebar />
       <div className="mx-auto flex min-w-0 flex-1 max-w-7xl flex-col">
         <AppHeader />

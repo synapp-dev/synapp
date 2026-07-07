@@ -36,8 +36,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select";
-import { Spinner } from "@workspace/ui/components/spinner";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
+import { PageHeader } from "@/components/page-header";
 import {
   useCreateRoutine,
   useDeleteRoutine,
@@ -152,7 +153,7 @@ export default function RoutinesPage() {
     })
   );
 
-  const all = routines ?? [];
+  const all = useMemo(() => routines ?? [], [routines]);
   const titleById = useMemo(() => {
     const map = new Map<string, string>();
     for (const routine of all) map.set(routine.id, routine.title);
@@ -261,14 +262,16 @@ export default function RoutinesPage() {
   }
 
   return (
-    <section className="w-full space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Routines</h1>
-        <Button size="sm" className="gap-1.5" onClick={openCreate}>
-          <Plus className="h-4 w-4" />
-          New routine
-        </Button>
-      </div>
+    <section className="w-full space-y-6">
+      <PageHeader
+        title="Routines"
+        actions={
+          <Button size="sm" className="gap-1.5" onClick={openCreate}>
+            <Plus className="h-4 w-4" />
+            New routine
+          </Button>
+        }
+      />
 
       <div className="inline-flex rounded-lg border border-border/60 p-0.5 text-sm">
         {(["list", "board"] as const).map((option) => (
@@ -276,6 +279,7 @@ export default function RoutinesPage() {
             key={option}
             type="button"
             onClick={() => setView(option)}
+            aria-pressed={view === option}
             className={cn(
               "rounded-md px-3 py-1 capitalize transition-colors",
               view === option
@@ -289,8 +293,11 @@ export default function RoutinesPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex justify-center py-10">
-          <Spinner />
+        <div className="mx-auto w-full max-w-7xl space-y-2">
+          <Skeleton className="h-3 w-20" />
+          {Array.from({ length: 4 }).map((_, index) => (
+            <Skeleton key={index} className="h-[60px] w-full rounded-xl" />
+          ))}
         </div>
       ) : all.length === 0 ? (
         <Card>
