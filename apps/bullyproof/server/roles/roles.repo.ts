@@ -275,7 +275,9 @@ export const rolesRepo = {
       .returning();
   },
 
-  hasRole: (userId: string, roleId: string, schoolId: string) =>
+  // Platform-scoped roles carry no school: match on IS NULL, never on an
+  // empty-string uuid (which Postgres rejects outright).
+  hasRole: (userId: string, roleId: string, schoolId?: string | null) =>
     db
       .select()
       .from(userRoles)
@@ -283,7 +285,9 @@ export const rolesRepo = {
         and(
           eq(userRoles.userId, userId),
           eq(userRoles.roleId, roleId),
-          eq(userRoles.schoolId, schoolId)
+          schoolId
+            ? eq(userRoles.schoolId, schoolId)
+            : isNull(userRoles.schoolId)
         )
       )
       .limit(1),

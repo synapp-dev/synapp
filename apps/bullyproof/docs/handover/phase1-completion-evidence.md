@@ -27,6 +27,9 @@
 
 | SOW 15.1.5 - export for ALL reporting roles | School-admin and teacher reporting surfaces had no export (school Reports page was a stub) | `9ff24f7` | Role-scoped export packs: admin all-schools export adds the schools register (state/sector/levels/licence/staff/teachers/classes/lessons/AP certified/culture benchmark/last lesson per school) + culture trends; admin school-scoped export adds the school pack (class list w/ student numbers + completion, staff list w/ access levels + AP status + last active, full lesson history w/ ratings, culture periods); school portal Reports page rebuilt: SCHOOL_ADMIN/licence sees the school pack on-page + export, TEACHER sees personal slice (own progress, certification, lesson history) per 5.1.5; government unchanged (aggregates only). All plain-table CSV/PDF: filters/Excel/year-selectors remain M4 paid work |
 
+| Platform-role user creation defect (found in UAT) | Creating a Bullyproof/Government user failed: rolesRepo.hasRole required a school uuid and the wizard passes "" for platform roles (invalid uuid, Postgres error) | UAT session fix | hasRole now matches school_id IS NULL for platform-scoped roles; verified live by creating the Gov Viewer Test account (gov.viewer.test@bullyproofaustralia.org.au) |
+| 36 - Government dashboard (live verification) | - | verified live | View-as Gov Viewer Test on /dashboard renders Government Reporting: 5 aggregate cards matching admin numbers (57/56/1,461/1,199/549), view-only, no command menu, CSV export works |
+
 ## Still open (tracked)
 
 - D6 Administrator User Guide + System Administrator Guide: markdown drafts complete at docs/handover/{admin-user-guide,system-administrator-guide}.md; convert to Word at packaging

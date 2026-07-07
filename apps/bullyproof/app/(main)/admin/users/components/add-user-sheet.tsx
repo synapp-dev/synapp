@@ -823,10 +823,10 @@ export function AddUserSheet({
             <DialogHeader className="text-center shrink-0">
               <DialogTitle className="flex items-center justify-center gap-2 text-2xl">
                 <ShieldCheck className="h-8 w-8" />
-                Select a Role
+                Select an Access Level
               </DialogTitle>
               <DialogDescription className="text-center">
-                Choose the role for this user.
+                Choose the access level for this user.
               </DialogDescription>
             </DialogHeader>
 
