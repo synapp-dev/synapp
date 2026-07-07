@@ -31,6 +31,7 @@ import {
   type TaskPriority,
 } from "@/entities/tasks/model/types";
 import { useDeleteTask, useUpdateTask } from "@/hooks/tasks/use-tasks";
+import { useProjects } from "@/hooks/projects/use-projects";
 
 type TaskDetailDialogProps = {
   task: Task | null;
@@ -68,9 +69,19 @@ function localInputToIso(value: string): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+const NO_PROJECT = "none";
+
 function TaskEditor({ task, close }: { task: Task; close: () => void }) {
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const { data: projects } = useProjects();
+
+  const projectOptions = (projects ?? []).filter(
+    (project) =>
+      project.status === "active" ||
+      project.status === "paused" ||
+      project.id === task.projectId
+  );
 
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes ?? "");
@@ -202,6 +213,42 @@ function TaskEditor({ task, close }: { task: Task; close: () => void }) {
             </SelectContent>
           </Select>
         </div>
+
+        {projectOptions.length > 0 ? (
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Project</p>
+            <Select
+              value={task.projectId ?? NO_PROJECT}
+              onValueChange={(value) =>
+                updateTask.mutate({
+                  taskId: task.id,
+                  input: { projectId: value === NO_PROJECT ? null : value },
+                })
+              }
+            >
+              <SelectTrigger className="h-8 w-full text-xs" aria-label="Project">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_PROJECT}>No project</SelectItem>
+                {projectOptions.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    <span className="flex items-center gap-2">
+                      <span
+                        aria-hidden
+                        className="h-2 w-2 rounded-full"
+                        style={{
+                          backgroundColor: project.color ?? "#64748b",
+                        }}
+                      />
+                      {project.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : null}
 
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">Domains</p>
