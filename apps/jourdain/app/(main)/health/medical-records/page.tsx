@@ -1,5 +1,13 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { FileHeart } from "lucide-react";
+import { ComingSoon } from "@/components/coming-soon";
 
 export default function HealthMedicalRecordsPage() {
-  return <SectionPlaceholder title="Medical Records" />;
+  return (
+    <ComingSoon
+      title="Medical Records"
+      description="Your complete medical history in your own hands: results, referrals, and reports."
+      icon={FileHeart}
+      bullets={["Test results", "Referrals", "Visit summaries"]}
+    />
+  );
 }

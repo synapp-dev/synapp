@@ -1,14 +1,20 @@
 "use client";
 
 import {
+  Cake,
   Dumbbell,
+  Gauge,
+  HandHeart,
   Mic,
   Moon,
   Plus,
   SendHorizontal,
+  Sparkles,
+  Tags,
   UtensilsCrossed,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { format } from "date-fns";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@workspace/ui/components/button";
@@ -25,6 +31,7 @@ import type {
   AgentCard,
   AgentChatMessage,
   AgentReply,
+  AgentSuggestionChip,
 } from "@/entities/agent/model/types";
 import type { Task } from "@/entities/tasks/model/types";
 
@@ -70,6 +77,41 @@ const SUGGESTIONS: Suggestion[] = [
     borderColor: "border-indigo-400/30",
   },
 ];
+
+// Server chips arrive as icon names + tone keys; the maps keep every class
+// string literal in this file so Tailwind compiles them.
+const CHIP_ICONS: Record<string, LucideIcon> = {
+  "utensils-crossed": UtensilsCrossed,
+  dumbbell: Dumbbell,
+  moon: Moon,
+  cake: Cake,
+  gauge: Gauge,
+  "hand-heart": HandHeart,
+  tags: Tags,
+};
+
+const CHIP_TONES: Record<string, { iconColor: string; borderColor: string }> = {
+  amber: { iconColor: "text-amber-500", borderColor: "border-amber-500/30" },
+  emerald: {
+    iconColor: "text-emerald-500",
+    borderColor: "border-emerald-500/30",
+  },
+  indigo: { iconColor: "text-indigo-400", borderColor: "border-indigo-400/30" },
+  sky: { iconColor: "text-sky-500", borderColor: "border-sky-500/30" },
+  violet: { iconColor: "text-violet-500", borderColor: "border-violet-500/30" },
+  pink: { iconColor: "text-pink-500", borderColor: "border-pink-500/30" },
+};
+
+function chipToSuggestion(chip: AgentSuggestionChip): Suggestion {
+  const tone = CHIP_TONES[chip.tone] ?? CHIP_TONES.sky!;
+  return {
+    label: chip.label,
+    prompt: chip.prompt,
+    icon: CHIP_ICONS[chip.icon] ?? Sparkles,
+    iconColor: tone.iconColor,
+    borderColor: tone.borderColor,
+  };
+}
 
 // Entrance direction per suggestion, in order: left, up, right.
 const SUGGESTION_DIRECTIONS = ["left", "up", "right"] as const;
@@ -414,6 +456,24 @@ export default function AgentPage() {
   const queryClient = useQueryClient();
   const updateTask = useUpdateTask();
 
+  // Context-aware chips from the server; the hardcoded set stands in while the
+  // fetch is in flight or if it fails.
+  const [suggestions, setSuggestions] = useState<Suggestion[]>(SUGGESTIONS);
+  useEffect(() => {
+    let cancelled = false;
+    void apiFetch<AgentSuggestionChip[]>(
+      `/agent/suggestions?date=${format(new Date(), "yyyy-MM-dd")}`,
+    ).then(
+      (result) => {
+        if (cancelled || result.error || result.data.length === 0) return;
+        setSuggestions(result.data.map(chipToSuggestion));
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Grow the composer cleanly once the text wraps past one line: the pill turns
   // into a rounded box and the controls drop below the text (mirrors supersolt).
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -586,7 +646,12 @@ export default function AgentPage() {
 
     const result = await apiFetch<AgentReply>("/agent", {
       method: "POST",
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({
+        messages: history,
+        // The client's local calendar day, so "today" resolves in the user's
+        // timezone rather than the server's.
+        clientDate: format(new Date(), "yyyy-MM-dd"),
+      }),
     });
 
     setIsThinking(false);
@@ -957,7 +1022,7 @@ export default function AgentPage() {
                 the start — nothing above shifts when they appear. Each only
                 animates in (left, up, right; staggered) once it's their turn. */}
             <div className="flex flex-wrap items-center justify-center gap-2">
-              {SUGGESTIONS.map((suggestion, index) => {
+              {suggestions.map((suggestion, index) => {
                 const Icon = suggestion.icon;
                 const animate = introPhase === "suggestions";
                 return (
