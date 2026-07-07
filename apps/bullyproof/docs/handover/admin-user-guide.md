@@ -401,9 +401,9 @@ A topic's quiz unlocks once its slides have been viewed. Quizzes show one questi
 
 ### 13.3 The certificate
 
-When every topic (and quiz) in the course is complete, the certificate appears in place of the current-topic card. It shows the completion date, the teacher's name, the line "Has successfully completed the Amayda Program", and an "AP Certified" badge. The Download button downloads it as a PDF; the certificate is formally issued the first time it is downloaded.
+When every topic (and quiz) in the course is complete, the certificate appears in place of the current-topic card. It shows the completion date, the teacher's name, the line "Has successfully completed the Amayda Program", and an "AP Certified" badge. The View button opens the certificate PDF in the browser; the Download button saves it. The certificate is formally issued the first time it is viewed or downloaded. The same certificate card, with the same View and Download buttons, appears on the teacher's dashboard once certification is complete.
 
-Certificates also appear on the teacher's Profile page under Certificates, each with its completion date and its own Download button, so a teacher can re-download at any time.
+Certificates also appear on the teacher's Profile page under Certificates, each with its completion date and its own View and Download buttons, so a teacher can revisit them at any time. The Profile page is reachable from the account menu in the sidebar footer (Profile).
 
 ### 13.4 Monitoring completion
 
