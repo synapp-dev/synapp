@@ -58,7 +58,7 @@ Persisted statuses on `lessons.status` (DB check constraint):
 
 **Typical flow:** `preparing` → `ready` → `in_progress` → `feedback` → `completed`
 
-Redirect targets, query invalidation keys, and live-store side effects are centralized in `lib/lesson-lifecycle/`. Realtime status updates flow through `hooks/use-lesson-status-realtime.ts`; the lesson layout wraps pages with `components/organisms/lesson-status-redirect.tsx`.
+Redirect targets, query invalidation keys, live-store side effects, and the update rules (who may change status, and how event history is built) are centralized in `lib/lesson-lifecycle/`; the update service applies the pure verdicts from `update-rules.ts`. Realtime status updates flow through `hooks/use-lesson-status-realtime.ts`; the lesson layout wraps pages with `components/organisms/lesson-status-redirect.tsx`.
 
 | Status | Default page |
 |--------|----------------|
@@ -109,3 +109,7 @@ Admin school drawer is split under `entities/dashboard/ui/admin/sections/schools
 ## Role
 
 Platform or school-scoped identity (e.g. TEACHER, school admin). School roles carry a `school_id`; platform roles do not.
+
+## Role catalog
+
+The single module owning role-key knowledge: membership groups, the platform vs school scope split, and the one display priority order. Lives in `lib/role-keys.ts`; property tests in `lib/role-keys.test.ts` keep the groups consistent. Consumers (rbac, roles repo, role badges, admin feature pages) import groups from it and do not restate role keys. Intentional differences between groups are documented on the group itself, including the historic assignment-exclusivity trio that omits INTRADARK_DEV and PLATFORM_MODERATOR.
