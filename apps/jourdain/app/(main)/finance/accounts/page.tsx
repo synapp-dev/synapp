@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
-import { differenceInDays, format, parseISO } from "date-fns";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -42,30 +41,8 @@ import {
   type BankAccount,
   type BankTransaction,
 } from "@/hooks/bank/use-bank";
-
-function formatMoney(
-  amount: number | null | undefined,
-  currency: string | null
-): string {
-  if (amount == null) return "—";
-  try {
-    return new Intl.NumberFormat("en-AU", {
-      style: "currency",
-      currency: currency ?? "AUD",
-    }).format(amount);
-  } catch {
-    return amount.toFixed(2);
-  }
-}
-
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "d MMM yyyy");
-  } catch {
-    return "—";
-  }
-}
+import { useCountUp } from "@/hooks/use-count-up";
+import { daysSince, formatDate, formatMoney, relativeTime } from "@/lib/format";
 
 function accountSubtitle(account: BankAccount): string | null {
   if (account.bsb) return `${account.bsb} ${account.externalId}`;
@@ -74,76 +51,12 @@ function accountSubtitle(account: BankAccount): string | null {
 
 const STALE_DAYS = 7;
 
-function daysSince(iso: string | null): number | null {
-  if (!iso) return null;
-  try {
-    return differenceInDays(new Date(), parseISO(iso));
-  } catch {
-    return null;
-  }
-}
-
 function isStale(iso: string | null): boolean {
-  const days = daysSince(iso);
-  return days != null && days >= STALE_DAYS;
-}
-
-// Compact relative time for the card badge, e.g. "1d", "3h", "5mo".
-function shortAgo(iso: string | null): string {
-  if (!iso) return "—";
-  let date: Date;
-  try {
-    date = parseISO(iso);
-  } catch {
-    return "—";
-  }
-  const sec = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (sec < 60) return `${sec}s`;
-  const min = Math.floor(sec / 60);
-  if (min < 60) return `${min}m`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h`;
-  const day = Math.floor(hr / 24);
-  if (day < 30) return `${day}d`;
-  const mo = Math.floor(day / 30);
-  if (mo < 12) return `${mo}mo`;
-  return `${Math.floor(day / 365)}y`;
+  if (!iso) return false;
+  return daysSince(iso) >= STALE_DAYS;
 }
 
 const COUNTUP_MS = 1100;
-const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-
-/** Animates a value 0 → target over durationMs, optionally after delayMs. */
-function useCountUp(
-  target: number,
-  durationMs = COUNTUP_MS,
-  delayMs = 0
-): number {
-  const [val, setVal] = useState(0);
-  const startRef = useRef(0);
-
-  useEffect(() => {
-    let raf = 0;
-    startRef.current = 0;
-    setVal(0);
-    const step = (ts: number) => {
-      if (!startRef.current) startRef.current = ts;
-      const t = Math.min(1, (ts - startRef.current) / durationMs);
-      setVal(target * easeOutCubic(t));
-      if (t < 1) raf = requestAnimationFrame(step);
-    };
-    const timeout = setTimeout(() => {
-      raf = requestAnimationFrame(step);
-    }, delayMs);
-
-    return () => {
-      clearTimeout(timeout);
-      cancelAnimationFrame(raf);
-    };
-  }, [target, durationMs, delayMs]);
-
-  return val;
-}
 
 const STREAM_CHARS_PER_TICK = 2;
 const STREAM_TICK_MS = 18;
@@ -222,7 +135,7 @@ export default function FinanceAccountsPage() {
   }
 
   return (
-    <section className="mx-auto w-full max-w-7xl space-y-4">
+    <section className="mx-auto w-full max-w-7xl space-y-6">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <Landmark className="h-6 w-6 text-muted-foreground" />
@@ -443,15 +356,18 @@ function AccountCard({
   const variant = VARIANTS[config.variant];
   const network = NETWORKS[config.network];
 
-  const animatedBalance = useCountUp(account.balance ?? 0, COUNTUP_MS, enterDelay);
+  const animatedBalance = useCountUp(account.balance ?? 0, {
+    duration: COUNTUP_MS,
+    delay: enterDelay,
+  });
   const fullNumber =
     config.number ??
     (account.bsb ? `${account.bsb} ${account.externalId}` : account.externalId);
   const numberLabel = hidden ? maskNumber(fullNumber) : fullNumber;
   const balanceLabel =
     account.balance == null
-      ? "—"
-      : formatMoney(animatedBalance, account.currency);
+      ? "–"
+      : formatMoney(animatedBalance, account.currency ?? undefined);
 
   const netScale = compact ? 0.82 : 1;
   const eyeIcon = compact ? "h-3.5 w-3.5" : "h-4 w-4";
@@ -588,7 +504,9 @@ function AccountCard({
               )}
             >
               <Clock className="h-3 w-3" />
-              <span suppressHydrationWarning>{shortAgo(account.updatedAt)}</span>
+              <span suppressHydrationWarning>
+                {account.updatedAt ? relativeTime(account.updatedAt) : "–"}
+              </span>
             </span>
           </div>
         </div>
@@ -643,13 +561,14 @@ function ImportDialog() {
           <DialogTitle>Import transactions</DialogTitle>
           <DialogDescription>
             Export an <code>.ofx</code> file from CommBank NetBank and drop it
-            below. Re-importing is safe — duplicates are skipped.
+            below. Re-importing is safe; duplicates are skipped.
           </DialogDescription>
         </DialogHeader>
 
         <div
           role="button"
           tabIndex={0}
+          aria-label="Choose or drop an OFX file to import"
           onClick={() => inputRef.current?.click()}
           onKeyDown={(event) => {
             if (event.key === "Enter" || event.key === " ") {
@@ -733,11 +652,10 @@ function TransactionRow({
   const streamMs =
     Math.ceil(transaction.description.length / STREAM_CHARS_PER_TICK) *
     STREAM_TICK_MS;
-  const amount = useCountUp(
-    transaction.amount,
-    AMOUNT_COUNTUP_MS,
-    delay + streamMs
-  );
+  const amount = useCountUp(transaction.amount, {
+    duration: AMOUNT_COUNTUP_MS,
+    delay: delay + streamMs,
+  });
 
   return (
     <TableRow
@@ -748,7 +666,7 @@ function TransactionRow({
       }}
     >
       <TableCell className="w-28 whitespace-nowrap py-4 pl-4 align-top text-sm text-muted-foreground">
-        {formatDate(transaction.date)}
+        {transaction.date ? formatDate(transaction.date) : "–"}
       </TableCell>
       <TableCell className="py-4 align-top">
         <span
@@ -780,11 +698,11 @@ function TransactionRow({
             className="inline-block animate-in fade-in slide-in-from-top-2 fill-mode-both"
             style={{ animationDuration: `${AMOUNT_FADE_MS}ms` }}
           >
-            {formatMoney(amount, currency)}
+            {formatMoney(amount, currency ?? undefined)}
           </span>
         ) : (
           <span className="invisible">
-            {formatMoney(transaction.amount, currency)}
+            {formatMoney(transaction.amount, currency ?? undefined)}
           </span>
         )}
       </TableCell>
@@ -826,7 +744,9 @@ function TransactionsPanel({ account }: { account: BankAccount | null }) {
         </div>
         {account ? (
           <p className="shrink-0 text-base font-semibold tabular-nums">
-            {formatMoney(account.balance, account.currency)}
+            {account.balance != null
+              ? formatMoney(account.balance, account.currency ?? undefined)
+              : "–"}
           </p>
         ) : null}
       </div>

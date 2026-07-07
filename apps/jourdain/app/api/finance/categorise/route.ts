@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { createServerClient } from "@/utils/supabase/server";
-import { importOfx } from "@/lib/bank/service";
 import { recategoriseTransactions } from "@/lib/finance/service";
 
-export const maxDuration = 60;
+const bodySchema = z.object({ force: z.boolean().optional() });
 
 export async function POST(request: NextRequest) {
   const supabase = await createServerClient();
@@ -17,30 +17,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => null)) as {
-    content?: unknown;
-  } | null;
-  const content = body?.content;
-  if (typeof content !== "string" || content.trim().length === 0) {
+  const parsed = bodySchema.safeParse(
+    await request.json().catch(() => ({}))
+  );
+  if (!parsed.success) {
     return NextResponse.json(
-      { data: null, error: { message: "No OFX content provided", status: 400 } },
+      { data: null, error: { message: "Invalid body", status: 400 } },
       { status: 400 }
     );
   }
 
   try {
-    const summary = await importOfx(user.id, content);
-    // Persist categories for the freshly inserted rows in one batched pass.
-    if (summary.inserted > 0) {
-      await recategoriseTransactions(user.id);
-    }
-    return NextResponse.json({ data: summary, error: null });
+    const updated = await recategoriseTransactions(
+      user.id,
+      parsed.data.force ?? false
+    );
+    return NextResponse.json({ data: { updated }, error: null });
   } catch (err) {
     return NextResponse.json(
       {
         data: null,
         error: {
-          message: err instanceof Error ? err.message : "Import failed",
+          message: err instanceof Error ? err.message : "Failed to categorise",
         },
       },
       { status: 500 }
