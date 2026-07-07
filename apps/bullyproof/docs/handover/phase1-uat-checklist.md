@@ -53,6 +53,14 @@
 - [ ] Tab switch changes export contents and filename
 - [ ] School scope filter is reflected in the export Scope row
 
+## 6b. Export packs (SOW 15.1.5)
+
+- [ ] /admin/reports all-schools Export: CSV now includes Schools register (every school with counts, licence, AP certified, culture benchmark) + Culture trends sections
+- [ ] /admin/reports with a school selected: export includes that school's Classes, Staff, Lesson history, Culture rating periods
+- [ ] School portal /reports as school admin: page shows Classes / Staff / Lesson history / Culture tables + Export works (CSV + PDF)
+- [ ] School portal /reports as TEACHER: page shows only My progress / My certification / My lesson history (no other staff visible) + Export works
+- [ ] Teacher cannot see school-wide data anywhere in their export file
+
 ## 7. Government dashboard (item 36)
 
 - [ ] GOVERNMENT_VIEWER sees the five-stat Government Reporting dashboard (no placeholder)

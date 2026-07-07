@@ -25,6 +25,8 @@
 | 36 - Government view-only dashboard (in-scope part) | Placeholder stub | `a18f28e` | Real `GovernmentDashboard`: five platform-wide aggregate stats, view-only (no per-school detail), CSV/PDF export; `GET /api/government/overview` authorised for GOVERNMENT_VIEWER. Expanded government reporting remains quoted M4 work |
 | ST4S OTP expiry | Register self-inconsistent (section 1 Delivered vs section 2 remaining) | this commit | Position documented: short-lived codes + indefinite session persistence (exceeds 60 days) via refresh rotation; see `docs/handover/auth-session-expiry.md`; production dashboard settings to be confirmed at deploy |
 
+| SOW 15.1.5 - export for ALL reporting roles | School-admin and teacher reporting surfaces had no export (school Reports page was a stub) | `9ff24f7` | Role-scoped export packs: admin all-schools export adds the schools register (state/sector/levels/licence/staff/teachers/classes/lessons/AP certified/culture benchmark/last lesson per school) + culture trends; admin school-scoped export adds the school pack (class list w/ student numbers + completion, staff list w/ access levels + AP status + last active, full lesson history w/ ratings, culture periods); school portal Reports page rebuilt: SCHOOL_ADMIN/licence sees the school pack on-page + export, TEACHER sees personal slice (own progress, certification, lesson history) per 5.1.5; government unchanged (aggregates only). All plain-table CSV/PDF: filters/Excel/year-selectors remain M4 paid work |
+
 ## Still open (tracked)
 
 - D6 Administrator User Guide + System Administrator Guide: markdown drafts complete at docs/handover/{admin-user-guide,system-administrator-guide}.md; convert to Word at packaging
