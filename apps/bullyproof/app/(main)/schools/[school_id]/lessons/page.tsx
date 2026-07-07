@@ -16,11 +16,8 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { useSchoolStore } from "@/stores/school-store";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
-import { Eye, EyeOff, Search } from "lucide-react";
-import { Button } from "@workspace/ui/components/button";
 import { Separator } from "@workspace/ui/components/separator";
 import { format } from "date-fns";
-import { Input } from "@workspace/ui/components/input";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { getDisplayStatus } from "@/utils/lesson-status";
 import {
@@ -115,9 +112,11 @@ export default function LessonsPage({
   }, [queryClient]);
   const [schoolSlug, setSchoolSlug] = useState<string>("");
   const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showCompletedMyLessons, setShowCompletedMyLessons] = useState(false);
-  const [showCompletedOtherLessons, setShowCompletedOtherLessons] = useState(false);
+  // Search and show-completed controls removed at client request (22 Jun
+  // review): completed lessons are visible per class on the Classes page.
+  const searchQuery = "";
+  const showCompletedMyLessons = false;
+  const showCompletedOtherLessons = false;
   const [showContentAnimation, setShowContentAnimation] = useState(false);
   const loadMoreOtherLessonsRef = useRef<HTMLDivElement | null>(null);
   const searchParams = useSearchParams();
@@ -630,17 +629,7 @@ export default function LessonsPage({
             showContentAnimation ? { animationFillMode: "forwards" } : undefined
           }
         >
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search lessons by topic, teacher, status, or class..."
-              className="pl-10"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              disabled={loading}
-            />
-          </div>
+        <div className="flex flex-col sm:flex-row justify-end gap-4">
           <Select
             value={filter}
             onValueChange={(value: "all" | "my-lessons") =>
@@ -698,24 +687,6 @@ export default function LessonsPage({
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <h2 className="text-2xl font-semibold">My Lessons</h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCompletedMyLessons(!showCompletedMyLessons)}
-                    className="text-muted-foreground"
-                  >
-                    {showCompletedMyLessons ? (
-                      <>
-                        <EyeOff className="h-4 w-4" />
-                        Show active
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="h-4 w-4" />
-                        Show completed
-                      </>
-                    )}
-                  </Button>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {/* Start New Lesson Card - Always First */}
@@ -747,24 +718,6 @@ export default function LessonsPage({
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <h2 className="text-2xl font-semibold">Other Lessons</h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowCompletedOtherLessons(!showCompletedOtherLessons)}
-                    className="text-muted-foreground"
-                  >
-                    {showCompletedOtherLessons ? (
-                      <>
-                        <EyeOff className="h-4 w-4" />
-                        Show active
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="h-4 w-4" />
-                        Show completed
-                      </>
-                    )}
-                  </Button>
                 </div>
                 {displayedOtherLessons.length > 0 ? (
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -785,9 +738,8 @@ export default function LessonsPage({
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {showCompletedOtherLessons
-                      ? 'No completed lessons found. Click "Show active" to see active lessons.'
-                      : 'No active lessons found. Click "Show completed" to see completed lessons.'}
+                    No active lessons found. Completed lessons can be viewed per
+                    class on the Classes page.
                   </p>
                 )}
               </div>

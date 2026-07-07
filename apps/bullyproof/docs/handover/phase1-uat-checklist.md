@@ -32,6 +32,18 @@
 - [ ] As a Bullyproof platform admin: the Ctrl+K command menu button and shortcut still work
 - [ ] View-as a teacher (impersonate): the command menu disappears while viewing as the school user
 
+## 3b. 22 June free-fix sweep (verified live 7 Jul 2026, re-checkable)
+
+- [x] User lists show only the highest access level per user (admin users, school Teachers, Settings/Users, Settings/Certification); the user detail drawer still lists everything for management
+- [x] Sidebar screen tips: hovering school portal items (Teachers, Classes, Teach Lessons, Preview Lessons, Resources, Performance, Reports, Settings, Support, AP Certification) shows the agreed descriptions
+- [x] Teach Lessons page: no search bar, no Show completed buttons; My Lessons / Other Lessons only
+- [x] Lesson wizard: no step numbers, step 1 titled "Select Class/Classes" with the different-levels caution, Recommendation copy reads "Review the recommended lesson for your selected class/classes." with click-Next / Choose-another-lesson lines, no Help button
+- [x] Wizard Choose Lesson list orders levels by year (1/2 up to 12)
+- [x] Lesson feedback: note under the stars reads "You must rate this lesson to do another lesson."
+- [x] School portal filters read All Access Levels and list school levels only (no licence account)
+- [x] School drawer: License and Feature Access panels both render and work (Activity remains the quoted-module stub)
+- [x] School activation tab: applied templates show a green card with a "Template active" badge and the button flips to "Re-apply template"
+
 ## 4. Culture rating (item 15)
 
 - [x] Benchmark exclusions = 0, comparative > 0: headline still computes from remaining metrics (verified live on St4s Test School: Term 3 comparative shows 5.7%, exclusion delta dropped and re-weighted)

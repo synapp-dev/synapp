@@ -521,6 +521,9 @@ export function LessonFeedbackForm({
                         ? "Click a star to rate this lesson"
                         : RATING_LABELS[hoveredRating ?? rating]}
                     </p>
+                    <p className="text-xs text-muted-foreground">
+                      Note: You must rate this lesson to do another lesson.
+                    </p>
                   </div>
 
                   {/* Comments */}

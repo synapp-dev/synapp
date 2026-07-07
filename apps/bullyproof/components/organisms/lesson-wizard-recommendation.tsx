@@ -1173,9 +1173,9 @@ export function LessonWizardRecommendation({
           <Alert className="mt-4 bg-muted/5 text-muted-foreground border-0">
             <Info className="h-4 w-4 text-muted-foreground" />
             <AlertDescription className="text-muted-foreground leading-none">
-              <span>If you&apos;re happy with this recommendation, you can click <span className="font-bold">Next</span>.</span>
+              <span>If you&apos;re happy with this recommendation, click <span className="font-bold">Next</span>.</span>
               <br />
-              <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another lesson</span>.</span>
+              <span>Otherwise, click <span className="font-bold">Choose another lesson</span>.</span>
             </AlertDescription>
           </Alert>
 
@@ -1540,8 +1540,8 @@ export function LessonWizardRecommendation({
                 <Alert className="mt-4 bg-muted/5 text-muted-foreground border-0">
                   <Info className="h-4 w-4 text-muted-foreground" />
                   <AlertDescription className="text-muted-foreground leading-normal">
-                    <span>If you&apos;re happy with this recommendation, you can click <span className="font-bold">Next</span>.</span>
-                    <span>Otherwise, if you&apos;d like to choose another lesson, click <span className="font-bold">Choose another lesson</span>.</span>
+                    <span>If you&apos;re happy with this recommendation, click <span className="font-bold">Next</span>.</span>
+                    <span>Otherwise, click <span className="font-bold">Choose another lesson</span>.</span>
                   </AlertDescription>
                 </Alert>
               </div>

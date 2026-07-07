@@ -430,6 +430,7 @@ export default function TeacherPageClient({
                     }))}
                     variant="joined"
                     size="sm"
+                    highestOnly
                   />
                 )}
                 {schoolRoles.length > 0 && (

@@ -61,6 +61,8 @@ const data = {
       icon: BadgeCheck,
       isActive: false,
       feature: "/ap-certification", // Dedicated AP certification feature key
+      description:
+        "Complete and track AP Certification progress and access your certificate.",
     },
     {
       title: "Welcome",
@@ -82,6 +84,7 @@ const data = {
       icon: HelpingHand,
       isActive: false,
       feature: "/support", // Feature key for access control
+      description: "Need help? Contact the Bullyproof Australia support team.",
     },
   ],
   navSchoolMain: [
@@ -98,6 +101,8 @@ const data = {
       icon: Users,
       isActive: false,
       feature: "/school/teachers", // Feature key for access control
+      description:
+        "View teachers' name, position, access level, AP classes and email. Allows you to take over a scheduled or unfinished lesson for another teacher.",
     },
     {
       title: "Classes",
@@ -105,6 +110,8 @@ const data = {
       icon: GraduationCap,
       isActive: false,
       feature: "/school/classes", // Feature key for access control
+      description:
+        "Select My Classes so they appear on top and view all classes and lesson progress.",
     },
   ],
   navCurriculum: [
@@ -114,6 +121,7 @@ const data = {
       icon: Presentation,
       isActive: false,
       feature: "/school/lessons", // Feature key for access control
+      description: "Start or continue lessons with your students.",
     },
     {
       title: "Preview Lessons",
@@ -121,6 +129,8 @@ const data = {
       icon: BookOpenText,
       isActive: false,
       feature: "/school/content", // Feature key for access control
+      description:
+        "Browse lesson content and teacher notes without recording lesson delivery.",
     },
     {
       title: "Resources",
@@ -128,6 +138,7 @@ const data = {
       icon: LibraryBig,
       isActive: false,
       feature: "/school/resources", // Feature key for access control
+      description: "Access activities, posters, guides and other resources.",
     },
   ],
   navData: [
@@ -137,6 +148,8 @@ const data = {
       icon: TrendingUp,
       isActive: false,
       feature: "/school/performance", // Feature key for access control
+      description:
+        "Monitor the impact of the Amayda Program on behaviour and wellbeing.",
     },
     {
       title: "Reports",
@@ -144,6 +157,7 @@ const data = {
       icon: FileText,
       isActive: false,
       feature: "/school/reports", // Feature key for access control
+      description: "View and export Amayda Program reports.",
     },
     {
       title: "Settings",
@@ -151,6 +165,7 @@ const data = {
       icon: Settings,
       isActive: false,
       feature: "/settings", // Feature key for access control
+      description: "Manage users, school information and portal settings.",
     },
   ],
 };

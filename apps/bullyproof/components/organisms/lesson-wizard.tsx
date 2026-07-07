@@ -7,7 +7,6 @@ import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import Image from "next/image";
 import {
   Drawer,
   DrawerContent,
@@ -36,13 +35,7 @@ import {
   Loader2,
   BookOpen,
   Play,
-  Users,
-  CheckCircle2,
-  Circle,
-  HelpCircle,
-  X,
   Check,
-  MessageSquare,
   Info,
 } from "lucide-react";
 import {
@@ -97,7 +90,6 @@ export function LessonWizard({
   }, [schoolId]);
 
   const [state, setState] = useState(initialWizardState);
-  const [showHelp, setShowHelp] = useState(false);
   const [shouldPreSelectTopic, setShouldPreSelectTopic] = useState(false);
   const [shouldFetchRecommendations, setShouldFetchRecommendations] = useState(false);
   const [skippedStep3, setSkippedStep3] = useState(false);
@@ -183,7 +175,6 @@ export function LessonWizard({
       setState(initialWizardState());
       setError(null);
       setLoading(false);
-      setShowHelp(false);
       setShouldPreSelectTopic(false);
       setShouldFetchRecommendations(false);
       setSkippedStep3(false);
@@ -731,7 +722,7 @@ export function LessonWizard({
       case 0:
         return "Get Started!";
       case 1:
-        return "Select Classes";
+        return "Select Class/Classes";
       case 2:
         return "Recommendation";
       case 3:
@@ -767,9 +758,9 @@ export function LessonWizard({
       case 0:
         return "What would you like to do?";
       case 1:
-        return "Choose which classes will participate in this lesson";
+        return "Choose the class or classes for this lesson. Please try to avoid selecting two or more classes who are on different levels.";
       case 2:
-        return "Review the recommended lesson for your selected classes";
+        return "Review the recommended lesson for your selected class/classes.";
       case 3:
         return "Select the lesson content you want to teach";
       case 4:
@@ -779,78 +770,21 @@ export function LessonWizard({
     }
   };
 
-  const getStepInfo = (step: number) => {
-    switch (step) {
-      case 0:
-        return {
-          title: "Get Started",
-          description: "Choose whether you want to prepare a new lesson or preview existing content.",
-          icon: Play,
-        };
-      case 1:
-        return {
-          title: "Select Classes",
-          description: "Choose the class or classes you want to teach, you can select multiple classes if you'd like!",
-          icon: Users,
-        };
-      case 2:
-        return {
-          title: "Recommendation",
-          description: "Review the recommended lesson based on your class selection.",
-          icon: CheckCircle2,
-        };
-      case 3:
-        return {
-          title: "Choose Lesson",
-          description: "Select the lesson content you want to teach. Browse lessons by stage and curriculum area.",
-          icon: BookOpen,
-        };
-      case 4:
-        return {
-          title: "Confirm",
-          description: "Review your selections before creating the lesson. You can go back to make changes.",
-          icon: CheckCircle2,
-        };
-      default:
-        return {
-          title: "",
-          description: "",
-          icon: Circle,
-        };
-    }
-  };
-
-  const currentStepInfo = getStepInfo(state.step);
-  const CurrentIcon = currentStepInfo.icon;
-
   return (
     <Drawer open={open} onOpenChange={handleOpenChange} direction="top">
       <DrawerContent className="h-[90vh] w-fit mx-auto bg-transparent border-none shadow-none px-4 pb-4 pt-0 !mt-0">
         <DrawerTitle className="sr-only">Create Lesson</DrawerTitle>
         <div className="flex gap-4 h-full justify-center">
           {/* Main Content Area */}
-          <div className={`flex flex-col min-w-0 w-xl transition-all bg-transparent duration-300 ease-in-out ${showHelp ? '-translate-x-2' : 'translate-x-0'}`}>
+          <div className="flex flex-col min-w-0 w-xl bg-transparent">
             <div className="bg-background border border-border rounded-lg shadow-lg flex flex-col h-full rounded-t-none">
               <div className="p-0 bg-muted relative">
                 <div className="flex items-start justify-between py-6 px-8">
                   <div className="flex flex-col text-left gap-0 items-start">
                     <h2 className="text-2xl font-semibold flex items-center">
-                      <span className="text-muted-foreground text-sm mr-2">{getDisplayedStepNumber()}</span>{getStepTitle()}
+                      {getStepTitle()}
                     </h2>
                     <p className="text-sm text-muted-foreground">{getStepDescription()}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {!showHelp && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowHelp(true)}
-                        className="gap-2"
-                      >
-                        <HelpCircle className="h-4 w-4" />
-                        Help
-                      </Button>
-                    )}
                   </div>
                 </div>
                 {/* {state.step > 0 && ( */}
@@ -1295,45 +1229,6 @@ export function LessonWizard({
             </div>
           </div>
 
-          {/* Floating Help Panel - Right Side */}
-          {showHelp && (
-            <div className="w-full max-w-sm flex-shrink-0 h-fit">
-              <div className="flex items-center gap-3">
-                <div 
-                  className="flex-shrink-0 animate-slide-left-fade-in" 
-                  
-                >
-                  <Image
-                    src="/images/bp-man/bp-man-pointleft.svg"
-                    alt="Bullyproof character"
-                    width={80}
-                    height={80}
-                    className="w-20 h-20 animate-float-gentle"
-                  />
-                </div>
-                <div 
-                  className="relative bg-background border border-border rounded-lg shadow-lg p-4 flex-1 animate-slide-right-fade-in"
-                  
-                >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-6 w-6"
-                    onClick={() => setShowHelp(false)}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                  <div className="pr-6">
-                    <p className="text-sm text-muted-foreground leading-relaxed italic">
-                      {currentStepInfo.description}
-                    </p>
-                  </div>
-                  {/* Speech bubble tail */}
-                  <div className="absolute -left-2 bottom-6 w-4 h-4 bg-background border-l border-b border-border transform rotate-45"></div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       </DrawerContent>
     </Drawer>

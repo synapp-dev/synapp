@@ -196,6 +196,8 @@ export function NavMain({
     title: string;
     url: string;
     icon?: LucideIcon;
+    /** Screen tip shown on hover (expanded and collapsed sidebar). */
+    description?: string;
     isActive?: boolean;
     exact?: boolean;
     disabled?: boolean;
@@ -254,6 +256,10 @@ export function NavMain({
           const itemActiveEffective = item.disableActiveStyle
             ? false
             : itemActive;
+          // Screen tips always show on hover; plain titles only when collapsed.
+          const itemTooltip = item.description
+            ? { children: item.description, hidden: false, className: "max-w-56" }
+            : item.title;
 
           const menuItem = item.disabled ? (
             <DisabledMenuItem
@@ -274,7 +280,7 @@ export function NavMain({
                   {item.onClick ? (
                     <div onClick={item.onClick}>
                       <SidebarMenuButton
-                        tooltip={item.title}
+                        tooltip={itemTooltip}
                         className={getButtonClassName(item.liveStyle, itemActiveEffective)}
                       >
                         <MenuButtonContent item={item} />
@@ -283,7 +289,7 @@ export function NavMain({
                   ) : (
                     <Link href={item.url} suppressHydrationWarning>
                       <SidebarMenuButton
-                        tooltip={item.title}
+                        tooltip={itemTooltip}
                         className={getButtonClassName(item.liveStyle, itemActiveEffective)}
                       >
                         <MenuButtonContent item={item} />

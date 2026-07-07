@@ -164,7 +164,7 @@ export function CertificationPageClient({
                   <TableHeader className="bg-background">
                     <TableRow>
                       <TableHead className="w-[30%]">Teacher</TableHead>
-                      <TableHead className="w-[28%]">Role(s)</TableHead>
+                      <TableHead className="w-[28%]">Access Level</TableHead>
                       <TableHead className="w-[12%]">Status</TableHead>
                       <TableHead className="w-[18%]">Progress</TableHead>
                       <TableHead className="w-[12%]">Completed</TableHead>
@@ -202,7 +202,7 @@ export function CertificationPageClient({
                             </div>
                           </TableCell>
                           <TableCell className="w-[28%]">
-                            <RoleBadges roles={row.roles} variant="pill" size="sm" />
+                            <RoleBadges roles={row.roles} variant="pill" size="sm" highestOnly />
                           </TableCell>
                           <TableCell className="w-[12%]">{getStatusBadge(row.status)}</TableCell>
                           <TableCell className="w-[18%]">

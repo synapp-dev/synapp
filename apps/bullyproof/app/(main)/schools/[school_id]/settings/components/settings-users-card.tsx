@@ -201,8 +201,9 @@ export function SettingsUsersCard({
     (key) => rowSelection[key]
   ).length;
 
+  // School portal shows school access levels only (no licence account filter).
   const availableRoles = roles
-    .filter((r) => r.key)
+    .filter((r) => r.key && r.key !== "SCHOOL_LICENCE")
     .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
   const currentAvailableRoleKeys = new Set(
@@ -298,10 +299,10 @@ export function SettingsUsersCard({
                 roleFilter && roleFilter !== "all" && "border-orange-500 bg-orange-500/10"
               )}
             >
-              <SelectValue placeholder="Role" />
+              <SelectValue placeholder="Access Level" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="all">All Access Levels</SelectItem>
               <SelectItem value="__NONE__">None</SelectItem>
               {availableRoles.map((role) => {
                 const key = role.key || "";

@@ -260,6 +260,7 @@ export function UsersTable({
                         }))}
                         variant="joined"
                         size="sm"
+                        highestOnly
                       />
                     ) : (
                       Array.from(rolesBySchool.entries()).map(
@@ -279,6 +280,7 @@ export function UsersTable({
                                 variant="joined"
                                 size="sm"
                                 lastConnectsToRight={!!schoolName}
+                                highestOnly
                               />
                               {schoolName && (
                                 <Badge

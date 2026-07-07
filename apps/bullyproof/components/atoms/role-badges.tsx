@@ -90,6 +90,11 @@ export interface RoleBadgesProps {
   size?: "sm" | "md";
   /** When true, last badge has no right border so a trailing sibling can connect */
   lastConnectsToRight?: boolean;
+  /**
+   * Show only the highest access level. Each level includes the ones below it
+   * (School Admin > AP Teacher > Staff), so lists display one badge per user.
+   */
+  highestOnly?: boolean;
   className?: string;
 }
 
@@ -98,16 +103,18 @@ export function RoleBadges({
   variant = "joined",
   size = "sm",
   lastConnectsToRight = false,
+  highestOnly = false,
   className,
 }: RoleBadgesProps) {
   if (roles.length === 0) return null;
 
-  const sortedRoles = [...roles].sort((a, b) => {
+  const prioritised = [...roles].sort((a, b) => {
     const aPriority = getRolePriority(a.roleKey);
     const bPriority = getRolePriority(b.roleKey);
     if (aPriority !== bPriority) return aPriority - bPriority;
     return (a.roleName || a.roleKey).localeCompare(b.roleName || b.roleKey);
   });
+  const sortedRoles = highestOnly ? prioritised.slice(0, 1) : prioritised;
 
   const iconClass = size === "sm" ? "h-4 w-4" : "h-5 w-5";
   const badgeTextShadowClass = "[text-shadow:0_1px_0_rgba(255,255,255,0.22),0_2px_3px_rgba(0,0,0,0.58)]";

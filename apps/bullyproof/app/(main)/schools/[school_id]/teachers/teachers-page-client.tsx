@@ -391,6 +391,7 @@ export default function TeachersPageClient() {
               roles={roles}
               variant={badgeVariant}
               size="sm"
+              highestOnly
               className="absolute top-4 right-4 shrink-0"
             />
             <div className="flex items-center gap-2">
@@ -487,7 +488,7 @@ export default function TeachersPageClient() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search teachers by name, email, or role..."
+            placeholder="Search teachers by name, email, or access level..."
             className="pl-10"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -500,10 +501,10 @@ export default function TeachersPageClient() {
           disabled={isInitialLoading}
         >
           <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="Filter by role" />
+            <SelectValue placeholder="Filter by access level" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Roles</SelectItem>
+            <SelectItem value="all">All Access Levels</SelectItem>
             {roleFilterOptions.map((role) => (
               <SelectItem key={role.roleKey} value={role.roleKey}>
                 {role.roleName}
