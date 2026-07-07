@@ -392,7 +392,14 @@ function APCertificationCard() {
   }
 
   if (isCertificationComplete && currentUser && lastCompletedTopicDate) {
-    return <TopicCertificate user={currentUser} completedAt={lastCompletedTopicDate} compact />;
+    return (
+      <TopicCertificate
+        user={currentUser}
+        completedAt={lastCompletedTopicDate}
+        compact
+        courseId={course?.id}
+      />
+    );
   }
 
   const totalTopics = topicsList.length;

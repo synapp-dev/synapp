@@ -6,7 +6,7 @@ import { Card } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Download } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 
 type UserProfile = UserProfileExpandedRow;
 
@@ -94,17 +94,32 @@ export function TopicCertificate({
           AP Certified
         </Badge>
         {courseId && (
-          <Button
-            asChild
-            variant="outline"
-            size={compact ? "sm" : "default"}
-            className="mt-2"
-          >
-            <a href={`/api/certification/courses/${courseId}/certificate`}>
-              <Download className={cn("mr-1.5", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
-              Download
-            </a>
-          </Button>
+          <div className={cn("mt-2 flex items-center", compact ? "gap-1.5" : "gap-2")}>
+            <Button
+              asChild
+              variant="ghost"
+              size={compact ? "sm" : "default"}
+            >
+              <a
+                href={`/api/certification/courses/${courseId}/certificate?view=1`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <Eye className={cn("mr-1.5", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                View
+              </a>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              size={compact ? "sm" : "default"}
+            >
+              <a href={`/api/certification/courses/${courseId}/certificate`}>
+                <Download className={cn("mr-1.5", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+                Download
+              </a>
+            </Button>
+          </div>
         )}
       </div>
     </Card>

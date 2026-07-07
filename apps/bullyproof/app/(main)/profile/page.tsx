@@ -15,7 +15,7 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Skeleton } from "@workspace/ui/components/skeleton";
-import { Award, Calendar, Download, Mail } from "lucide-react";
+import { Award, Calendar, Download, Eye, Mail } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useMeStore } from "@/entities/me/model/store";
 import { apiFetch } from "@/lib/api/fetcher.client";
@@ -153,14 +153,26 @@ export default function Profile() {
                           {completed ? `Completed ${completed}` : "Completed"}
                         </p>
                       </div>
-                      <Button asChild variant="outline" size="sm">
-                        <a
-                          href={`/api/certification/courses/${certificate.courseId}/certificate`}
-                        >
-                          <Download className="h-4 w-4 mr-1.5" />
-                          Download
-                        </a>
-                      </Button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button asChild variant="ghost" size="sm">
+                          <a
+                            href={`/api/certification/courses/${certificate.courseId}/certificate?view=1`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Eye className="h-4 w-4 mr-1.5" />
+                            View
+                          </a>
+                        </Button>
+                        <Button asChild variant="outline" size="sm">
+                          <a
+                            href={`/api/certification/courses/${certificate.courseId}/certificate`}
+                          >
+                            <Download className="h-4 w-4 mr-1.5" />
+                            Download
+                          </a>
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}

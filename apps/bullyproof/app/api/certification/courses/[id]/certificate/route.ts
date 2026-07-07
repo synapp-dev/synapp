@@ -14,7 +14,7 @@ import { courseProgressRepo } from "@/server/course-progress/course-progress.rep
 import { renderCourseCertificatePdf } from "@/server/certificates/certificate-pdf";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -77,11 +77,15 @@ export async function GET(
       .replace(/-+/g, "-")
       .replace(/^-|-$/g, "");
 
+    // ?view=1 renders the PDF in the browser tab; default forces a download.
+    const wantsInlineView =
+      request.nextUrl.searchParams.get("view") === "1";
+
     return new NextResponse(Buffer.from(pdfBytes), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="AP-Certificate-${safeName || "certificate"}.pdf"`,
+        "Content-Disposition": `${wantsInlineView ? "inline" : "attachment"}; filename="AP-Certificate-${safeName || "certificate"}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

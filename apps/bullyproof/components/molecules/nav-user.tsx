@@ -6,6 +6,7 @@ import {
   Cpu,
   LogOut,
   Settings,
+  UserRound,
 } from "lucide-react";
 
 import {
@@ -97,6 +98,15 @@ export function NavUser() {
             </DropdownMenuLabel> */}
 
             {/* <DropdownMenuSeparator /> */}
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link href="/profile">
+                  <UserRound />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem disabled>
                 <Cpu />
