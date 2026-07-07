@@ -8,6 +8,7 @@ import { Card, CardContent } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 import { Combobox } from "@/components/molecules/combobox";
 import { ReportExportMenu } from "@/components/molecules/report-export-menu";
+import { apiFetch } from "@/lib/api/fetcher.client";
 import type { ExportTable } from "@/lib/report-export";
 import {
   ReportsOverviewProvider,
@@ -61,6 +62,19 @@ function ReportsLayoutInner({ children }: { children: ReactNode }) {
   const scopeLabel = schoolIdFromUrl
     ? (schoolOptions.find((s) => s.id === schoolIdFromUrl)?.name ?? "School")
     : "All schools";
+
+  // Comprehensive registers fetched on demand when the user exports (SOW
+  // 5.1.5/15.1.5: full data outputs per role, kept to plain basic tables).
+  const fetchExportPackTables = async (): Promise<ExportTable[]> => {
+    const query = schoolIdFromUrl
+      ? `?schoolId=${encodeURIComponent(schoolIdFromUrl)}`
+      : "";
+    const result = await apiFetch<{ tables: ExportTable[] }>(
+      `/admin/reports/export-pack${query}`
+    );
+    if (result.error) throw new Error(result.error.message);
+    return result.data?.tables ?? [];
+  };
 
   const buildExportTables = (): ExportTable[] => {
     if (!overview) return [];
@@ -155,7 +169,10 @@ function ReportsLayoutInner({ children }: { children: ReactNode }) {
         <ReportExportMenu
           filename={`bullyproof-report-${activeNav.label.toLowerCase()}`}
           documentTitle={`Bullyproof Reports - ${activeNav.label} (${scopeLabel})`}
-          getTables={buildExportTables}
+          getTables={async () => [
+            ...buildExportTables(),
+            ...(await fetchExportPackTables()),
+          ]}
           disabled={!overview}
         />
       </div>

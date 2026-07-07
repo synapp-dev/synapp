@@ -20,7 +20,8 @@ interface ReportExportMenuProps {
   /** Base filename without extension, e.g. "bullyproof-reports-overview". */
   filename: string;
   documentTitle: string;
-  getTables: () => ExportTable[];
+  /** May fetch on demand: called when the user picks a format. */
+  getTables: () => ExportTable[] | Promise<ExportTable[]>;
   disabled?: boolean;
 }
 
@@ -35,7 +36,7 @@ export function ReportExportMenu({
   const handleExport = async (format: "csv" | "pdf") => {
     setIsExporting(true);
     try {
-      const tables = getTables();
+      const tables = await getTables();
       if (format === "csv") {
         downloadCsv(filename, tables);
       } else {

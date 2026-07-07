@@ -1,19 +1,87 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
-import { FileText, Lock } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@workspace/ui/components/alert";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
+import { ReportExportMenu } from "@/components/molecules/report-export-menu";
 import { SchoolPageCompactHeader } from "@/components/molecules/school-page-compact-header";
 import { useStorageImageUrl } from "@/hooks/use-storage-image-url";
 import { useSchoolBySlugQuery } from "@/entities/school/model/useListSchoolsQuery";
 import { useSchoolStore } from "@/stores/school-store";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Skeleton } from "@workspace/ui/components/skeleton";
+import { apiFetch } from "@/lib/api/fetcher.client";
+import type { ExportTable } from "@/lib/report-export";
 
 interface ReportsPageClientProps {
   schoolSlug: string;
+}
+
+type ReportPack = {
+  scope: "school" | "personal";
+  tables: ExportTable[];
+};
+
+function ReportTableCard({ table }: { table: ExportTable }) {
+  const headers = table.rows[0] ? Object.keys(table.rows[0]) : [];
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{table.title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {headers.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-4">
+            No data recorded yet.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {headers.map((header) => (
+                    <TableHead key={header}>{header}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {table.rows.map((row, index) => (
+                  <TableRow key={index}>
+                    {headers.map((header) => (
+                      <TableCell key={header} className="whitespace-nowrap">
+                        {row[header] == null || row[header] === ""
+                          ? "-"
+                          : String(row[header])}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function ReportsPageClient({ schoolSlug }: ReportsPageClientProps) {
@@ -29,6 +97,23 @@ export function ReportsPageClient({ schoolSlug }: ReportsPageClientProps) {
   const headerReady =
     !(!!currentSchool?.bannerUrl && banner.loading) &&
     !(!!currentSchool?.avatarUrl && avatar.loading);
+
+  const {
+    data: pack,
+    isLoading: isLoadingPack,
+    error: packError,
+  } = useQuery<ReportPack>({
+    queryKey: ["schools", schoolSlug, "report-pack"],
+    enabled: !!schoolSlug,
+    queryFn: async () => {
+      const result = await apiFetch<ReportPack>(
+        `/schools/${encodeURIComponent(schoolSlug)}/reports/export-pack`
+      );
+      if (result.error) throw new Error(result.error.message);
+      if (!result.data) throw new Error("No report data returned");
+      return result.data;
+    },
+  });
 
   if (isLoading) {
     return (
@@ -58,6 +143,8 @@ export function ReportsPageClient({ schoolSlug }: ReportsPageClientProps) {
     );
   }
 
+  const isPersonal = pack?.scope === "personal";
+
   return (
     <FeatureGuard feature="/school/reports" schoolId={currentSchool.id}>
       <div className="space-y-6">
@@ -65,7 +152,11 @@ export function ReportsPageClient({ schoolSlug }: ReportsPageClientProps) {
           bannerUrl={banner.url}
           avatarUrl={avatar.url}
           title="Reports"
-          description="Generate and download comprehensive school reports."
+          description={
+            isPersonal
+              ? "Your lesson history, certification progress and ratings."
+              : "School-level progress, staff and lesson reporting."
+          }
           isLoading={!headerReady}
           onAnimationComplete={() => setShowContentAnimation(true)}
         />
@@ -78,25 +169,42 @@ export function ReportsPageClient({ schoolSlug }: ReportsPageClientProps) {
               : undefined
           }
         >
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-center py-12">
-              <div className="flex items-center justify-center gap-2 mb-4">
-                <FileText className="h-16 w-16 text-muted-foreground" />
-                <Lock className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <Badge variant="secondary" className="mb-4">
-                Coming Soon
-              </Badge>
-              <h2 className="text-xl font-semibold mb-2">
-                Reports will be available soon
-              </h2>
-              <p className="text-muted-foreground">
-                Check back soon to generate and download school reports.
-              </p>
+          <div className="flex justify-end">
+            <ReportExportMenu
+              filename={
+                isPersonal
+                  ? "my-bullyproof-report"
+                  : `${schoolSlug}-school-report`
+              }
+              documentTitle={
+                isPersonal
+                  ? "Bullyproof - My Report"
+                  : `Bullyproof - ${currentSchool.name} School Report`
+              }
+              getTables={() => pack?.tables ?? []}
+              disabled={!pack}
+            />
+          </div>
+
+          {packError ? (
+            <Alert variant="destructive">
+              <AlertTitle>Unable to load report data</AlertTitle>
+              <AlertDescription>
+                {packError instanceof Error
+                  ? packError.message
+                  : "Please try again later."}
+              </AlertDescription>
+            </Alert>
+          ) : isLoadingPack || !pack ? (
+            <div className="space-y-4">
+              <Skeleton className="h-40 w-full" />
+              <Skeleton className="h-40 w-full" />
             </div>
-          </CardContent>
-        </Card>
+          ) : (
+            pack.tables.map((table) => (
+              <ReportTableCard key={table.title} table={table} />
+            ))
+          )}
         </div>
       </div>
     </FeatureGuard>
