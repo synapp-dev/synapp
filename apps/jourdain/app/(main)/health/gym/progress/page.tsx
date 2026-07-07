@@ -6,6 +6,7 @@ import { useMeStore } from "@/entities/me/model/store";
 import { Sparkles, Trash2 } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import { GymHeaderActions } from "@/components/organisms/gym-header";
 import {
   useBodyWeights,
@@ -32,7 +33,7 @@ import {
 } from "@/entities/gym/model/types";
 
 export default function GymProgressPage() {
-  const { data: exercises } = useExercises();
+  const { data: exercises, isLoading } = useExercises();
   const { data: standards } = useStandards();
   const { data: bodyWeights } = useBodyWeights();
   const { data: bests } = useExerciseBests();
@@ -70,7 +71,7 @@ export default function GymProgressPage() {
   const [statsReady, setStatsReady] = useState(false);
   // The carousel only comes in once the user picks a group/muscle for the first
   // time. Latched: once they've interacted it stays (it doesn't leave on
-  // deselect) — the body + stats just start out larger until that first pick.
+  // deselect); the body + stats just start out larger until that first pick.
   const [hasInteracted, setHasInteracted] = useState(false);
   useEffect(() => {
     if (selectedGroup != null || selectedSub != null) setHasInteracted(true);
@@ -85,7 +86,7 @@ export default function GymProgressPage() {
     [list],
   );
 
-  // Strength level vs benchmarks — drives the muscle map colours & ratings.
+  // Strength level vs benchmarks; drives the muscle map colours & ratings.
   const rating = useMemo(
     () => rateMuscles({ exercises: list, standards, bests, bodyweight, sex }),
     [list, standards, bests, bodyweight, sex],
@@ -95,6 +96,22 @@ export default function GymProgressPage() {
     for (const sg of MUSCLE_SUBGROUPS) out[sg] = rating.bySubgroup[sg].standing;
     return out;
   }, [rating]);
+  if (isLoading) {
+    return (
+      <div className="mx-auto flex min-h-[calc(100svh-9rem)] w-full max-w-7xl flex-col pt-[4vh]">
+        <div className="flex w-full flex-col items-center gap-6 lg:flex-row lg:items-center lg:justify-center">
+          <div className="flex w-full max-w-sm justify-center lg:w-1/4 lg:max-w-none lg:shrink-0">
+            <Skeleton className="h-96 w-56 rounded-3xl" />
+          </div>
+          <div className="w-full space-y-3 lg:w-1/2">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Skeleton key={index} className="h-8 w-full" />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (list.length === 0) {
     return (
       <div className="mx-auto w-full max-w-7xl">
@@ -109,7 +126,7 @@ export default function GymProgressPage() {
   }
 
   const anySelected = selectedGroup != null || selectedSub != null;
-  // Groups the hovered exercise works — dims the unrelated strength bars.
+  // Groups the hovered exercise works; dims the unrelated strength bars.
   const hoverGroups = hoverExerciseSubs
     ? new Set([...hoverExerciseSubs].map((s) => SUBGROUP_TO_GROUP[s]))
     : null;
@@ -166,8 +183,8 @@ export default function GymProgressPage() {
     );
 
   return (
-    // Top-pinned (not vertically centred) so selecting a muscle — which grows
-    // the exercises lane — never repositions the body or stats. The pt gives
+    // Top-pinned (not vertically centred) so selecting a muscle (which grows
+    // the exercises lane) never repositions the body or stats. The pt gives
     // breathing room from the header.
     <div className="mx-auto flex min-h-[calc(100svh-9rem)] w-full max-w-7xl flex-col pt-[4vh]">
       <GymHeaderActions>
@@ -200,7 +217,7 @@ export default function GymProgressPage() {
           hasInteracted ? "lg:scale-100" : "lg:scale-[1.18]"
         }`}
       >
-        {/* Body map — keeps the same size throughout; it's centre-stage during
+        {/* Body map keeps the same size throughout; it's centre-stage during
             the intro, then framer layout slides it aside (no resize) once the
             strength bars mount. */}
         <motion.div
@@ -226,7 +243,7 @@ export default function GymProgressPage() {
           />
         </motion.div>
 
-        {/* Strength bars — raw (no card), mount once the intro hands off. Fixed
+        {/* Strength bars, raw (no card), mount once the intro hands off. Fixed
             height in the overview (Overall pinned to the bottom); drops the
             height when a group is selected so it shrinks to fit. */}
         {statsReady ? (
@@ -252,7 +269,7 @@ export default function GymProgressPage() {
         ) : null}
       </div>
 
-      {/* Exercises — horizontal carousel below the top row. Comes in on the
+      {/* Exercises: horizontal carousel below the top row. Comes in on the
           first group/muscle pick and stays (even on deselect); shows every
           exercise (focused on the middle card) when nothing is selected. */}
       {hasInteracted ? (

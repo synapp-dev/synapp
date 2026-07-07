@@ -17,6 +17,7 @@ import type {
   MuscleSummary,
   Program,
   Session,
+  SessionPreviewExercise,
   SessionSummary,
   StartSessionInput,
   UpdateExerciseInput,
@@ -198,6 +199,16 @@ export function useSetTrainingReminder() {
       qc.invalidateQueries({ queryKey: routinesQueryKey });
       qc.invalidateQueries({ queryKey: tasksQueryKey });
     },
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
+/** Fetch the exercise list a session would start with (start-wizard preview).
+ *  A mutation so smart programs can "Regenerate" for a fresh roll. */
+export function useSessionPreview() {
+  return useMutation({
+    mutationFn: (programId: string) =>
+      send<SessionPreviewExercise[]>(`/gym/programs/${programId}/preview`, "POST"),
     onError: (err: Error) => toast.error(err.message),
   });
 }

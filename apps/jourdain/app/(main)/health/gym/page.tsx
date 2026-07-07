@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { CalendarPlus, Dumbbell, History, CalendarDays } from "lucide-react";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
@@ -15,6 +15,7 @@ import {
 } from "@/hooks/gym/use-gym";
 import { useCreateTask } from "@/hooks/tasks/use-tasks";
 import { StartSessionButton } from "@/components/gym/start-session-button";
+import { formatDate } from "@/lib/format";
 import { MUSCLE_GROUP_LABELS, type Program } from "@/entities/gym/model/types";
 import { toast } from "sonner";
 
@@ -174,13 +175,7 @@ export default function GymTodayPage() {
                 >
                   <span className="min-w-0 truncate font-medium">{s.title}</span>
                   <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                    {(() => {
-                      try {
-                        return format(parseISO(s.performedOn), "d MMM");
-                      } catch {
-                        return s.performedOn;
-                      }
-                    })()}{" "}
+                    {formatDate(s.performedOn, "short")}{" "}
                     · {s.setCount} sets
                     {s.status === "active" ? " · active" : ""}
                   </span>

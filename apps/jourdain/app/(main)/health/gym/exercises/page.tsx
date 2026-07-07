@@ -9,6 +9,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Badge } from "@workspace/ui/components/badge";
 import { Label } from "@workspace/ui/components/label";
+import { Skeleton } from "@workspace/ui/components/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -215,7 +216,7 @@ export default function GymExercisesPage() {
   const isEmpty = exercises != null && exercises.length === 0;
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-4">
+    <div className="mx-auto w-full max-w-7xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-medium tracking-tight">Exercise library</h2>
         <div className="flex gap-2">
@@ -281,7 +282,27 @@ export default function GymExercisesPage() {
           </div>
 
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <div className="space-y-5">
+              {Array.from({ length: 2 }).map((_, groupIndex) => (
+                <div key={groupIndex} className="space-y-2">
+                  <Skeleton className="h-3 w-16" />
+                  <Card>
+                    <CardContent className="px-4 py-1">
+                      {Array.from({ length: 4 }).map((_, rowIndex) => (
+                        <div
+                          key={rowIndex}
+                          className="flex items-center gap-2.5 border-b py-2.5 last:border-b-0"
+                        >
+                          <Skeleton className="h-10 w-10 shrink-0 rounded-md" />
+                          <Skeleton className="h-4 w-40" />
+                          <Skeleton className="ml-auto h-4 w-28" />
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                </div>
+              ))}
+            </div>
           ) : (
             <div className="space-y-5">
               {grouped.map((group) => (
