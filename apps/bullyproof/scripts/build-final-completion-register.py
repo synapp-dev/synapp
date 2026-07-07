@@ -156,7 +156,14 @@ SECTION3_EXTRA = (
     "Also found and fixed during completion UAT, at no cost: user-table "
     "column sorting across pages (28), a fault that blocked creating "
     "platform-scoped users, and a welcome-tutorial redirect loop when "
-    "impersonating a school user."
+    "impersonating a school user. Beyond the defects, the minor text and "
+    "usability asks from your 22 June document have been applied at no "
+    "charge as promised: only the highest access level shows per user, the "
+    "sidebar screen tips use your wording, the Teach Lessons page and "
+    "lesson-wizard copy follow your notes (including removal of the step "
+    "numbers, search bar, Show completed and Help), the feedback form "
+    "carries the mandatory-rating note, and the school portal filters read "
+    "All Access Levels."
 )
 
 CLOSING = (
