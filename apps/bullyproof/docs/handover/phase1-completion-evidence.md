@@ -29,6 +29,7 @@
 
 | Platform-role user creation defect (found in UAT) | Creating a Bullyproof/Government user failed: rolesRepo.hasRole required a school uuid and the wizard passes "" for platform roles (invalid uuid, Postgres error) | UAT session fix | hasRole now matches school_id IS NULL for platform-scoped roles; verified live by creating the Gov Viewer Test account (gov.viewer.test@bullyproofaustralia.org.au) |
 | 36 - Government dashboard (live verification) | - | verified live | View-as Gov Viewer Test on /dashboard renders Government Reporting: 5 aggregate cards matching admin numbers (57/56/1,461/1,199/549), view-only, no command menu, CSV export works |
+| 15 - Culture zero-input weighting (live verification) | - | verified live | Admin > Culture ratings on St4s Test School: benchmark (Term 1 2025) entered with exclusions = 0, then two comparatives. Term 2 with exclusions 0 -> headline 11.1% (zero-to-zero counted as 0% change, full weight kept; per-metric deltas +1.06/+25.49/+38.73/0 match the hand-computed weighted sum 11.0958). Term 3 with exclusions 1 -> exclusion delta uncomputable from a zero base, metric drops out and its 0.2 weight redistributes over the remaining 0.8 -> headline 5.7256, matching (0.47x0.53 + 0.165x12.87 + 0.165x13.37)/0.8 exactly. Both rows previously rendered a null headline. Test data left in place (source note marks it UAT) as a worked example; deletable via the row trash action |
 
 ## Still open (tracked)
 

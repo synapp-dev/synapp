@@ -34,9 +34,9 @@
 
 ## 4. Culture rating (item 15)
 
-- [ ] Benchmark exclusions = 0, comparative > 0: headline still computes from remaining metrics
-- [ ] Metric 0 in both periods: shows as no change, headline computes
-- [ ] Full dataset: headline unchanged from before
+- [x] Benchmark exclusions = 0, comparative > 0: headline still computes from remaining metrics (verified live on St4s Test School: Term 3 comparative shows 5.7%, exclusion delta dropped and re-weighted)
+- [x] Metric 0 in both periods: shows as no change, headline computes (verified live on St4s Test School: Term 2 comparative shows 11.1% with exclusion delta 0)
+- [ ] Full dataset: headline unchanged from before (covered by `culture-rating-math.test.ts` sample-workbook case; re-check on-screen when Glenn's real Woodford data goes in)
 
 ## 5. AP certificate (item 32)
 
