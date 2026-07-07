@@ -20,6 +20,8 @@
 
 Payable on written Acceptance under clause 7 and completion of handover, per clause 4(b) of the Formal Variation Agreement. Deemed Acceptance under clause 7.4 applies if no response is received within the UAT Period.
 
+Note: this invoice covers the clause 4(b) fee balance only. The salary component remainder under the agreed Phase 1 structure is settled through payroll with the final pay run and does not form part of this invoice.
+
 ## Payment details
 
 | | |

@@ -11,6 +11,7 @@
 - Bill of Materials (CSV)
 - Variation deliverables verification register
 - Phase 1 UAT checklist
+- M2-M8 scope classification (A, B, C, D, per your categories)
 - Tax invoices: Phase 1 completion; M1 deposit
 
 *(The System Administrator Guide, covering configuration, deployment and credentials, is complete and is delivered with the clause 6 handover set on payment, together with the source code and repository control.)*
@@ -58,7 +59,7 @@ Applying your categories to the M2-M8 proposal as of today:
 
 On your specific module notes: M2 agreed as new. M3 presents data the platform already holds, but a program-health home page, term calendars, a schedule calculation engine and nine drill-downs are new construction, not display changes; the register's Section 4 maps each item. M4: the baseline reports and exports you describe are delivered (verify above); M4 prices only the four renamed report types with percentage builds, filter panels, Excel and export scopes. M5: ST4S security posture is documented in the handover pack; content audit logs, versioning and step-up MFA were never in the SOW and are quoted. M6: the Variation culture scope is delivered and live-verified; M6 prices the signed speedometer and the expanded page. M7: the defect list you cite is fixed free (above); M7 prices the new scheduling flows and redesigned pages only. M8: platform user management is delivered (above); M8 prices the Amayda tier, onboarding checklist extensions and getting-started video management.
 
-I will send the tabulated line-by-line with every M2-M8 row tagged A, B, C or D within two business days, and then let us do the Teams session you proposed with the SOW open. Any line where you show me the SOW or Variation already says it, I will re-tag it without argument.
+The tabulated line-by-line is attached: every numbered item from your 22 June document tagged A, B, C or D, with where each one stands today. Then let us do the Teams session you proposed with the SOW open. Any line where you show me the SOW or Variation already says it, I will re-tag it without argument.
 
 ## The Phase 1 account
 
@@ -68,7 +69,7 @@ Three things to pin down so the numbers close cleanly:
 
 1. **Salary figure.** Your $96,482.57 reconciles closely against my payslips on the agreed basis (gross plus super, with accrued leave counting): gross to 10 June was $72,348.50 with $8,681.82 super, and adding the 10 July run (gross $8,333.33 plus super) and the accrued annual leave balance paid out on cessation lands within a few hundred dollars of your figure. Could you send the short schedule (gross, super and leave per run) so we adopt one exact number? Naturally the 10 July run and the leave payout count toward the component only once actually paid; if either does not proceed, the completion balance adjusts up by the same amount, so we are both whole either way.
 2. **Cessation date.** Let us fix the salary arrangement as ending with the 10 July run, in writing, so the component stops moving and the completion balance is a fixed number for both of us.
-3. **GST.** The salary component carries no GST, but the fee balance and M1 do. So on your own figures the position is: fee balance $100,000 + GST = $110,000, plus the salary component remainder of $100,000 less the verified salary figure (on your number, $3,517.43, no GST), plus M1 at $19,112.50 + GST. Your $122,629.93 is the ex-GST arithmetic of the same position, so we are agreeing on substance; the invoices just need to show GST correctly.
+3. **GST and settlement channels.** The salary component carries no GST, but the fee balance and M1 do. So on your own figures the position is: fee balance $100,000 + GST = $110,000 (invoiced by Intradark, attached), plus the salary component remainder of $100,000 less the verified salary figure (on your number, $3,517.43, settled through payroll with the final run, no GST), plus M1 at $19,112.50 + GST. Your $122,629.93 is the ex-GST arithmetic of the same position, so we are agreeing on substance; the paperwork just needs to carry the GST correctly.
 
 The Phase 1 completion invoice is attached and is payable on Acceptance under clause 7 (including deemed acceptance under 7.4), exactly as clause 4(b) provides. It is not contingent on the M2-M8 reconciliation, and your letter reads the same way, so I do not think we disagree: Phase 1 completes on its own contractual track while we agree the new work in parallel.
 
