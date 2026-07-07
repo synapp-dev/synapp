@@ -1,5 +1,5 @@
-import { SectionPlaceholder } from "@/components/molecules/section-placeholder";
+import { IdentitySectionPage } from "@/components/identity/section-page";
 
 export default function IdentityEmotionalPatternsPage() {
-  return <SectionPlaceholder title="Emotional Patterns" />;
+  return <IdentitySectionPage section="emotional-patterns" />;
 }

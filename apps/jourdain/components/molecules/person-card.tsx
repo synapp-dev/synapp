@@ -40,13 +40,32 @@ export function birthdayLabel(person: Person): string | null {
   return format(date, "d MMM");
 }
 
-export function isTouchOverdue(person: Person): boolean {
-  if (!person.touchBaseDays) return false;
-  if (!person.lastTouchAt) return true;
+export function touchCadenceDays(
+  person: Person,
+  defaultCadenceDays: number | null = null,
+): number | null {
+  return person.touchBaseDays ?? defaultCadenceDays;
+}
+
+/** Days past the cadence; Infinity when never contacted, null when no cadence applies. */
+export function touchOverdueDays(
+  person: Person,
+  defaultCadenceDays: number | null = null,
+): number | null {
+  const cadence = touchCadenceDays(person, defaultCadenceDays);
+  if (!cadence) return null;
+  if (!person.lastTouchAt) return Number.POSITIVE_INFINITY;
   return (
-    differenceInDays(new Date(), parseISO(person.lastTouchAt)) >
-    person.touchBaseDays
+    differenceInDays(new Date(), parseISO(person.lastTouchAt)) - cadence
   );
+}
+
+export function isTouchOverdue(
+  person: Person,
+  defaultCadenceDays: number | null = null,
+): boolean {
+  const overdue = touchOverdueDays(person, defaultCadenceDays);
+  return overdue !== null && overdue > 0;
 }
 
 export function lastTouchLabel(person: Person): string {

@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/components/select";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
+import { PageHeader } from "@/components/page-header";
 import { CIRCLE_CONFIG, PersonCard } from "@/components/molecules/person-card";
 import { ImportContactsDialog } from "@/components/organisms/import-contacts-dialog";
 import { PersonDetailDialog } from "@/components/organisms/person-detail-dialog";
@@ -58,14 +59,14 @@ export default function SocialRelationshipsPage() {
 
   return (
     <section className="mx-auto w-full max-w-7xl space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Relationships</h1>
-        <p className="text-muted-foreground text-sm">
-          {isLoading
+      <PageHeader
+        title="Relationships"
+        subtitle={
+          isLoading
             ? "Loading..."
-            : `${people?.length ?? 0} ${people?.length === 1 ? "person" : "people"} in your life`}
-        </p>
-      </div>
+            : `${people?.length ?? 0} ${people?.length === 1 ? "person" : "people"} in your life`
+        }
+      />
 
       <form
         className="flex items-center gap-2"
@@ -96,7 +97,12 @@ export default function SocialRelationshipsPage() {
             ))}
           </SelectContent>
         </Select>
-        <Button type="submit" size="icon" disabled={!name.trim() || createPerson.isPending}>
+        <Button
+          type="submit"
+          size="icon"
+          aria-label="Add person"
+          disabled={!name.trim() || createPerson.isPending}
+        >
           <Plus className="h-4 w-4" />
         </Button>
         <Button
