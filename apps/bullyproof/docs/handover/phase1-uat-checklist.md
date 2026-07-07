@@ -1,4 +1,4 @@
-# Phase 1 completion - manual UAT checklist
+# Phase 1 UAT Checklist
 
 > Run signed in, on the Vercel preview of `fixes/phase1-completion` or local dev.
 > Accounts needed: platform admin; a teacher at a school with classes at

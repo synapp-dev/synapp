@@ -1,4 +1,4 @@
-# Variation Agreement deliverables: verification register
+# Deliverables Verification Register
 
 > Every deliverable the Formal Variation Agreement and its Statement of Work
 > (Schedule 1) oblige, with the concrete way to check each one and the result

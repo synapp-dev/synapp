@@ -1,4 +1,4 @@
-# Bullyproof Platform: System Administrator Guide
+# System Administrator Guide
 
 > Handover documentation for Bullyproof Australia (deliverable D6). This guide covers the technical operation of the Bullyproof platform: architecture, configuration, deployment, database, storage, backups, and incident basics. The companion Administrator User Guide covers the product itself.
 
