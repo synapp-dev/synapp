@@ -1,6 +1,6 @@
 """
 Converts the handover markdown documents (deliverable D6 and the acceptance
-paperwork) to Word .docx for the client package.
+paperwork) to polished Word .docx for the client package.
 
 Usage (from apps/bullyproof):
     python scripts/convert-handover-docs.py docs/handover/admin-user-guide.md ...
@@ -9,6 +9,10 @@ Writes a .docx next to each input with the same basename. Handles the
 markdown subset the handover docs use: headings, paragraphs, bullet and
 numbered lists (one nesting level), GFM pipe tables, fenced code blocks,
 horizontal rules, bold / italic / inline code / links.
+
+House style: ink headings with a teal accent (the client's corporate teal),
+numbered top-level sections always start on a new page, teal table headers,
+and a branded footer with page numbers.
 """
 
 import re
@@ -17,16 +21,24 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from docx.shared import Cm, Pt, RGBColor
 
 INK = RGBColor(0x1F, 0x29, 0x37)
+TEAL = RGBColor(0x00, 0x84, 0x90)
+GREY = RGBColor(0x6B, 0x72, 0x80)
 CODE_INK = RGBColor(0x3E, 0x45, 0x4E)
+TEAL_HEX = "008490"
+
+FOOTER_TEXT = "Intradark Pty Ltd  ·  ABN 38 696 182 457  ·  Commercial in confidence"
 
 INLINE_TOKEN = re.compile(
     r"(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))"
 )
 LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+NUMBERED_SECTION = re.compile(r"^\d+[a-z]?[\.\)]\s")
 
 
 def add_inline(paragraph, text):
@@ -57,6 +69,103 @@ def add_inline(paragraph, text):
                 paragraph.add_run(part)
 
 
+def set_paragraph_border(paragraph, edge, color_hex, size=6, space=4):
+    p_pr = paragraph._p.get_or_add_pPr()
+    p_bdr = p_pr.find(qn("w:pBdr"))
+    if p_bdr is None:
+        p_bdr = OxmlElement("w:pBdr")
+        p_pr.append(p_bdr)
+    element = OxmlElement(f"w:{edge}")
+    element.set(qn("w:val"), "single")
+    element.set(qn("w:sz"), str(size))
+    element.set(qn("w:space"), str(space))
+    element.set(qn("w:color"), color_hex)
+    p_bdr.append(element)
+
+
+def shade_cell(cell, color_hex):
+    tc_pr = cell._tc.get_or_add_tcPr()
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:fill"), color_hex)
+    tc_pr.append(shd)
+
+
+def add_page_number_field(paragraph, instruction):
+    run = paragraph.add_run()
+    begin = OxmlElement("w:fldChar")
+    begin.set(qn("w:fldCharType"), "begin")
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = instruction
+    end = OxmlElement("w:fldChar")
+    end.set(qn("w:fldCharType"), "end")
+    run._r.append(begin)
+    run._r.append(instr)
+    run._r.append(end)
+    run.font.size = Pt(8)
+    run.font.color.rgb = GREY
+    return run
+
+
+def build_footer(doc):
+    section = doc.sections[0]
+    footer_paragraph = section.footer.paragraphs[0]
+    footer_paragraph.text = ""
+    tab_stops = footer_paragraph.paragraph_format.tab_stops
+    tab_stops.add_tab_stop(
+        section.page_width - section.left_margin - section.right_margin,
+        WD_TAB_ALIGNMENT.RIGHT,
+    )
+    run = footer_paragraph.add_run(FOOTER_TEXT)
+    run.font.size = Pt(8)
+    run.font.color.rgb = GREY
+    footer_paragraph.add_run("\t").font.size = Pt(8)
+    page_label = footer_paragraph.add_run("Page ")
+    page_label.font.size = Pt(8)
+    page_label.font.color.rgb = GREY
+    add_page_number_field(footer_paragraph, "PAGE")
+    of_label = footer_paragraph.add_run(" of ")
+    of_label.font.size = Pt(8)
+    of_label.font.color.rgb = GREY
+    add_page_number_field(footer_paragraph, "NUMPAGES")
+    set_paragraph_border(footer_paragraph, "top", TEAL_HEX, size=4, space=6)
+
+
+def style_heading(paragraph, level, text_is_numbered):
+    for run in paragraph.runs:
+        run.font.name = "Calibri"
+        if level == 1:
+            run.font.size = Pt(25)
+            run.font.color.rgb = INK
+            run.bold = True
+        elif level == 2:
+            run.font.size = Pt(15.5)
+            run.font.color.rgb = TEAL
+            run.bold = True
+        elif level == 3:
+            run.font.size = Pt(12.5)
+            run.font.color.rgb = INK
+            run.bold = True
+        else:
+            run.font.size = Pt(11)
+            run.font.color.rgb = GREY
+            run.bold = True
+    fmt = paragraph.paragraph_format
+    if level == 1:
+        fmt.space_after = Pt(4)
+        set_paragraph_border(paragraph, "bottom", TEAL_HEX, size=10, space=8)
+    elif level == 2:
+        fmt.space_before = Pt(16)
+        fmt.space_after = Pt(6)
+    else:
+        fmt.space_before = Pt(12)
+        fmt.space_after = Pt(4)
+    # Numbered top-level sections always open a fresh page.
+    if level in (2, 3) and text_is_numbered:
+        fmt.page_break_before = True
+
+
 def is_table_row(line):
     return line.strip().startswith("|") and line.strip().endswith("|")
 
@@ -71,6 +180,16 @@ def convert(md_path: Path) -> Path:
     style.font.name = "Calibri"
     style.font.size = Pt(10.5)
     style.font.color.rgb = INK
+    style.paragraph_format.space_after = Pt(6)
+    style.paragraph_format.line_spacing = 1.12
+
+    for section in doc.sections:
+        section.top_margin = Cm(2.2)
+        section.bottom_margin = Cm(2.0)
+        section.left_margin = Cm(2.4)
+        section.right_margin = Cm(2.4)
+
+    build_footer(doc)
 
     lines = md_path.read_text(encoding="utf-8").splitlines()
     i = 0
@@ -102,18 +221,20 @@ def convert(md_path: Path) -> Path:
         heading = re.match(r"^(#{1,4})\s+(.*)$", stripped)
         if heading:
             level = len(heading.group(1))
-            paragraph = doc.add_heading("", level=level)
-            add_inline(paragraph, heading.group(2).strip())
-            for run in paragraph.runs:
-                run.font.color.rgb = INK
+            heading_text = heading.group(2).strip()
+            paragraph = doc.add_heading("", level=min(level, 4))
+            add_inline(paragraph, heading_text)
+            style_heading(
+                paragraph, level, bool(NUMBERED_SECTION.match(heading_text))
+            )
             i += 1
             continue
 
         if re.fullmatch(r"[-*_]{3,}", stripped):
             paragraph = doc.add_paragraph()
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = paragraph.add_run("•  •  •")
-            run.font.size = Pt(8)
+            paragraph.paragraph_format.space_before = Pt(8)
+            paragraph.paragraph_format.space_after = Pt(8)
+            set_paragraph_border(paragraph, "bottom", TEAL_HEX, size=4, space=1)
             i += 1
             continue
 
@@ -132,17 +253,23 @@ def convert(md_path: Path) -> Path:
             for col, text in enumerate(header):
                 cell = table.rows[0].cells[col]
                 cell.text = ""
+                shade_cell(cell, TEAL_HEX)
                 paragraph = cell.paragraphs[0]
                 add_inline(paragraph, text)
+                if not paragraph.runs:
+                    paragraph.add_run(" ")
                 for run in paragraph.runs:
                     run.bold = True
                     run.font.size = Pt(9.5)
-            for row_values in body:
+                    run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+            for row_index, row_values in enumerate(body):
                 row = table.add_row()
                 for col in range(len(header)):
                     value = row_values[col] if col < len(row_values) else ""
                     cell = row.cells[col]
                     cell.text = ""
+                    if row_index % 2 == 1:
+                        shade_cell(cell, "F2F7F7")
                     paragraph = cell.paragraphs[0]
                     add_inline(paragraph, value)
                     for run in paragraph.runs:
@@ -170,8 +297,16 @@ def convert(md_path: Path) -> Path:
             continue
 
         if stripped.startswith(">"):
-            paragraph = doc.add_paragraph(style="Intense Quote")
+            paragraph = doc.add_paragraph()
             add_inline(paragraph, stripped.lstrip("> "))
+            paragraph.paragraph_format.left_indent = Pt(14)
+            paragraph.paragraph_format.space_before = Pt(4)
+            paragraph.paragraph_format.space_after = Pt(10)
+            set_paragraph_border(paragraph, "left", TEAL_HEX, size=12, space=8)
+            for run in paragraph.runs:
+                run.font.color.rgb = GREY
+                run.font.size = Pt(10.5)
+                run.italic = True
             i += 1
             continue
 
