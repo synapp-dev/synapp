@@ -27,7 +27,7 @@ The System Administrator Guide (deliverable D6, complete), covering configuratio
 
 ### 2. Delivery for User Acceptance Testing (clause 7.1)
 
-The platform is available for your testing at [production URL, e.g. https://app.bullyproofaustralia.org.au] using your existing administrator account. For test purposes:
+The platform is available for your testing at https://app.bullyproofaustralia.org.au using your existing administrator account. For test purposes:
 
 - **St4s Test School** is populated with classes and data, including a worked culture-rating example (benchmark plus two comparative periods) so you can see the calculation behaviour end to end without touching a real school.
 - A **Government viewer account** exists: gov.viewer.test@bullyproofaustralia.org.au. It signs in with the normal email one-time code sent to that mailbox, which your organisation controls. It demonstrates the view-only government reporting dashboard.
