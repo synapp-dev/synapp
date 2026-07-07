@@ -57,7 +57,22 @@ async function runReminders() {
   let taskReminders = 0;
   let digestsSent = 0;
 
-  // 0. Materialize routine occurrences due today (idempotent, tz-aware) so their
+  // 0a. Lock in yesterday-and-older routine occurrences as missed (tz-aware)
+  // so they never linger as overdue and can't block the next occurrence.
+  let tasksExpired = 0;
+  try {
+    const { data: expired } = await admin.rpc("expire_missed_tasks", {
+      p_user_id: null,
+    });
+    tasksExpired = (expired as number) ?? 0;
+  } catch (err) {
+    console.warn(
+      "[run-reminders] task expiry failed:",
+      err instanceof Error ? err.message : err
+    );
+  }
+
+  // 0b. Materialize routine occurrences due today (idempotent, tz-aware) so their
   // reminders exist before we scan for due reminders below.
   let routinesMaterialized = 0;
   try {
@@ -238,6 +253,7 @@ async function runReminders() {
     digestsSent,
     dueTasks: dueTasks.length,
     bankNudges,
+    tasksExpired,
     routinesMaterialized,
     pingsFired,
   };

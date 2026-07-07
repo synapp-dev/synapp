@@ -12,11 +12,12 @@ const updateTaskSchema = z
   .object({
     title: z.string().trim().min(1).max(500).optional(),
     notes: z.string().trim().max(5000).nullish(),
-    status: z.enum(["open", "done"]).optional(),
+    status: z.enum(["open", "done", "missed"]).optional(),
     dueDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
       .nullish(),
+    projectId: z.string().uuid().nullish(),
     remindAt: z.string().datetime({ offset: true }).nullish(),
     priority: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
     domains: z.array(z.enum(TASK_DOMAINS)).max(TASK_DOMAINS.length).optional(),

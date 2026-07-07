@@ -27,6 +27,7 @@ import {
 } from "@workspace/ui/components/select";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
+import { PageHeader } from "@/components/page-header";
 import { PRIORITY_OPTIONS, TaskRow } from "@/components/molecules/task-row";
 import { TaskDetailDialog } from "@/components/organisms/task-detail-dialog";
 import {
@@ -35,6 +36,7 @@ import {
   useTasks,
   useUpdateTask,
 } from "@/hooks/tasks/use-tasks";
+import { addDays } from "@/lib/scoring/compute";
 import type { Task, TaskDomain, TaskPriority } from "@/entities/tasks/model/types";
 
 const UNSORTED = "unsorted" as const;
@@ -74,6 +76,7 @@ export default function TasksPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [showDone, setShowDone] = useState(false);
+  const [showMissed, setShowMissed] = useState(false);
   const [view, setView] = useState<"today" | "board">("today");
 
   const { data: tasks, isLoading, error } = useTasks();
@@ -108,6 +111,19 @@ export default function TasksPage() {
         .sort((a, b) => a.priority - b.priority),
     [openTasks, todayStr]
   );
+
+  const missedRecently = useMemo(() => {
+    const floor = addDays(todayStr, -3);
+    return (tasks ?? [])
+      .filter(
+        (task) =>
+          task.status === "missed" &&
+          task.dueDate &&
+          task.dueDate >= floor &&
+          task.dueDate < todayStr
+      )
+      .sort((a, b) => (a.dueDate! < b.dueDate! ? 1 : -1));
+  }, [tasks, todayStr]);
 
   const byColumn = useMemo(() => {
     const map = new Map<ColumnKey, Task[]>();
@@ -149,17 +165,19 @@ export default function TasksPage() {
   }
 
   return (
-    <section className="w-full space-y-5">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Tasks</h1>
-        <p className="text-sm text-muted-foreground">
-          {isLoading
-            ? "Loading…"
-            : view === "today"
-              ? `${todayTasks.length} due today`
-              : `${openTasks.length} open`}
-        </p>
-      </div>
+    <section className="w-full space-y-6">
+      <PageHeader
+        title="Tasks"
+        actions={
+          <p className="text-sm text-muted-foreground">
+            {isLoading
+              ? "Loading…"
+              : view === "today"
+                ? `${todayTasks.length} due today`
+                : `${openTasks.length} open`}
+          </p>
+        }
+      />
 
       <form
         className="flex flex-wrap items-center gap-2"
@@ -210,6 +228,7 @@ export default function TasksPage() {
         <Button
           type="submit"
           size="icon"
+          aria-label="Add task"
           disabled={!title.trim() || createTask.isPending}
         >
           <Plus className="h-4 w-4" />
@@ -224,6 +243,8 @@ export default function TasksPage() {
         <button
           type="button"
           onClick={() => setView("today")}
+          aria-label="Today view"
+          aria-pressed={view === "today"}
           className={cn(
             "rounded-md px-3 py-1 transition-colors",
             view === "today"
@@ -236,6 +257,8 @@ export default function TasksPage() {
         <button
           type="button"
           onClick={() => setView("board")}
+          aria-label="Board view"
+          aria-pressed={view === "board"}
           className={cn(
             "rounded-md px-3 py-1 transition-colors",
             view === "board"
@@ -299,6 +322,30 @@ export default function TasksPage() {
             <p className="rounded-md border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
               Nothing due today. 🎉
             </p>
+          ) : null}
+
+          {missedRecently.length > 0 ? (
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => setShowMissed((value) => !value)}
+              >
+                {showMissed ? "Hide" : "Show"} missed recently (
+                {missedRecently.length})
+              </button>
+              {showMissed ? (
+                <div className="space-y-2">
+                  {missedRecently.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onOpen={(item) => setSelectedTaskId(item.id)}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       )}
