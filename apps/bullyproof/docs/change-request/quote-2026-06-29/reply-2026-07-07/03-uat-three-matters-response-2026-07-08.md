@@ -3,7 +3,7 @@
 **Send as a reply in his UAT thread** (the 3:43pm "three critical operational matters" email)
 **To:** glenn@rushtonmanagement.com.au
 **Cc:** jeff@bullyproofaustralia.org.au
-**Attachments:** none (everything is demonstrable live on the platform)
+**Attachments:** Administrator User Guide v1.1 (docx)
 
 ---
 
@@ -33,6 +33,8 @@ Two factual corrections first, then the practical path.
 First, Bullyproof Admin user management is already independent of Intradark. A Bullyproof Admin can create, manage, re-role and remove other Bullyproof Admin users today: Admin > Users > Add New User > Bullyproof > Bullyproof Admin, and the same screens manage and remove them. This was covered in my last letter and is verifiable in UAT in two minutes. The only account operation reserved to the developer role is modifying holders of the developer role itself, which is a safety guard, not a dependency.
 
 Second, destructive actions (delete user, delete school) are not hardcoded to Intradark. They are configurable permissions in the feature-access system, currently granted to the developer role as a safety default. Who holds them is data, not code, which matters for what follows.
+
+Third, on the feature-permission system itself, since it is the machinery behind both points: the Completion Register's Section 5 records it as Intradark development scaffolding built beyond the SOW. What the platform provides operationally is oversight and activation. Every school drawer now includes a Feature Access view showing exactly what that school can see and use (read-only by design, so a misclick can never strip a live school's access), and schools are activated by applying permission templates from the Activation tab, which remains yours day to day. The configuration consoles behind that (per-feature switching across global, role, school and user levels, template authoring, and the rest of the internal developer toolset such as the migrations console, support tools and impersonation) are Intradark development tooling, restricted accordingly today, and they are removed at the clause 6 handover for exactly the reason your letter raises: developer-grade capability does not belong in production administrative hands. The permission configuration itself transfers as data, precisely as accepted at UAT. If you would like owner-level control surfaces built properly under your governance, that belongs in the M8 conversation at the Teams session. I have attached version 1.1 of the Administrator User Guide, which clarifies section 8 so the guide matches this operating model.
 
 On ultimate control: at handover under clause 6 you receive the repository, the database, the hosting and every credential. From that day, ultimate administrative control of the platform is yours structurally, not by role naming: you can grant or revoke anything, including developer access, and Intradark's access exists only to the extent you grant it for M1 and any commissioned work. The concern your letter describes resolves itself at settlement, by design.
 

@@ -1,6 +1,6 @@
 # Administrator User Guide
 
-> Handover documentation for Bullyproof Australia (deliverable D6). This guide covers day-to-day administration of the Bullyproof platform. A companion System Administrator Guide covers hosting, configuration, and technical operations.
+> Handover documentation for Bullyproof Australia (deliverable D6), version 1.1. This guide covers day-to-day administration of the Bullyproof platform. A companion System Administrator Guide covers hosting, configuration, and technical operations. Version 1.1 clarifies section 8: feature access is presented for oversight, with configuration managed at the platform engineering level.
 
 ## 1. Introduction
 
@@ -65,7 +65,7 @@ Two rules to remember:
 - A user with a platform access level cannot also hold school access levels, and vice versa.
 - Every user assigned to a school always has Staff as a minimum; the interface adds it automatically.
 
-On top of access levels, the platform has a fine-grained feature permission system that can switch individual features on or off globally, per access level, per school, or per user. Section 8 explains how to manage it.
+On top of access levels, the platform has a fine-grained feature permission system that can switch individual features on or off globally, per access level, per school, or per user. The system is configured at the platform engineering level; section 8 explains how it works, how to view what each school can access, and how to activate schools with permission templates.
 
 ## 4. Finding your way around
 
@@ -87,7 +87,7 @@ The Admin entry takes you to the admin home at /admin, a grid of cards, one per 
 | Content | /admin/content | Curriculum and certification content |
 | Schools | /admin/schools | School accounts |
 | Users | /admin/users | User accounts and access levels |
-| Features | /admin/features | Feature access control (day-to-day school activation is on each school's Activation tab) |
+| Features | /admin/features | Feature access control console (platform engineering level; day-to-day school activation is on each school's Activation tab) |
 | Resources | /admin/resources | Folder-based resource documents |
 | Reports | /admin/reports | Platform reporting dashboards |
 | Ratings | /admin/ratings | Teacher lesson ratings by curriculum stage |
@@ -136,7 +136,7 @@ Clicking a school opens a drawer with a tab per management area:
 | Activity | Activity feed (currently disabled) |
 | Culture | The school's culture rating data (same data as section 9) |
 | License | The school's licence (section 5.5) |
-| Feature Access | Per-school feature permissions (shown only if you can manage features) |
+| Feature Access | Read-only view of the school's feature access (editing is a platform engineering function) |
 
 ### 5.4 The onboarding checklist
 
@@ -203,7 +203,7 @@ Click any user to open their drawer. The side tabs are:
 | Positions | Positions held at their schools |
 | Classes | Classes they are linked to |
 | History | Account history |
-| Feature Access | Per-user feature permission overrides |
+| Feature Access | Per-user feature permission overrides (platform engineering level) |
 
 From the Access Levels tab you can:
 
@@ -247,7 +247,7 @@ Changes here directly affect the course teachers are working through, so take ca
 
 ## 8. Feature permissions and permission templates
 
-Open Admin > Features (/admin/features). This is the platform's access control panel, titled "Feature Access Control".
+Feature permissions determine what every user can see and do. As a Bullyproof administrator you work with them in two ways: viewing each school's feature access from the school drawer, and activating schools by applying permission templates. The configuration console itself (Admin > Features, titled "Feature Access Control") sits at the platform engineering level.
 
 ### 8.1 How permissions work
 
@@ -266,16 +266,9 @@ Permissions can be set at five levels, and the most specific level wins:
 
 If nothing is set at any level, the feature is off: the platform is deny-by-default.
 
-### 8.2 Managing permissions
+### 8.2 Viewing feature access
 
-The Features section is organised into cards by area; open one to see its features and the permission tabs:
-
-- Global: switch "Global Access" and "Global Visible" per feature.
-- Platform Access Levels: pick a role, then set overrides. "Role settings override Global."
-- Schools: pick a school, then either set school-wide overrides or filter to a single school role.
-- Users: pick a user. "User settings override School, Role, and Global."
-
-Each override table shows what is inherited from the level above, so you can see the effective result before you change anything. You can also create new feature entries with the "Create Feature" dialog, though in practice new features are added by the development team.
+Each school's drawer has a Feature Access tab (Admin > Schools > open a school > Feature Access). It shows, at a glance, what the school can currently use ("Available to this school") and anything shown to its users but locked ("Visible but locked"). The view is read-only for administrators: changes to feature permissions, the creation of new feature entries, and configuration at the global, access-level or per-user layers are platform engineering functions. If a school's feature access needs to change beyond what a template provides, raise it with the platform team.
 
 ### 8.3 Permission templates
 
@@ -288,7 +281,7 @@ You work with templates on each school's Activation tab (section 5.6):
 - Click "Apply template" (or "Re-apply template" on an already-active card) and confirm. The card turns green once applied.
 
 
-The everyday workflow is: onboard the school (section 5.4), then apply the standard school template from the Activation tab. Reserve the per-feature switches (section 8.2) for one-off adjustments. If a new template or a change to an existing bundle is needed, raise it with the platform team.
+The everyday workflow is: onboard the school (section 5.4), then apply the standard school template from the Activation tab, and use the Feature Access view (section 8.2) to confirm the result. If a one-off adjustment, a new template or a change to an existing bundle is needed, raise it with the platform team.
 
 ## 9. Culture ratings
 

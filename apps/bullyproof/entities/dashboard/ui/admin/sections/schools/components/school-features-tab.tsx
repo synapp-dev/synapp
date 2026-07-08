@@ -170,14 +170,101 @@ export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
     );
   }
 
+  // Read-only oversight view for school administrators: a high-level summary
+  // of what the school can use, without the underlying permission machinery.
+  if (!canManageFeatures) {
+    const enabledFeatures = features.filter((feature) => {
+      const permission = getSchoolPermissionForFeature(feature.id);
+      return permission?.enabled === true;
+    });
+    const lockedFeatures = features.filter((feature) => {
+      const permission = getSchoolPermissionForFeature(feature.id);
+      return permission?.enabled === false && permission?.visible === true;
+    });
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Feature Access</CardTitle>
+          <CardDescription>
+            What this school can currently see and use on the platform.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Alert className="mb-6">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Managed by the platform team</AlertTitle>
+            <AlertDescription>
+              This view is provided for oversight. Feature access is configured
+              at the platform engineering level, normally by applying a
+              permission template from the school&apos;s Activation tab.
+            </AlertDescription>
+          </Alert>
+
+          {isLoadingFeatures || isLoadingPermissions ? (
+            <div className="space-y-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-sm font-medium mb-3">
+                  Available to this school
+                </h4>
+                {enabledFeatures.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No features are enabled for this school yet. Apply a
+                    permission template from the Activation tab to activate it.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {enabledFeatures.map((feature) => (
+                      <Badge
+                        key={feature.id}
+                        variant="secondary"
+                        className="text-sm font-normal py-1 px-3"
+                      >
+                        {feature.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {lockedFeatures.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-3">
+                    Visible but locked
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {lockedFeatures.map((feature) => (
+                      <Badge
+                        key={feature.id}
+                        variant="outline"
+                        className="text-sm font-normal py-1 px-3 text-muted-foreground"
+                      >
+                        {feature.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Feature Access</CardTitle>
         <CardDescription>
-          {canManageFeatures
-            ? "Control which features are available to all users in this school. School-level permissions override role and global permissions, but are overridden by user-level permissions."
-            : "The features available to this school. School-level permissions override role and global permissions, but are overridden by user-level permissions."}
+          Control which features are available to all users in this school.
+          School-level permissions override role and global permissions, but
+          are overridden by user-level permissions.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -188,8 +275,6 @@ export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
             School-level permissions apply to all users in this school. They
             override role and global permissions, but individual user
             permissions take precedence.
-            {!canManageFeatures &&
-              " This view is provided for oversight; feature access is configured at the platform engineering level, normally by applying a permission template from the school's Activation tab."}
           </AlertDescription>
         </Alert>
 
