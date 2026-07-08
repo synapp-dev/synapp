@@ -1,4 +1,4 @@
-# M2-M8 scope classification
+# M2-M8 Scope Classification
 
 > The line-by-line reconciliation requested in your 7 July letter, using your
 > categories. Every numbered item from the 22 June document is classified as:

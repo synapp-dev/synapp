@@ -1,4 +1,4 @@
-# Bullyproof Platform: Administrator User Guide
+# Administrator User Guide
 
 > Handover documentation for Bullyproof Australia (deliverable D6). This guide covers day-to-day administration of the Bullyproof platform. A companion System Administrator Guide covers hosting, configuration, and technical operations.
 
@@ -22,7 +22,6 @@ Bullyproof uses email codes rather than passwords as the standard sign-in method
 2. Enter your email address and continue. The platform emails you a 6 digit verification code. You will see the message "Code Sent: We've sent a verification code to your email. Please check your inbox!"
 3. Enter the code on the sign-in screen. You are signed in and taken to your dashboard.
 
-[Screenshot: Sign-in page with the email field, and the code entry screen]
 
 Points to note:
 
@@ -98,7 +97,6 @@ The Admin entry takes you to the admin home at /admin, a grid of cards, one per 
 | Tickets | /admin/tickets | User feedback tickets |
 | Migrations | /admin/migrations | One-off database maintenance jobs (technical team only) |
 
-[Screenshot: Admin home page showing the grid of admin cards]
 
 ## 5. Managing schools
 
@@ -123,7 +121,6 @@ Click the add button to open the "Add New School" dialog and complete the four f
 
 All four fields are required before the "Add School" button becomes available. The new school then appears in the list, ready for onboarding.
 
-[Screenshot: Add New School dialog with the four fields completed]
 
 ### 5.3 The school detail drawer
 
@@ -152,7 +149,6 @@ The Onboarding tab tracks what a new school still needs. Essential steps:
 
 Optional steps: Add Email Domain, Add Address, Add Banner, Add Avatar. Each item shows a green "Completed" badge once done, so you can see a school's readiness at a glance.
 
-[Screenshot: Onboarding tab with some steps completed]
 
 ### 5.5 Licences
 
@@ -193,7 +189,6 @@ Click the add button to start the four step wizard: Details, User Type, Access L
    - For Bullyproof or Government users, pick the single platform access level.
 4. Confirm: review the name, email, access level badge, and school, then click "Create User".
 
-[Screenshot: Add user wizard on the User Type step]
 
 The account is created immediately. Remember there is no invitation email: tell the person to go to the platform and sign in with their email address (section 2).
 
@@ -238,7 +233,6 @@ At /admin/content/curriculum you can add a stage ("Add new stage": Code, Name, a
 
 Opening a topic's slides lets you add, edit, delete, and reorder individual slides, including uploading slide images. What you publish here is exactly what teachers see when previewing and delivering lessons.
 
-[Screenshot: Curriculum stage page with topics on the left and slides on the right]
 
 ### 7.2 Certification content: courses, topics, and quizzes
 
@@ -293,7 +287,6 @@ You work with templates on each school's Activation tab (section 5.6):
 - A green "Template active" badge shows when the school's current permissions already match that template; otherwise the card reads "Not active".
 - Click "Apply template" (or "Re-apply template" on an already-active card) and confirm. The card turns green once applied.
 
-[Screenshot: a school's Activation tab with a Template active badge on the applied card]
 
 The everyday workflow is: onboard the school (section 5.4), then apply the standard school template from the Activation tab. Reserve the per-feature switches (section 8.2) for one-off adjustments. If a new template or a change to an existing bundle is needed, raise it with the platform team.
 
@@ -325,7 +318,6 @@ There is also an optional "Source notes" field, useful for recording where the s
 - Benchmark: each school has exactly one benchmark period, entered on the Benchmark tab and saved with "Save benchmark". This is the school's starting point, typically the period before the Bullyproof program began.
 - Comparative periods: later periods you compare against the benchmark. Add them on the Comparative periods tab; a comparative period must fall entirely outside the benchmark date range (no overlapping days). Existing periods are listed in a table with their dates, Culture %, report status, and actions to Edit, Request report, upload a PDF, Download, or delete.
 
-[Screenshot: Culture ratings Benchmark tab with the eight inputs]
 
 ### 9.3 How the headline rating works
 
@@ -365,7 +357,6 @@ At the top of the section a scope selector lets you switch between "All schools"
 - Onboarding: school readiness: accounts and licences, plus (in all-schools scope) the "Active schools with no lessons yet" table listing schools with an active licence but no lessons, with days since licence start, class and teacher counts, and their activation status (Active, Certification, or Locked, based on the school's activation status).
 - Lessons: lesson and rating totals plus a table of all lessons in scope, newest first, with the topic, classes, teacher, school, status, and date.
 
-[Screenshot: Reports Overview tab with the scope filter and Export button]
 
 ### 10.3 Exporting
 
@@ -393,7 +384,6 @@ Teachers open AP Certification in the sidebar (the /courses area) and land on th
 - A My Progress bar with one segment per topic and a certificate marker at the end. Topics unlock in order: a teacher must complete the current topic before the next opens.
 - A topic timeline listing every topic with its status (completed, current, or locked), quiz score shown as stars, and buttons to review slides or retake quizzes.
 
-[Screenshot: AMAYDA Program course page showing the progress bar]
 
 ### 13.2 Quizzes
 
