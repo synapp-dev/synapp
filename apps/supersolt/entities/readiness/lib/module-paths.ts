@@ -5,7 +5,7 @@ export const PATH_SUFFIX_TO_READINESS_MODULE: Record<
   string,
   ReadinessModuleId
 > = {
-  "settings/inventory-setup/master-inventory-list": "menu-ingredients",
+  "settings/inventory-setup/inventory/master-list": "menu-ingredients",
   "settings/inventory": "menu-ingredients",
   "purchasing/orders": "purchasing-orders",
   "stock-management/stock-counts": "stock-counts",

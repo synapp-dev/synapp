@@ -102,7 +102,7 @@ export const APP_NAVIGATION_CATALOG: Record<
     key: "catalog_items",
     title: "Items",
     description: "Catalog items.",
-    pathSuffix: "/settings/inventory-setup/recipes",
+    pathSuffix: "/settings/inventory-setup/products/recipes",
   },
   catalog_menu: {
     key: "catalog_menu",
@@ -114,7 +114,7 @@ export const APP_NAVIGATION_CATALOG: Record<
     key: "ingredients",
     title: "Ingredients",
     description: "View and manage ingredients for this venue.",
-    pathSuffix: "/settings/inventory-setup/master-inventory-list",
+    pathSuffix: "/settings/inventory-setup/inventory/master-list",
   },
   inventory: {
     key: "inventory",
@@ -240,7 +240,7 @@ export const APP_NAVIGATION_CATALOG: Record<
   settings_recipes: {
     key: "settings_recipes",
     title: "Recipes",
-    pathSuffix: "/settings/inventory-setup/recipes",
+    pathSuffix: "/settings/inventory-setup/products/recipes",
   },
   settings_devkit: {
     key: "settings_devkit",

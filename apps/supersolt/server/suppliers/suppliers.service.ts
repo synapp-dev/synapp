@@ -3,11 +3,15 @@ import type {
   ScheduleOverrideEntry,
 } from "@/entities/suppliers/model/schedule-types";
 import type { RequestAuthContext } from "@/server/auth/context";
+import type { RlsTx } from "@/server/db/drizzle";
 import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
+import { supplierRawItemsRepo } from "@/server/supplier-raw-items/supplier-raw-items.repo";
 import {
   suppliersRepo,
   type SupplierInsert,
+  type SupplierItemBreakdown,
+  type SupplierMetrics,
   type SupplierRow,
   type SupplierUpdate,
 } from "@/server/suppliers/suppliers.repo";
@@ -17,6 +21,10 @@ import {
   serializeDeliverySchedule,
   serializeScheduleOverrides,
 } from "@/server/suppliers/supplier-schedule";
+import {
+  evaluateSupplierReadiness,
+  type SupplierReadiness,
+} from "@/entities/suppliers/model/supplier-readiness";
 
 const SUPPLIER_CATEGORIES = [
   "produce",
@@ -45,7 +53,20 @@ export type SupplierSummary = {
   orderMethod: string;
   monthlySpendCents: number;
   ytdSpendCents: number;
+  itemCount: number;
+  /** Detected raw items still awaiting an approve/skip decision. */
+  unreviewedItemCount: number;
+  /** Approved supplier_products — the supplier's priced catalog. */
   productCount: number;
+  /** Likely-inventory items: unique products (total raw items parsed). */
+  inventoryItems: SupplierItemBreakdown;
+  /** Non-inventory items (packaging, fees…): unique (total parsed). */
+  nonInventoryItems: SupplierItemBreakdown;
+  /** Whether this supplier is flagged as an inventory source. */
+  isInventorySource: boolean;
+  /** Whether the user has parked this supplier as "no catalog yet". */
+  noCatalogAcked: boolean;
+  readiness: SupplierReadiness;
   lastInvoiceDate: string | null;
   updatedAt: string;
 };
@@ -121,10 +142,131 @@ function assertSupplierCategory(value: string): SupplierCategory {
   return value as SupplierCategory;
 }
 
+function supplierReadinessFromRow(
+  row: SupplierRow,
+  unreviewedItemCount: number,
+  inventoryItemCount: number,
+): SupplierReadiness {
+  const deliverySchedule = parseDeliverySchedule(row.deliverySchedule as never);
+  const hasDeliveryDay =
+    deliverySchedule.some((entry) => entry.is_order_day) ||
+    (row.deliveryDays ?? "").trim().length > 0;
+  return evaluateSupplierReadiness({
+    name: row.name,
+    abn: row.abn ?? "",
+    category: row.category,
+    email: row.email ?? "",
+    contactPerson: row.contactPerson ?? "",
+    phone: row.phone ?? "",
+    paymentTerms: row.paymentTerms ?? "",
+    hasDeliveryDay,
+    unreviewedItemCount,
+    isInventorySource: row.isInventorySource,
+    inventoryItemCount,
+    noCatalogAcked: row.noCatalogAckedAt != null,
+  });
+}
+
+/** Count of suppliers whose profile + items are fully ready for ordering. */
+export async function countReadySuppliersForVenue(
+  tx: RlsTx,
+  args: { organisationId: string; venueId: string },
+): Promise<number> {
+  const rows = await suppliersRepo.getAllForVenue(tx, args);
+  if (rows.length === 0) return 0;
+  const supplierIds = rows.map((r) => r.id);
+  const unreviewed = await supplierRawItemsRepo.countUnreviewedBySupplierIds(tx, {
+    organisationId: args.organisationId,
+    supplierIds,
+  });
+  const inventoryCounts =
+    await supplierRawItemsRepo.countLikelyInventoryBySupplierIds(tx, {
+      organisationId: args.organisationId,
+      supplierIds,
+    });
+  let ready = 0;
+  for (const row of rows) {
+    if (
+      supplierReadinessFromRow(
+        row,
+        unreviewed.get(row.id) ?? 0,
+        inventoryCounts.get(row.id) ?? 0,
+      ).complete
+    ) {
+      ready += 1;
+    }
+  }
+  return ready;
+}
+
+export type InventorySupplierResolution = {
+  /**
+   * Inventory suppliers not yet resolved: still have unreviewed raw items, OR
+   * have no priced catalog and haven't been parked as "no catalog yet". Gates
+   * the Suppliers stage's "approve every supplier item" sub-step.
+   */
+  unresolvedCount: number;
+  /**
+   * The subset that produced no items at all and isn't parked — drives the
+   * "N kept suppliers produced no items" warning so empties stop passing
+   * silently.
+   */
+  emptyUnackedCount: number;
+};
+
+/**
+ * Per-supplier resolution state for inventory sources, so stage completion is
+ * honest: every kept supplier must be reviewed + priced, or consciously parked.
+ */
+export async function countInventorySupplierResolutionForVenue(
+  tx: RlsTx,
+  args: { organisationId: string; venueId: string },
+): Promise<InventorySupplierResolution> {
+  const rows = await suppliersRepo.getAllForVenue(tx, args);
+  const inventoryRows = rows.filter((r) => r.isInventorySource);
+  if (inventoryRows.length === 0) {
+    return { unresolvedCount: 0, emptyUnackedCount: 0 };
+  }
+  const supplierIds = inventoryRows.map((r) => r.id);
+  const unreviewed = await supplierRawItemsRepo.countUnreviewedBySupplierIds(tx, {
+    organisationId: args.organisationId,
+    supplierIds,
+  });
+  const inventoryCounts =
+    await supplierRawItemsRepo.countLikelyInventoryBySupplierIds(tx, {
+      organisationId: args.organisationId,
+      supplierIds,
+    });
+
+  let unresolvedCount = 0;
+  let emptyUnackedCount = 0;
+  for (const row of inventoryRows) {
+    const hasUnreviewed = (unreviewed.get(row.id) ?? 0) > 0;
+    // Triage doesn't mint products any more — "empty" means the supplier's
+    // invoices yielded no inventory items at all, not "no priced catalog".
+    const hasNoInventoryItems = (inventoryCounts.get(row.id) ?? 0) === 0;
+    const notAcked = row.noCatalogAckedAt == null;
+    // "Produced no items" only counts once triage is done — a supplier with
+    // items still awaiting triage isn't empty, it's mid-review.
+    const emptyUnacked = hasNoInventoryItems && !hasUnreviewed && notAcked;
+    if (emptyUnacked) emptyUnackedCount += 1;
+    // Unresolved = still has items to triage, OR finished with no inventory
+    // items and hasn't been parked.
+    if (hasUnreviewed || emptyUnacked) unresolvedCount += 1;
+  }
+  return { unresolvedCount, emptyUnackedCount };
+}
+
 function toSummary(
   row: SupplierRow,
-  metrics?: { productCount: number; ytdSpendCents: number; lastInvoiceDate: string | null },
+  metrics?: SupplierMetrics,
 ): SupplierSummary {
+  const readiness = supplierReadinessFromRow(
+    row,
+    metrics?.unreviewedItemCount ?? 0,
+    metrics?.inventoryItems.parsed ?? 0,
+  );
+
   return {
     id: row.id,
     name: row.name,
@@ -141,7 +283,14 @@ function toSummary(
     orderMethod: row.orderMethod ?? "",
     monthlySpendCents: metrics?.ytdSpendCents ?? 0,
     ytdSpendCents: metrics?.ytdSpendCents ?? 0,
+    itemCount: metrics?.itemCount ?? 0,
+    unreviewedItemCount: metrics?.unreviewedItemCount ?? 0,
     productCount: metrics?.productCount ?? 0,
+    inventoryItems: metrics?.inventoryItems ?? { unique: 0, parsed: 0 },
+    nonInventoryItems: metrics?.nonInventoryItems ?? { unique: 0, parsed: 0 },
+    isInventorySource: row.isInventorySource,
+    noCatalogAcked: row.noCatalogAckedAt != null,
+    readiness,
     lastInvoiceDate: metrics?.lastInvoiceDate ?? null,
     updatedAt: row.updatedAt,
   };
@@ -149,7 +298,7 @@ function toSummary(
 
 function toDetail(
   row: SupplierRow,
-  metrics?: { productCount: number; ytdSpendCents: number; lastInvoiceDate: string | null },
+  metrics?: SupplierMetrics,
 ): SupplierDetail {
   return {
     ...toSummary(row, metrics),
@@ -513,6 +662,40 @@ export const suppliersService = {
         row,
       });
     });
+
+    return updated ? toDetail(updated) : null;
+  },
+
+  /**
+   * Park (or un-park) a supplier as "no catalog yet" — the conscious bypass for
+   * a kept inventory supplier that can't be priced from invoices yet. Setting it
+   * suppresses the catalog readiness requirement; clearing it restores the
+   * blocker. Readiness keys off live productCount, so once the supplier gains a
+   * product this ack is moot regardless (and is auto-cleared on approve).
+   */
+  async setNoCatalogAck(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      supplierId: string;
+      acked: boolean;
+    },
+  ): Promise<SupplierDetail | null> {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+
+    const updated = await ctx.appDb.rls((tx) =>
+      suppliersRepo.updateSupplier(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        supplierId: args.supplierId,
+        row: {
+          noCatalogAckedAt: args.acked ? new Date().toISOString() : null,
+          noCatalogAckedBy: args.acked ? ctx.userId : null,
+          updatedAt: new Date().toISOString(),
+        },
+      }),
+    );
 
     return updated ? toDetail(updated) : null;
   },

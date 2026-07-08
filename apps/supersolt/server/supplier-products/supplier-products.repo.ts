@@ -6,6 +6,7 @@ import {
   ilike,
   inArray,
   isNull,
+  max,
   or,
   sql,
   type SQL,
@@ -157,6 +158,54 @@ export const supplierProductsRepo = {
       .limit(1);
 
     return rows[0] ?? null;
+  },
+
+  async listByIds(
+    tx: RlsTx,
+    args: { organisationId: string; productIds: string[] },
+  ): Promise<SupplierProductRow[]> {
+    if (args.productIds.length === 0) return [];
+    return tx
+      .select()
+      .from(supplierProducts)
+      .where(
+        and(
+          eq(supplierProducts.organisationId, args.organisationId),
+          inArray(supplierProducts.id, args.productIds),
+          isNull(supplierProducts.archivedAt),
+        ),
+      );
+  },
+
+  /**
+   * Latest price-history `changedAt` per product. Seeded history carries the
+   * invoice date; manual edits default to now() — so this is the date the
+   * forward-only re-import guard compares an incoming invoice against.
+   */
+  async getLatestPriceChangeAtByProductIds(
+    tx: RlsTx,
+    args: { organisationId: string; productIds: string[] },
+  ): Promise<Map<string, string>> {
+    if (args.productIds.length === 0) return new Map();
+    const rows = await tx
+      .select({
+        productId: supplierProductPriceHistory.supplierProductId,
+        latest: max(supplierProductPriceHistory.changedAt),
+      })
+      .from(supplierProductPriceHistory)
+      .where(
+        and(
+          eq(supplierProductPriceHistory.organisationId, args.organisationId),
+          inArray(supplierProductPriceHistory.supplierProductId, args.productIds),
+        ),
+      )
+      .groupBy(supplierProductPriceHistory.supplierProductId);
+
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      if (row.latest) map.set(row.productId, row.latest);
+    }
+    return map;
   },
 
   async countBySupplierIds(

@@ -1,4 +1,7 @@
-import type { InventorySetupImportResult } from "@/entities/inventory-setup/model/types";
+import type {
+  InventorySetupImportResult,
+  InvoiceFirstImportResult,
+} from "@/entities/inventory-setup/model/types";
 
 import type { SquareCatalogImportResult } from "@/entities/pos-catalog-import/model/types";
 
@@ -64,11 +67,67 @@ export type ImportJobStepId = XeroImportJobStepId | SquareCatalogImportStepId;
 
 
 
+/** One real invoice the parse step just finished, for the live activity feed. */
+export type ImportJobInvoiceActivity = {
+
+  /** Stable invoice id — unique render key for the activity feed. */
+  id: string;
+
+  supplier: string | null;
+
+  number: string | null;
+
+  amountCents: number | null;
+
+  items: number;
+
+  ok: boolean;
+
+  /**
+   * Invoice-first import: how this invoice's supplier was resolved from its
+   * header — matched by ABN, matched by name, or minted fresh. Absent on the
+   * legacy contact-based flow.
+   */
+  supplierAction?: "matched_abn" | "matched_name" | "created" | null;
+
+};
+
+/**
+ * One diagnostic line in a step's live event log — connection checks, pages
+ * fetched, rate-limit hits — newest first, capped (mirrors the server type).
+ */
+export type ImportJobStepLogEvent = {
+
+  /** ISO timestamp of when the event happened. */
+  at: string;
+
+  text: string;
+
+  kind: "info" | "throttle" | "error";
+
+};
+
 export type ImportJobStepProgress = {
 
   current: number;
 
   total: number;
+
+  /** Wall-clock ms since the step's work began — lets the UI show an ETA. */
+  elapsedMs?: number;
+
+  /** Most-recently completed items, newest first (capped). */
+  recent?: ImportJobInvoiceActivity[];
+
+  /**
+   * When Xero has throttled us and the whole fleet is paused, the epoch-ms
+   * timestamp work resumes at — lets the UI show a live "resuming in 0:42"
+   * countdown instead of an unexplained stall. Null/absent when running freely.
+   */
+  throttledUntilMs?: number | null;
+
+  /** Live diagnostic event log for this step, newest first (capped). */
+  events?: ImportJobStepLogEvent[];
 
 };
 
@@ -94,7 +153,11 @@ export type ImportJobStep = {
 
 
 
-export type ImportJobResult = InventorySetupImportResult | SquareCatalogImportResult | null;
+export type ImportJobResult =
+  | InventorySetupImportResult
+  | InvoiceFirstImportResult
+  | SquareCatalogImportResult
+  | null;
 
 
 

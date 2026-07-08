@@ -1031,6 +1031,8 @@ export const suppliers = pgTable("suppliers", {
 	xeroContactId: text("xero_contact_id"),
 	detailsSourceInvoiceDate: date("details_source_invoice_date"),
 	isInventorySource: boolean("is_inventory_source").default(true).notNull(),
+	noCatalogAckedAt: timestamp("no_catalog_acked_at", { withTimezone: true, mode: 'string' }),
+	noCatalogAckedBy: uuid("no_catalog_acked_by"),
 }, (table) => [
 	index("idx_suppliers_org_list").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
 	index("idx_suppliers_org_venue_list").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops"), table.venueId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
@@ -1954,6 +1956,7 @@ export const venueInvoices = pgTable("venue_invoices", {
 	attachmentParsedAt: timestamp("attachment_parsed_at", { withTimezone: true, mode: 'string' }),
 	attachmentParseFingerprint: text("attachment_parse_fingerprint"),
 	attachmentParseError: text("attachment_parse_error"),
+	hasAttachments: boolean("has_attachments"),
 }, (table) => [
 	index("venue_invoices_org_idx").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")),
 	index("venue_invoices_po_idx").using("btree", table.purchaseOrderId.asc().nullsLast().op("uuid_ops")).where(sql`(purchase_order_id IS NOT NULL)`),
@@ -4095,6 +4098,7 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
 	rawDescription: text("raw_description").notNull(),
 	rawDescriptionNormalized: text("raw_description_normalized").notNull(),
 	rawUnit: text("raw_unit"),
+	rawUnitNormalized: text("raw_unit_normalized").default('').notNull(),
 	lastQuantity: numeric("last_quantity"),
 	lastUnitPriceCents: integer("last_unit_price_cents"),
 	lastLineTotalCents: integer("last_line_total_cents"),
@@ -4110,6 +4114,9 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	createdBy: uuid("created_by"),
 	updatedBy: uuid("updated_by"),
+	reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: 'string' }),
+	reviewedBy: uuid("reviewed_by"),
+	normalisationSuggestion: jsonb("normalisation_suggestion"),
 }, (table) => [
 	index("idx_supplier_raw_items_org_supplier").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops"), table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
 	index("idx_supplier_raw_items_pending").using("btree", table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`((archived_at IS NULL) AND (normalisation_status = 'pending'::text))`),
@@ -4133,7 +4140,7 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
 			foreignColumns: [supplierProducts.id],
 			name: "supplier_raw_items_supplier_product_id_fkey"
 		}).onDelete("set null"),
-	unique("supplier_raw_items_supplier_dedupe_uq").on(table.supplierId, table.rawDescriptionNormalized),
+	unique("supplier_raw_items_supplier_dedupe_uq").on(table.supplierId, table.rawDescriptionNormalized, table.rawUnitNormalized),
 	pgPolicy("supplier_raw_items_all", { as: "permissive", for: "all", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
    FROM user_organisations uo
   WHERE ((uo.organisation_id = supplier_raw_items.organisation_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`, withCheck: sql`(EXISTS ( SELECT 1
@@ -4155,6 +4162,9 @@ export const supplierProducts = pgTable("supplier_products", {
 	unitsPerPack: numeric("units_per_pack").default('1').notNull(),
 	packUnit: text("pack_unit").default('each').notNull(),
 	unitPriceCents: integer("unit_price_cents").default(0).notNull(),
+	portionSize: numeric("portion_size"),
+	portionUnit: text("portion_unit"),
+	portionLabel: text("portion_label"),
 	isActiveForIngredient: boolean("is_active_for_ingredient").default(false).notNull(),
 	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),

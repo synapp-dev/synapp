@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import { useScopedSettingsAccess } from "@/entities/access/model/use-scoped-settings-access";
@@ -22,14 +24,11 @@ import { SquareLocationPicker } from "@/entities/square/components/square-locati
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select";
 import { Switch } from "@workspace/ui/components/switch";
+
+import { SearchCombobox } from "@/components/molecules/search-combobox";
+import { SmartFillRecipesButton } from "@/entities/pos-catalog-import/components/smart-fill-recipes-button";
+import { isInventorySetupSectionsUnlockedForDev } from "@/lib/inventory-setup/dev-unlock-all-sections";
 import {
   Table,
   TableBody,
@@ -87,6 +86,7 @@ export function PosCatalogImportPage({
 }) {
   const access = useScopedSettingsAccess();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const listQuery = usePosCatalogImportQuery({ organisationSlug, venueSlug });
   const squareQuery = useVenueSquareConnectionQuery(organisationSlug, venueSlug);
   const recipesQuery = useRecipesQuery({
@@ -172,18 +172,51 @@ export function PosCatalogImportPage({
             </CardDescription>
           </div>
           {canWrite ? (
-            <Button
-              type="button"
-              onClick={() => void startImport()}
-              disabled={
-                isImportInProgress ||
-                !squareQuery.data?.connected ||
-                !squareQuery.data?.locationConfigured ||
-                listQuery.isLoading
-              }
-            >
-              {isImportInProgress ? "Importing…" : "Import from Square"}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {summary?.posImportRan && isInventorySetupSectionsUnlockedForDev() ? (
+                <SmartFillRecipesButton
+                  organisation={organisationSlug}
+                  venue={venueSlug}
+                  rows={rows}
+                />
+              ) : null}
+              {summary?.posImportRan &&
+              rows.some((row) => row.showOnMenu && !row.missingFromSquare) ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() =>
+                    router.push(
+                      buildScopedPath(
+                        organisationSlug,
+                        venueSlug,
+                        "settings/inventory-setup/products/wizard",
+                      ),
+                    )
+                  }
+                >
+                  <Sparkles className="size-4" aria-hidden />
+                  {rows.some(
+                    (row) => row.showOnMenu && !row.recipeId && !row.missingFromSquare,
+                  )
+                    ? "Build recipes with AI"
+                    : "Review recipes"}
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                onClick={() => void startImport()}
+                disabled={
+                  isImportInProgress ||
+                  !squareQuery.data?.connected ||
+                  !squareQuery.data?.locationConfigured ||
+                  listQuery.isLoading
+                }
+              >
+                {isImportInProgress ? "Importing…" : "Import from Square"}
+              </Button>
+            </div>
           ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
@@ -277,9 +310,21 @@ export function PosCatalogImportPage({
                           />
                         </TableCell>
                         <TableCell className="min-w-[12rem]">
-                          <Select
+                          <SearchCombobox
                             value={row.recipeId ?? "none"}
                             disabled={!canWrite}
+                            ariaLabel={`Recipe for ${row.name}`}
+                            placeholder="Map recipe"
+                            searchPlaceholder="Search recipes…"
+                            emptyLabel="No recipe matches."
+                            options={[
+                              { value: "none", label: "Unmapped" },
+                              { value: CREATE_RECIPE_VALUE, label: "+ Create new recipe" },
+                              ...recipes.map((recipe) => ({
+                                value: recipe.id,
+                                label: recipe.name,
+                              })),
+                            ]}
                             onValueChange={(value) => {
                               if (value === CREATE_RECIPE_VALUE) {
                                 setCreateTarget({
@@ -293,22 +338,7 @@ export function PosCatalogImportPage({
                                 value === "none" ? null : value,
                               );
                             }}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Map recipe" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Unmapped</SelectItem>
-                              <SelectItem value={CREATE_RECIPE_VALUE}>
-                                + Create new recipe
-                              </SelectItem>
-                              {recipes.map((recipe) => (
-                                <SelectItem key={recipe.id} value={recipe.id}>
-                                  {recipe.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          />
                           {row.recipeCostIncomplete ? (
                             <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
                               Incomplete recipe — add ingredients to set cost

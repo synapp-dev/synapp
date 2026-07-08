@@ -48,8 +48,11 @@ import {
   isImportJobAwaitingSelection,
   isImportJobInProgress,
 } from "@/entities/inventory-setup/lib/import-job-progress";
+import { StepEventLog } from "@/entities/inventory-setup/components/import-activity-view";
+import { XeroThrottleCountdown } from "@/entities/inventory-setup/components/xero-throttle-countdown";
 
 import type {
+  ImportJobInvoiceActivity,
   ImportJobRow,
   ImportJobStep,
   ImportJobStepStatus,
@@ -57,6 +60,7 @@ import type {
 import type {
   InventorySetupImportGateState,
   InventorySetupImportResult,
+  InvoiceFirstImportResult,
   SelectableSupplier,
 } from "@/entities/inventory-setup/model/types";
 import type { SquareCatalogImportResult } from "@/entities/pos-catalog-import/model/types";
@@ -92,6 +96,82 @@ function StepIcon({ status }: { status: ImportJobStepStatus }) {
 }
 
 
+
+function formatFeedAmount(cents: number | null): string | null {
+  if (cents == null) return null;
+  return `$${(cents / 100).toLocaleString("en-AU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function activityActionLabel(
+  action: ImportJobInvoiceActivity["supplierAction"],
+): string | null {
+  switch (action) {
+    case "created":
+      return "new supplier";
+    case "matched_abn":
+      return "matched by ABN";
+    case "matched_name":
+      return "matched by name";
+    default:
+      return null;
+  }
+}
+
+/**
+ * The live per-invoice feed under the running step — the user watches each
+ * bill get read, its supplier resolved off the header, and its items counted.
+ */
+function InvoiceActivityFeed({ recent }: { recent: ImportJobInvoiceActivity[] }) {
+  if (recent.length === 0) return null;
+  return (
+    <ul className="mt-2 space-y-1">
+      {recent.map((activity) => {
+        const action = activityActionLabel(activity.supplierAction);
+        const amount = formatFeedAmount(activity.amountCents);
+        return (
+          <li
+            key={activity.id}
+            className="animate-in fade-in slide-in-from-top-1 flex items-center gap-2 rounded-md bg-background/70 px-2 py-1 text-xs"
+          >
+            {activity.ok ? (
+              <CheckCircle2 className="size-3 shrink-0 text-emerald-600" />
+            ) : (
+              <XCircle className="text-destructive size-3 shrink-0" />
+            )}
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium">
+                {activity.supplier ?? activity.number ?? "Invoice"}
+              </span>
+              {action ? (
+                <span
+                  className={cn(
+                    "ml-1.5",
+                    activity.supplierAction === "created"
+                      ? "text-primary font-medium"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {action}
+                </span>
+              ) : null}
+              {activity.items > 0 ? (
+                <span className="text-muted-foreground ml-1.5">
+                  +{activity.items} item{activity.items === 1 ? "" : "s"}
+                </span>
+              ) : null}
+            </span>
+            {amount ? (
+              <span className="text-muted-foreground shrink-0 tabular-nums">{amount}</span>
+            ) : null}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
 
 function StepRow({ step, isActive }: { step: ImportJobStep; isActive: boolean }) {
 
@@ -141,6 +221,25 @@ function StepRow({ step, isActive }: { step: ImportJobStep; isActive: boolean })
 
             <Progress value={progressPct} className="mt-2 h-1.5" />
 
+          ) : null}
+
+          {step.status === "running" ? (
+            <div className="mt-2">
+              <XeroThrottleCountdown throttledUntilMs={step.progress?.throttledUntilMs} />
+            </div>
+          ) : null}
+
+          {/* Live diagnostic log while running; kept on failure so the trail
+              that led up to the death stays visible. */}
+          {(step.status === "running" || step.status === "failed") &&
+          step.progress?.events?.length ? (
+            <div className="mt-2">
+              <StepEventLog events={step.progress.events} />
+            </div>
+          ) : null}
+
+          {step.status === "running" && step.progress?.recent?.length ? (
+            <InvoiceActivityFeed recent={step.progress.recent} />
           ) : null}
 
           {step.summary ? (
@@ -246,8 +345,16 @@ function SupplierSelectionStep({
   );
 }
 
+function isInvoiceFirstImportResult(
+  result: ImportJobRow["result"],
+): result is InvoiceFirstImportResult {
+  if (!result || !("suppliers" in result)) return false;
+  const suppliers = (result as InvoiceFirstImportResult).suppliers;
+  return Boolean(suppliers && typeof suppliers === "object" && "matchedByAbn" in suppliers);
+}
+
 function isXeroImportResult(result: ImportJobRow["result"]): result is InventorySetupImportResult {
-  return Boolean(result && "rawItems" in result);
+  return Boolean(result && "rawItems" in result && !isInvoiceFirstImportResult(result));
 }
 
 function isSquareImportResult(
@@ -290,7 +397,7 @@ export function ImportFromXeroProgressDialog({
   const title = isSquare ? "Importing from Square" : "Importing from Xero";
   const runningDescription = isSquare
     ? "Fetching your Square item library and creating POS lines. You can close this and keep working."
-    : "This may take a few minutes while we download invoice PDFs and extract product lines. You can close this and keep working — progress stays in the header.";
+    : "We're collecting every bill from the last 12 months and reading them one by one — your suppliers, items and prices come straight off the invoices. You can close this and keep working — progress stays in the header.";
   const completedDescription = isSquare
     ? "Import finished. Review POS lines and map recipes."
     : "Import finished. Review your suppliers and raw items.";
@@ -362,6 +469,20 @@ export function ImportFromXeroProgressDialog({
                 {result.menuItems.created} created, {result.menuItems.updated} updated from{" "}
                 {result.variationsSeen} Square variations
               </p>
+            ) : isInvoiceFirstImportResult(result) ? (
+              <>
+                <p>
+                  {result.rawItems.upserted} items catalogued from{" "}
+                  {result.invoices.parsed + result.invoices.alreadyParsed} invoices ·{" "}
+                  {result.suppliers.created} supplier
+                  {result.suppliers.created === 1 ? "" : "s"} created from invoice headers
+                </p>
+                {result.invoices.failed > 0 ? (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {result.invoices.failed} invoice(s) could not be read
+                  </p>
+                ) : null}
+              </>
             ) : isXeroImportResult(result) ? (
               <>
                 <p>

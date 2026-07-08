@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 
 import {
@@ -40,15 +40,18 @@ async function callSuggestLlm(args: {
   rawDescription: string;
   rawUnit: string | null;
   supplierName: string;
+  /** Nudge the model toward a different reading on a user-requested retry. */
+  vary?: boolean;
 }): Promise<NormalisationSuggestion> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
-    throw new SuggestUnavailableError("OPENAI_API_KEY is not configured");
+    throw new SuggestUnavailableError("ANTHROPIC_API_KEY is not configured");
   }
 
   const { object } = await generateObject({
-    model: openai("gpt-4o-mini"),
+    model: anthropic("claude-haiku-4-5-20251001"),
     schema: normalisationSuggestionSchema,
+    temperature: args.vary ? 0.7 : 0.2,
     messages: [
       {
         role: "user",
@@ -60,10 +63,19 @@ async function callSuggestLlm(args: {
           "Return JSON that separates:\n" +
           "- productName: cleaned purchasable product name\n" +
           "- packLabel: how it is sold (box, carton, bag, each, etc.)\n" +
-          "- unitsPerPack + packUnit: measurable content per pack (g, kg, mL, L, or each)\n" +
-          "- ingredientName + ingredientCategory + ingredientUnit for the master inventory list\n" +
+          "- unitsPerPack + packUnit: the measurable content of ONE pack in g, kg, mL, L, or each. " +
+          'Read any size baked into the description — "Red Onion Peeled 10kg" sold by the bag means 10 + kg per bag. ' +
+          "When the unit is non-metric (bunch, bag, punnet, each…) and no size is stated, ESTIMATE the typical " +
+          "metric weight or volume of one such pack in Australia (e.g. a bunch of basil ≈ 30 g, a bunch of " +
+          "bananas ≈ 1 kg), picking g/kg/mL/L sensibly. Prefer a metric unit over each for produce sold loosely.\n" +
+          "- ingredientName: a short master-inventory name. Drop pack sizes and brand noise, and move " +
+          'processing descriptors into parentheses — e.g. "Red Onion Peeled 10kg" → "Red Onion (Peeled)".\n' +
+          "- ingredientCategory + ingredientUnit for the master inventory list\n" +
           "- likelyNonInventory: true for fees, surcharges, freight, credits — not food inventory\n" +
           "- unitPriceCents: pack price in cents if inferable from the description, else null\n" +
+          (args.vary
+            ? "The user wasn't happy with the previous interpretation — offer a different, still-plausible reading.\n"
+            : "") +
           "Use Australian hospitality context. Be conservative on confidence when ambiguous.",
       },
     ],
@@ -81,6 +93,8 @@ export async function suggestNormalisationForRawItem(args: {
   lastQuantity: number | null;
   /** Deterministic pack size extracted from the invoice wording (e.g. "@160g"). */
   packHint?: PackHint | null;
+  /** User-requested retry — ask the model for a different reading. */
+  vary?: boolean;
 }): Promise<NormalisationSuggestion> {
   const keywordBucket = classifyRawItemBucket({
     rawDescription: args.rawDescription,
@@ -94,6 +108,7 @@ export async function suggestNormalisationForRawItem(args: {
         rawDescription: args.rawDescription,
         rawUnit: args.rawUnit,
         supplierName: args.supplierName,
+        vary: args.vary,
       });
 
       const likelyNonInventory =

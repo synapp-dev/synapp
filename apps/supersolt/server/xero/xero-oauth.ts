@@ -54,6 +54,8 @@ export async function exchangeXeroAuthorizationCode(
       code,
       redirect_uri: cfg.redirectUri,
     }),
+    // A hung identity call must fail loudly, not freeze an import forever.
+    signal: AbortSignal.timeout(30_000),
   });
 
   const body = (await res.json()) as XeroTokenSuccess & XeroTokenErrorBody;
@@ -98,6 +100,7 @@ export async function listXeroConnections(
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
     },
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {
@@ -150,6 +153,8 @@ export async function refreshXeroAccessToken(
       grant_type: "refresh_token",
       refresh_token: refreshToken,
     }),
+    // A hung token refresh must fail loudly, not freeze an import forever.
+    signal: AbortSignal.timeout(30_000),
   });
 
   const body = (await res.json()) as XeroTokenSuccess & XeroTokenErrorBody;

@@ -1,3 +1,4 @@
+import { fetchXero } from "@/server/xero/xero-request-queue";
 import type { XeroApiInvoice } from "@/server/xero/xero-invoice-map";
 
 const XERO_ACCOUNTING_INVOICES_URL = "https://api.xero.com/api.xro/2.0/Invoices";
@@ -31,7 +32,7 @@ export async function getXeroAccountingInvoice(args: {
   | { ok: false; message: string; status: number }
 > {
   const id = encodeURIComponent(args.xeroInvoiceId.trim());
-  const res = await fetch(`${XERO_ACCOUNTING_INVOICES_URL}/${id}`, {
+  const res = await fetchXero(`${XERO_ACCOUNTING_INVOICES_URL}/${id}`, {
     headers: {
       Authorization: `Bearer ${args.accessToken}`,
       Accept: "application/json",

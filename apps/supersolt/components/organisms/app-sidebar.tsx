@@ -71,6 +71,7 @@ import {
 } from "@/entities/readiness/lib/module-paths";
 import { useVenueReadinessQuery } from "@/entities/readiness/model/use-venue-readiness-query";
 import { applyReadinessToNavItems } from "@/lib/readiness/apply-readiness-to-nav";
+import { isFullSidebarUnlockedForDev } from "@/lib/dev-full-sidebar-unlock";
 
 type AccessControlledItem = {
   title: string;
@@ -468,9 +469,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const features = currentUser?.features ?? [];
   const { data: onboardingState } = useOnboardingStateQuery();
   const needsSetupNav =
-    Boolean(currentUser?.needsSetup) ||
-    (pathname.startsWith("/setup") &&
-      (!onboardingState || !onboardingState.completed));
+    !isFullSidebarUnlockedForDev() &&
+    (Boolean(currentUser?.needsSetup) ||
+      (pathname.startsWith("/setup") &&
+        (!onboardingState || !onboardingState.completed)));
   const topPlatformNavItems = useMemo(() => {
     if (!needsSetupNav) {
       return [];
@@ -538,11 +540,20 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     features,
   );
 
-  const { data: venueReadiness } = useVenueReadinessQuery({
+  const { data: rawVenueReadiness } = useVenueReadinessQuery({
     organisationSlug: resolvedScope?.organisationSlug,
     venueSlug: resolvedScope?.venueSlug,
     enabled: Boolean(resolvedScope && !needsSetupNav),
   });
+
+  // Dev-only escape hatch: drop readiness/account-setup gating so every module
+  // (Stock Management, etc.) shows unlocked. RBAC controls are untouched.
+  const venueReadiness = useMemo(() => {
+    if (!rawVenueReadiness || !isFullSidebarUnlockedForDev()) {
+      return rawVenueReadiness;
+    }
+    return { ...rawVenueReadiness, appliesGating: false };
+  }, [rawVenueReadiness]);
 
   const readinessNavItems = useMemo(
     () => applyReadinessToNavItems(visiblePlatformItems, venueReadiness ?? null),

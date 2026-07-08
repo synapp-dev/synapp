@@ -1,4 +1,5 @@
 import type { DeliveryScheduleEntry, ScheduleOverrideEntry } from "./schedule-types";
+import type { SupplierReadiness } from "./supplier-readiness";
 
 export type { DeliveryScheduleEntry, ScheduleOverrideEntry } from "./schedule-types";
 
@@ -26,7 +27,20 @@ export type SupplierSummary = {
   orderMethod: string;
   monthlySpendCents: number;
   ytdSpendCents: number;
+  itemCount: number;
+  /** Detected raw items still awaiting an approve/skip decision. */
+  unreviewedItemCount: number;
+  /** Approved supplier_products — the supplier's priced catalog. */
   productCount: number;
+  /** Likely-inventory items: unique products + total raw items parsed. */
+  inventoryItems: { unique: number; parsed: number };
+  /** Non-inventory items (packaging, fees…): unique + total parsed. */
+  nonInventoryItems: { unique: number; parsed: number };
+  /** Whether this supplier is flagged as an inventory source. */
+  isInventorySource: boolean;
+  /** Whether the user has parked this supplier as "no catalog yet". */
+  noCatalogAcked: boolean;
+  readiness: SupplierReadiness;
   lastInvoiceDate: string | null;
   updatedAt: string;
 };
@@ -51,6 +65,11 @@ export type SupplierDetail = SupplierSummary & {
 export type SupplierListResponse = {
   suppliers: SupplierSummary[];
   total: number;
+};
+
+/** Bot-inferred values for empty supplier fields (currently just category). */
+export type SupplierFieldSuggestions = {
+  category: SupplierCategory | null;
 };
 
 export type UpsertSupplierInput = {

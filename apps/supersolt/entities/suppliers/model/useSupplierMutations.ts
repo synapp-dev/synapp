@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { suppliersApi } from "@/entities/suppliers/api/endpoints";
 import { suppliersKeys } from "@/entities/suppliers/model/keys";
+import { inventorySetupKeys } from "@/entities/inventory-setup/model/keys";
 import type { UpsertSupplierInput } from "@/entities/suppliers/model/types";
 
 type ScopedInput = {
@@ -23,12 +24,29 @@ type DeleteSupplierInput = ScopedInput & {
   supplierId: string;
 };
 
+type NoCatalogAckInput = ScopedInput & {
+  supplierId: string;
+  acked: boolean;
+};
+
+type RetryCatalogInput = ScopedInput & {
+  supplierId: string;
+  daysBack?: number;
+};
+
 export function useSupplierMutations(scope: ScopedInput) {
   const queryClient = useQueryClient();
 
   const invalidateScopedQueries = async () => {
     await queryClient.invalidateQueries({
       queryKey: suppliersKeys.scope(scope.organisationSlug, scope.venueSlug),
+    });
+    // Readiness + the empty-supplier counts feed the wizard progress too.
+    await queryClient.invalidateQueries({
+      queryKey: inventorySetupKeys.progress(
+        scope.organisationSlug,
+        scope.venueSlug,
+      ),
     });
   };
 
@@ -94,9 +112,57 @@ export function useSupplierMutations(scope: ScopedInput) {
     },
   });
 
+  const setNoCatalogAck = useMutation({
+    mutationFn: async (input: NoCatalogAckInput) => {
+      const { data, error } = await suppliersApi.post.noCatalogAck(input);
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (!data) {
+        throw new Error("Failed to update supplier");
+      }
+      return data;
+    },
+    onSuccess: async (_data, variables) => {
+      await invalidateScopedQueries();
+      await queryClient.invalidateQueries({
+        queryKey: suppliersKeys.detail(
+          variables.organisationSlug,
+          variables.venueSlug,
+          variables.supplierId,
+        ),
+      });
+    },
+  });
+
+  const retryCatalogLookback = useMutation({
+    mutationFn: async (input: RetryCatalogInput) => {
+      const { data, error } = await suppliersApi.post.retryCatalog(input);
+      if (error) {
+        throw new Error(error.message);
+      }
+      if (!data) {
+        throw new Error("Failed to look back for this supplier");
+      }
+      return data;
+    },
+    onSuccess: async (_data, variables) => {
+      await invalidateScopedQueries();
+      await queryClient.invalidateQueries({
+        queryKey: suppliersKeys.detail(
+          variables.organisationSlug,
+          variables.venueSlug,
+          variables.supplierId,
+        ),
+      });
+    },
+  });
+
   return {
     createSupplier,
     updateSupplier,
     deleteSupplier,
+    setNoCatalogAck,
+    retryCatalogLookback,
   };
 }

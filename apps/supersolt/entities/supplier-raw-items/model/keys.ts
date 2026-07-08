@@ -4,4 +4,6 @@ export const supplierRawItemsKeys = {
     [...supplierRawItemsKeys.all, "list", organisationSlug, venueSlug, supplierId, search ?? ""] as const,
   sources: (organisationSlug: string, venueSlug: string, supplierId: string) =>
     [...supplierRawItemsKeys.all, "sources", organisationSlug, venueSlug, supplierId] as const,
+  reviewProducts: (organisationSlug: string, venueSlug: string, supplierId: string) =>
+    [...supplierRawItemsKeys.all, "review-products", organisationSlug, venueSlug, supplierId] as const,
 };

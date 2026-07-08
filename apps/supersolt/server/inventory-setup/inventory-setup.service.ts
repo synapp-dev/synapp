@@ -7,7 +7,9 @@ import {
   type InventorySetupProgress,
 } from "@/server/inventory-setup/inventory-setup-progress";
 import {
+  applyWizardStatePatch,
   buildWizardModel,
+  WIZARD_ACK_KEYS,
   type InventorySetupWizardModel,
 } from "@/server/inventory-setup/wizard-model";
 import { inventorySetupWizardStateRepo } from "@/server/inventory-setup/inventory-setup-wizard-state.repo";
@@ -17,18 +19,38 @@ import { parseInvoiceAttachmentsForInventorySetup } from "@/server/inventory-set
 import {
   IMPORT_JOB_SELECTION_GATE,
   INITIAL_IMPORT_JOB_STEPS,
+  INITIAL_INVOICE_FIRST_IMPORT_STEPS,
   type ImportJobRow,
 } from "@/server/inventory-setup/inventory-setup-import-job.types";
 import { inventorySetupImportJobRepo } from "@/server/inventory-setup/inventory-setup-import-job.repo";
 import { InventorySetupImportJobTracker } from "@/server/inventory-setup/inventory-setup-import-job.tracker";
-import { wipeVenueProcurementData } from "@/server/inventory-setup/inventory-setup-restart.repo";
+import {
+  resetVenueNormalisation,
+  resetVenueProducts,
+  wipeVenueProcurementData,
+} from "@/server/inventory-setup/inventory-setup-restart.repo";
 import { aggregateInvoiceLinesToRawCatalogForVenue } from "@/server/supplier-raw-items/aggregate-invoice-lines";
+import { propagateReimportInvoicePrices } from "@/server/supplier-products/supplier-products.service";
+import { ensureSuppliersFromPurchaseOrders } from "@/server/inventory-setup/purchase-orders-ingest";
+import {
+  classifySuppliersByAccount,
+  isLikelyNonInventorySupplierName,
+} from "@/server/inventory-setup/classify-suppliers-by-account";
+import {
+  foldOrphanBillsByAccount,
+  isPlaceholderSupplierName,
+} from "@/server/inventory-setup/fold-orphan-bills";
 import { supplierRawItemsRepo } from "@/server/supplier-raw-items/supplier-raw-items.repo";
 import { suppliersRepo } from "@/server/suppliers/suppliers.repo";
+import {
+  countReadySuppliersForVenue,
+  countInventorySupplierResolutionForVenue,
+} from "@/server/suppliers/suppliers.service";
 import { posCatalogImportRepo } from "@/server/pos-catalog-import/pos-catalog-import.repo";
 import { readinessRepo } from "@/server/readiness/readiness.repo";
 import { syncVenueXeroSuppliers } from "@/server/xero/xero-suppliers.service";
 import { syncVenueXeroInvoices } from "@/server/xero/xero-invoices.service";
+import { describeXeroRateLimit } from "@/server/xero/xero-request-queue";
 
 export type InventorySetupImportResult = {
   suppliers: {
@@ -56,6 +78,16 @@ export type InventorySetupRestartResult = {
   importJobsRemoved: number;
 };
 
+export type InventorySetupNormalisationResetResult = {
+  itemsReset: number;
+  productsRemoved: number;
+};
+
+export type InventorySetupProductsResetResult = {
+  recipesRemoved: number;
+  mappingsRemoved: number;
+};
+
 export type InventorySetupProgressResponse = InventorySetupProgress & {
   wizard: InventorySetupWizardModel;
 };
@@ -65,6 +97,13 @@ export type SelectableSupplier = {
   id: string;
   name: string;
   isInventorySource: boolean;
+  email: string | null;
+  orderingEmail: string | null;
+  phone: string | null;
+  /** Pre-tick state suggested from how the supplier's Xero bills are coded. */
+  suggestedInventory: boolean;
+  /** Short human reason behind the suggestion, e.g. "Bills coded to overheads (Rent)". */
+  classificationReason: string | null;
 };
 
 /**
@@ -129,6 +168,20 @@ export const inventorySetupService = {
         organisationId: scope.organisationId,
         venueId: scope.venueId,
       });
+      const unreviewedRawItemCount =
+        await supplierRawItemsRepo.countUnreviewedForOrganisationVenue(tx, {
+          organisationId: scope.organisationId,
+          venueId: scope.venueId,
+        });
+      const readySupplierCount = await countReadySuppliersForVenue(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+      });
+      const inventoryResolution =
+        await countInventorySupplierResolutionForVenue(tx, {
+          organisationId: scope.organisationId,
+          venueId: scope.venueId,
+        });
       const posImportRan = await posCatalogImportRepo.hasCompletedSquareImport(tx, scope.venueId);
       const inUseMenuItemCount = await posCatalogImportRepo.countInUseWithSquareLink(tx, {
         organisationId: scope.organisationId,
@@ -153,6 +206,11 @@ export const inventorySetupService = {
           pendingRawItemCount: statusCounts.pending,
           normalisedRawItemCount: statusCounts.normalised,
           skippedRawItemCount: statusCounts.skipped,
+          unreviewedRawItemCount,
+          readySupplierCount,
+          unresolvedInventorySupplierCount: inventoryResolution.unresolvedCount,
+          emptyUnackedInventorySupplierCount:
+            inventoryResolution.emptyUnackedCount,
           posImportRan,
           inUseMenuItemCount,
           mappedInUseCount,
@@ -184,7 +242,12 @@ export const inventorySetupService = {
 
   async createImportJob(
     ctx: RequestAuthContext,
-    args: { organisationSlug: string; venueSlug: string },
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      /** "invoice_first" seeds the invoice-first steps (no contact sync/gate). */
+      variant?: "invoice_first";
+    },
   ): Promise<ImportJobRow> {
     const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
     assertInventorySetupWriteAccess(ctx.tenantRoles, {
@@ -206,7 +269,11 @@ export const inventorySetupService = {
       venueId: scope.venueId,
       createdByUserId: ctx.userId,
       jobType: "xero",
-      steps: structuredClone(INITIAL_IMPORT_JOB_STEPS),
+      steps: structuredClone(
+        args.variant === "invoice_first"
+          ? INITIAL_INVOICE_FIRST_IMPORT_STEPS
+          : INITIAL_IMPORT_JOB_STEPS,
+      ),
     });
   },
 
@@ -237,6 +304,35 @@ export const inventorySetupService = {
       return null;
     }
     return job;
+  },
+
+  /**
+   * User-requested abort of an in-flight import. Flips the job to failed with a
+   * "Cancelled" message; the running loop polls its row and winds down. Nothing
+   * already downloaded or parsed is lost — a re-run skips it via stored
+   * attachments + parse fingerprints and only fetches what's missing.
+   */
+  async cancelImportJob(
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string; venueSlug: string; jobId: string },
+  ): Promise<{ cancelled: boolean }> {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+    assertInventorySetupWriteAccess(ctx.tenantRoles, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+    const job = await inventorySetupImportJobRepo.getById(ctx.appDb, args.jobId);
+    if (!job || job.venueId !== scope.venueId) {
+      throw new InventorySetupServiceError(404, "Import job not found");
+    }
+    const cancelled = await inventorySetupImportJobRepo.cancel(ctx.appDb, args.jobId);
+    console.info("[inventory-setup] import_cancelled", {
+      venueId: scope.venueId,
+      jobId: args.jobId,
+      userId: ctx.userId,
+      cancelled,
+    });
+    return { cancelled };
   },
 
   async importFromXero(
@@ -304,27 +400,59 @@ export const inventorySetupService = {
       });
 
       if (supplierSync.error && supplierSync.fetchedFromXero === 0) {
+        // On a Xero rate-limit, swap the raw "(429)" for a clear message with the
+        // actual local time the limit resets, computed from the Retry-After header.
+        const failureMessage = supplierSync.rateLimit
+          ? describeXeroRateLimit({
+              retryAfterSeconds: supplierSync.rateLimit.retryAfterSeconds,
+              problem: supplierSync.rateLimit.problem,
+              timezone: scope.timezone,
+              nowMs: Date.now(),
+            })
+          : supplierSync.error;
         const result: InventorySetupImportResult = {
           suppliers: {
             created: 0,
             updated: 0,
             skipped: 0,
-            errors: supplierSync.error ? [supplierSync.error] : [],
+            errors: [failureMessage],
           },
           invoices: { synced: 0, parsedFromAttachment: 0, parseFailed: [] },
           rawItems: { upserted: 0, skipped: 0 },
           deliverySuggestions: { suppliersSuggested: 0 },
-          error: supplierSync.error,
+          error: failureMessage,
         };
-        await tracker?.failStep("suppliers", supplierSync.error);
-        await tracker?.fail(supplierSync.error, result);
+        await tracker?.failStep("suppliers", failureMessage);
+        await tracker?.fail(failureMessage, result);
         console.info("[inventory-setup] import_completed", result);
         return result;
       }
 
+      // Suppliers we only raise POs to (no bills, e.g. Morabito Fruit & Veg) are
+      // skipped by the contact sync. Create them from PO contacts now so they show
+      // up in the selection gate alongside the bill suppliers. Non-fatal on failure.
+      // Run this BEFORE completing the step so the summary can account for both
+      // sources — otherwise the "N new" count looks inconsistent with the larger
+      // selection list (which also includes these PO-derived suppliers).
+      const poSuppliers = await ensureSuppliersFromPurchaseOrders(ctx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+      });
+      if (poSuppliers.error) {
+        console.warn(
+          "[inventory-setup] PO supplier creation skipped",
+          poSuppliers.error,
+        );
+      }
+
+      // Combine both sources (bill contacts + PO-only contacts) into one "new"
+      // count so the sidebar matches the supplier list shown in the gate.
+      const newSuppliers = supplierSync.created + poSuppliers.created;
       await tracker?.completeStep(
         "suppliers",
-        `${supplierSync.created} new, ${supplierSync.updated} updated`,
+        supplierSync.updated > 0
+          ? `${newSuppliers} new, ${supplierSync.updated} updated`
+          : `${newSuppliers} new`,
       );
 
       // Phase 2 selection gate: pause RIGHT AFTER suppliers are fetched, before
@@ -333,12 +461,47 @@ export const inventorySetupService = {
       // (parseSelectedSuppliersForSetup). Non-interactive callers (no jobId)
       // fall through and import everything, as before.
       if (tracker) {
-        const selectableSuppliers = await ctx.appDb.rls((tx) =>
+        const selectableRows = await ctx.appDb.rls((tx) =>
           suppliersRepo.listForVenueSelection(tx, {
             organisationId: scope.organisationId,
             venueId: scope.venueId,
           }),
         );
+
+        // Pre-classify each supplier from how its Xero bills are coded (Direct
+        // Costs → ingredient supplier, overheads → not). Non-fatal: on failure the
+        // gate falls back to its old all-pre-ticked behaviour.
+        const classification = await classifySuppliersByAccount(ctx, {
+          organisationId: scope.organisationId,
+          venueId: scope.venueId,
+        });
+        if (classification.error) {
+          console.warn(
+            "[inventory-setup] supplier classification skipped",
+            classification.error,
+          );
+        }
+
+        const selectableSuppliers: SelectableSupplier[] = selectableRows
+          // Hide placeholder contacts ("No Contact") — they're not a real user
+          // decision and get folded into their true supplier by account code
+          // during parsing. Showing them invites the user to untick something that
+          // would then skip its bills.
+          .filter((row) => !isPlaceholderSupplierName(row.name))
+          .map((row) => {
+            // Names that are never an orderable ingredient supplier (the tax office,
+            // payment processors) are pushed to the excluded list regardless of how
+            // their bills are coded — the user can still re-tick them in the gate.
+            if (isLikelyNonInventorySupplierName(row.name)) {
+              return { ...row, suggestedInventory: false, classificationReason: "Looks non-inventory" };
+            }
+            const suggestion = classification.suggestions.get(row.id);
+            return {
+              ...row,
+              suggestedInventory: suggestion ? suggestion.suggestedInventory : true,
+              classificationReason: suggestion ? suggestion.reason : null,
+            };
+          });
         const gateState: InventorySetupImportGateState = {
           stage: "awaiting_selection",
           suppliers: {
@@ -382,14 +545,16 @@ export const inventorySetupService = {
         venueId: scope.venueId,
       });
 
-      await ctx.appDb.rls((tx) =>
-        supplierRawItemsRepo.clearForVenueScope(tx, {
-          organisationId: scope.organisationId,
-          venueId: scope.venueId,
-        }),
-      );
-
+      // Non-destructive: aggregation upserts by (supplier + normalized desc +
+      // unit) and preserves review/normalisation status + product links, so a
+      // re-run merges fresh prices in without wiping the user's work. The wipe
+      // lives only behind the explicit restart action (wipeVenueProcurementData).
       const rawItems = await aggregateInvoiceLinesToRawCatalogForVenue(ctx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+      });
+
+      await propagateReimportInvoicePrices(ctx, {
         organisationId: scope.organisationId,
         venueId: scope.venueId,
       });
@@ -498,12 +663,32 @@ export const inventorySetupService = {
       const invoiceSync = await syncVenueXeroInvoices(ctx, {
         organisationSlug: args.organisationSlug,
         venueSlug: args.venueSlug,
-        // Only the last 8 weeks of bills — recent invoices are what matter for
-        // learning a supplier's items, and it keeps PDF parsing cheap.
-        daysBack: args.daysBack ?? 56,
+        // Last 90 days of bills. Every invoice in this window that's mapped to a
+        // kept supplier is fully parsed below — so the supplier drawer later shows
+        // exactly this synced set, already parsed, with no live re-fetch.
+        daysBack: args.daysBack ?? 90,
         skipApiLineItems: true,
       });
       await tracker.completeStep("invoices", `${invoiceSync.synced} invoices synced`);
+
+      // Fold "No Contact"-style orphan bills into their true supplier by account
+      // code (a per-supplier purchase account uniquely identifies the supplier),
+      // BEFORE parsing — so the reattributed bills are read under the right
+      // supplier and the placeholder is archived. Non-fatal.
+      try {
+        const fold = await foldOrphanBillsByAccount(ctx, {
+          organisationId: scope.organisationId,
+          venueId: scope.venueId,
+        });
+        if (fold.error) {
+          console.warn("[inventory-setup] orphan bill fold skipped", fold.error);
+        }
+      } catch (error) {
+        console.warn(
+          "[inventory-setup] orphan bill fold error",
+          error instanceof Error ? error.message : error,
+        );
+      }
 
       // …then read only the selected suppliers' PDFs.
       await tracker.beginStep("parse_pdfs");
@@ -517,6 +702,8 @@ export const inventorySetupService = {
           await tracker.updateStepDetail("parse_pdfs", progress.detail, {
             current: progress.current,
             total: progress.total,
+            elapsedMs: progress.elapsedMs,
+            recent: progress.recent,
           });
         },
       });
@@ -528,17 +715,37 @@ export const inventorySetupService = {
       await tracker.completeStep("parse_pdfs", `${parseSummary}${parseFailures}`);
 
       await tracker.beginStep("raw_items");
-      await ctx.appDb.rls((tx) =>
-        supplierRawItemsRepo.clearForVenueScope(tx, {
-          organisationId: scope.organisationId,
-          venueId: scope.venueId,
-        }),
-      );
+
+      // Non-destructive re-import: no clearForVenueScope here. Aggregation upserts
+      // by (supplier + normalized desc + unit) and preserves normalisationStatus /
+      // reviewedAt / supplierProductId, so re-running merges new invoice lines and
+      // refreshes prices without discarding the user's review/normalisation work.
+      // The full wipe lives only behind the explicit restart action.
+      //
+      // Items come ONLY from invoices. A purchase order is the client's request;
+      // the supplier sets the real price on the bill, so a PO line is a priceless
+      // intent, not a catalog fact — instantiating items from it is unsound. POs
+      // are used purely to discover suppliers (ensureSuppliersFromPurchaseOrders),
+      // never to populate line items.
       const rawItems = await aggregateInvoiceLinesToRawCatalogForVenue(ctx, {
         organisationId: scope.organisationId,
         venueId: scope.venueId,
       });
-      await tracker.completeStep("raw_items", `${rawItems.upserted} items added or updated`);
+
+      // Forward-only price refresh for already-approved products from any newer
+      // invoice in this sync. New/unreviewed items are untouched (still queued).
+      const repriced = await propagateReimportInvoicePrices(ctx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+      });
+      const repricedSummary =
+        repriced.productsRepriced > 0
+          ? `, ${repriced.productsRepriced} repriced`
+          : "";
+      await tracker.completeStep(
+        "raw_items",
+        `${rawItems.upserted} items added or updated${repricedSummary}`,
+      );
 
       await tracker.beginStep("delivery");
       const suppliersSuggested = await ctx.appDb.rls((tx) =>
@@ -577,6 +784,86 @@ export const inventorySetupService = {
     }
   },
 
+  /**
+   * Empty-supplier recovery: re-sync and parse a SINGLE supplier's bills over a
+   * wider window (12 months by default) to rescue a kept supplier that produced
+   * no items from the standard 90-day import — typically one invoiced less than
+   * quarterly. Reuses the normal sync → fold → parse → aggregate → reprice chain,
+   * scoped to the one supplier; non-destructive (no clear). If still empty after
+   * this, the user's remaining options are a manual PDF upload or the
+   * "no catalog yet" ack.
+   */
+  async retrySupplierCatalogLookback(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      supplierId: string;
+      daysBack?: number;
+    },
+  ): Promise<{ invoicesSynced: number; pdfsParsed: number; rawItemsUpserted: number }> {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+    assertInventorySetupWriteAccess(ctx.tenantRoles, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    const invoiceSync = await syncVenueXeroInvoices(ctx, {
+      organisationSlug: args.organisationSlug,
+      venueSlug: args.venueSlug,
+      daysBack: args.daysBack ?? 365,
+      skipApiLineItems: true,
+    });
+
+    try {
+      const fold = await foldOrphanBillsByAccount(ctx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+      });
+      if (fold.error) {
+        console.warn("[inventory-setup] retry fold skipped", fold.error);
+      }
+    } catch (error) {
+      console.warn(
+        "[inventory-setup] retry fold error",
+        error instanceof Error ? error.message : error,
+      );
+    }
+
+    const attachmentParse = await parseInvoiceAttachmentsForInventorySetup(ctx, {
+      organisationSlug: args.organisationSlug,
+      venueSlug: args.venueSlug,
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+      supplierIds: [args.supplierId],
+    });
+
+    const rawItems = await aggregateInvoiceLinesToRawCatalogForVenue(ctx, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    await propagateReimportInvoicePrices(ctx, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    console.info("[inventory-setup] supplier_catalog_retry", {
+      venueId: scope.venueId,
+      supplierId: args.supplierId,
+      daysBack: args.daysBack ?? 365,
+      invoicesSynced: invoiceSync.synced,
+      pdfsParsed: attachmentParse.parsed,
+      rawItemsUpserted: rawItems.upserted,
+    });
+
+    return {
+      invoicesSynced: invoiceSync.synced,
+      pdfsParsed: attachmentParse.parsed,
+      rawItemsUpserted: rawItems.upserted,
+    };
+  },
+
   async restart(
     ctx: RequestAuthContext,
     args: { organisationSlug: string; venueSlug: string },
@@ -598,6 +885,72 @@ export const inventorySetupService = {
     });
 
     console.info("[inventory-setup] restart_completed", {
+      venueId: scope.venueId,
+      userId: ctx.userId,
+      ...counts,
+    });
+
+    return counts;
+  },
+
+  async resetNormalisation(
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string; venueSlug: string },
+  ): Promise<InventorySetupNormalisationResetResult> {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+    assertInventorySetupWriteAccess(ctx.tenantRoles, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    const counts = await resetVenueNormalisation(ctx.appDb, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    console.info("[inventory-setup] normalisation_reset", {
+      venueId: scope.venueId,
+      userId: ctx.userId,
+      ...counts,
+    });
+
+    return counts;
+  },
+
+  async resetProducts(
+    ctx: RequestAuthContext,
+    args: { organisationSlug: string; venueSlug: string },
+  ): Promise<InventorySetupProductsResetResult> {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+    assertInventorySetupWriteAccess(ctx.tenantRoles, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    const counts = await resetVenueProducts(ctx.appDb, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    // The stage's confirmation acks come back too, so the wizard journey
+    // (modifiers check → recipes → confirm) replays from the start.
+    await ctx.appDb.rls(async (tx) => {
+      const state = await inventorySetupWizardStateRepo.getForVenue(tx, scope.venueId);
+      const stamp = { at: new Date().toISOString(), by: ctx.userId };
+      let next = applyWizardStatePatch(
+        state,
+        { setSubStepAck: { key: WIZARD_ACK_KEYS.productsModifiersConfirmed, value: false } },
+        stamp,
+      );
+      next = applyWizardStatePatch(
+        next,
+        { setSubStepAck: { key: WIZARD_ACK_KEYS.productsConfirmed, value: false } },
+        stamp,
+      );
+      await inventorySetupWizardStateRepo.setForVenue(tx, scope.venueId, next);
+    });
+
+    console.info("[inventory-setup] products_reset", {
       venueId: scope.venueId,
       userId: ctx.userId,
       ...counts,

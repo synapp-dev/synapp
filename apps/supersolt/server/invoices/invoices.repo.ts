@@ -179,6 +179,7 @@ export const invoicesRepo = {
           updatedAt: row.updatedAt,
           purchaseOrderId: row.purchaseOrderId,
           matchMethod: row.matchMethod,
+          hasAttachments: row.hasAttachments,
         },
       });
   },

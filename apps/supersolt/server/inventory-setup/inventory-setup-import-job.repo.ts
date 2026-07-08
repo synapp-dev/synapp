@@ -238,6 +238,32 @@ export const inventorySetupImportJobRepo = {
     return rows.length > 0;
   },
 
+  /**
+   * User-requested cancel: atomically flips an in-flight job to failed with a
+   * clear message. The running loop polls its own row and winds down when it
+   * sees the terminal status; everything already downloaded/parsed is kept
+   * (re-running skips it via stored attachments + parse fingerprints).
+   */
+  async cancel(appDb: AppDb, jobId: string): Promise<boolean> {
+    const now = new Date().toISOString();
+    const rows = await appDb.admin
+      .update(inventorySetupImportJobs)
+      .set({
+        status: "failed",
+        errorMessage: "Cancelled — everything already read has been kept.",
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(inventorySetupImportJobs.id, jobId),
+          inArray(inventorySetupImportJobs.status, ["pending", "running"]),
+        ),
+      )
+      .returning();
+    return rows.length > 0;
+  },
+
 
 
   async update(

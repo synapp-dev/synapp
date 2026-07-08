@@ -7,5 +7,5 @@ export default async function LegacyMenuIngredientsPage({
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/master-inventory-list"));
+  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/inventory/master-list"));
 }

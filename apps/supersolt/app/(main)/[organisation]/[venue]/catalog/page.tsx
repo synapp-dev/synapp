@@ -7,5 +7,5 @@ export default async function CatalogIndexPage({
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/recipes"));
+  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/products/recipes"));
 }

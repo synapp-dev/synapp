@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, Search } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronRight, Search, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -13,8 +13,11 @@ import { buildScopedPath } from "@/lib/build-scoped-path";
 import { isInventorySetupSectionsUnlockedForDev } from "@/lib/inventory-setup/dev-unlock-all-sections";
 import { useInventorySetupProgressQuery } from "@/entities/inventory-setup/model/useInventorySetupProgressQuery";
 import { NormalisationWizardSheet } from "@/entities/inventory-normalisation/components/normalisation-wizard-sheet";
+import { NormalisationIntroCard } from "@/entities/inventory-normalisation/components/normalisation-intro-card";
+import { SmartFillButton } from "@/entities/inventory-normalisation/components/smart-fill-button";
 import { useNormalisationQueueQuery } from "@/entities/inventory-normalisation/model/useNormalisationQueueQuery";
 import { useNormalisationMutations } from "@/entities/inventory-normalisation/model/useNormalisationMutations";
+import { groupQueueItemVariants } from "@/entities/inventory-normalisation/lib/group-queue-item-variants";
 import type { NormalisationQueueItem } from "@/entities/inventory-normalisation/model/types";
 
 type NormalisationQueuePageProps = {
@@ -87,6 +90,50 @@ function QueueItemsTable({
   showSkip?: boolean;
   showUnskip?: boolean;
 }) {
+  // Same-product unit variants (linked via similarPendingItems) collapse into
+  // one accordion row per product; expanding reveals each unit size.
+  const groups = useMemo(() => groupQueueItemVariants(items), [items]);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const renderActions = (item: NormalisationQueueItem) => (
+    <div className="flex flex-wrap justify-end gap-1">
+      {item.normalisationStatus === "pending" ? (
+        <>
+          <Button size="sm" onClick={() => onNormalise(item)}>
+            Normalise
+          </Button>
+          {showSkip && onSkip ? (
+            <Button size="sm" variant="outline" onClick={() => onSkip(item)}>
+              Skip
+            </Button>
+          ) : null}
+        </>
+      ) : null}
+      {item.normalisationStatus === "normalised" && onEdit ? (
+        <Button size="sm" variant="outline" onClick={() => onEdit(item)}>
+          Edit
+        </Button>
+      ) : null}
+      {item.normalisationStatus === "skipped" && showUnskip && onUnskip ? (
+        <Button size="sm" variant="outline" onClick={() => onUnskip(item)}>
+          Unskip
+        </Button>
+      ) : null}
+    </div>
+  );
+
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table className="table-fixed">
@@ -105,64 +152,140 @@ function QueueItemsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {items.map((item) => (
-            <TableRow key={item.id}>
-              <TableCell
-                className="max-w-0 truncate font-medium"
-                title={item.rawDescription}
-              >
-                <span className="inline-flex max-w-full items-center gap-1.5">
-                  <span className="truncate">{item.rawDescription}</span>
-                  {(item.similarPendingItems?.length ?? 0) > 0 ? (
-                    <Badge variant="outline" className="shrink-0 text-xs">
-                      Similar ({item.similarPendingItems?.length ?? 0})
-                    </Badge>
+          {groups.map((group) => {
+            const rep = group.representative;
+
+            if (group.variants.length === 1) {
+              return (
+                <TableRow key={rep.id}>
+                  <TableCell
+                    className="max-w-0 truncate font-medium"
+                    title={rep.rawDescription}
+                  >
+                    {rep.rawDescription}
+                  </TableCell>
+                  {showSupplierColumn ? (
+                    <TableCell
+                      className="text-muted-foreground max-w-0 truncate text-sm"
+                      title={rep.supplierName}
+                    >
+                      {rep.supplierName}
+                    </TableCell>
                   ) : null}
-                </span>
-              </TableCell>
-              {showSupplierColumn ? (
-                <TableCell
-                  className="text-muted-foreground max-w-0 truncate text-sm"
-                  title={item.supplierName}
+                  <TableCell className="text-sm">{rep.rawUnit ?? "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums text-sm">
+                    {formatCurrency(rep.lastUnitPriceCents)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{rep.normalisationStatus}</Badge>
+                  </TableCell>
+                  <TableCell>{renderActions(rep)}</TableCell>
+                </TableRow>
+              );
+            }
+
+            const isOpen = expandedIds.has(rep.id);
+            const units = [
+              ...new Set(group.variants.map((v) => v.rawUnit?.trim() || "—")),
+            ];
+            const prices = [
+              ...new Set(
+                group.variants
+                  .map((v) => v.lastUnitPriceCents)
+                  .filter((p): p is number => p != null),
+              ),
+            ];
+
+            return (
+              <Fragment key={rep.id}>
+                <TableRow
+                  className="cursor-pointer"
+                  onClick={() => toggleExpanded(rep.id)}
                 >
-                  {item.supplierName}
-                </TableCell>
-              ) : null}
-              <TableCell className="text-sm">{item.rawUnit ?? "—"}</TableCell>
-              <TableCell className="text-right tabular-nums text-sm">
-                {formatCurrency(item.lastUnitPriceCents)}
-              </TableCell>
-              <TableCell>
-                <Badge variant="secondary">{item.normalisationStatus}</Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap justify-end gap-1">
-                  {item.normalisationStatus === "pending" ? (
-                    <>
-                      <Button size="sm" onClick={() => onNormalise(item)}>
-                        Normalise
-                      </Button>
-                      {showSkip && onSkip ? (
-                        <Button size="sm" variant="outline" onClick={() => onSkip(item)}>
-                          Skip
-                        </Button>
-                      ) : null}
-                    </>
+                  <TableCell
+                    className="max-w-0 truncate font-medium"
+                    title={rep.rawDescription}
+                  >
+                    <span className="inline-flex max-w-full items-center gap-1.5">
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-foreground shrink-0"
+                        aria-expanded={isOpen}
+                        aria-label={isOpen ? "Collapse unit sizes" : "Expand unit sizes"}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleExpanded(rep.id);
+                        }}
+                      >
+                        {isOpen ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                      <span className="truncate">{rep.rawDescription}</span>
+                      <Badge variant="secondary" className="shrink-0 text-xs">
+                        {group.variants.length} unit sizes
+                      </Badge>
+                    </span>
+                  </TableCell>
+                  {showSupplierColumn ? (
+                    <TableCell
+                      className="text-muted-foreground max-w-0 truncate text-sm"
+                      title={rep.supplierName}
+                    >
+                      {rep.supplierName}
+                    </TableCell>
                   ) : null}
-                  {item.normalisationStatus === "normalised" && onEdit ? (
-                    <Button size="sm" variant="outline" onClick={() => onEdit(item)}>
-                      Edit
-                    </Button>
-                  ) : null}
-                  {item.normalisationStatus === "skipped" && showUnskip && onUnskip ? (
-                    <Button size="sm" variant="outline" onClick={() => onUnskip(item)}>
-                      Unskip
-                    </Button>
-                  ) : null}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
+                  <TableCell
+                    className="max-w-0 truncate text-sm"
+                    title={units.join(", ")}
+                  >
+                    {units.join(" · ")}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-sm">
+                    {prices.length === 1
+                      ? formatCurrency(prices[0] ?? null)
+                      : prices.length > 1
+                        ? `${formatCurrency(Math.min(...prices))} – ${formatCurrency(Math.max(...prices))}`
+                        : "—"}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="secondary">{rep.normalisationStatus}</Badge>
+                  </TableCell>
+                  <TableCell />
+                </TableRow>
+                {isOpen
+                  ? group.variants.map((item) => (
+                      <TableRow key={item.id} className="bg-muted/30">
+                        <TableCell
+                          className="text-muted-foreground max-w-0 truncate pl-9 text-sm"
+                          title={item.rawDescription}
+                        >
+                          {item.rawDescription}
+                        </TableCell>
+                        {showSupplierColumn ? (
+                          <TableCell
+                            className="text-muted-foreground max-w-0 truncate text-sm"
+                            title={item.supplierName}
+                          >
+                            {item.supplierName}
+                          </TableCell>
+                        ) : null}
+                        <TableCell className="text-sm">{item.rawUnit ?? "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">
+                          {formatCurrency(item.lastUnitPriceCents)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{item.normalisationStatus}</Badge>
+                        </TableCell>
+                        <TableCell>{renderActions(item)}</TableCell>
+                      </TableRow>
+                    ))
+                  : null}
+              </Fragment>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -278,14 +401,6 @@ export function NormalisationQueuePage({ organisation, venue }: NormalisationQue
       ),
     [items],
   );
-  const pendingNonInventory = useMemo(
-    () =>
-      items.filter(
-        (i) =>
-          i.normalisationStatus === "pending" && i.bucket === "likely_non_inventory",
-      ),
-    [items],
-  );
   const doneItems = useMemo(
     () =>
       items.filter(
@@ -347,19 +462,53 @@ export function NormalisationQueuePage({ organisation, venue }: NormalisationQue
             Convert invoice lines into master inventory ingredients and supplier products.
           </p>
         </div>
-        {progress?.phase2Complete ? (
-          <Button
-            variant="outline"
-            onClick={() =>
-              router.push(
-                buildScopedPath(organisation, venue, "settings/inventory-setup/master-inventory-list"),
-              )
-            }
-          >
-            Open master inventory list
-          </Button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {isInventorySetupSectionsUnlockedForDev() ? (
+            <SmartFillButton organisation={organisation} venue={venue} items={pendingMain} />
+          ) : null}
+          {total > 0 ? (
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={() =>
+                router.push(
+                  buildScopedPath(organisation, venue, "settings/inventory-setup/inventory/wizard"),
+                )
+              }
+            >
+              <Sparkles className="size-4" aria-hidden />
+              {pendingMain.length > 0 ? "Open wizard" : "Review normalised items"}
+            </Button>
+          ) : null}
+          {progress?.phase2Complete ? (
+            <Button
+              variant="outline"
+              onClick={() =>
+                router.push(
+                  buildScopedPath(organisation, venue, "settings/inventory-setup/inventory/master-list"),
+                )
+              }
+            >
+              Open master inventory list
+            </Button>
+          ) : null}
+        </div>
       </div>
+
+      {pendingMain.length > 0 ? (
+        <NormalisationIntroCard
+          pendingCount={pendingMain.length}
+          onStart={() =>
+            router.push(
+              buildScopedPath(
+                organisation,
+                venue,
+                "settings/inventory-setup/inventory/wizard",
+              ),
+            )
+          }
+        />
+      ) : null}
 
       {progress?.hasNewPendingSinceComplete ? (
         <Card className="border-amber-500/40 bg-amber-500/5">
@@ -428,18 +577,9 @@ export function NormalisationQueuePage({ organisation, venue }: NormalisationQue
       ) : null}
 
       <QueueSection
-        title="To normalise"
+        title="Inventory items to normalise"
         items={pendingMain}
         groupBySupplier
-        onNormalise={openWizard}
-        onSkip={handleSkip}
-        showSkip
-      />
-
-      <QueueSection
-        title="Likely non-inventory"
-        description="Fees, surcharges, and delivery charges — skip unless they should be tracked as inventory."
-        items={pendingNonInventory}
         onNormalise={openWizard}
         onSkip={handleSkip}
         showSkip

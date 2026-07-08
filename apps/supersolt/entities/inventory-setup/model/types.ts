@@ -89,6 +89,13 @@ export type SelectableSupplier = {
   id: string;
   name: string;
   isInventorySource: boolean;
+  email: string | null;
+  orderingEmail: string | null;
+  phone: string | null;
+  /** Pre-tick state suggested from how the supplier's Xero bills are coded. */
+  suggestedInventory: boolean;
+  /** Short human reason behind the suggestion, e.g. "Bills coded to overheads (Rent)". */
+  classificationReason: string | null;
 };
 
 /**
@@ -118,6 +125,25 @@ export type InventorySetupImportResult = {
   error: string | null;
 };
 
+/** Result of the invoice-first import (suppliers minted from invoice headers). */
+export type InvoiceFirstImportResult = {
+  invoices: {
+    synced: number;
+    parsed: number;
+    alreadyParsed: number;
+    noAttachment: number;
+    failed: number;
+  };
+  suppliers: {
+    created: number;
+    matchedByAbn: number;
+    matchedByName: number;
+  };
+  rawItems: { upserted: number; skipped: number };
+  deliverySuggestions: { suppliersSuggested: number };
+  error: string | null;
+};
+
 export type InventorySetupRestartResult = {
   suppliersRemoved: number;
   invoicesRemoved: number;
@@ -125,4 +151,14 @@ export type InventorySetupRestartResult = {
   purchaseOrdersRemoved: number;
   menuItemsRemoved: number;
   importJobsRemoved: number;
+};
+
+export type InventorySetupNormalisationResetResult = {
+  itemsReset: number;
+  productsRemoved: number;
+};
+
+export type InventorySetupProductsResetResult = {
+  recipesRemoved: number;
+  mappingsRemoved: number;
 };

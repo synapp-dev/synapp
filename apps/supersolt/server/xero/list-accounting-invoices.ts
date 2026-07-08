@@ -1,3 +1,4 @@
+import { fetchXero } from "@/server/xero/xero-request-queue";
 import type { XeroApiInvoice } from "@/server/xero/xero-invoice-map";
 
 const XERO_ACCOUNTING_INVOICES_URL = "https://api.xero.com/api.xro/2.0/Invoices";
@@ -13,6 +14,8 @@ export async function listXeroAccpayInvoices(args: {
   /** YYYY-MM-DD — filters by invoice Date (Date >= dateSince), not update time. */
   dateSince?: string;
   pageSize?: number;
+  /** Live progress: called after each fetched page with the running total. */
+  onPage?: (page: number, collected: number) => void | Promise<void>;
 }): Promise<
   | { ok: true; invoices: XeroApiInvoice[]; httpStatuses: number[]; usedModifiedSince: boolean }
   | { ok: false; message: string; status: number }
@@ -48,7 +51,7 @@ export async function listXeroAccpayInvoices(args: {
       headers["If-Modified-Since"] = args.modifiedSince;
     }
 
-    const res = await fetch(`${XERO_ACCOUNTING_INVOICES_URL}?${q.toString()}`, {
+    const res = await fetchXero(`${XERO_ACCOUNTING_INVOICES_URL}?${q.toString()}`, {
       headers,
     });
     httpStatuses.push(res.status);
@@ -85,6 +88,12 @@ export async function listXeroAccpayInvoices(args: {
     const body = (await res.json()) as XeroInvoicesResponse;
     const batch = body.Invoices ?? [];
     collected.push(...batch);
+    console.info("[xero] list ACCPAY invoices: page fetched", {
+      page,
+      batch: batch.length,
+      collected: collected.length,
+    });
+    await args.onPage?.(page, collected.length);
 
     if (batch.length < pageSize) {
       break;

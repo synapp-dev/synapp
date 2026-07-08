@@ -10,6 +10,7 @@ import {
   type ParseTokenUsage,
 } from "@/server/invoices/invoice-parser.service";
 import { downloadInvoiceAttachment, uploadInvoiceAttachment } from "@/server/invoices/invoice-storage";
+import { XeroRateLimitError } from "@/server/xero/xero-request-queue";
 import { supplierProductsRepo } from "@/server/supplier-products/supplier-products.repo";
 import { suppliersRepo } from "@/server/suppliers/suppliers.repo";
 
@@ -170,6 +171,26 @@ async function loadAttachmentBytes(
   return Buffer.from(downloaded.data);
 }
 
+/**
+ * The supplier identity block read off the invoice's own header — the ground
+ * truth the invoice-first import uses to resolve/mint suppliers (ABN primary).
+ * Only present on a fresh successful parse; cached/skipped results carry null.
+ */
+export type ParsedSupplierHeader = {
+  name: string | null;
+  abn: string | null;
+  category: string | null;
+  email: string | null;
+  phone: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  suburb: string | null;
+  state: string | null;
+  postcode: string | null;
+  /** Invoice date (row value, else parsed) — for most-recent-wins enrichment. */
+  invoiceDate: string | null;
+};
+
 export type ParseInvoiceAttachmentResult = {
   skipped: boolean;
   parsed: boolean;
@@ -177,6 +198,7 @@ export type ParseInvoiceAttachmentResult = {
   fingerprint: string | null;
   error: string | null;
   tokenUsage: ParseTokenUsage | null;
+  supplierHeader: ParsedSupplierHeader | null;
 };
 
 export async function parseInvoiceAttachmentIfNeeded(
@@ -219,6 +241,16 @@ export async function parseInvoiceAttachmentIfNeeded(
       venueSlug: args.venueSlug,
       invoiceId: args.invoiceId,
     });
+    // A failed attachment lookup (e.g. Xero throttling that survived the queue's
+    // retries) must NOT be mistaken for "no attachment" — that silently drops a
+    // bill that really does have a PDF. Surface it so the caller records a
+    // retryable failure instead of skipping.
+    if (xeroPayload.attachmentsError) {
+      throw new InvoicesServiceError(
+        502,
+        `Could not list Xero attachments: ${xeroPayload.attachmentsError}`,
+      );
+    }
     xeroAttachments = xeroPayload.attachments;
   }
 
@@ -236,6 +268,7 @@ export async function parseInvoiceAttachmentIfNeeded(
       fingerprint: null,
       error: null,
       tokenUsage: null,
+      supplierHeader: null,
     };
   }
 
@@ -252,6 +285,7 @@ export async function parseInvoiceAttachmentIfNeeded(
       fingerprint: parseable.fingerprint,
       error: null,
       tokenUsage: null,
+      supplierHeader: null,
     };
   }
 
@@ -370,6 +404,7 @@ export async function parseInvoiceAttachmentIfNeeded(
           invoiceDate: effectiveInvoiceDate,
           details: {
             abn: parsed.supplierAbn,
+            category: parsed.supplierCategory ?? null,
             email: parsed.supplierEmail ?? null,
             phone: parsed.supplierPhone ?? null,
             addressLine1: parsed.supplierAddressLine1 ?? null,
@@ -400,8 +435,25 @@ export async function parseInvoiceAttachmentIfNeeded(
       fingerprint: parseable.fingerprint,
       error: null,
       tokenUsage: usage,
+      supplierHeader: {
+        name: parsed.supplierName?.trim() || null,
+        abn: parsed.supplierAbn?.trim() || null,
+        category: parsed.supplierCategory ?? null,
+        email: parsed.supplierEmail ?? null,
+        phone: parsed.supplierPhone ?? null,
+        addressLine1: parsed.supplierAddressLine1 ?? null,
+        addressLine2: parsed.supplierAddressLine2 ?? null,
+        suburb: parsed.supplierSuburb ?? null,
+        state: parsed.supplierState ?? null,
+        postcode: parsed.supplierPostcode ?? null,
+        invoiceDate: effectiveInvoiceDate ?? null,
+      },
     };
   } catch (error) {
+    // A spent Xero API budget is not a parse failure — recording it against
+    // the bill would brand a perfectly readable invoice as broken. Rethrow so
+    // the import stops cleanly and this bill is retried on the next run.
+    if (error instanceof XeroRateLimitError) throw error;
     const message = error instanceof Error ? error.message : "Attachment parse failed";
     await ctx.appDb.rls((tx) =>
       invoicesRepo.updateInvoice(tx, invoice.id, {
@@ -416,6 +468,7 @@ export async function parseInvoiceAttachmentIfNeeded(
       fingerprint: parseable.fingerprint,
       error: message,
       tokenUsage: null,
+      supplierHeader: null,
     };
   }
 }

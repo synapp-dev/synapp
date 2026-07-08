@@ -8,6 +8,6 @@ export default async function SettingsInventoryRedirectPage({
 }) {
   const { organisation, venue } = await params;
   redirect(
-    buildScopedPath(organisation, venue, "settings/inventory-setup/master-inventory-list"),
+    buildScopedPath(organisation, venue, "settings/inventory-setup/inventory/master-list"),
   );
 }

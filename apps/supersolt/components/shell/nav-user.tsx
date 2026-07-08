@@ -25,6 +25,8 @@ import {
 import { useMeStore } from "@/entities/me/model/store";
 import { ReplaySetupIntroMenuItem } from "@/components/shell/replay-setup-intro-menu-item";
 import { RestartInventorySetupMenuItem } from "@/components/shell/restart-inventory-setup-menu-item";
+import { ResetNormalisationMenuItem } from "@/components/shell/reset-normalisation-menu-item";
+import { ResetProductsMenuItem } from "@/components/shell/reset-products-menu-item";
 
 export function NavUser() {
   const { isMobile } = useSidebar();
@@ -90,6 +92,8 @@ export function NavUser() {
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <ReplaySetupIntroMenuItem />
+            <ResetNormalisationMenuItem />
+            <ResetProductsMenuItem />
             <RestartInventorySetupMenuItem />
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

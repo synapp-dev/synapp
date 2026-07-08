@@ -7,13 +7,17 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
   Download,
+  Eraser,
   LayoutGrid,
   List,
   Loader2,
   Plus,
   Search,
   SlidersHorizontal,
+  Sparkles,
+  TriangleAlert,
   Upload,
+  WandSparkles,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -58,18 +62,25 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover";
+import { Badge } from "@workspace/ui/components/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
 import { useSupplierMutations } from "@/entities/suppliers/model/useSupplierMutations";
 import { useSuppliersQuery } from "@/entities/suppliers/model/useSuppliersQuery";
+import { EmptySupplierCatalogBanner } from "@/entities/suppliers/components/empty-supplier-catalog-banner";
+import { OrphanBillAttributionBanner } from "@/entities/inventory-setup/components/orphan-bill-attribution-banner";
 import { useSuppliersFilterStore } from "@/entities/suppliers/model/store";
 import type { SupplierCategory, UpsertSupplierInput } from "@/entities/suppliers/model/types";
 import { SupplierDetailPageClient } from "./supplier-detail-page";
+import { SupplierTruckAnimation } from "./supplier-truck-animation";
 import { buildScopedPath } from "@/lib/build-scoped-path";
 import { xeroApi } from "@/entities/xero/api/endpoints";
+import { suppliersApi } from "@/entities/suppliers/api/endpoints";
 import { useVenueXeroConnectionQuery } from "@/entities/xero/model/use-venue-xero-connection";
 import { suppliersKeys } from "@/entities/suppliers/model/keys";
 import { useInventorySetupImport } from "@/entities/inventory-setup/components/inventory-setup-import-provider";
+import { consumeSupplierSetupComplete } from "@/entities/inventory-setup/lib/supplier-setup-handoff";
 import { InvoiceUploadDialog } from "@/entities/invoices/components/invoice-upload-dialog";
 
 type SuppliersPageClientProps = {
@@ -106,6 +117,27 @@ function formatCurrency(cents: number): string {
 
 function categoryLabel(value: string): string {
   return CATEGORIES.find((c) => c.value === value)?.label ?? value;
+}
+
+/**
+ * "12 (34)" — unique products first (unit/wording variants folded together,
+ * same grouping as the normalisation queue), total raw items parsed off
+ * invoices in brackets. Just "0" when the supplier has none in the category.
+ */
+function ItemBreakdownCell({
+  breakdown,
+}: {
+  breakdown: { unique: number; parsed: number };
+}) {
+  if (breakdown.parsed === 0) {
+    return <span className="text-muted-foreground">0</span>;
+  }
+  return (
+    <span>
+      {breakdown.unique}
+      <span className="text-muted-foreground"> ({breakdown.parsed})</span>
+    </span>
+  );
 }
 
 function createDefaultSupplier(): UpsertSupplierInput {
@@ -146,13 +178,17 @@ export function SuppliersPageClient({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [detailSupplierId, setDetailSupplierId] = useState<string | null>(null);
   const [form, setForm] = useState<UpsertSupplierInput>(createDefaultSupplier);
-  // Post-selection guided review: walk the kept suppliers one at a time while
-  // their invoices parse in the background.
-  const [review, setReview] = useState<{ id: string; name: string }[] | null>(null);
-  const [reviewIndex, setReviewIndex] = useState(0);
-  const [reviewPromptOpen, setReviewPromptOpen] = useState(false);
+  // After a completed inventory-setup import we land here with ?setupComplete=1.
+  // Once the table has actually loaded with suppliers, we offer to walk through
+  // configuring them (see the completion dialog below).
+  const [setupCompleteOpen, setSetupCompleteOpen] = useState(false);
 
   const integrationsPath = buildScopedPath(organisation, venue, "settings/integrations");
+  const configurePath = buildScopedPath(
+    organisation,
+    venue,
+    "settings/inventory-setup/suppliers/configure",
+  );
   const suppliersListPath = buildScopedPath(
     organisation,
     venue,
@@ -195,6 +231,52 @@ export function SuppliersPageClient({
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Xero import failed");
+    },
+  });
+
+  // Testing convenience: auto-complete the whole supplier stage in one click.
+  const smartFill = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await suppliersApi.post.smartFill(organisation, venue);
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("Smart fill failed");
+      return data;
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({
+        queryKey: suppliersKeys.scope(organisation, venue),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["supplier-raw-items"] });
+      await queryClient.invalidateQueries({ queryKey: ["inventory-setup"] });
+      toast.success(
+        `Smart fill done — ${data.productsCreated} products, ${data.itemsCleared} cleared, ${data.profilesFilled} profiles filled, ${data.deactivated} suppliers deactivated`,
+      );
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Smart fill failed");
+    },
+  });
+
+  // Testing convenience: undo Smart Fill in one click.
+  const resetApprovals = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await suppliersApi.post.resetApprovals(organisation, venue);
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error("Reset failed");
+      return data;
+    },
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({
+        queryKey: suppliersKeys.scope(organisation, venue),
+      });
+      await queryClient.invalidateQueries({ queryKey: ["supplier-raw-items"] });
+      await queryClient.invalidateQueries({ queryKey: ["inventory-setup"] });
+      toast.success(
+        `Reset done — ${data.productsRemoved} products removed, ${data.itemsReset} items back to unreviewed`,
+      );
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Reset failed");
     },
   });
 
@@ -241,6 +323,17 @@ export function SuppliersPageClient({
   });
 
   const suppliers = suppliersQuery.data?.suppliers ?? [];
+  // Kept inventory suppliers with no priced catalog and not parked — surfaced in
+  // the recovery banner. needsCatalog is already false for non-inventory and
+  // acked suppliers, so this filter alone is the right set.
+  const emptyCatalogSuppliers = suppliers
+    .filter((supplier) => supplier.readiness.needsCatalog)
+    .map((supplier) => ({ id: supplier.id, name: supplier.name }));
+  // Real suppliers offered as attribution targets for orphan bills.
+  const candidateSuppliers = suppliers.map((supplier) => ({
+    id: supplier.id,
+    name: supplier.name,
+  }));
   const totalItems = suppliersQuery.data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const visibleStart = totalItems === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -253,6 +346,14 @@ export function SuppliersPageClient({
     hasProducts !== "all" ||
     sort !== "name";
 
+  // Count of filters surfaced in the popover (search has its own field).
+  const activeFilterCount =
+    (category !== "all" ? 1 : 0) +
+    (status !== "all" ? 1 : 0) +
+    (archived ? 1 : 0) +
+    (hasProducts !== "all" ? 1 : 0) +
+    (sort !== "name" ? 1 : 0);
+
   // Brand-new venue with no suppliers and nothing filtered out — show a guided
   // "import your first supplier" empty state instead of the filters + table.
   const isEmptyFirstRun =
@@ -260,6 +361,20 @@ export function SuppliersPageClient({
     !suppliersQuery.isError &&
     totalItems === 0 &&
     !hasActiveFilters;
+
+  // In inventory-setup, an empty suppliers list hands off to the dedicated
+  // "import your first supplier" picker (/suppliers/start) — which owns the
+  // truck + entry-point cards — rather than showing them inline here.
+  const setupStartPath = buildScopedPath(
+    organisation,
+    venue,
+    "settings/inventory-setup/suppliers/start",
+  );
+  useEffect(() => {
+    if (inventorySetupMode && isEmptyFirstRun) {
+      router.replace(setupStartPath);
+    }
+  }, [inventorySetupMode, isEmptyFirstRun, router, setupStartPath]);
 
   // The persisted view preference only applies after hydration, so SSR/first
   // paint always renders the table and avoids a hydration mismatch.
@@ -317,46 +432,52 @@ export function SuppliersPageClient({
     setDetailSupplierId(supplierId);
   }
 
-  // When the user commits their supplier selection, enter the review walkthrough:
-  // flip to the card view and prompt to review each kept supplier in turn.
-  const pendingReview = inventorySetupMode ? inventorySetupImport.pendingReview : null;
-  const clearPendingReview = inventorySetupImport.clearPendingReview;
+  // Arriving from a completed setup import: the import page leaves a one-shot
+  // sessionStorage flag (query params don't survive these scoped routes). Read it
+  // once on mount, then open the "want me to walk you through it?" dialog as soon
+  // as the table has actually loaded with suppliers.
+  const [handoffPending, setHandoffPending] = useState(false);
   useEffect(() => {
-    if (!pendingReview || pendingReview.length === 0) return;
-    setReview(pendingReview);
-    setReviewIndex(0);
-    setReviewPromptOpen(true);
-    setViewMode("cards");
-    clearPendingReview();
-  }, [pendingReview, clearPendingReview, setViewMode]);
-
-  function endReview() {
-    setReview(null);
-    setReviewPromptOpen(false);
-    setReviewIndex(0);
-  }
-
-  function advanceReview() {
-    if (!review) return;
-    const next = reviewIndex + 1;
-    if (next >= review.length) {
-      endReview();
-      toast.success("All suppliers reviewed");
-      return;
+    if (inventorySetupMode && consumeSupplierSetupComplete()) {
+      setHandoffPending(true);
     }
-    setReviewIndex(next);
-    setReviewPromptOpen(true);
+  }, [inventorySetupMode]);
+  useEffect(() => {
+    if (!handoffPending) return;
+    if (suppliersQuery.isLoading || suppliersQuery.isError) return;
+    if (suppliers.length === 0) return;
+    setHandoffPending(false);
+    setSetupCompleteOpen(true);
+  }, [handoffPending, suppliersQuery.isLoading, suppliersQuery.isError, suppliers.length]);
+
+  function dismissSetupComplete() {
+    setSetupCompleteOpen(false);
   }
 
   function handleDetailClose() {
     setDetailSupplierId(null);
-    // Closing a supplier mid-review moves on to the next one.
-    if (review && !reviewPromptOpen) {
-      advanceReview();
-    }
   }
 
-  const reviewSupplier = review?.[reviewIndex] ?? null;
+  const xeroImportButton = xeroConnection.data?.connected ? (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5"
+      disabled={inventorySetupMode ? isSetupImportRunning : xeroImport.isPending}
+      onClick={() => void xeroImport.mutate()}
+    >
+      {(inventorySetupMode ? isSetupImportRunning : xeroImport.isPending) ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Download className="size-4" />
+      )}
+      Import from Xero
+    </Button>
+  ) : (
+    <Button variant="outline" size="sm" asChild>
+      <Link href={integrationsPath}>Connect Xero</Link>
+    </Button>
+  );
 
   async function handleSave() {
     const payload: UpsertSupplierInput = {
@@ -404,87 +525,41 @@ export function SuppliersPageClient({
 
   return (
     <>
-      <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
-        {hidePageHeader ? (
-          isEmptyFirstRun ? null : (
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {xeroConnection.data?.connected ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={inventorySetupMode ? isSetupImportRunning : xeroImport.isPending}
-                  onClick={() => void xeroImport.mutate()}
-                >
-                  {inventorySetupMode ? (
-                    isSetupImportRunning ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      <Download className="mr-2 size-4" />
-                    )
-                  ) : xeroImport.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="h-4 w-4" />
-                  )}
-                  Import from Xero
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={integrationsPath}>Connect Xero</Link>
-                </Button>
-              )}
-            </div>
-          </div>
-          )
-        ) : (
+      <section
+        className={cn(
+          "flex flex-col gap-5",
+          // In setup mode, pin the section to the viewport so the table body
+          // scrolls on its own and the pagination bar stays visible at the
+          // bottom. Elsewhere keep the page's natural document scroll.
+          inventorySetupMode
+            ? "h-[calc(100dvh-10rem)] min-h-[28rem] overflow-hidden"
+            : "min-h-[calc(100vh-10rem)]",
+        )}
+      >
+        {hidePageHeader ? null : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
                 <Building2 className="h-5 w-5 text-muted-foreground" />
                 Suppliers
               </h1>
-              {isEmptyFirstRun ? null : (
-              <div className="flex flex-wrap items-center gap-2">
-                {xeroConnection.data?.connected ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5"
-                              disabled={
-                                inventorySetupMode ? isSetupImportRunning : xeroImport.isPending
-                              }
-                              onClick={() => void xeroImport.mutate()}
-                            >
-                              {inventorySetupMode ? (
-                                isSetupImportRunning ? (
-                                  <Loader2 className="mr-2 size-4 animate-spin" />
-                                ) : (
-                                  <Download className="mr-2 size-4" />
-                                )
-                              ) : xeroImport.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Download className="h-4 w-4" />
-                    )}
-                    Import from Xero
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={integrationsPath}>Connect Xero</Link>
-                  </Button>
-                )}
-              </div>
-              )}
             </div>
             <Separator />
           </>
         )}
 
         {isEmptyFirstRun ? (
+          inventorySetupMode ? (
+            <div
+              className="text-muted-foreground flex flex-1 items-center justify-center py-12 text-sm"
+              aria-busy="true"
+            >
+              Taking you to setup…
+            </div>
+          ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-7 py-12">
-            <div className="text-center">
+            <div className="flex flex-col items-center text-center">
+              <SupplierTruckAnimation className="mb-5 h-[16rem] w-[28rem] sm:h-[18rem] sm:w-[32rem]" />
               <h2 className="text-lg font-semibold">Import your first supplier</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Pick how you'd like to get started.
@@ -553,137 +628,228 @@ export function SuppliersPageClient({
               </button>
             </div>
           </div>
+          )
         ) : (
           <>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search name, email, phone, ABN..."
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className="h-9 w-[480px] max-w-full pl-8"
-            />
-          </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filters
-            </span>
-            <div className="flex flex-wrap items-center gap-3">
-              {isHydrated ? (
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger className="h-9 w-[170px]">
-                    <SelectValue placeholder="Category" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {CATEGORIES.map((cat) => (
-                      <SelectItem key={cat.value} value={cat.value}>
-                        {cat.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="h-9 w-[170px] rounded-md border bg-background" />
-              )}
-
-              {isHydrated ? (
-                <Select value={status} onValueChange={setStatus}>
-                  <SelectTrigger className="h-9 w-[130px]">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <div className="h-9 w-[130px] rounded-md border bg-background" />
-              )}
-
-              {isHydrated ? (
-                <Select
-                  value={archived ? "archived" : "active_list"}
-                  onValueChange={(v) => setArchived(v === "archived")}
-                >
-                  <SelectTrigger className="h-9 w-[130px]">
-                    <SelectValue placeholder="View" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active_list">Active list</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : null}
-
-              {isHydrated ? (
-                <Select value={hasProducts} onValueChange={setHasProducts}>
-                  <SelectTrigger className="h-9 w-[150px]">
-                    <SelectValue placeholder="Products" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All suppliers</SelectItem>
-                    <SelectItem value="yes">Has products</SelectItem>
-                    <SelectItem value="no">No products</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : null}
-
-              {isHydrated ? (
-                <Select value={sort} onValueChange={setSort}>
-                  <SelectTrigger className="h-9 w-[150px]">
-                    <SelectValue placeholder="Sort" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">Name</SelectItem>
-                    <SelectItem value="ytd_spend">YTD spend</SelectItem>
-                    <SelectItem value="last_invoice">Last invoice</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : null}
-
-              {hasActiveFilters ? (
+        {inventorySetupMode && emptyCatalogSuppliers.length > 0 ? (
+          <EmptySupplierCatalogBanner
+            organisation={organisation}
+            venue={venue}
+            suppliers={emptyCatalogSuppliers}
+          />
+        ) : null}
+        {inventorySetupMode ? (
+          <OrphanBillAttributionBanner
+            organisation={organisation}
+            venue={venue}
+            candidateSuppliers={candidateSuppliers}
+          />
+        ) : null}
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+          {/* Left: view switcher · search */}
+          <div className="flex flex-wrap items-center gap-3">
+            {isHydrated ? (
+              <div className="inline-flex items-center rounded-md border p-0.5">
                 <Button
-                  variant="ghost"
+                  type="button"
+                  variant={effectiveView === "table" ? "secondary" : "ghost"}
                   size="sm"
-                  className="h-8 gap-1 text-xs"
-                  onClick={clearFilters}
+                  className="h-7 w-7 p-0"
+                  aria-label="Table view"
+                  aria-pressed={effectiveView === "table"}
+                  onClick={() => setViewMode("table")}
                 >
-                  <X className="h-3.5 w-3.5" />
-                  Clear
+                  <List className="h-3.5 w-3.5" />
                 </Button>
-              ) : null}
+                <Button
+                  type="button"
+                  variant={effectiveView === "cards" ? "secondary" : "ghost"}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  aria-label="Card view"
+                  aria-pressed={effectiveView === "cards"}
+                  onClick={() => setViewMode("cards")}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            ) : (
+              <div className="h-8 w-[68px] rounded-md border bg-background" />
+            )}
 
-              {isHydrated ? (
-                <div className="inline-flex items-center rounded-md border p-0.5">
-                  <Button
-                    type="button"
-                    variant={effectiveView === "table" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    aria-label="Table view"
-                    aria-pressed={effectiveView === "table"}
-                    onClick={() => setViewMode("table")}
-                  >
-                    <List className="h-3.5 w-3.5" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={effectiveView === "cards" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-7 w-7 p-0"
-                    aria-label="Card view"
-                    aria-pressed={effectiveView === "cards"}
-                    onClick={() => setViewMode("cards")}
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ) : null}
+            {inventorySetupMode ? (
+              <>
+                <Button
+                  size="sm"
+                  className="h-9 gap-1.5 bg-[var(--brand-supersolt-primary)] text-black hover:bg-[var(--brand-supersolt-primary)]/90"
+                  onClick={() => router.push(configurePath)}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  Setup wizard
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 gap-1.5"
+                  disabled={smartFill.isPending}
+                  onClick={() => void smartFill.mutate()}
+                  title="Testing: approve all inventory items, clear non-inventory, deactivate empty suppliers"
+                >
+                  {smartFill.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <WandSparkles className="h-3.5 w-3.5" />
+                  )}
+                  Smart fill (test)
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 gap-1.5"
+                  disabled={resetApprovals.isPending}
+                  onClick={() => void resetApprovals.mutate()}
+                  title="Testing: undo smart fill — back to just raw items, none approved"
+                >
+                  {resetApprovals.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Eraser className="h-3.5 w-3.5" />
+                  )}
+                  Reset approvals (test)
+                </Button>
+              </>
+            ) : null}
+
+            <span className="text-muted-foreground/40 select-none" aria-hidden>
+              ·
+            </span>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search name, email, phone, ABN..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-9 w-[360px] max-w-full pl-8"
+              />
             </div>
+          </div>
+
+          {/* Right: filters popover · import */}
+          <div className="flex flex-wrap items-center gap-3">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="h-9 gap-1.5">
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Filters
+                  {activeFilterCount > 0 ? (
+                    <Badge
+                      variant="secondary"
+                      className="ml-0.5 h-5 min-w-5 justify-center rounded-full px-1 text-xs tabular-nums"
+                    >
+                      {activeFilterCount}
+                    </Badge>
+                  ) : null}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" sideOffset={8} className="w-72 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Filters</span>
+                  {hasActiveFilters ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="-mr-2 h-7 gap-1 text-xs"
+                      onClick={clearFilters}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Clear
+                    </Button>
+                  ) : null}
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground text-xs font-medium">Category</span>
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {CATEGORIES.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground text-xs font-medium">Status</span>
+                  <Select value={status} onValueChange={setStatus}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground text-xs font-medium">List</span>
+                  <Select
+                    value={archived ? "archived" : "active_list"}
+                    onValueChange={(v) => setArchived(v === "archived")}
+                  >
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="View" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active_list">Active list</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground text-xs font-medium">Items</span>
+                  <Select value={hasProducts} onValueChange={setHasProducts}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Items" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All suppliers</SelectItem>
+                      <SelectItem value="yes">Has items</SelectItem>
+                      <SelectItem value="no">No items</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <span className="text-muted-foreground text-xs font-medium">Sort by</span>
+                  <Select value={sort} onValueChange={setSort}>
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue placeholder="Sort" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="name">Name</SelectItem>
+                      <SelectItem value="ytd_spend">YTD spend</SelectItem>
+                      <SelectItem value="last_invoice">Last invoice</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            <span className="text-muted-foreground/40 select-none" aria-hidden>
+              ·
+            </span>
+
+            {xeroImportButton}
           </div>
         </div>
 
@@ -712,12 +878,18 @@ export function SuppliersPageClient({
                   Add new supplier
                 </button>
 
-                {suppliers.map((supplier) => (
+                {suppliers.map((supplier) => {
+                  const needsAttention = supplier.readiness.total > 0;
+                  return (
                   <button
                     key={supplier.id}
                     type="button"
                     onClick={() => openSupplierDetailSheet(supplier.id)}
-                    className="group flex flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/30"
+                    className={cn(
+                      "group flex flex-col gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/30",
+                      needsAttention &&
+                        "border-amber-300 bg-amber-50/50 hover:bg-amber-50 dark:border-amber-500/40 dark:bg-amber-950/20",
+                    )}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-2.5">
@@ -726,9 +898,16 @@ export function SuppliersPageClient({
                         </div>
                         <span className="truncate font-medium">{supplier.name}</span>
                       </div>
-                      {supplier.active ? (
+                      {needsAttention ? (
+                        <span
+                          className="inline-flex shrink-0 items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+                          title={`${supplier.readiness.total} item${supplier.readiness.total === 1 ? "" : "s"} left to finish setup`}
+                        >
+                          <TriangleAlert className="h-3.5 w-3.5" /> Needs attention
+                        </span>
+                      ) : supplier.active ? (
                         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ready
                         </span>
                       ) : (
                         <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground">
@@ -755,8 +934,8 @@ export function SuppliersPageClient({
                         </dd>
                       </div>
                       <div>
-                        <dt className="text-xs text-muted-foreground">Products</dt>
-                        <dd className="tabular-nums">{supplier.productCount}</dd>
+                        <dt className="text-xs text-muted-foreground">Items</dt>
+                        <dd className="tabular-nums">{supplier.itemCount}</dd>
                       </div>
                       <div>
                         <dt className="text-xs text-muted-foreground">YTD spend</dt>
@@ -768,27 +947,26 @@ export function SuppliersPageClient({
                       </div>
                     </dl>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         ) : (
         <Card className="flex-1 overflow-hidden gap-0 py-0">
           <CardContent className="flex h-full min-h-0 flex-col px-0 py-0">
-            <div className="min-h-0 flex-1 overflow-auto">
+            {/* Make shadcn's table-container (the real scroll ancestor) the bounded
+                scroller so the sticky header pins to it. */}
+            <div className="min-h-0 flex-1 [&>[data-slot=table-container]]:h-full [&>[data-slot=table-container]]:overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/50">
-                    <TableHead className="pl-6 text-xs font-medium uppercase tracking-wider">Name</TableHead>
-                    <TableHead className="text-xs font-medium uppercase tracking-wider">Category</TableHead>
-                    <TableHead className="text-xs font-medium uppercase tracking-wider">Contact</TableHead>
-                    <TableHead className="text-xs font-medium uppercase tracking-wider">Payment terms</TableHead>
-                    <TableHead className="text-xs font-medium uppercase tracking-wider">Products</TableHead>
-                    <TableHead className="text-xs font-medium uppercase tracking-wider">Last invoice</TableHead>
-                    <TableHead className="text-xs font-medium uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="text-right text-xs font-medium uppercase tracking-wider">
-                      YTD spend
-                    </TableHead>
+                    <TableHead className="pl-6 bg-muted sticky top-0 z-10 text-xs font-medium uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="bg-muted sticky top-0 z-10 text-xs font-medium uppercase tracking-wider">Name</TableHead>
+                    <TableHead className="bg-muted sticky top-0 z-10 text-xs font-medium uppercase tracking-wider">Category</TableHead>
+                    <TableHead className="bg-muted sticky top-0 z-10 text-xs font-medium uppercase tracking-wider">Inventory items</TableHead>
+                    <TableHead className="bg-muted sticky top-0 z-10 text-xs font-medium uppercase tracking-wider">Non-inventory items</TableHead>
+                    <TableHead className="bg-muted sticky top-0 z-10 text-xs font-medium uppercase tracking-wider">Approved items</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -796,7 +974,8 @@ export function SuppliersPageClient({
                     className="cursor-pointer bg-[#bcdc88]/20 hover:bg-[#bcdc88]/50"
                     onClick={openCreateSheet}
                   >
-                    <TableCell className="pl-6">
+                    <TableCell className="pl-6 text-muted-foreground">-</TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-2.5">
                         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-dashed border-primary/50 bg-primary/5">
                           <Plus className="h-3.5 w-3.5 text-primary" />
@@ -808,26 +987,23 @@ export function SuppliersPageClient({
                     <TableCell className="text-muted-foreground">-</TableCell>
                     <TableCell className="text-muted-foreground">-</TableCell>
                     <TableCell className="text-muted-foreground">-</TableCell>
-                    <TableCell className="text-muted-foreground">-</TableCell>
-                    <TableCell className="text-muted-foreground">-</TableCell>
-                    <TableCell className="text-right text-muted-foreground">-</TableCell>
                   </TableRow>
 
                   {suppliersQuery.isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                         Loading suppliers...
                       </TableCell>
                     </TableRow>
                   ) : suppliersQuery.isError ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center text-sm text-destructive">
+                      <TableCell colSpan={6} className="py-10 text-center text-sm text-destructive">
                         {suppliersQuery.error.message}
                       </TableCell>
                     </TableRow>
                   ) : suppliers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="py-10 text-center">
+                      <TableCell colSpan={6} className="py-10 text-center">
                         <p className="text-sm font-medium">No suppliers yet</p>
                         <p className="mt-1 text-sm text-muted-foreground">
                           {xeroConnection.data?.connected
@@ -855,13 +1031,38 @@ export function SuppliersPageClient({
                       </TableCell>
                     </TableRow>
                   ) : (
-                    suppliers.map((supplier) => (
+                    suppliers.map((supplier) => {
+                      const needsAttention = supplier.readiness.total > 0;
+                      return (
                       <TableRow
                         key={supplier.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className={cn(
+                          "cursor-pointer",
+                          needsAttention
+                            ? "bg-amber-50/60 hover:bg-amber-100/70 dark:bg-amber-950/20 dark:hover:bg-amber-950/30"
+                            : "hover:bg-muted/50",
+                        )}
                         onClick={() => openSupplierDetailSheet(supplier.id)}
                       >
                         <TableCell className="pl-6">
+                          {needsAttention ? (
+                            <span
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400"
+                              title={`${supplier.readiness.total} item${supplier.readiness.total === 1 ? "" : "s"} left to finish setup`}
+                            >
+                              <TriangleAlert className="h-3.5 w-3.5" /> Needs attention
+                            </span>
+                          ) : supplier.active ? (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Ready
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                              <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> Inactive
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
                           <div className="flex items-center gap-2.5">
                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-teal-50 dark:bg-teal-900/20">
                               <Building2 className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
@@ -874,32 +1075,16 @@ export function SuppliersPageClient({
                             {categoryLabel(supplier.category)}
                           </span>
                         </TableCell>
-                        <TableCell>{supplier.contactPerson || supplier.email || "—"}</TableCell>
-                        <TableCell className="text-sm">{supplier.paymentTerms || "—"}</TableCell>
+                        <TableCell className="tabular-nums">
+                          <ItemBreakdownCell breakdown={supplier.inventoryItems} />
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          <ItemBreakdownCell breakdown={supplier.nonInventoryItems} />
+                        </TableCell>
                         <TableCell className="tabular-nums">{supplier.productCount}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {supplier.lastInvoiceDate ?? "—"}
-                        </TableCell>
-                        <TableCell>
-                          {supplier.active ? (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Active
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                              <span className="h-1.5 w-1.5 rounded-full bg-slate-400" /> Inactive
-                            </span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium tabular-nums">
-                          {supplier.ytdSpendCents > 0 ? (
-                            formatCurrency(supplier.ytdSpendCents)
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
                       </TableRow>
-                    ))
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -908,7 +1093,7 @@ export function SuppliersPageClient({
         </Card>
         )}
 
-        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-1">
           <p className="text-xs text-muted-foreground">
             {`Showing ${visibleStart}-${visibleEnd} of ${totalItems}`}
           </p>
@@ -1043,7 +1228,7 @@ export function SuppliersPageClient({
         <SheetContent
           side="bottom"
           className={cn(
-            "inset-x-1/2 right-auto top-14 flex h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] w-full max-w-4xl -translate-x-1/2 flex-col overflow-hidden rounded-t-xl border p-0 md:w-[min(96vw,52rem)]"
+            "inset-x-1/2 right-auto top-14 flex h-[calc(100dvh-3.5rem)] max-h-[calc(100dvh-3.5rem)] w-full max-w-6xl -translate-x-1/2 flex-col overflow-hidden rounded-t-xl border p-0 md:w-[min(96vw,72rem)]"
           )}
         >
           <SheetTitle className="sr-only">Supplier details</SheetTitle>
@@ -1063,42 +1248,34 @@ export function SuppliersPageClient({
       </Sheet>
 
       <Dialog
-        open={reviewPromptOpen && reviewSupplier !== null}
+        open={setupCompleteOpen}
         onOpenChange={(open) => {
-          if (!open) endReview();
+          if (!open) dismissSetupComplete();
         }}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>
-              {reviewIndex === 0 ? "Let's review your suppliers" : "Next supplier"}
-            </DialogTitle>
+            <DialogTitle>Your suppliers are ready</DialogTitle>
             <DialogDescription>
-              We&apos;re reading {reviewSupplier?.name}&apos;s invoices in the background. While that
-              runs, let&apos;s make sure their details are right.
-              {review && review.length > 1
-                ? ` (${reviewIndex + 1} of ${review.length})`
-                : ""}
+              I&apos;ve pulled in {totalItems} supplier{totalItems === 1 ? "" : "s"} from Xero.
+              Want me to walk you through setting each of them up — contact, payment, delivery
+              and items?
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:justify-between">
-            <Button variant="ghost" onClick={endReview}>
-              Done
+            <Button variant="ghost" onClick={dismissSetupComplete}>
+              No, I&apos;ll do it myself
             </Button>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={advanceReview}>
-                Skip
-              </Button>
-              <Button
-                onClick={() => {
-                  if (!reviewSupplier) return;
-                  setReviewPromptOpen(false);
-                  openSupplierDetailSheet(reviewSupplier.id);
-                }}
-              >
-                Review {reviewSupplier?.name}
-              </Button>
-            </div>
+            <Button
+              className="gap-1.5 bg-[var(--brand-supersolt-primary)] text-black hover:bg-[var(--brand-supersolt-primary)]/90"
+              onClick={() => {
+                setSetupCompleteOpen(false);
+                router.push(configurePath);
+              }}
+            >
+              <Sparkles className="size-4" />
+              Yes, walk me through it
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

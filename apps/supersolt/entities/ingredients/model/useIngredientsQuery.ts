@@ -53,7 +53,8 @@ export function useIngredientSelectorQuery(
         venueSlug: input.venueSlug,
         status: "active",
         page: 1,
-        pageSize: 200,
+        // Full catalog for select-style pickers — server caps at 1000.
+        pageSize: 1000,
       });
       if (error) {
         throw new Error(error.message);

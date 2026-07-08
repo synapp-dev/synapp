@@ -65,6 +65,26 @@ export type RecipeIngredientSuggestionsResponse = {
   suggestions: RecipeIngredientSuggestion[];
 };
 
+/** One editable line in the products recipe wizard, resolved server-side. */
+export type RecipeWizardLine = {
+  ingredientId: string | null;
+  name: string;
+  /** Null when the deterministic fallback couldn't quantify. */
+  quantity: number | null;
+  unit: string;
+  unitCostCents: number;
+  matched: boolean;
+};
+
+export type RecipeWizardSuggestion = {
+  serves: number;
+  confidence: "high" | "medium" | "low";
+  notes: string | null;
+  fallbackUsed: boolean;
+  lines: RecipeWizardLine[];
+  estimatedCostPerServeCents: number;
+};
+
 export type PosItemModifiersResponse = {
   groupId: string | null;
   lists: PosItemModifierList[];

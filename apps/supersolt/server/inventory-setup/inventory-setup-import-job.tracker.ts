@@ -182,7 +182,9 @@ export class InventorySetupImportJobTracker {
 
       step.id === stepId
 
-        ? { ...step, status: "failed", detail: message, progress: null }
+        // Keep `progress` — its diagnostic event log is exactly what the user
+        // needs to see when a step dies.
+        ? { ...step, status: "failed", detail: message }
 
         : step,
 

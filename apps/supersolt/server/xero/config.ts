@@ -55,7 +55,12 @@ export const XERO_OAUTH_SCOPES = [
   "accounting.attachments",
   // Supplier name, Xero contact ID, and full contact records for supplier matching/creation
   "accounting.contacts",
-  // Items / chart-of-accounts context when mapping parsed line items to ingredients
+  // Items / chart-of-accounts context when mapping parsed line items to ingredients.
+  // NOTE: this scope (with accounting.invoices) already grants read access to Xero
+  // Items AND Purchase Orders — verified GET /Items + GET /PurchaseOrders both 200.
+  // The PO import needs NO additional scope. Do NOT add accounting.purchaseorders.* or
+  // accounting.transactions.* here — those exact strings aren't enabled on this app
+  // and return invalid_scope at the OAuth consent step.
   "accounting.settings",
 ] as const;
 

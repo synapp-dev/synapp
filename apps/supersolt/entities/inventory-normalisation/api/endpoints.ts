@@ -11,6 +11,27 @@ type ScopedInput = {
   venueSlug: string;
 };
 
+export type NormalisationMappingResponse = {
+  rawDescription: string;
+  rawUnit: string | null;
+  lastUnitPriceCents: number | null;
+  product: {
+    name: string;
+    packLabel: string;
+    unitsPerPack: string;
+    packUnit: string;
+    unitPriceCents: number;
+  } | null;
+  ingredient: {
+    id: string;
+    name: string;
+    unit: string;
+    category: string;
+    costPerUnitCents: number;
+    currentStockLevel: number;
+  } | null;
+};
+
 export const inventoryNormalisationApi = {
   get: {
     queue(input: ScopedInput & { search?: string }): Promise<ApiResult<NormalisationQueueResponse>> {
@@ -21,16 +42,26 @@ export const inventoryNormalisationApi = {
         `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/normalise/queue${qs ? `?${qs}` : ""}`,
       );
     },
+    mapping(
+      input: ScopedInput & { rawItemId: string },
+    ): Promise<ApiResult<NormalisationMappingResponse>> {
+      return apiFetch<NormalisationMappingResponse>(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/normalise/${input.rawItemId}/mapping`,
+      );
+    },
   },
   post: {
     suggest(
-      input: ScopedInput & { rawItemId: string },
+      input: ScopedInput & { rawItemId: string; regenerate?: boolean },
     ): Promise<ApiResult<NormalisationSuggestion>> {
       return apiFetch<NormalisationSuggestion>(
         `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/normalise/suggest`,
         {
           method: "POST",
-          body: JSON.stringify({ rawItemId: input.rawItemId }),
+          body: JSON.stringify({
+            rawItemId: input.rawItemId,
+            regenerate: input.regenerate ?? false,
+          }),
         },
       );
     },

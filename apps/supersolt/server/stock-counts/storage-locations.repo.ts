@@ -1,4 +1,4 @@
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
 
 import type { RlsTx } from "@/server/db/drizzle";
 import {
@@ -7,6 +7,30 @@ import {
 } from "@/server/db/schema";
 
 export const storageLocationsRepo = {
+  /** Primary storage location per ingredient, for a batch of ingredients. */
+  async listPrimaryForIngredients(
+    tx: RlsTx,
+    ingredientIds: string[],
+  ): Promise<Map<string, string>> {
+    if (ingredientIds.length === 0) return new Map();
+    const rows = await tx
+      .select({
+        ingredientId: ingredientStorageLocations.ingredientId,
+        locationId: ingredientStorageLocations.locationId,
+        isPrimary: ingredientStorageLocations.isPrimary,
+      })
+      .from(ingredientStorageLocations)
+      .where(inArray(ingredientStorageLocations.ingredientId, ingredientIds));
+    const byIngredient = new Map<string, string>();
+    for (const row of rows) {
+      // Primary wins; any link beats none.
+      if (row.isPrimary || !byIngredient.has(row.ingredientId)) {
+        byIngredient.set(row.ingredientId, row.locationId);
+      }
+    }
+    return byIngredient;
+  },
+
   async countForVenue(tx: RlsTx, venueId: string): Promise<number> {
     const rows = await tx
       .select({ value: count() })

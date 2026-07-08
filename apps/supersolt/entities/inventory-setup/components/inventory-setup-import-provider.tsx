@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 
 import { useScopedNavigation } from "@/entities/access/scoped-navigation-context";
@@ -58,6 +59,9 @@ type InventorySetupImportContextValue = {
   openDialog: () => void;
   dismissDialog: () => void;
   finishImport: () => Promise<void>;
+  /** Abort the in-flight import; everything already read is kept. */
+  cancelImport: () => Promise<void>;
+  isCancelling: boolean;
 };
 
 const InventorySetupImportContext =
@@ -65,6 +69,10 @@ const InventorySetupImportContext =
 
 export function InventorySetupImportProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const pathname = usePathname();
+  // The dedicated /xero-import page renders its own full-page progress + gate, so
+  // suppress the global dialog there to avoid showing both.
+  const onImportPage = pathname?.endsWith("/inventory-setup/suppliers/xero-import") ?? false;
   const { resolvedScope } = useScopedNavigation();
   const organisationSlug = resolvedScope?.organisationSlug ?? null;
   const venueSlug = resolvedScope?.venueSlug ?? null;
@@ -73,6 +81,7 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [isSubmittingSelection, setIsSubmittingSelection] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [pendingReview, setPendingReview] = useState<PendingReviewSupplier[] | null>(null);
   const autoOpenedForJobRef = useRef<string | null>(null);
   const completionHandledForJobRef = useRef<string | null>(null);
@@ -186,9 +195,12 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
 
     setIsStarting(true);
     try {
+      // Invoice-first: suppliers are minted from the invoices themselves — no
+      // contact sync, no selection gate, just a year of bills read live.
       const { data: job, error: jobError } = await inventorySetupApi.post.createImportJob({
         organisationSlug,
         venueSlug,
+        variant: "invoice_first",
       });
       if (jobError) throw new Error(jobError.message);
       if (!job) throw new Error("Could not start import");
@@ -205,6 +217,7 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
         organisationSlug,
         venueSlug,
         jobId: job.id,
+        variant: "invoice_first",
       });
       if (error) throw new Error(error.message);
     } catch (error) {
@@ -213,6 +226,26 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
       setIsStarting(false);
     }
   }, [activeJob, isStarting, organisationSlug, venueSlug]);
+
+  const cancelImport = useCallback(async () => {
+    if (!activeJobId || !organisationSlug || !venueSlug || isCancelling) return;
+    setIsCancelling(true);
+    try {
+      const { error } = await inventorySetupApi.post.cancelImportJob({
+        organisationSlug,
+        venueSlug,
+        jobId: activeJobId,
+      });
+      if (error) throw new Error(error.message);
+      toast.success("Import cancelled — everything already read has been kept.");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not cancel the import",
+      );
+    } finally {
+      setIsCancelling(false);
+    }
+  }, [activeJobId, organisationSlug, venueSlug, isCancelling]);
 
   const openDialog = useCallback(() => {
     if (!activeJobId) return;
@@ -308,6 +341,8 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
       openDialog,
       dismissDialog,
       finishImport,
+      cancelImport,
+      isCancelling,
     }),
     [
       activeJob,
@@ -317,6 +352,8 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
       dialogOpen,
       dismissDialog,
       finishImport,
+      cancelImport,
+      isCancelling,
       isStarting,
       isSubmittingSelection,
       openDialog,
@@ -328,7 +365,7 @@ export function InventorySetupImportProvider({ children }: { children: ReactNode
   return (
     <InventorySetupImportContext.Provider value={value}>
       {children}
-      {organisationSlug && venueSlug && activeJobId ? (
+      {organisationSlug && venueSlug && activeJobId && !onImportPage ? (
         <ImportFromXeroProgressDialog
           open={dialogOpen}
           onOpenChange={(open) => {

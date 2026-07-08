@@ -25,7 +25,7 @@ type SuppliersFilterState = {
   reset: () => void;
 };
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 50;
 
 export const useSuppliersFilterStore = create<SuppliersFilterState>()(
   persist(

@@ -1,3 +1,5 @@
+import { fetchXero } from "@/server/xero/xero-request-queue";
+
 const XERO_ACCOUNTING_INVOICES_URL = "https://api.xero.com/api.xro/2.0/Invoices";
 
 export async function getXeroAccountingInvoiceAttachment(args: {
@@ -14,7 +16,7 @@ export async function getXeroAccountingInvoiceAttachment(args: {
   const fileName = encodeURIComponent(args.fileName.trim());
   const accept = args.mimeType?.trim() || "application/octet-stream";
 
-  const res = await fetch(
+  const res = await fetchXero(
     `${XERO_ACCOUNTING_INVOICES_URL}/${invoiceId}/Attachments/${fileName}`,
     {
       headers: {

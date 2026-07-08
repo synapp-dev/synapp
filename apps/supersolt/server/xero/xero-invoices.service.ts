@@ -262,6 +262,15 @@ export async function syncVenueXeroInvoices(
     daysBack?: number;
     /** When true, only sync invoice headers — line items come from attachment parse elsewhere. */
     skipApiLineItems?: boolean;
+    /** Live progress for the import UI: listing pages, then per-row saves.
+     * `event: true` marks a line worth keeping in the step's diagnostic log
+     * (stage changes, pages, milestones) vs a rolling detail update. */
+    onProgress?: (p: {
+      detail: string;
+      current?: number;
+      total?: number;
+      event?: boolean;
+    }) => void | Promise<void>;
   },
 ): Promise<XeroInvoicesSyncPayload> {
   const context = await resolveVenueScope(
@@ -270,6 +279,7 @@ export async function syncVenueXeroInvoices(
     args.venueSlug,
   );
 
+  await args.onProgress?.({ detail: "Checking your Xero connection…", event: true });
   const connection = await loadVenueXeroConnectionForVenue(
     ctx.appDb,
     context.venueId,
@@ -295,12 +305,20 @@ export async function syncVenueXeroInvoices(
     daysBack: args.daysBack ?? 90,
   });
 
+  await args.onProgress?.({
+    detail: "Connection found — authorising with Xero…",
+    event: true,
+  });
   const token = await ensureVenueXeroAccessToken(ctx.appDb, connection);
   if (!token.ok) {
     const nowIso = new Date().toISOString();
     console.error("[xero] sync: token refresh failed", {
       venueId: context.venueId,
       message: token.message,
+    });
+    await args.onProgress?.({
+      detail: `Xero authorisation failed: ${token.message}`,
+      event: true,
     });
     await xeroInvoicesRepo.updateConnectionSyncError(
       ctx.appDb,
@@ -325,11 +343,22 @@ export async function syncVenueXeroInvoices(
   const modifiedSince = xeroModifiedSinceHeader(daysBack);
   const dateSince = xeroDateSinceFilter(daysBack);
 
+  await args.onProgress?.({
+    detail: "Authorised — asking Xero for your bills…",
+    event: true,
+  });
+  const onPage = (page: number, collected: number) =>
+    args.onProgress?.({
+      detail: `Found ${collected} bill${collected === 1 ? "" : "s"} so far (page ${page})…`,
+      event: true,
+    });
+
   let listed = await listXeroAccpayInvoices({
     accessToken: token.accessToken,
     tenantId: connection.xeroTenantId,
     modifiedSince,
     dateSince,
+    onPage,
   });
 
   if (listed.ok && listed.invoices.length === 0 && modifiedSince) {
@@ -337,11 +366,16 @@ export async function syncVenueXeroInvoices(
       venueId: context.venueId,
       modifiedSince,
     });
+    await args.onProgress?.({
+      detail: "No recently-updated bills — asking again for the full window…",
+      event: true,
+    });
     // Keep the invoice-date window on the retry; only drop the update-time header.
     listed = await listXeroAccpayInvoices({
       accessToken: token.accessToken,
       tenantId: connection.xeroTenantId,
       dateSince,
+      onPage,
     });
   }
 
@@ -351,6 +385,10 @@ export async function syncVenueXeroInvoices(
       venueId: context.venueId,
       status: listed.status,
       message: listed.message,
+    });
+    await args.onProgress?.({
+      detail: `Xero returned an error (${listed.status}) while listing bills`,
+      event: true,
     });
     await xeroInvoicesRepo.updateConnectionSyncError(
       ctx.appDb,
@@ -377,8 +415,27 @@ export async function syncVenueXeroInvoices(
   let synced = 0;
   let skipped = 0;
   const nowIso = new Date().toISOString();
+  const totalToSave = listed.invoices.length;
+
+  await args.onProgress?.({
+    detail: `${totalToSave} bill${totalToSave === 1 ? "" : "s"} found — saving them now…`,
+    current: 0,
+    total: totalToSave,
+    event: true,
+  });
 
   for (const raw of listed.invoices) {
+    // Every ~10 rows, surface the save loop — ~578 sequential remote writes
+    // take minutes and used to look like a hang. Every 100th row also lands
+    // in the diagnostic event log as a milestone.
+    if ((synced + skipped) % 10 === 0) {
+      await args.onProgress?.({
+        detail: `Saving bill ${synced + skipped + 1} of ${totalToSave}…`,
+        current: synced + skipped,
+        total: totalToSave,
+        event: (synced + skipped) > 0 && (synced + skipped) % 100 === 0,
+      });
+    }
     const mapped = mapXeroApiInvoice(raw);
     if (!mapped) {
       console.warn("[xero] sync: skipped unmapped invoice", {
@@ -428,6 +485,7 @@ export async function syncVenueXeroInvoices(
         xeroUpdatedAt: mapped.xero_updated_at,
         syncedAt: nowIso,
         updatedAt: nowIso,
+        hasAttachments: mapped.has_attachments,
       });
 
       const invoiceRows = await ctx.appDb.admin

@@ -42,7 +42,7 @@ export const READINESS_CHECK_BLOCKERS: Record<
     title: "Map ingredients to suppliers",
     description:
       "Add ingredients and link each one to a supplier product so stock counts and ordering use accurate costs.",
-    pathSuffix: "settings/inventory-setup/master-inventory-list",
+    pathSuffix: "settings/inventory-setup/inventory/master-list",
     ctaLabel: "Open ingredients",
   },
   has_team_members: {
@@ -68,7 +68,7 @@ export const READINESS_MODULES: ReadinessModuleDefinition[] = [
       description:
         "You have suppliers — next, add ingredients and link them to supplier products for accurate costing.",
       ctaLabel: "Open ingredients",
-      pathSuffix: "settings/inventory-setup/master-inventory-list",
+      pathSuffix: "settings/inventory-setup/inventory/master-list",
       iconId: "utensils",
       pageFollowUpQuestion:
         "Want help linking your first ingredient to a supplier product?",

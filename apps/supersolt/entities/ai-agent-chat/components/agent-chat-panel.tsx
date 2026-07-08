@@ -16,7 +16,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useTheme } from "next-themes";
 import {
   Fragment,
   useCallback,
@@ -46,6 +45,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { useRightSidebar } from "@workspace/ui/components/right-sidebar-provider";
 import { StaggeredAnimation } from "@/lib/ui/staggered-animation";
+import { AgentBotAvatarVideo } from "@/entities/ai-agent-chat/components/agent-bot-avatar-video";
 import { AgentChatAssistantText } from "@/entities/ai-agent-chat/components/agent-chat-assistant-text";
 import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
 import { AgentNavDestinationCards } from "@/entities/ai-agent-chat/components/agent-nav-destination-cards";
@@ -89,7 +89,6 @@ export function AgentChatPanel({
 }: {
   variant?: AgentChatPanelVariant;
 }) {
-  const { resolvedTheme } = useTheme();
   const {
     messages,
     sendMessage,
@@ -255,12 +254,6 @@ export function AgentChatPanel({
       setIsMultiline((prev) => (prev ? prev : true));
     }
   }, [input]);
-
-  const assistantVideoTheme = resolvedTheme === "dark" ? "dark" : "light";
-  const assistantVideoSrc =
-    assistantVideoTheme === "dark"
-      ? "/images/supersolt-bot-dark.webm"
-      : "/images/supersolt-bot-light.webm";
 
   const submit = useCallback(() => {
     const text = input.trim();
@@ -1101,20 +1094,12 @@ export function AgentChatPanel({
               fadeDirection="up"
               className="flex shrink-0 justify-center"
             >
-              <video
-                key={assistantVideoTheme}
-                autoPlay
-                loop
-                muted
-                playsInline
-                preload="auto"
+              <AgentBotAvatarVideo
                 width={192}
                 height={192}
                 aria-label="Supersolt assistant"
-                className="h-36 w-36 shrink-0 select-none object-contain sm:h-44 sm:w-44 md:h-48 md:w-48"
-              >
-                <source src={assistantVideoSrc} type="video/webm" />
-              </video>
+                className="h-36 w-36 shrink-0 sm:h-44 sm:w-44 md:h-48 md:w-48"
+              />
             </StaggeredAnimation>
             <StaggeredAnimation
               index={0}

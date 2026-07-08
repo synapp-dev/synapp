@@ -4,6 +4,7 @@ import {
   inventorySetupService,
   InventorySetupServiceError,
 } from "@/server/inventory-setup/inventory-setup.service";
+import { runInvoiceFirstImport } from "@/server/inventory-setup/invoice-first-import.service";
 import { requireRequestAuth } from "@/lib/api/route-auth";
 import {
   isServiceError,
@@ -32,10 +33,18 @@ export async function POST(
   const { organisation, venue } = await context.params;
   let daysBack: number | undefined;
   let jobId: string | undefined;
+  let variant: "invoice_first" | undefined;
   try {
-    const body = (await request.json()) as { daysBack?: number; jobId?: string };
+    const body = (await request.json()) as {
+      daysBack?: number;
+      jobId?: string;
+      variant?: "invoice_first";
+    };
     daysBack = body.daysBack;
     jobId = body.jobId;
+    if (body.variant === "invoice_first") {
+      variant = "invoice_first";
+    }
   } catch {
     daysBack = undefined;
     jobId = undefined;
@@ -72,12 +81,21 @@ export async function POST(
 
       after(async () => {
         try {
-          await inventorySetupService.importFromXero(ctx, {
-            organisationSlug: organisation,
-            venueSlug: venue,
-            daysBack,
-            jobId,
-          });
+          if (variant === "invoice_first") {
+            await runInvoiceFirstImport(ctx, {
+              organisationSlug: organisation,
+              venueSlug: venue,
+              daysBack,
+              jobId,
+            });
+          } else {
+            await inventorySetupService.importFromXero(ctx, {
+              organisationSlug: organisation,
+              venueSlug: venue,
+              daysBack,
+              jobId,
+            });
+          }
         } catch (error) {
           if (isServiceError(error) && error.status === 409) {
             return;
@@ -90,11 +108,18 @@ export async function POST(
       return jsonDataResponse(response, 202);
     }
 
-    const data = await inventorySetupService.importFromXero(ctx, {
-      organisationSlug: organisation,
-      venueSlug: venue,
-      daysBack,
-    });
+    const data =
+      variant === "invoice_first"
+        ? await runInvoiceFirstImport(ctx, {
+            organisationSlug: organisation,
+            venueSlug: venue,
+            daysBack,
+          })
+        : await inventorySetupService.importFromXero(ctx, {
+            organisationSlug: organisation,
+            venueSlug: venue,
+            daysBack,
+          });
     return jsonDataResponse(data);
   } catch (error) {
     return serviceErrorResponse(error, "inventory-setup/import-from-xero");

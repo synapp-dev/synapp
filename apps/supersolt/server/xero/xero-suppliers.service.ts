@@ -20,6 +20,8 @@ export type XeroSuppliersSyncPayload = {
   fetchedFromXero: number;
   lastSyncAt: string | null;
   error: string | null;
+  /** Present when the sync failed because Xero rate-limited the contacts call. */
+  rateLimit?: { retryAfterSeconds: number | null; problem: string | null };
 };
 
 export class XeroSuppliersServiceError extends Error {
@@ -207,6 +209,13 @@ export async function syncVenueXeroSuppliers(
       fetchedFromXero: 0,
       lastSyncAt: null,
       error: listed.message,
+      rateLimit:
+        listed.status === 429
+          ? {
+              retryAfterSeconds: listed.retryAfterSeconds,
+              problem: listed.rateLimitProblem,
+            }
+          : undefined,
     };
   }
 

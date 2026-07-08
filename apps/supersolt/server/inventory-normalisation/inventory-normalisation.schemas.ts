@@ -31,6 +31,8 @@ export type NormalisationSuggestion = z.infer<typeof normalisationSuggestionSche
 
 export const suggestNormalisationBodySchema = z.object({
   rawItemId: z.string().uuid(),
+  /** A user-requested retry — nudge the model toward a different reading. */
+  regenerate: z.boolean().optional(),
 });
 
 export const supplierProductCommitSchema = z.object({
@@ -40,6 +42,11 @@ export const supplierProductCommitSchema = z.object({
   unitsPerPack: z.number().positive(),
   packUnit: packUnitSchema,
   unitPriceCents: z.number().int().nonnegative(),
+  // Per-piece size (e.g. a 160 g fillet sold by the kg). Informational — does not
+  // affect cost. When omitted, the server derives it from invoice wording.
+  portionSize: z.number().positive().nullable().optional(),
+  portionUnit: packUnitSchema.nullable().optional(),
+  portionLabel: z.string().nullable().optional(),
 });
 
 export const ingredientCreateCommitSchema = z.object({
@@ -52,6 +59,22 @@ export const ingredientCreateCommitSchema = z.object({
   supplierId: z.string().uuid().nullable().optional(),
 });
 
+// Other raw items that are the same product in different invoice wording / order
+// quantities — normalised in one go, linked to the same supplier product, so the
+// user doesn't re-enter "Breast Fillet" once per pack size.
+const alsoRawItemIdsSchema = z.array(z.string().uuid()).optional();
+
+// Extra pack representations of the SAME ingredient priced differently on
+// invoices (e.g. "each" alongside "bag"). Each becomes its own supplier_product
+// linked to its own raw item; the primary `supplierProduct` stays the active
+// costing source. Listed raw items are excluded from the `alsoRawItemIds`
+// cascade so they link to their own pack rather than the base one.
+const additionalPackSchema = z.object({
+  rawItemId: z.string().uuid(),
+  supplierProduct: supplierProductCommitSchema,
+});
+const additionalPacksSchema = z.array(additionalPackSchema).optional();
+
 export const normaliseCommitBodySchema = z.discriminatedUnion("mode", [
   z.object({
     rawItemId: z.string().uuid(),
@@ -59,6 +82,8 @@ export const normaliseCommitBodySchema = z.discriminatedUnion("mode", [
     ingredient: ingredientCreateCommitSchema,
     supplierProduct: supplierProductCommitSchema,
     makeActiveSource: z.boolean().optional(),
+    alsoRawItemIds: alsoRawItemIdsSchema,
+    additionalPacks: additionalPacksSchema,
   }),
   z.object({
     rawItemId: z.string().uuid(),
@@ -66,6 +91,8 @@ export const normaliseCommitBodySchema = z.discriminatedUnion("mode", [
     ingredientId: z.string().uuid(),
     supplierProduct: supplierProductCommitSchema,
     makeActiveSource: z.boolean().optional(),
+    alsoRawItemIds: alsoRawItemIdsSchema,
+    additionalPacks: additionalPacksSchema,
   }),
 ]);
 

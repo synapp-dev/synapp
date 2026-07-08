@@ -24,10 +24,13 @@ export function useNormalisationMutations(scoped: ScopedInput) {
   };
 
   const suggest = useMutation({
-    mutationFn: async (rawItemId: string) => {
+    mutationFn: async (
+      input: string | { rawItemId: string; regenerate?: boolean },
+    ) => {
+      const args = typeof input === "string" ? { rawItemId: input } : input;
       const { data, error } = await inventoryNormalisationApi.post.suggest({
         ...scoped,
-        rawItemId,
+        ...args,
       });
       if (error) throw new Error(error.message);
       return data;

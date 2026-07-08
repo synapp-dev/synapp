@@ -1,9 +1,16 @@
 import { apiFetch, type ApiResult } from "@/lib/api/fetcher.client";
 import type {
+  ApproveSupplierAsProductsInput,
+  ApproveSupplierAsProductsResult,
+  ApproveSupplierRawItemsInput,
+  ConfirmSupplierItemsTriageInput,
+  ConfirmSupplierItemsTriageResult,
   CreateSupplierRawItemInput,
+  SkipSupplierItemsInput,
   SupplierRawItemListResponse,
   SupplierRawItemSourcesResponse,
   SupplierRawItemSummary,
+  SupplierReviewProductsResponse,
   UpdateSupplierRawItemInput,
 } from "@/entities/supplier-raw-items/model/types";
 
@@ -31,6 +38,13 @@ export const supplierRawItemsApi = {
         `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/raw-item-sources`,
       );
     },
+    reviewProducts(
+      input: ScopedSupplierInput,
+    ): Promise<ApiResult<SupplierReviewProductsResponse>> {
+      return apiFetch<SupplierReviewProductsResponse>(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/review-products`,
+      );
+    },
   },
   post: {
     create(
@@ -38,6 +52,38 @@ export const supplierRawItemsApi = {
     ): Promise<ApiResult<SupplierRawItemSummary>> {
       return apiFetch(
         `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/raw-items`,
+        { method: "POST", body: JSON.stringify(input.payload) },
+      );
+    },
+    approveMany(
+      input: ScopedSupplierInput & { payload: ApproveSupplierRawItemsInput },
+    ): Promise<ApiResult<{ updated: number }>> {
+      return apiFetch(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/raw-items/approve`,
+        { method: "POST", body: JSON.stringify(input.payload) },
+      );
+    },
+    approveAsProducts(
+      input: ScopedSupplierInput & { payload: ApproveSupplierAsProductsInput },
+    ): Promise<ApiResult<ApproveSupplierAsProductsResult>> {
+      return apiFetch(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/review-products`,
+        { method: "POST", body: JSON.stringify(input.payload) },
+      );
+    },
+    skipNotInventory(
+      input: ScopedSupplierInput & { payload: SkipSupplierItemsInput },
+    ): Promise<ApiResult<{ updated: number }>> {
+      return apiFetch(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/review-products/skip`,
+        { method: "POST", body: JSON.stringify(input.payload) },
+      );
+    },
+    confirmItemsTriage(
+      input: ScopedSupplierInput & { payload: ConfirmSupplierItemsTriageInput },
+    ): Promise<ApiResult<ConfirmSupplierItemsTriageResult>> {
+      return apiFetch(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/suppliers/${input.supplierId}/items-triage`,
         { method: "POST", body: JSON.stringify(input.payload) },
       );
     },

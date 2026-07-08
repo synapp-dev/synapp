@@ -823,7 +823,6 @@ function AuthFormContent() {
             />
             <div className="relative z-10 flex w-full max-w-xs flex-col items-center justify-center gap-2 px-10">
               <AgentBotAvatarVideo
-                appearance="inverted"
                 key={authPanelThemeKey}
                 aria-label="Supersolt assistant"
                 className="h-40 w-40 shrink-0 object-contain sm:h-44 sm:w-44 md:h-48 md:w-48"

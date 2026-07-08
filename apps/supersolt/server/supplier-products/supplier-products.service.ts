@@ -10,6 +10,7 @@ import {
   recipes,
 } from "@/server/db/schema";
 import { suppliersRepo } from "@/server/suppliers/suppliers.repo";
+import { supplierRawItemsRepo } from "@/server/supplier-raw-items/supplier-raw-items.repo";
 import {
   supplierProductsRepo,
   type PriceHistorySource,
@@ -232,6 +233,108 @@ async function propagateIngredientCost(
     .where(eq(ingredients.id, args.ingredientId));
 
   return recomputeRecipesForIngredient(ctx, args.ingredientId);
+}
+
+export type ReimportPricePropagationResult = {
+  productsRepriced: number;
+};
+
+/**
+ * Re-import price propagation. For supplier_products already linked to reviewed
+ * raw items, refresh the catalog price (and any active ingredient cost) from the
+ * newest invoice — but only forward in time, so an out-of-order older bill in
+ * the sync window can't regress a price, and a more recent manual edit is left
+ * untouched (its price-history `changedAt` is now(), later than any invoice).
+ * Unlinked / unreviewed items are never auto-priced — they stay in the review
+ * queue.
+ */
+export async function propagateReimportInvoicePrices(
+  ctx: RequestAuthContext,
+  args: { organisationId: string; venueId: string },
+): Promise<ReimportPricePropagationResult> {
+  const candidates = await ctx.appDb.rls((tx) =>
+    supplierRawItemsRepo.listLinkedPricePropagationCandidates(tx, {
+      organisationId: args.organisationId,
+      venueId: args.venueId,
+    }),
+  );
+  if (candidates.length === 0) return { productsRepriced: 0 };
+
+  // One target per product: the candidate from its newest invoice.
+  const newestByProduct = new Map<string, (typeof candidates)[number]>();
+  for (const c of candidates) {
+    const current = newestByProduct.get(c.supplierProductId);
+    const cTime = c.invoiceDate ? Date.parse(c.invoiceDate) : -Infinity;
+    const curTime = current?.invoiceDate
+      ? Date.parse(current.invoiceDate)
+      : current
+        ? -Infinity
+        : -Infinity;
+    if (!current || cTime > curTime) newestByProduct.set(c.supplierProductId, c);
+  }
+
+  const productIds = [...newestByProduct.keys()];
+  const [products, latestChangeAt] = await ctx.appDb.rls(async (tx) => [
+    await supplierProductsRepo.listByIds(tx, {
+      organisationId: args.organisationId,
+      productIds,
+    }),
+    await supplierProductsRepo.getLatestPriceChangeAtByProductIds(tx, {
+      organisationId: args.organisationId,
+      productIds,
+    }),
+  ]);
+  const productById = new Map(products.map((p) => [p.id, p]));
+
+  let productsRepriced = 0;
+  for (const [productId, candidate] of newestByProduct) {
+    const product = productById.get(productId);
+    if (!product) continue;
+    if (product.unitPriceCents === candidate.newPriceCents) continue;
+    // Forward-only: need a dated invoice strictly newer than the product's last
+    // recorded price change. No history → safe to seed.
+    const invoiceDate = candidate.invoiceDate;
+    if (!invoiceDate) continue;
+    const last = latestChangeAt.get(productId);
+    if (last && Date.parse(invoiceDate) <= Date.parse(last)) continue;
+
+    const ingredientId = await ctx.appDb.rls(async (tx) => {
+      const row = await supplierProductsRepo.updateProduct(tx, {
+        organisationId: args.organisationId,
+        productId,
+        row: { unitPriceCents: candidate.newPriceCents, updatedBy: ctx.userId },
+      });
+      if (!row) return null;
+      await supplierProductsRepo.insertPriceHistory(tx, {
+        organisationId: args.organisationId,
+        supplierProductId: productId,
+        oldPriceCents: product.unitPriceCents,
+        newPriceCents: candidate.newPriceCents,
+        source: "invoice" satisfies PriceHistorySource,
+        sourceRef: candidate.invoiceId,
+        changedByUserId: ctx.userId,
+        changedAt: new Date(invoiceDate).toISOString(),
+      });
+      return row.isActiveForIngredient ? row.ingredientId : null;
+    });
+
+    if (ingredientId) {
+      await propagateIngredientCost(ctx, {
+        ingredientId,
+        unitPriceCents: candidate.newPriceCents,
+        propagate: true,
+      });
+    }
+    productsRepriced += 1;
+  }
+
+  console.info("[supplier-products] reimport_price_propagation", {
+    organisationId: args.organisationId,
+    venueId: args.venueId,
+    candidates: candidates.length,
+    productsRepriced,
+  });
+  return { productsRepriced };
 }
 
 export const supplierProductsService = {

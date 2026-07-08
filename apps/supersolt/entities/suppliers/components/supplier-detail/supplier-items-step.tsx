@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   FileText,
@@ -12,6 +13,7 @@ import {
 import { toast } from "sonner";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
+import { Checkbox } from "@workspace/ui/components/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -30,7 +32,9 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 import { useSupplierRawItemsQuery } from "@/entities/supplier-raw-items/model/useSupplierRawItemsQuery";
 import { useSupplierRawItemSourcesQuery } from "@/entities/supplier-raw-items/model/useSupplierRawItemSourcesQuery";
+import { useSupplierRawItemMutations } from "@/entities/supplier-raw-items/model/useSupplierRawItemMutations";
 import { RawItemFormSheet } from "@/entities/supplier-raw-items/components/raw-item-form-sheet";
+import { RawItemReviewDialog } from "@/entities/supplier-raw-items/components/raw-item-review-dialog";
 import {
   groupSimilarRawItems,
   type RawItemGroup,
@@ -66,11 +70,13 @@ export function SupplierItemsStep({
   venue,
   supplierId,
 }: SupplierItemsStepProps) {
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<SupplierRawItemSummary | null>(null);
+  const [addSheetOpen, setAddSheetOpen] = useState(false);
+  const [reviewItem, setReviewItem] = useState<SupplierRawItemSummary | null>(null);
+  const [reviewInvoiceId, setReviewInvoiceId] = useState<string | null>(null);
   const [sourcesDialog, setSourcesDialog] = useState<SourcesDialogState | null>(null);
   const [previewInvoiceId, setPreviewInvoiceId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const itemsQuery = useSupplierRawItemsQuery({
     organisationSlug: organisation,
@@ -78,6 +84,11 @@ export function SupplierItemsStep({
     supplierId,
   });
   const sourcesQuery = useSupplierRawItemSourcesQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    supplierId,
+  });
+  const { approveRawItems } = useSupplierRawItemMutations({
     organisationSlug: organisation,
     venueSlug: venue,
     supplierId,
@@ -105,16 +116,31 @@ export function SupplierItemsStep({
   const inventory = items.filter((i) => i.isLikelyInventory !== false);
   const nonInventory = items.filter((i) => i.isLikelyInventory === false);
 
-  function openEdit(item: SupplierRawItemSummary) {
-    setEditing(item);
-    setSheetOpen(true);
-  }
+  // Drop selections for items that no longer exist (e.g. after a refetch).
+  const liveIds = useMemo(() => new Set(items.map((i) => i.id)), [items]);
+  useEffect(() => {
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => liveIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [liveIds]);
 
   function toggleExpanded(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelected(ids: string[], on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
   }
@@ -136,6 +162,32 @@ export function SupplierItemsStep({
     );
   }
 
+  function openReview(item: SupplierRawItemSummary, rows: SupplierRawItemSource[]) {
+    setReviewItem(item);
+    setReviewInvoiceId(rows[0]?.invoiceId ?? null);
+  }
+
+  async function approveSet(ids: string[], reviewed: boolean) {
+    if (ids.length === 0) return;
+    try {
+      await approveRawItems.mutateAsync({ rawItemIds: ids, reviewed });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update approval");
+    }
+  }
+
+  async function bulkApprove() {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    try {
+      await approveRawItems.mutateAsync({ rawItemIds: ids, reviewed: true });
+      toast.success(`Approved ${ids.length} item${ids.length === 1 ? "" : "s"}`);
+      setSelected(new Set());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not approve items");
+    }
+  }
+
   function InvoiceButton({
     title,
     rows,
@@ -149,7 +201,10 @@ export function SupplierItemsStep({
         size="sm"
         className="h-7 gap-1.5"
         disabled={rows.length === 0}
-        onClick={() => setSourcesDialog({ title, rows })}
+        onClick={(e) => {
+          e.stopPropagation();
+          setSourcesDialog({ title, rows });
+        }}
       >
         <FileText className="h-3.5 w-3.5" />
         Invoice ({rows.length})
@@ -157,8 +212,35 @@ export function SupplierItemsStep({
     );
   }
 
+  function ApproveButton({ ids, approved }: { ids: string[]; approved: boolean }) {
+    return (
+      <Button
+        variant={approved ? "ghost" : "outline"}
+        size="sm"
+        className={cn("h-7 gap-1.5", approved && "text-primary")}
+        disabled={approveRawItems.isPending}
+        onClick={(e) => {
+          e.stopPropagation();
+          void approveSet(ids, !approved);
+        }}
+      >
+        <Check className="h-3.5 w-3.5" />
+        {approved ? "Approved" : "Approve"}
+      </Button>
+    );
+  }
+
   function renderTable(label: string, rows: SupplierRawItemSummary[]) {
     const groups = groupSimilarRawItems(rows);
+    const allIds = groups.flatMap((g) => g.variants.map((v) => v.id));
+    const selectedCount = allIds.filter((id) => selected.has(id)).length;
+    const headerState: boolean | "indeterminate" =
+      allIds.length > 0 && selectedCount === allIds.length
+        ? true
+        : selectedCount > 0
+          ? "indeterminate"
+          : false;
+
     return (
       <div className="space-y-2">
         <h4 className="text-sm font-semibold">
@@ -173,29 +255,65 @@ export function SupplierItemsStep({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[40px]">
+                    <Checkbox
+                      checked={headerState}
+                      aria-label={`Select all in ${label}`}
+                      onCheckedChange={(v) => toggleSelected(allIds, v === true)}
+                    />
+                  </TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead className="text-right">Last price</TableHead>
                   <TableHead className="w-[130px]">Source</TableHead>
-                  <TableHead className="w-[70px]" />
+                  <TableHead className="w-[120px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {groups.map((group) => {
                   const rep = group.representative;
+                  const variantIds = group.variants.map((v) => v.id);
                   const variantCount = group.variants.length;
                   const isGroup = variantCount > 1;
                   const isOpen = expanded.has(rep.id);
+                  const groupSources = sourcesForGroup(group);
+                  const groupSelected = variantIds.every((id) => selected.has(id));
+                  const groupSome = variantIds.some((id) => selected.has(id));
+                  const groupApproved = group.variants.every(
+                    (v) => v.reviewedAt != null,
+                  );
+
                   return (
                     <Fragment key={rep.id}>
-                      <TableRow>
+                      <TableRow
+                        className="cursor-pointer"
+                        onClick={() => openReview(rep, groupSources)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={
+                              groupSelected
+                                ? true
+                                : groupSome
+                                  ? "indeterminate"
+                                  : false
+                            }
+                            aria-label={`Select ${rep.rawDescription}`}
+                            onCheckedChange={(v) =>
+                              toggleSelected(variantIds, v === true)
+                            }
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-1.5">
                             {isGroup ? (
                               <button
                                 type="button"
                                 className="text-muted-foreground hover:text-foreground -ml-1 flex items-center"
-                                onClick={() => toggleExpanded(rep.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpanded(rep.id);
+                                }}
                                 aria-label={isOpen ? "Collapse" : "Expand"}
                               >
                                 {isOpen ? (
@@ -204,6 +322,9 @@ export function SupplierItemsStep({
                                   <ChevronRight className="h-4 w-4" />
                                 )}
                               </button>
+                            ) : null}
+                            {groupApproved ? (
+                              <Check className="text-primary h-3.5 w-3.5 shrink-0" />
                             ) : null}
                             <span>{rep.rawDescription}</span>
                             {isGroup ? (
@@ -218,45 +339,58 @@ export function SupplierItemsStep({
                           {formatCurrency(rep.lastUnitPriceCents)}
                         </TableCell>
                         <TableCell>
-                          <InvoiceButton
-                            title={rep.rawDescription}
-                            rows={sourcesForGroup(group)}
-                          />
+                          <InvoiceButton title={rep.rawDescription} rows={groupSources} />
                         </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(rep)}>
-                            Edit
-                          </Button>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <ApproveButton ids={variantIds} approved={groupApproved} />
                         </TableCell>
                       </TableRow>
 
                       {isGroup && isOpen
-                        ? group.variants.map((variant) => (
-                            <TableRow key={variant.id} className="bg-muted/30">
-                              <TableCell className="text-muted-foreground pl-9 text-sm">
-                                {variant.rawDescription}
-                              </TableCell>
-                              <TableCell>{variant.rawUnit ?? "—"}</TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {formatCurrency(variant.lastUnitPriceCents)}
-                              </TableCell>
-                              <TableCell>
-                                <InvoiceButton
-                                  title={variant.rawDescription}
-                                  rows={sourcesForItem(variant.id)}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => openEdit(variant)}
-                                >
-                                  Edit
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
+                        ? group.variants.map((variant) => {
+                            const variantSources = sourcesForItem(variant.id);
+                            return (
+                              <TableRow
+                                key={variant.id}
+                                className="bg-muted/30 cursor-pointer"
+                                onClick={() => openReview(variant, variantSources)}
+                              >
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selected.has(variant.id)}
+                                    aria-label={`Select ${variant.rawDescription}`}
+                                    onCheckedChange={(v) =>
+                                      toggleSelected([variant.id], v === true)
+                                    }
+                                  />
+                                </TableCell>
+                                <TableCell className="text-muted-foreground pl-9 text-sm">
+                                  <span className="flex items-center gap-1.5">
+                                    {variant.reviewedAt != null ? (
+                                      <Check className="text-primary h-3.5 w-3.5 shrink-0" />
+                                    ) : null}
+                                    {variant.rawDescription}
+                                  </span>
+                                </TableCell>
+                                <TableCell>{variant.rawUnit ?? "—"}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {formatCurrency(variant.lastUnitPriceCents)}
+                                </TableCell>
+                                <TableCell>
+                                  <InvoiceButton
+                                    title={variant.rawDescription}
+                                    rows={variantSources}
+                                  />
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <ApproveButton
+                                    ids={[variant.id]}
+                                    approved={variant.reviewedAt != null}
+                                  />
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
                         : null}
                     </Fragment>
                   );
@@ -279,10 +413,7 @@ export function SupplierItemsStep({
         <Button
           size="sm"
           className="gap-1.5"
-          onClick={() => {
-            setEditing(null);
-            setSheetOpen(true);
-          }}
+          onClick={() => setAddSheetOpen(true)}
         >
           <Plus className="h-4 w-4" />
           Add item
@@ -293,6 +424,30 @@ export function SupplierItemsStep({
         <div className="border-primary/20 bg-primary/5 text-primary flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
           <Loader2 className="h-4 w-4 animate-spin" />
           We&apos;re still reading this supplier&apos;s invoices — items will fill in as we go.
+        </div>
+      ) : null}
+
+      {selected.size > 0 ? (
+        <div className="bg-muted/40 flex items-center justify-between gap-3 rounded-md border px-3 py-2">
+          <span className="text-sm font-medium">{selected.size} selected</span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
+              Clear
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5"
+              disabled={approveRawItems.isPending}
+              onClick={() => void bulkApprove()}
+            >
+              {approveRawItems.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4" />
+              )}
+              Approve {selected.size} selected
+            </Button>
+          </div>
         </div>
       ) : null}
 
@@ -317,15 +472,31 @@ export function SupplierItemsStep({
       )}
 
       <RawItemFormSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        open={addSheetOpen}
+        onOpenChange={setAddSheetOpen}
         organisation={organisation}
         venue={venue}
         supplierId={supplierId}
-        item={editing}
+        item={null}
         onSaved={() => {
-          setSheetOpen(false);
-          toast.success(editing ? "Item updated" : "Item added");
+          setAddSheetOpen(false);
+          toast.success("Item added");
+        }}
+      />
+
+      <RawItemReviewDialog
+        open={reviewItem !== null}
+        onOpenChange={(open) => {
+          if (!open) setReviewItem(null);
+        }}
+        organisation={organisation}
+        venue={venue}
+        supplierId={supplierId}
+        item={reviewItem}
+        invoiceId={reviewInvoiceId}
+        onSaved={(approved) => {
+          setReviewItem(null);
+          toast.success(approved ? "Item approved" : "Item saved");
         }}
       />
 

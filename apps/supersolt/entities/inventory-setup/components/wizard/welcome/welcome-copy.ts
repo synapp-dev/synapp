@@ -24,14 +24,35 @@ export type WelcomeStageBox = {
   id: "suppliers" | "inventory" | "products" | "storage";
   label: string;
   icon: LucideIcon;
+  summary: string;
 };
 
-/** The four pillars of inventory setup, shown as a grid then collapsed. */
+/** The four pillars of inventory setup, shown as a 2x2 grid in the overview. */
 export const WELCOME_STAGE_BOXES: readonly WelcomeStageBox[] = [
-  { id: "suppliers", label: "Suppliers", icon: Building2 },
-  { id: "inventory", label: "Inventory", icon: Boxes },
-  { id: "products", label: "Products", icon: ScanBarcode },
-  { id: "storage", label: "Storage", icon: Warehouse },
+  {
+    id: "suppliers",
+    label: "Suppliers",
+    icon: Building2,
+    summary: "Who you buy from and the items they sell.",
+  },
+  {
+    id: "inventory",
+    label: "Inventory",
+    icon: Boxes,
+    summary: "Supplier items turned into trackable ingredients.",
+  },
+  {
+    id: "products",
+    label: "Products",
+    icon: ScanBarcode,
+    summary: "Your menu items, each with a costed recipe.",
+  },
+  {
+    id: "storage",
+    label: "Storage",
+    icon: Warehouse,
+    summary: "Where your stock actually lives for counts.",
+  },
 ];
 
 export type TracebackStep = {
@@ -70,9 +91,12 @@ export const SUPPLIER_BENEFITS: readonly SupplierBenefit[] = [
  * the app-wide typewriter so it matches the agent chat voice.
  */
 export function buildWelcomeScript(firstName: string | null) {
-  const name = firstName?.trim() ? firstName.trim() : "there";
+  const trimmed = firstName?.trim();
+  const name = trimmed ? trimmed : "there";
   return {
-    greeting: `Welcome to the inventory setup, ${name}!`,
+    greeting: trimmed ? `Hey there ${trimmed}!` : "Hey there!",
+    greetingBody:
+      "Once you give me a few details, I can cost every dish to the cent, track stock as it moves, flag waste before it adds up, and keep your ordering tight — so the numbers across the rest of Supersolt stay accurate.",
     overview:
       "I'm excited to help you run your restaurant. I just need a few things from you first, so I can do my job perfectly.",
     supplierIntroLead: "Let's start with suppliers.",

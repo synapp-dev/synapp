@@ -19,10 +19,37 @@ import {
 import type { RlsTx } from "@/server/db/drizzle";
 import type { AppDb } from "@/server/db/create-app-db";
 import { suppliers, venueInvoices, venueXeroConnections } from "@/server/db/schema";
+import { abnKey } from "@/server/suppliers/supplier-identity";
+import { countUniqueProducts } from "@/server/inventory-normalisation/find-similar-pending-raw-items";
 import { supplierProductsRepo } from "@/server/supplier-products/supplier-products.repo";
+import { supplierRawItemsRepo } from "@/server/supplier-raw-items/supplier-raw-items.repo";
 
 export type SupplierRow = typeof suppliers.$inferSelect;
 export type SupplierInsert = typeof suppliers.$inferInsert;
+
+/** Unique products (variant-folded) vs total raw items parsed, per category. */
+export type SupplierItemBreakdown = {
+  /** Distinct products after folding unit-size/wording variants together. */
+  unique: number;
+  /** Raw item rows parsed off invoices (each unit variant counts). */
+  parsed: number;
+};
+
+/** Per-supplier aggregates joined onto summaries/details by the service. */
+export type SupplierMetrics = {
+  /** Approved, likely-inventory raw items (the "Items" column). */
+  itemCount: number;
+  /** Raw items still awaiting an approve/skip decision. */
+  unreviewedItemCount: number;
+  /** Approved supplier_products — the supplier's priced catalog. */
+  productCount: number;
+  /** Likely-inventory items (isLikelyInventory true or null). */
+  inventoryItems: SupplierItemBreakdown;
+  /** Explicitly non-inventory items (isLikelyInventory false). */
+  nonInventoryItems: SupplierItemBreakdown;
+  ytdSpendCents: number;
+  lastInvoiceDate: string | null;
+};
 export type SupplierUpdate = Partial<
   Omit<SupplierInsert, "id" | "organisationId">
 >;
@@ -115,12 +142,13 @@ export const suppliersRepo = {
     let filteredRows = rows;
     if (args.hasProducts !== undefined) {
       const supplierIds = rows.map((r) => r.id);
-      const productCounts = await supplierProductsRepo.countBySupplierIds(tx, {
-        organisationId: args.organisationId,
-        supplierIds,
-      });
+      const itemCounts =
+        await supplierRawItemsRepo.countApprovedInventoryBySupplierIds(tx, {
+          organisationId: args.organisationId,
+          supplierIds,
+        });
       filteredRows = rows.filter((r) => {
-        const count = productCounts.get(r.id) ?? 0;
+        const count = itemCounts.get(r.id) ?? 0;
         return args.hasProducts ? count > 0 : count === 0;
       });
     }
@@ -128,23 +156,40 @@ export const suppliersRepo = {
     return { rows: filteredRows, total: Number(totalRow[0]?.value ?? 0) };
   },
 
+  /** All non-archived suppliers visible to the venue (no pagination). */
+  async getAllForVenue(
+    tx: RlsTx,
+    args: { organisationId: string; venueId: string },
+  ): Promise<SupplierRow[]> {
+    return tx
+      .select()
+      .from(suppliers)
+      .where(
+        and(
+          eq(suppliers.organisationId, args.organisationId),
+          venueScopeCondition(args.venueId),
+          isNull(suppliers.archivedAt),
+        ),
+      );
+  },
+
   async getSupplierMetrics(
     tx: RlsTx,
     args: { organisationId: string; venueId: string; supplierIds: string[] },
-  ): Promise<
-    Map<
-      string,
-      { productCount: number; ytdSpendCents: number; lastInvoiceDate: string | null }
-    >
-  > {
-    const result = new Map<
-      string,
-      { productCount: number; ytdSpendCents: number; lastInvoiceDate: string | null }
-    >();
+  ): Promise<Map<string, SupplierMetrics>> {
+    const result = new Map<string, SupplierMetrics>();
     if (args.supplierIds.length === 0) return result;
 
     for (const id of args.supplierIds) {
-      result.set(id, { productCount: 0, ytdSpendCents: 0, lastInvoiceDate: null });
+      result.set(id, {
+        itemCount: 0,
+        unreviewedItemCount: 0,
+        productCount: 0,
+        inventoryItems: { unique: 0, parsed: 0 },
+        nonInventoryItems: { unique: 0, parsed: 0 },
+        ytdSpendCents: 0,
+        lastInvoiceDate: null,
+      });
     }
 
     const productCounts = await supplierProductsRepo.countBySupplierIds(tx, {
@@ -154,6 +199,66 @@ export const suppliersRepo = {
     for (const [id, count] of productCounts) {
       const entry = result.get(id);
       if (entry) entry.productCount = count;
+    }
+
+    const itemCounts =
+      await supplierRawItemsRepo.countApprovedInventoryBySupplierIds(tx, {
+        organisationId: args.organisationId,
+        supplierIds: args.supplierIds,
+      });
+    for (const [id, count] of itemCounts) {
+      const entry = result.get(id);
+      if (entry) entry.itemCount = count;
+    }
+
+    const unreviewedCounts =
+      await supplierRawItemsRepo.countUnreviewedBySupplierIds(tx, {
+        organisationId: args.organisationId,
+        supplierIds: args.supplierIds,
+      });
+    for (const [id, count] of unreviewedCounts) {
+      const entry = result.get(id);
+      if (entry) entry.unreviewedItemCount = count;
+    }
+
+    // Inventory / non-inventory breakdown: unique products (variant-folded via
+    // the same relation as the normalisation queue's grouping) + parsed rows.
+    const breakdownRows = await supplierRawItemsRepo.listCatalogBreakdownRows(
+      tx,
+      {
+        organisationId: args.organisationId,
+        supplierIds: args.supplierIds,
+      },
+    );
+    const descriptionsByKey = new Map<
+      string,
+      Array<{ description: string; priceCents: number | null }>
+    >();
+    for (const row of breakdownRows) {
+      // Drawer rule: isLikelyInventory !== false counts as inventory.
+      const bucket = row.isLikelyInventory !== false ? "inv" : "non";
+      const key = `${row.supplierId}:${bucket}`;
+      const item = { description: row.rawDescription, priceCents: row.lastUnitPriceCents };
+      const list = descriptionsByKey.get(key);
+      if (list) {
+        list.push(item);
+      } else {
+        descriptionsByKey.set(key, [item]);
+      }
+    }
+    for (const [key, descriptions] of descriptionsByKey) {
+      const [supplierId, bucket] = key.split(":") as [string, "inv" | "non"];
+      const entry = result.get(supplierId);
+      if (!entry) continue;
+      const breakdown = {
+        unique: countUniqueProducts(descriptions),
+        parsed: descriptions.length,
+      };
+      if (bucket === "inv") {
+        entry.inventoryItems = breakdown;
+      } else {
+        entry.nonInventoryItems = breakdown;
+      }
     }
 
     const yearStart = `${new Date().getFullYear()}-01-01`;
@@ -408,6 +513,7 @@ export const suppliersRepo = {
       invoiceDate: string;
       details: {
         abn: string | null;
+        category: string | null;
         email: string | null;
         phone: string | null;
         addressLine1: string | null;
@@ -423,7 +529,14 @@ export const suppliersRepo = {
       updatedAt: new Date().toISOString(),
     };
     const { details } = args;
-    if (details.abn) set.abn = details.abn;
+    // A partial ABN read (fewer than 11 digits) must never overwrite a real
+    // one; matching already ignores it, so persisting it is pure damage.
+    if (abnKey(details.abn)) set.abn = details.abn;
+    // Only adopt the inferred category while the supplier is still the default
+    // "other" — never overwrite a classification a human has already chosen.
+    if (details.category && details.category !== "other") {
+      set.category = sql`case when ${suppliers.category} = 'other' then ${details.category} else ${suppliers.category} end` as unknown as string;
+    }
     if (details.email) set.email = details.email;
     if (details.phone) set.phone = details.phone;
     if (details.addressLine1) set.addressLine1 = details.addressLine1;
@@ -455,12 +568,24 @@ export const suppliersRepo = {
   async listForVenueSelection(
     tx: RlsTx,
     args: { organisationId: string; venueId: string },
-  ): Promise<Array<{ id: string; name: string; isInventorySource: boolean }>> {
+  ): Promise<
+    Array<{
+      id: string;
+      name: string;
+      isInventorySource: boolean;
+      email: string | null;
+      orderingEmail: string | null;
+      phone: string | null;
+    }>
+  > {
     return tx
       .select({
         id: suppliers.id,
         name: suppliers.name,
         isInventorySource: suppliers.isInventorySource,
+        email: suppliers.email,
+        orderingEmail: suppliers.orderingEmail,
+        phone: suppliers.phone,
       })
       .from(suppliers)
       .where(

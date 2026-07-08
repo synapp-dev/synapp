@@ -14,10 +14,17 @@ export async function POST(
 
   const { organisation, venue } = await context.params;
   let jobType: "xero" | "square_catalog" = "xero";
+  let variant: "invoice_first" | undefined;
   try {
-    const body = (await request.json()) as { jobType?: "xero" | "square_catalog" };
+    const body = (await request.json()) as {
+      jobType?: "xero" | "square_catalog";
+      variant?: "invoice_first";
+    };
     if (body.jobType === "square_catalog") {
       jobType = "square_catalog";
+    }
+    if (body.variant === "invoice_first") {
+      variant = "invoice_first";
     }
   } catch {
     jobType = "xero";
@@ -33,6 +40,7 @@ export async function POST(
         : await inventorySetupService.createImportJob(ctx, {
             organisationSlug: organisation,
             venueSlug: venue,
+            variant,
           });
     return jsonDataResponse(data);
   } catch (error) {

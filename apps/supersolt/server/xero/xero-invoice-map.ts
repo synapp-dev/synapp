@@ -8,6 +8,16 @@ export type XeroReviewStatus =
 
 export type XeroDocumentType = "invoice" | "credit_note";
 
+export type XeroApiInvoiceLine = {
+  ItemCode?: string;
+  Description?: string;
+  Quantity?: number;
+  UnitAmount?: number;
+  LineAmount?: number;
+  /** Chart-of-accounts code the bill line is coded to (e.g. a Direct Costs account). */
+  AccountCode?: string;
+};
+
 export type XeroApiInvoice = {
   InvoiceID?: string;
   InvoiceNumber?: string;
@@ -24,6 +34,11 @@ export type XeroApiInvoice = {
     ContactID?: string;
     Name?: string;
   };
+  /** Returned by the Invoices list endpoint — lets the import skip attachment
+   * calls entirely for bills that have no files. */
+  HasAttachments?: boolean;
+  /** Returned inline by the Invoices list endpoint; used for setup classification. */
+  LineItems?: XeroApiInvoiceLine[];
 };
 
 export type MappedXeroInvoiceUpsert = {
@@ -41,6 +56,7 @@ export type MappedXeroInvoiceUpsert = {
   review_status: XeroReviewStatus;
   reference: string | null;
   xero_updated_at: string | null;
+  has_attachments: boolean | null;
 };
 
 function dollarsToCents(value: number | undefined): number | null {
@@ -100,5 +116,6 @@ export function mapXeroApiInvoice(inv: XeroApiInvoice): MappedXeroInvoiceUpsert 
     review_status: mapXeroReviewStatus(inv.Status),
     reference: inv.Reference?.trim() ?? null,
     xero_updated_at: parseXeroDate(inv.UpdatedDateUTC),
+    has_attachments: typeof inv.HasAttachments === "boolean" ? inv.HasAttachments : null,
   };
 }

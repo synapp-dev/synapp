@@ -14,6 +14,7 @@ import {
   Phone,
   Plus,
   ShoppingCart,
+  TriangleAlert,
   Truck,
   X,
 } from "lucide-react";
@@ -42,6 +43,12 @@ import type { DeliveryScheduleEntry, ScheduleOverrideEntry } from "@/entities/su
 import { useSupplierMutations } from "@/entities/suppliers/model/useSupplierMutations";
 import { useSupplierQuery } from "@/entities/suppliers/model/useSupplierQuery";
 import type { SupplierCategory, SupplierDetail } from "@/entities/suppliers/model/types";
+import {
+  evaluateSupplierReadiness,
+  SUPPLIER_READINESS_FIELD_META,
+  type SupplierReadinessField,
+  type SupplierReadinessSection,
+} from "@/entities/suppliers/model/supplier-readiness";
 import { useSupplierProductMutations } from "@/entities/supplier-products/model/useSupplierProductMutations";
 import { useSupplierProductsQuery } from "@/entities/supplier-products/model/useSupplierProductsQuery";
 import type { SupplierProductSummary } from "@/entities/supplier-products/model/types";
@@ -329,13 +336,99 @@ export function SupplierDetailPageClient({
 
   const ptSelect = paymentTermsSelectValue(draft.paymentTerms);
 
-  const steps: Array<{ id: StepId; label: string; icon: typeof Info; count?: number }> = [
-    { id: "information", label: "Information", icon: Info },
-    { id: "contact", label: "Contact", icon: Phone },
-    { id: "payment", label: "Payment", icon: CreditCard },
-    { id: "delivery", label: "Delivery", icon: Truck },
+  // Live readiness from the in-progress draft so the sidebar badges update as
+  // fields are edited. Unreviewed items come from the loaded raw items when
+  // available (setup mode), else the server-derived count on the detail.
+  const unreviewedItemCount = rawItemsQuery.data
+    ? rawItemsQuery.data.items.filter((i) => i.reviewedAt == null).length
+    : (supplierQuery.data?.readiness.outstanding.items ?? 0);
+  const readiness = evaluateSupplierReadiness({
+    name: draft.name,
+    abn: draft.abn,
+    category: draft.category,
+    email: draft.email,
+    contactPerson: draft.contactPerson,
+    phone: draft.phone,
+    paymentTerms: draft.paymentTerms,
+    hasDeliveryDay:
+      draft.deliverySchedule.some((d) => d.is_order_day) ||
+      draft.deliveryDays.trim().length > 0,
+    unreviewedItemCount,
+    // Catalog requirement is driven by server-derived facts (not editable in
+    // this drawer), so the live readiness stays consistent with the table/banner.
+    isInventorySource: supplierQuery.data?.isInventorySource ?? false,
+    inventoryItemCount: supplierQuery.data?.inventoryItems.parsed ?? 0,
+    noCatalogAcked: supplierQuery.data?.noCatalogAcked ?? false,
+  });
+
+  const missingSet = new Set<SupplierReadinessField>(readiness.missing);
+  // Amber ring applied to an input whose value is still outstanding.
+  const fieldRing = (field: SupplierReadinessField): string | undefined =>
+    missingSet.has(field)
+      ? "border-amber-400 focus-visible:border-amber-400 focus-visible:ring-amber-400/30 dark:border-amber-500/60"
+      : undefined;
+  // Banner above a form listing what that section is still missing.
+  const missingBanner = (section: SupplierReadinessSection) => {
+    const labels = readiness.missing
+      .filter((f) => SUPPLIER_READINESS_FIELD_META[f].section === section)
+      .map((f) => SUPPLIER_READINESS_FIELD_META[f].label);
+    if (labels.length === 0) return null;
+    const joined =
+      labels.length === 1
+        ? labels[0]
+        : `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+    return (
+      <div className="flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 dark:border-amber-500/40 dark:bg-amber-950/30">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div className="text-sm">
+          <p className="font-medium text-amber-900 dark:text-amber-200">
+            Finish setting up this supplier
+          </p>
+          <p className="text-amber-800 dark:text-amber-300/90">Add {joined}.</p>
+        </div>
+      </div>
+    );
+  };
+
+  const steps: Array<{
+    id: StepId;
+    label: string;
+    icon: typeof Info;
+    count?: number;
+    outstanding?: number;
+  }> = [
+    {
+      id: "information",
+      label: "Information",
+      icon: Info,
+      outstanding: readiness.outstanding.information,
+    },
+    {
+      id: "contact",
+      label: "Contact",
+      icon: Phone,
+      outstanding: readiness.outstanding.contact,
+    },
+    {
+      id: "payment",
+      label: "Payment",
+      icon: CreditCard,
+      outstanding: readiness.outstanding.payment,
+    },
+    {
+      id: "delivery",
+      label: "Delivery",
+      icon: Truck,
+      outstanding: readiness.outstanding.delivery,
+    },
     inventorySetupMode
-      ? { id: "items", label: "Items", icon: Package, count: rawItemTotal }
+      ? {
+          id: "items",
+          label: "Items",
+          icon: Package,
+          count: rawItemTotal,
+          outstanding: readiness.outstanding.items,
+        }
       : { id: "products", label: "Products", icon: Package, count: productTotal },
     { id: "invoices", label: "Invoices", icon: FileText, count: invoices.length },
     ...(inventorySetupMode
@@ -364,42 +457,56 @@ export function SupplierDetailPageClient({
     </div>
   );
 
+  const stepButtons = steps.map((step) => {
+    const Icon = step.icon;
+    const active = activeStep === step.id;
+    return (
+      <button
+        key={step.id}
+        type="button"
+        onClick={() => setActiveStep(step.id)}
+        className={cn(
+          "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm whitespace-nowrap transition-colors",
+          active
+            ? "bg-primary/10 text-primary font-medium"
+            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="flex-1">{step.label}</span>
+        <span className="flex items-center gap-1.5">
+          {step.outstanding && step.outstanding > 0 ? (
+            <span
+              className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-100 px-1 text-[10px] font-semibold tabular-nums text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+              title={`${step.outstanding} to finish`}
+            >
+              {step.outstanding}
+            </span>
+          ) : null}
+          {step.count != null ? (
+            <span className="text-muted-foreground text-xs tabular-nums">{step.count}</span>
+          ) : null}
+        </span>
+      </button>
+    );
+  });
+
   const sidebarNav = (
     <nav className="flex shrink-0 gap-1 overflow-x-auto border-b p-2 md:w-52 md:flex-col md:overflow-visible md:border-b-0 md:border-r md:p-3">
-      {steps.map((step) => {
-        const Icon = step.icon;
-        const active = activeStep === step.id;
-        return (
-          <button
-            key={step.id}
-            type="button"
-            onClick={() => setActiveStep(step.id)}
-            className={cn(
-              "flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm whitespace-nowrap transition-colors",
-              active
-                ? "bg-primary/10 text-primary font-medium"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            <span className="flex-1">{step.label}</span>
-            {step.count != null ? (
-              <span className="text-muted-foreground text-xs tabular-nums">{step.count}</span>
-            ) : null}
-          </button>
-        );
-      })}
+      {stepButtons}
     </nav>
   );
 
   const informationPanel = (
     <Card className="space-y-6 p-6">
       <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Supplier details</h3>
+      {missingBanner("information")}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2 md:col-span-2">
           <Label htmlFor="sup-name">Name *</Label>
           <Input
             id="sup-name"
+            className={cn(fieldRing("name"))}
             value={draft.name}
             onChange={(e) => setDraft((d) => (d ? { ...d, name: e.target.value } : d))}
           />
@@ -408,6 +515,7 @@ export function SupplierDetailPageClient({
           <Label htmlFor="sup-abn">ABN</Label>
           <Input
             id="sup-abn"
+            className={cn(fieldRing("abn"))}
             value={draft.abn}
             onChange={(e) => setDraft((d) => (d ? { ...d, abn: e.target.value } : d))}
           />
@@ -420,7 +528,7 @@ export function SupplierDetailPageClient({
               setDraft((d) => (d ? { ...d, category: v as SupplierCategory } : d))
             }
           >
-            <SelectTrigger>
+            <SelectTrigger className={cn(fieldRing("category"))}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -515,11 +623,13 @@ export function SupplierDetailPageClient({
   const contactPanel = (
     <Card className="space-y-6 p-6">
       <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Contact &amp; address</h3>
+      {missingBanner("contact")}
       <div className="grid gap-4 md:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="sup-contact">Contact</Label>
           <Input
             id="sup-contact"
+            className={cn(fieldRing("contactPerson"))}
             value={draft.contactPerson}
             onChange={(e) => setDraft((d) => (d ? { ...d, contactPerson: e.target.value } : d))}
           />
@@ -528,6 +638,7 @@ export function SupplierDetailPageClient({
           <Label htmlFor="sup-phone">Phone</Label>
           <Input
             id="sup-phone"
+            className={cn(fieldRing("phone"))}
             value={draft.phone}
             onChange={(e) => setDraft((d) => (d ? { ...d, phone: e.target.value } : d))}
           />
@@ -537,6 +648,7 @@ export function SupplierDetailPageClient({
           <Input
             id="sup-email"
             type="email"
+            className={cn(fieldRing("email"))}
             value={draft.email}
             onChange={(e) => setDraft((d) => (d ? { ...d, email: e.target.value } : d))}
           />
@@ -625,6 +737,7 @@ export function SupplierDetailPageClient({
   const paymentPanel = (
     <Card className="space-y-6 p-6">
       <h3 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">Payment &amp; ordering</h3>
+      {missingBanner("payment")}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label>Payment terms</Label>
@@ -637,7 +750,7 @@ export function SupplierDetailPageClient({
               setDraft((d) => (d ? { ...d, paymentTerms: v } : d));
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={cn(fieldRing("paymentTerms"))}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -651,7 +764,7 @@ export function SupplierDetailPageClient({
           </Select>
           {ptSelect === "custom" ? (
             <Input
-              className="mt-2"
+              className={cn("mt-2", fieldRing("paymentTerms"))}
               placeholder="Describe terms"
               value={draft.paymentTerms}
               onChange={(e) => setDraft((d) => (d ? { ...d, paymentTerms: e.target.value } : d))}
@@ -684,6 +797,7 @@ export function SupplierDetailPageClient({
 
   const deliveryPanel = (
     <div className="space-y-4">
+      {missingBanner("delivery")}
       <DeliveryScheduleGrid
         schedule={draft.deliverySchedule}
         disabled={updateSupplier.isPending}
@@ -697,6 +811,7 @@ export function SupplierDetailPageClient({
           <Label htmlFor="sup-delivery-days">Delivery days (free text)</Label>
           <Input
             id="sup-delivery-days"
+            className={cn(fieldRing("delivery"))}
             placeholder="e.g. Mon, Wed, Fri"
             value={draft.deliveryDays}
             onChange={(e) => setDraft((d) => (d ? { ...d, deliveryDays: e.target.value } : d))}
@@ -1057,13 +1172,8 @@ export function SupplierDetailPageClient({
     }
   })();
 
-  const bodySection = (
+  const overlays = (
     <>
-      <div className="flex flex-col overflow-hidden rounded-lg border md:flex-row md:items-stretch">
-        {sidebarNav}
-        <div className="min-w-0 flex-1 p-4 md:p-5">{activePanel}</div>
-      </div>
-
       <SupplierProductFormSheet
         open={productSheetOpen}
         onOpenChange={setProductSheetOpen}
@@ -1078,7 +1188,18 @@ export function SupplierDetailPageClient({
         venue={venue}
         invoiceId={previewInvoiceId}
         onClose={() => setPreviewInvoiceId(null)}
+        autoParseOnOpen={false}
       />
+    </>
+  );
+
+  const bodySection = (
+    <>
+      <div className="flex flex-col overflow-hidden rounded-lg border md:flex-row md:items-stretch">
+        {sidebarNav}
+        <div className="min-w-0 flex-1 p-4 md:p-5">{activePanel}</div>
+      </div>
+      {overlays}
     </>
   );
 
@@ -1086,27 +1207,43 @@ export function SupplierDetailPageClient({
     return (
       <div className="flex h-full min-h-0 flex-col">
         <div className="shrink-0 border-b px-4 py-4 md:px-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              className="gap-1.5 shrink-0"
+              onClick={() => onClose?.()}
+            >
+              <X className="h-4 w-4" />
+              Close
+            </Button>
+            <h2 className="min-w-0 truncate text-lg font-semibold tracking-tight">{draft.name}</h2>
+            <Badge variant={draft.active ? "default" : "secondary"} className="shrink-0">
+              {draft.active ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </div>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="flex w-44 shrink-0 flex-col border-r md:w-52">
+            <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3">
+              {stepButtons}
+              <div className="my-1 border-t" />
               <Button
                 variant="ghost"
                 size="sm"
-                type="button"
-                className="gap-1.5 shrink-0"
-                onClick={() => onClose?.()}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive h-auto w-full justify-start gap-2 px-3 py-2 text-sm font-normal"
+                disabled={deleteSupplier.isPending}
+                onClick={() => void handleArchive()}
               >
-                <X className="h-4 w-4" />
-                Close
+                <Archive className="h-4 w-4 shrink-0" />
+                Archive
               </Button>
-              <h2 className="min-w-0 truncate text-lg font-semibold tracking-tight">{draft.name}</h2>
-              <Badge variant={draft.active ? "default" : "secondary"} className="shrink-0">
-                {draft.active ? "Active" : "Inactive"}
-              </Badge>
-            </div>
-            {archiveButton}
+            </nav>
           </div>
+          <div className="min-w-0 flex-1 overflow-y-auto p-4 md:p-5">{activePanel}</div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 md:px-5">{bodySection}</div>
+        {overlays}
       </div>
     );
   }

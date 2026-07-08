@@ -37,7 +37,6 @@ export const EMPTY_WIZARD_STATE: InventorySetupWizardState = {
 
 /** Stable ack keys persisted in venues.inventory_setup_wizard_state.subStepAcks. */
 export const WIZARD_ACK_KEYS = {
-  suppliersNonInventoryFiltered: "suppliers.nonInventoryFiltered",
   inventoryBatchesDone: "inventory.batchesDone",
   inventoryMasterListReviewed: "inventory.masterListReviewed",
   productsModifiersConfirmed: "products.modifiersConfirmed",
@@ -93,11 +92,11 @@ export type InventorySetupWizardModel = {
 
 const SECTION = {
   suppliers: "settings/inventory-setup/suppliers",
-  normalise: "settings/inventory-setup/normalise",
-  masterList: "settings/inventory-setup/master-inventory-list",
-  posItems: "settings/inventory-setup/pos-items",
-  recipes: "settings/inventory-setup/recipes",
-  storage: "settings/inventory-setup/storage-locations",
+  normalise: "settings/inventory-setup/inventory",
+  masterList: "settings/inventory-setup/inventory/master-list",
+  posItems: "settings/inventory-setup/products",
+  recipes: "settings/inventory-setup/products/recipes",
+  storage: "settings/inventory-setup/storage",
 } as const;
 
 type SubStepSpec = {
@@ -145,18 +144,27 @@ const STAGE_SPECS: StageSpec[] = [
         prereqLockReason: "Add at least one supplier first",
       },
       {
-        key: WIZARD_ACK_KEYS.suppliersNonInventoryFiltered,
-        label: "Filter out non-inventory items",
-        kind: "ack",
-        deepLink: SECTION.normalise,
-        complete: (_p, acks) =>
-          acks.has(WIZARD_ACK_KEYS.suppliersNonInventoryFiltered),
+        // Per-supplier, not venue-global: every inventory supplier must have
+        // its items triaged AND yield ≥1 inventory item, or be consciously
+        // parked as "no catalog yet". An empty kept supplier blocks here
+        // instead of passing silently. Pricing happens later, at normalisation.
+        key: "suppliers.approved",
+        label: "Check items for every supplier",
+        kind: "derived",
+        deepLink: SECTION.suppliers,
+        complete: (p) =>
+          p.rawItemCount >= 1 && p.unresolvedInventorySupplierCount === 0,
         prereqComplete: (p) => p.rawItemCount >= 1,
         prereqLockReason: "Add supplier items first",
-        staleness: (p) => ({
-          stale: p.hasNewPendingSinceComplete,
-          count: p.counts.pendingRawItemCount,
-        }),
+      },
+      {
+        key: "suppliers.ready",
+        label: "Get a supplier order-ready",
+        kind: "derived",
+        deepLink: SECTION.suppliers,
+        complete: (p) => p.readySupplierCount >= 1,
+        prereqComplete: (p) => p.supplierCount >= 1,
+        prereqLockReason: "Add at least one supplier first",
       },
     ],
   },
@@ -244,7 +252,7 @@ const STAGE_SPECS: StageSpec[] = [
   },
   {
     id: "storage",
-    label: "Storage Locations",
+    label: "Storage",
     lockReason: "Complete the Products stage first",
     subSteps: [
       {

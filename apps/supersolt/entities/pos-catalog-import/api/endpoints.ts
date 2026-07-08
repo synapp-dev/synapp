@@ -4,6 +4,7 @@ import type {
   PosCatalogImportListResponse,
   PosItemModifiersResponse,
   RecipeIngredientSuggestionsResponse,
+  RecipeWizardSuggestion,
   SquareCatalogImportResult,
 } from "@/entities/pos-catalog-import/model/types";
 import type { ImportJobRow } from "@/entities/inventory-setup/model/import-job-types";
@@ -65,6 +66,20 @@ export const posCatalogImportApi = {
         {
           method: "POST",
           body: JSON.stringify({ jobId: input.jobId }),
+        },
+      );
+    },
+    recipeWizardSuggest(
+      input: ScopedInput & { menuItemId: string; regenerate?: boolean },
+    ): Promise<ApiResult<RecipeWizardSuggestion>> {
+      return apiFetch<RecipeWizardSuggestion>(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/products/recipe-wizard-suggest`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            menuItemId: input.menuItemId,
+            regenerate: input.regenerate ?? false,
+          }),
         },
       );
     },

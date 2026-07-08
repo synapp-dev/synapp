@@ -45,6 +45,13 @@ type InvoiceDetailPanelProps = {
   invoiceId: string | null;
   invoicePreview?: InvoiceRow | null;
   onClose: () => void;
+  /**
+   * Auto-run a parse when an unparsed invoice is opened. Default true (standalone
+   * Invoices page). The inventory-setup supplier drawer passes false: every bill
+   * was already parsed during the import, so opening one just shows the result
+   * rather than kicking off a fresh parse.
+   */
+  autoParseOnOpen?: boolean;
 };
 
 function formatCurrency(cents: number, currency = "AUD"): string {
@@ -82,6 +89,7 @@ export function InvoiceDetailPanel({
   invoiceId,
   invoicePreview = null,
   onClose,
+  autoParseOnOpen = true,
 }: InvoiceDetailPanelProps) {
   const queryClient = useQueryClient();
   const [disputeReason, setDisputeReason] = useState<DisputeReason>("price_mismatch");
@@ -149,6 +157,7 @@ export function InvoiceDetailPanel({
   });
 
   useEffect(() => {
+    if (!autoParseOnOpen) return;
     if (!invoiceId || !detailQuery.data) return;
     const status = detailQuery.data.attachmentParse.status;
     if (status !== "needed") return;
@@ -157,7 +166,7 @@ export function InvoiceDetailPanel({
 
     parseTriggeredRef.current = invoiceId;
     parseAttachmentMutation.mutate(false);
-  }, [invoiceId, detailQuery.data?.attachmentParse.status, detailQuery.data, parseAttachmentMutation.isPending]);
+  }, [autoParseOnOpen, invoiceId, detailQuery.data?.attachmentParse.status, detailQuery.data, parseAttachmentMutation.isPending]);
 
   useEffect(() => {
     parseTriggeredRef.current = null;

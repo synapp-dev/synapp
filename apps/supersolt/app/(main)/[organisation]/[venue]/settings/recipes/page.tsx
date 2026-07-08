@@ -7,5 +7,5 @@ export default async function SettingsRecipesRedirectPage({
   params: Promise<{ organisation: string; venue: string }>;
 }) {
   const { organisation, venue } = await params;
-  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/recipes"));
+  redirect(buildScopedPath(organisation, venue, "settings/inventory-setup/products/recipes"));
 }

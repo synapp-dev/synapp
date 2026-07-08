@@ -58,6 +58,21 @@ export type NormaliseCommitSupplierProduct = {
   unitsPerPack: number;
   packUnit: "g" | "kg" | "mL" | "L" | "each";
   unitPriceCents: number;
+  /** Per-piece size (e.g. a 160 g fillet sold by the kg). Informational. */
+  portionSize?: number | null;
+  portionUnit?: "g" | "kg" | "mL" | "L" | "each" | null;
+  portionLabel?: string | null;
+};
+
+/**
+ * An extra pack representation of the same ingredient, priced differently on
+ * invoices (e.g. "bag" alongside the base "each"). Each becomes its own
+ * supplier_product linked to its own raw item; the primary supplierProduct stays
+ * the active costing source.
+ */
+export type NormaliseCommitAdditionalPack = {
+  rawItemId: string;
+  supplierProduct: NormaliseCommitSupplierProduct;
 };
 
 export type NormaliseCommitInput =
@@ -75,6 +90,10 @@ export type NormaliseCommitInput =
       };
       supplierProduct: NormaliseCommitSupplierProduct;
       makeActiveSource?: boolean;
+      /** Same-product quantity variants to fold into this product in one commit. */
+      alsoRawItemIds?: string[];
+      /** Same product priced under other packs — kept as their own products. */
+      additionalPacks?: NormaliseCommitAdditionalPack[];
     }
   | {
       rawItemId: string;
@@ -82,6 +101,8 @@ export type NormaliseCommitInput =
       ingredientId: string;
       supplierProduct: NormaliseCommitSupplierProduct;
       makeActiveSource?: boolean;
+      alsoRawItemIds?: string[];
+      additionalPacks?: NormaliseCommitAdditionalPack[];
     };
 
 export type NormaliseCommitResult = {
@@ -89,4 +110,5 @@ export type NormaliseCommitResult = {
   ingredientId: string;
   supplierProductId: string;
   normalisationStatus: "normalised";
+  cascadedCount: number;
 };

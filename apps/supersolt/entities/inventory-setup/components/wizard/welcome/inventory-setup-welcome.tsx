@@ -10,16 +10,13 @@ import { AgentBotAvatarVideo } from "@/entities/ai-agent-chat/components/agent-b
 import { useStreamingText } from "@/entities/dashboard/components/superbot-suggestions-use-streaming-text";
 import { buildWelcomeScript } from "@/entities/inventory-setup/components/wizard/welcome/welcome-copy";
 import { WelcomeStageGrid } from "@/entities/inventory-setup/components/wizard/welcome/welcome-stage-grid";
-import { SupplierTracebackIllustration } from "@/entities/inventory-setup/components/wizard/welcome/supplier-traceback-illustration";
-import { SupplierBenefitBoxes } from "@/entities/inventory-setup/components/wizard/welcome/supplier-benefit-boxes";
+import { SuperbotSpeechBubble } from "@/entities/inventory-setup/components/wizard/superbot-speech-bubble";
 
-const STEPS = [
-  "greeting",
-  "overview",
-  "supplierIntro",
-  "supplierWhy",
-  "supplierBenefit",
-] as const;
+// The opening intro is intentionally general — just the greeting and the
+// four-pillar overview. All supplier-specific narration (the "let's start with
+// suppliers" lead, the traceback and the benefits) now lives in the suppliers
+// stage intro so it isn't said twice. See stage-intro-steps.tsx.
+const STEPS = ["greeting", "overview"] as const;
 type WelcomeStep = (typeof STEPS)[number];
 
 export function InventorySetupWelcome({
@@ -50,161 +47,145 @@ export function InventorySetupWelcome({
   };
   const goBack = () => setIndex((i) => Math.max(0, i - 1));
 
-  const leadText: string = {
-    greeting: script.greeting,
-    overview: script.overview,
-    supplierIntro: script.supplierIntroLead,
-    supplierWhy: script.supplierWhy,
-    supplierBenefit: script.supplierBenefit,
-  }[step];
-
-  // Stream the "why" line like the agent chat; show others instantly (fade-in).
-  const streamingEnabled = step === "supplierWhy" && !reduceMotion;
-  const whyVisibleLen = useStreamingText(
-    script.supplierWhy,
-    "welcome:supplierWhy",
+  // Stream the overview line like the agent chat; the greeting shows instantly.
+  const overviewLen = useStreamingText(
+    script.overview,
+    "welcome:overview",
     reduceMotion,
-    step === "supplierWhy",
+    step === "overview",
   );
-  const shownLead =
-    streamingEnabled && step === "supplierWhy"
-      ? script.supplierWhy.slice(0, whyVisibleLen)
-      : leadText;
-  const whyStreaming =
-    streamingEnabled &&
-    step === "supplierWhy" &&
-    whyVisibleLen < script.supplierWhy.length;
-
-  const botAvatar = (
-    <AgentBotAvatarVideo
-      aria-hidden
-      className={cn(
-        !reduceMotion && "transition-all duration-500 ease-in-out",
-        isGreeting ? "h-40 w-40 sm:h-48 sm:w-48" : "h-24 w-24 sm:h-28 sm:w-28",
-      )}
-    />
-  );
-
-  const textBlock = (
-    <div
-      key={`lead-${step}`}
-      className={cn(
-        "flex max-w-md flex-col gap-2",
-        isGreeting
-          ? "items-center text-center"
-          : "items-center text-center sm:items-start sm:text-left",
-        !reduceMotion && "animate-in fade-in slide-in-from-bottom-2 duration-500",
-      )}
-    >
-      <p
-        className="text-foreground text-balance text-lg font-medium leading-snug sm:text-xl"
-        aria-live="polite"
-      >
-        {shownLead}
-        {whyStreaming ? (
-          <span
-            className="bg-muted-foreground/60 ml-px inline-block h-[1.05em] w-px animate-pulse align-middle"
-            aria-hidden
-          />
-        ) : null}
-      </p>
-      {step === "supplierIntro" ? (
-        <p className="text-muted-foreground text-sm">{script.supplierIntroSub}</p>
-      ) : null}
-    </div>
-  );
-
-  const stageContent =
-    step === "overview" || step === "supplierIntro" ? (
-      <WelcomeStageGrid
-        collapsed={step === "supplierIntro"}
-        reduceMotion={reduceMotion}
-      />
-    ) : step === "supplierWhy" ? (
-      <SupplierTracebackIllustration active reduceMotion={reduceMotion} />
-    ) : step === "supplierBenefit" ? (
-      <SupplierBenefitBoxes active reduceMotion={reduceMotion} />
-    ) : null;
+  const shownOverview = reduceMotion
+    ? script.overview
+    : script.overview.slice(0, overviewLen);
+  const overviewStreaming =
+    !reduceMotion && step === "overview" && overviewLen < script.overview.length;
 
   return (
-    <Card className="relative mx-auto flex min-h-[28rem] w-full max-w-2xl flex-col items-center gap-6 overflow-hidden border-0 bg-transparent px-6 py-10 shadow-none sm:min-h-[34rem] sm:px-10">
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        className="text-muted-foreground absolute right-3 top-3 h-auto px-2 py-1 text-xs"
-        onClick={onSkip}
-      >
-        Skip intro
-      </Button>
-
-      {isGreeting ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-          {botAvatar}
-          {textBlock}
-        </div>
-      ) : (
-        <div className="flex w-full flex-1 flex-col items-center justify-center gap-8 sm:flex-row sm:gap-8">
-          <div className="flex flex-col items-center gap-4 sm:w-72 sm:items-start">
-            {botAvatar}
-            {textBlock}
-          </div>
-          {stageContent ? (
-            <div className="flex w-full justify-center sm:w-72">
-              {stageContent}
-            </div>
-          ) : null}
-        </div>
-      )}
-
-      <div className="mt-2 flex items-center gap-2">
-        {!isGreeting ? (
+    <div className="flex min-h-[32rem] w-full flex-1 items-center justify-center py-6">
+      <div className="flex w-full max-w-3xl flex-col gap-4">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-muted-foreground text-sm font-medium tracking-wide">
+            Inventory Setup
+          </span>
           <Button
             type="button"
             variant="ghost"
-            onClick={goBack}
-            className="text-muted-foreground"
+            size="sm"
+            className="text-muted-foreground h-auto px-2 py-1 text-sm"
+            onClick={onSkip}
           >
-            <ArrowLeft className="h-4 w-4" aria-hidden />
-            Back
+            Skip intro
           </Button>
-        ) : null}
-        <Button
-          type="button"
-          onClick={goNext}
-          size="lg"
-          className="bg-[var(--brand-supersolt-primary)] text-white hover:bg-[var(--brand-supersolt-primary)]/90"
-        >
-          {isLast ? (
-            <>
-              <Sparkles className="h-4 w-4" aria-hidden />
-              Let&apos;s get started
-            </>
-          ) : (
-            <>
-              Next
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </>
-          )}
-        </Button>
-      </div>
+        </div>
 
-      <StepDots count={STEPS.length} active={index} />
-    </Card>
+        <Card className="bg-[var(--brand-supersolt-primary)]/10 flex w-full flex-col items-center justify-center gap-8 overflow-hidden px-8 py-12 sm:px-12">
+
+      {isGreeting ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-8">
+          <div className="flex items-center gap-6">
+            <AgentBotAvatarVideo
+              aria-hidden
+              className={cn(
+                "h-40 w-40 shrink-0 sm:h-48 sm:w-48",
+                !reduceMotion && "transition-all duration-500 ease-in-out",
+              )}
+            />
+            <h2 className="leading-snug">
+              <span className="text-2xl font-normal">Welcome to your</span>
+              <br />
+              <span className="text-4xl font-extrabold uppercase tracking-wide">
+                inventory setup
+              </span>
+            </h2>
+          </div>
+          <SuperbotSpeechBubble className="w-full max-w-lg text-left">
+            <p className="text-foreground text-base font-medium leading-relaxed">
+              {script.greeting}
+            </p>
+            <p className="text-muted-foreground mt-2 text-base leading-relaxed">
+              {script.greetingBody}
+            </p>
+          </SuperbotSpeechBubble>
+        </div>
+      ) : (
+        <div className="flex w-full flex-1 flex-col justify-center gap-8">
+          <div className="flex items-start gap-5">
+            <AgentBotAvatarVideo
+              aria-hidden
+              className="h-24 w-24 shrink-0 sm:h-28 sm:w-28"
+            />
+            <SuperbotSpeechBubble tail="left" className="flex-1 text-left">
+              <p
+                className="text-foreground/90 text-balance text-base leading-relaxed"
+                aria-live="polite"
+              >
+                {shownOverview}
+                {overviewStreaming ? (
+                  <span
+                    className="bg-muted-foreground/60 ml-px inline-block h-[1.05em] w-px animate-pulse align-middle"
+                    aria-hidden
+                  />
+                ) : null}
+              </p>
+            </SuperbotSpeechBubble>
+          </div>
+          <WelcomeStageGrid start={!overviewStreaming} reduceMotion={reduceMotion} />
+        </div>
+      )}
+
+        </Card>
+
+        <div className="flex flex-col items-center gap-4">
+          <div className="flex items-center gap-3">
+            {!isGreeting ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="lg"
+                onClick={goBack}
+                className="text-muted-foreground text-base"
+              >
+                <ArrowLeft className="h-5 w-5" aria-hidden />
+                Back
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              onClick={goNext}
+              size="lg"
+              className="h-12 bg-[var(--brand-supersolt-primary)] px-7 text-base text-black hover:bg-[var(--brand-supersolt-primary)]/90"
+            >
+              {isLast ? (
+                <>
+                  <Sparkles className="h-5 w-5" aria-hidden />
+                  Let&apos;s get started
+                </>
+              ) : (
+                <>
+                  Next
+                  <ArrowRight className="h-5 w-5" aria-hidden />
+                </>
+              )}
+            </Button>
+          </div>
+          <StepDots count={STEPS.length} active={index} />
+        </div>
+      </div>
+    </div>
   );
 }
 
 function StepDots({ count, active }: { count: number; active: number }) {
   return (
-    <div className="flex items-center gap-1.5" aria-hidden>
+    <div className="flex items-center gap-2" aria-hidden>
       {Array.from({ length: count }).map((_, i) => (
         <span
           key={i}
           className={cn(
-            "h-1.5 rounded-full transition-all duration-300",
+            "h-2 rounded-full transition-all duration-300",
             i === active
-              ? "bg-[var(--brand-supersolt-primary)] w-4"
-              : "bg-muted-foreground/30 w-1.5",
+              ? "bg-[var(--brand-supersolt-primary)] w-5"
+              : "bg-muted-foreground/30 w-2",
           )}
         />
       ))}

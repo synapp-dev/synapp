@@ -166,7 +166,9 @@ export const ingredientsService = {
     );
 
     const page = Math.max(1, Number(args.page ?? 1));
-    const pageSize = clampNumber(Number(args.pageSize ?? 20), 1, 200);
+    // 1000 cap so selector-style consumers (recipe editor, products wizard) can
+    // load the whole catalog — venues run to a few hundred ingredients.
+    const pageSize = clampNumber(Number(args.pageSize ?? 20), 1, 1000);
     const category = args.category
       ? assertIngredientCategory(args.category)
       : undefined;

@@ -24,6 +24,17 @@ export type InventorySetupProgress = {
     pendingRawItemCount: number;
     normalisedRawItemCount: number;
     skippedRawItemCount: number;
+    /** Raw items still awaiting an approve/skip decision (reviewedAt null). */
+    unreviewedRawItemCount: number;
+    /** Suppliers whose profile + items are fully order-ready. */
+    readySupplierCount: number;
+    /**
+     * Inventory suppliers not yet resolved (unreviewed items, or empty + not
+     * parked as "no catalog yet"). Gates the "approve every supplier item" step.
+     */
+    unresolvedInventorySupplierCount: number;
+    /** Inventory suppliers that produced no items and aren't parked. */
+    emptyUnackedInventorySupplierCount: number;
     posImportRan: boolean;
     inUseMenuItemCount: number;
     mappedInUseCount: number;
@@ -37,6 +48,12 @@ export function evaluateInventorySetupProgress(args: {
   pendingRawItemCount: number;
   normalisedRawItemCount: number;
   skippedRawItemCount: number;
+  unreviewedRawItemCount: number;
+  readySupplierCount: number;
+  /** Defaults to 0 when omitted (e.g. legacy callers / tests). */
+  unresolvedInventorySupplierCount?: number;
+  /** Defaults to 0 when omitted. */
+  emptyUnackedInventorySupplierCount?: number;
   posImportRan: boolean;
   inUseMenuItemCount: number;
   mappedInUseCount: number;
@@ -73,17 +90,17 @@ export function evaluateInventorySetupProgress(args: {
     },
     {
       id: "raw_items",
-      label: "Raw items",
+      label: "Inventory",
       status: rawItemsComplete ? "complete" : suppliersComplete ? "pending" : "locked",
     },
     {
       id: "normalise",
-      label: "Normalise",
+      label: "Products",
       status: normaliseStatus,
     },
     {
       id: "pos_items",
-      label: "POS items",
+      label: "Storage",
       status: posStatus,
     },
   ];
@@ -113,6 +130,12 @@ export function evaluateInventorySetupProgress(args: {
       pendingRawItemCount: args.pendingRawItemCount,
       normalisedRawItemCount: args.normalisedRawItemCount,
       skippedRawItemCount: args.skippedRawItemCount,
+      unreviewedRawItemCount: args.unreviewedRawItemCount,
+      readySupplierCount: args.readySupplierCount,
+      unresolvedInventorySupplierCount:
+        args.unresolvedInventorySupplierCount ?? 0,
+      emptyUnackedInventorySupplierCount:
+        args.emptyUnackedInventorySupplierCount ?? 0,
       posImportRan: args.posImportRan,
       inUseMenuItemCount: args.inUseMenuItemCount,
       mappedInUseCount: args.mappedInUseCount,

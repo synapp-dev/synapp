@@ -14,6 +14,10 @@ const ZERO_COUNTS = {
   pendingRawItemCount: 0,
   normalisedRawItemCount: 0,
   skippedRawItemCount: 0,
+  unreviewedRawItemCount: 0,
+  readySupplierCount: 0,
+  unresolvedInventorySupplierCount: 0,
+  emptyUnackedInventorySupplierCount: 0,
   posImportRan: false,
   inUseMenuItemCount: 0,
   mappedInUseCount: 0,
@@ -67,19 +71,41 @@ describe("buildWizardModel", () => {
     expect(rawItems?.lockReason).toBe("Add at least one supplier first");
   });
 
-  it("completes Suppliers only when items added AND non-inventory filtered (ack)", () => {
-    const withoutAck = buildWizardModel(
-      progress({ supplierCount: 2, rawItemCount: 5 }),
+  it("completes Suppliers only when items are approved AND a supplier is ready", () => {
+    const unapproved = buildWizardModel(
+      progress({
+        supplierCount: 2,
+        rawItemCount: 5,
+        unreviewedRawItemCount: 2,
+        unresolvedInventorySupplierCount: 1,
+        readySupplierCount: 0,
+      }),
       EMPTY_WIZARD_STATE,
     );
-    expect(withoutAck.stages[0]?.complete).toBe(false);
+    expect(unapproved.stages[0]?.complete).toBe(false);
 
-    const withAck = buildWizardModel(
-      progress({ supplierCount: 2, rawItemCount: 5 }),
-      stateWith([WIZARD_ACK_KEYS.suppliersNonInventoryFiltered]),
+    const approvedButNoneReady = buildWizardModel(
+      progress({
+        supplierCount: 2,
+        rawItemCount: 5,
+        unreviewedRawItemCount: 0,
+        readySupplierCount: 0,
+      }),
+      EMPTY_WIZARD_STATE,
     );
-    expect(withAck.stages[0]?.complete).toBe(true);
-    expect(withAck.stages[1]?.status).toBe("current");
+    expect(approvedButNoneReady.stages[0]?.complete).toBe(false);
+
+    const done = buildWizardModel(
+      progress({
+        supplierCount: 2,
+        rawItemCount: 5,
+        unreviewedRawItemCount: 0,
+        readySupplierCount: 1,
+      }),
+      EMPTY_WIZARD_STATE,
+    );
+    expect(done.stages[0]?.complete).toBe(true);
+    expect(done.stages[1]?.status).toBe("current");
   });
 
   it("treats inUseMenuItemCount === 0 as a satisfied mapping sub-step", () => {
@@ -87,12 +113,13 @@ describe("buildWizardModel", () => {
       progress({
         supplierCount: 1,
         rawItemCount: 1,
+        unreviewedRawItemCount: 0,
+        readySupplierCount: 1,
         posImportRan: true,
         inUseMenuItemCount: 0,
         mappedInUseCount: 0,
       }),
       stateWith([
-        WIZARD_ACK_KEYS.suppliersNonInventoryFiltered,
         WIZARD_ACK_KEYS.inventoryBatchesDone,
         WIZARD_ACK_KEYS.inventoryMasterListReviewed,
       ]),
@@ -103,24 +130,20 @@ describe("buildWizardModel", () => {
     expect(mapped?.complete).toBe(true);
   });
 
-  it("marks an ack sub-step stale (but stage stays complete) when pending raw items reappear", () => {
-    const p = progress({
-      supplierCount: 1,
-      rawItemCount: 5,
-      pendingRawItemCount: 3,
-      normalisedRawItemCount: 2,
-    });
-    expect(p.hasNewPendingSinceComplete).toBe(true);
+  it("completes the Suppliers stage without any manual acknowledgement", () => {
     const model = buildWizardModel(
-      p,
-      stateWith([WIZARD_ACK_KEYS.suppliersNonInventoryFiltered]),
+      progress({
+        supplierCount: 1,
+        rawItemCount: 3,
+        unreviewedRawItemCount: 0,
+        readySupplierCount: 1,
+      }),
+      EMPTY_WIZARD_STATE,
     );
-    const filter = model.stages[0]?.subSteps.find(
-      (s) => s.key === WIZARD_ACK_KEYS.suppliersNonInventoryFiltered,
-    );
-    expect(filter?.complete).toBe(true);
-    expect(filter?.stale).toBe(true);
-    expect(filter?.staleCount).toBe(3);
+    expect(model.stages[0]?.complete).toBe(true);
+    expect(
+      model.stages[0]?.subSteps.every((s) => s.kind === "derived"),
+    ).toBe(true);
   });
 
   it("reports introSeen from persisted state", () => {
