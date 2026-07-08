@@ -1,0 +1,195 @@
+:root {
+  --bg: #0a0e14;
+  --panel: #121826;
+  --panel-2: #0f1420;
+  --border: #1e2636;
+  --text: #e6eaf2;
+  --text-dim: #8a93a6;
+  --ok: #2ecc71;
+  --ok-bg: rgba(46, 204, 113, 0.08);
+  --ok-border: rgba(46, 204, 113, 0.25);
+  --warn: #e0a23b;
+  --accent: #ff5a3c;
+  /* Intradark brand blues (from intradark-symbol-blue.svg). */
+  --brand-blue: #0483c8;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: "Geist Variable", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  user-select: none;
+  overflow: hidden;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 22px;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1c2436, #0f1420);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+  object-fit: cover;
+}
+
+.account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.account-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.account-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.auth-btn {
+  background: var(--brand-blue);
+  border: 1px solid var(--brand-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 9px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+
+.auth-btn:hover {
+  filter: brightness(1.1);
+}
+
+.auth-btn:active {
+  filter: brightness(0.95);
+}
+
+.attest {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 10px;
+  background: var(--ok-bg);
+  border: 1px solid var(--ok-border);
+}
+
+.attest.warn {
+  background: rgba(224, 162, 59, 0.08);
+  border-color: rgba(224, 162, 59, 0.25);
+}
+
+.attest-icon {
+  color: var(--ok);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.attest.warn .attest-icon {
+  color: var(--warn);
+}
+
+.attest-title {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.attest-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+.status {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+
+.dot.connected {
+  background: var(--ok);
+  box-shadow: 0 0 8px var(--ok);
+}
+
+.dot.connecting {
+  background: var(--warn);
+}
+
+.dot.disconnected,
+.dot.error {
+  background: var(--accent);
+}
+
+.status-label {
+  font-weight: 600;
+}
+
+.status-sep {
+  color: var(--border);
+}
+
+.status-detail {
+  color: var(--text-dim);
+}

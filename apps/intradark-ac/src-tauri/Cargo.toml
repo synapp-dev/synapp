@@ -1,0 +1,34 @@
+[package]
+name = "intradark-ac"
+version = "0.0.1"
+description = "Intradark Anticheat — lightweight user-mode AC client"
+authors = ["Intradark"]
+edition = "2021"
+
+[lib]
+# The Tauri v2 app entry lives in the lib so it can also target mobile later.
+name = "intradark_ac_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+# Native HTTP so /api/ac/* calls bypass the webview's CORS/CSP (talks to the API
+# from Rust, not the webview's fetch).
+tauri-plugin-http = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# On-disk image hashing for the scan engine (P5).
+sha2 = "0.10"
+hex = "0.4"
+# Device token storage in the Windows Credential Manager (P1).
+keyring = "2"
+
+# VAC SAFETY LAW (see docs/anticheat-client-build-decisions.md §1): this client
+# NEVER opens, reads, or injects into cs2.exe. Attestation (P2) and the scan (P5)
+# shell out to system-scoped Windows tooling (Get-CimInstance / Get-Process /
+# tasklist) — the same queries Task Manager / AV make, which VAC never bans for.
