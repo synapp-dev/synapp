@@ -8,7 +8,11 @@
 
 Hi Glenn, Jeff,
 
-Thank you, and yes: I am comfortable proceeding on exactly the basis you propose. The coordinated settlement process is a sensible way to give both sides certainty, and it matches the sequence I described: no access to the handover materials before payment, everything in your hands the moment it clears.
+Two things, both good.
+
+First: the M1 deposit has landed, $8,409.50 received in full, thank you. The M1 Content Type build is now underway, and the balance of $12,614.25 including GST falls due on delivery and acceptance of the module as agreed.
+
+Second, the settlement process: yes, I am comfortable proceeding on exactly the basis you propose. The coordinated settlement process is a sensible way to give both sides certainty, and it matches the sequence I described: no access to the handover materials before payment, everything in your hands the moment it clears.
 
 Confirming the mechanics, with dates attached so neither of us is waiting on an undefined step:
 
