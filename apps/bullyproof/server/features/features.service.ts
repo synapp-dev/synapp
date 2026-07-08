@@ -151,12 +151,29 @@ async function assertCanManageFeatures(ctx: AuthContext) {
   }
 }
 
+/**
+ * Assert that user can VIEW feature access state (read-only oversight).
+ * Managing requires /admin/features; school oversight (/admin/schools)
+ * grants a read-only view of features and their school-level state.
+ */
+async function assertCanViewFeatures(ctx: AuthContext) {
+  if (!ctx.userId) {
+    throw new Error("Unauthorized");
+  }
+
+  const canManage = await checkFeatureAccess(ctx.userId, ADMIN_FEATURES_KEY);
+  if (canManage) return;
+  const canOversee = await checkFeatureAccess(ctx.userId, "/admin/schools");
+  if (canOversee) return;
+  throw new Error("Unauthorized to view features");
+}
+
 export const featuresService = {
   /**
    * List all features
    */
   async listFeatures(ctx: AuthContext) {
-    await assertCanManageFeatures(ctx);
+    await assertCanViewFeatures(ctx);
     return featuresRepo.getAll();
   },
 
@@ -239,7 +256,7 @@ export const featuresService = {
     targetId?: string,
     schoolId?: string
   ) {
-    await assertCanManageFeatures(ctx);
+    await assertCanViewFeatures(ctx);
     return getFeaturePermissions(featureId, level, targetId, schoolId);
   },
 

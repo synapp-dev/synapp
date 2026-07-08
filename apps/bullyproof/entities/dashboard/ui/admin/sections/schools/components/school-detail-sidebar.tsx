@@ -52,7 +52,6 @@ export function SchoolDetailSidebar({
   onTabChange,
   onDeleteClick,
 }: SchoolDetailSidebarProps) {
-  const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
   const { hasAccess: canAccessSchoolActivation } = useFeatureAccess(
     "admin:school-activation"
   );
@@ -72,9 +71,11 @@ export function SchoolDetailSidebar({
                     {navItems.map((item, index) => {
                       const Icon = item.icon;
                       const isOnboarding = item.id === "onboarding";
+                      // Feature Access is available read-only to school
+                      // overseers; editing inside the tab still requires
+                      // /admin/features (platform engineering).
                       const isDisabled =
                         item.disabled ||
-                        (item.id === "features" && !canManageFeatures) ||
                         (item.id === "activation" && !canAccessSchoolActivation);
                       
                       return (

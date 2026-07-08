@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/fetcher.client";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
 import type { School } from "./schools-table-columns";
 import {
   Card,
@@ -41,6 +42,9 @@ interface SchoolFeaturesTabProps {
 
 export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
   const queryClient = useQueryClient();
+  // Editing requires /admin/features (platform engineering level);
+  // school overseers get a read-only view of the current state.
+  const { hasAccess: canManageFeatures } = useFeatureAccess("/admin/features");
 
   // Fetch all features
   const {
@@ -171,9 +175,9 @@ export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
       <CardHeader>
         <CardTitle>Feature Access</CardTitle>
         <CardDescription>
-          Control which features are available to all users in this school.
-          School-level permissions override role and global permissions, but
-          are overridden by user-level permissions.
+          {canManageFeatures
+            ? "Control which features are available to all users in this school. School-level permissions override role and global permissions, but are overridden by user-level permissions."
+            : "The features available to this school. School-level permissions override role and global permissions, but are overridden by user-level permissions."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -184,6 +188,8 @@ export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
             School-level permissions apply to all users in this school. They
             override role and global permissions, but individual user
             permissions take precedence.
+            {!canManageFeatures &&
+              " This view is provided for oversight; feature access is configured at the platform engineering level, normally by applying a permission template from the school's Activation tab."}
           </AlertDescription>
         </Alert>
 
@@ -265,7 +271,7 @@ export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
                           onCheckedChange={(checked) =>
                             handleToggleVisible(feature.id, checked)
                           }
-                          disabled={setPermissionMutation.isPending}
+                          disabled={!canManageFeatures || setPermissionMutation.isPending}
                         />
                       </div>
                       <div className="flex items-center gap-2">
@@ -281,7 +287,7 @@ export function SchoolFeaturesTab({ school }: SchoolFeaturesTabProps) {
                           onCheckedChange={(checked) =>
                             handleToggleAccess(feature.id, checked)
                           }
-                          disabled={setPermissionMutation.isPending}
+                          disabled={!canManageFeatures || setPermissionMutation.isPending}
                         />
                       </div>
                     </div>
