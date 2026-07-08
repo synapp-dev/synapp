@@ -109,12 +109,15 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok || body?.error) {
+    // Routes return `{ error: string }`; normalise to `{ message, status }`
+    // so callers reading error.message get the server's actual message.
+    const rawError = body?.error;
     return {
       data: null,
-      error: body?.error ?? {
-        message: `HTTP ${res.status}`,
-        status: res.status,
-      },
+      error:
+        typeof rawError === "string"
+          ? { message: rawError, status: res.status }
+          : (rawError ?? { message: `HTTP ${res.status}`, status: res.status }),
     };
   }
   const payload =
