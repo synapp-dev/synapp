@@ -109,6 +109,7 @@ export const classesRepo = {
     room?: string;
     studentCap?: number;
     active?: boolean;
+    startYear?: string;
   }) =>
     db
       .insert(classes)
@@ -120,6 +121,9 @@ export const classesRepo = {
         room: data.room,
         studentCap: data.studentCap,
         active: data.active ?? true,
+        // Running year: without this the selected year was silently dropped
+        // and every class defaulted to the creation date's year.
+        ...(data.startYear ? { startYear: data.startYear } : {}),
       })
       .returning(),
 
