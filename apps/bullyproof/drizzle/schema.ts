@@ -1239,13 +1239,15 @@ export const classes = pgTable("classes", {
 	startYear: timestamp("start_year", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
 	index("idx_classes_school_id").using("btree", table.schoolId.asc().nullsLast().op("uuid_ops")),
-	uniqueIndex("ux_classes_school_name").using("btree", sql`school_id`, sql`lower(name)`),
+	// Partial: only ACTIVE classes contend for a name/code, so an archived
+	// prior-year class releases them for the new school year (0028).
+	uniqueIndex("ux_classes_school_name").using("btree", sql`school_id`, sql`lower(name)`).where(sql`active`),
+	uniqueIndex("classes_school_code_unique").using("btree", sql`school_id`, sql`code`).where(sql`active`),
 	foreignKey({
 			columns: [table.schoolId],
 			foreignColumns: [schools.id],
 			name: "classes_school_id_fkey"
 		}).onDelete("cascade"),
-	unique("classes_school_code_unique").on(table.schoolId, table.code),
 ]);
 
 export const topicSlides = pgTable("topic_slides", {
@@ -1928,7 +1930,7 @@ export const lessonClasses = pgTable("lesson_classes", {
 			columns: [table.classId],
 			foreignColumns: [classes.id],
 			name: "lesson_classes_class_id_fkey"
-		}).onUpdate("cascade").onDelete("cascade"),
+		}).onUpdate("cascade").onDelete("restrict"),
 	foreignKey({
 			columns: [table.lessonId],
 			foreignColumns: [lessons.id],

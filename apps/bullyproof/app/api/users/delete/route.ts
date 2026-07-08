@@ -64,6 +64,16 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // Destructive action: enforce the delete-user action feature server-side,
+    // not just on the UI button that renders it.
+    const canDeleteUsers = await checkFeatureAccess(userId, "admin:delete-user");
+    if (!canDeleteUsers) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 403 }
+      );
+    }
+
     // Step 3: Parse request body
     console.log("[BULK USER DELETE] Step 3: Parsing request body...");
     let body: any;

@@ -1287,8 +1287,10 @@ export function SettingsClassesCard({
                     <HelpCircle className="size-3.5" strokeWidth={2} />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="">
+                <TooltipContent side="right" className="max-w-xs">
                   When a class is active, it can be used in lessons and selected by teachers.
+                  Turning this off archives the class, e.g. at the end of the school year: its
+                  lesson history is kept and a new class can reuse the name for the next year.
                 </TooltipContent>
               </Tooltip>
             </div>

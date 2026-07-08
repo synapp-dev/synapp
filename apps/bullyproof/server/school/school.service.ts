@@ -107,6 +107,9 @@ async function assertCanUpdateSchool(ctx: AuthContext, schoolId: string) {
 
 async function assertCanDeleteSchool(ctx: AuthContext) {
   await assertFeature(ctx, "/admin/schools");
+  // Destructive action: enforce the delete-school action feature server-side,
+  // not just on the UI button that renders it.
+  await assertFeature(ctx, "admin:delete-school");
 }
 
 async function assertCanViewSchool(ctx: AuthContext, schoolId: string) {

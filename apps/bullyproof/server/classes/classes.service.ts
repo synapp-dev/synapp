@@ -73,7 +73,17 @@ export const classesService = {
     await assertCanManageClasses(ctx, data.schoolId);
 
     const { yearIds, ...classData } = data;
-    const newClass = await classesRepo.create(classData);
+    let newClass;
+    try {
+      newClass = await classesRepo.create(classData);
+    } catch (error: any) {
+      if (error?.code === "23505" || error?.message?.includes("duplicate key")) {
+        throw new Error(
+          `An active class named "${classData.name}" already exists at this school. Archive the previous year's class (set it inactive) or choose a different name.`
+        );
+      }
+      throw error;
+    }
 
     if (yearIds && yearIds.length > 0) {
       await classesRepo.assignYears(newClass[0]!.id, yearIds);
@@ -93,7 +103,17 @@ export const classesService = {
     await assertCanManageClasses(ctx, existingClass[0].schoolId);
 
     const { yearIds, teacherIds, ...classData } = data;
-    const updatedClass = await classesRepo.update(id, classData);
+    let updatedClass;
+    try {
+      updatedClass = await classesRepo.update(id, classData);
+    } catch (error: any) {
+      if (error?.code === "23505" || error?.message?.includes("duplicate key")) {
+        throw new Error(
+          `An active class with that name or code already exists at this school. Archive the previous year's class (set it inactive) or choose a different name.`
+        );
+      }
+      throw error;
+    }
 
     if (yearIds !== undefined) {
       await classesRepo.removeYears(id);
@@ -120,7 +140,16 @@ export const classesService = {
 
     await assertCanManageClasses(ctx, existingClass[0].schoolId);
 
-    await classesRepo.delete(id);
+    try {
+      await classesRepo.delete(id);
+    } catch (error: any) {
+      if (error?.code === "23503" || error?.message?.includes("foreign key")) {
+        throw new Error(
+          `"${existingClass[0].name}" has delivered lesson history and cannot be deleted. Archive it (set it inactive) to keep its records and free the name for a new class.`
+        );
+      }
+      throw error;
+    }
     return { success: true };
   },
 
@@ -156,7 +185,16 @@ export const classesService = {
     }
 
     // Batch delete all classes and related records
-    await classesRepo.deleteBatch(ids);
+    try {
+      await classesRepo.deleteBatch(ids);
+    } catch (error: any) {
+      if (error?.code === "23503" || error?.message?.includes("foreign key")) {
+        throw new Error(
+          "One or more selected classes have delivered lesson history and cannot be deleted. Archive them (set them inactive) to keep their records and free the names for new classes."
+        );
+      }
+      throw error;
+    }
     return { success: true, deletedCount: ids.length };
   },
 
