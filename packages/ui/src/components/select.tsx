@@ -127,11 +127,13 @@ function SelectItem({
 function SelectItemWithLeadingIcon({
   icon: Icon,
   label,
+  description,
   className,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Item> & {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  description?: string;
 }) {
   return (
     <SelectPrimitive.Item
@@ -148,7 +150,16 @@ function SelectItemWithLeadingIcon({
         </SelectPrimitive.ItemIndicator>
       </span>
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-      <SelectPrimitive.ItemText>{label}</SelectPrimitive.ItemText>
+      {description ? (
+        <span className="flex min-w-0 flex-col">
+          <SelectPrimitive.ItemText>{label}</SelectPrimitive.ItemText>
+          <span className="text-muted-foreground text-xs font-normal">
+            {description}
+          </span>
+        </span>
+      ) : (
+        <SelectPrimitive.ItemText>{label}</SelectPrimitive.ItemText>
+      )}
     </SelectPrimitive.Item>
   );
 }

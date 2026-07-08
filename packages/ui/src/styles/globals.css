@@ -1229,6 +1229,59 @@
   transition: transform 5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/*
+ * animated-underline-N — a left-growing underline that wipes in on hover (and
+ * out when the pointer leaves from the other side). Ported from the Landmark
+ * comment UX; used on names, reaction summaries, and reply links. The `-active`
+ * variant pins the underline open without hover.
+ */
+@utility animated-underline-1 {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: bottom right;
+    background-color: currentColor;
+    transition: transform 0.2s ease;
+  }
+  &:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+  }
+}
+
+@utility animated-underline-1-active {
+  &::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+  }
+}
+
+@utility animated-underline-2 {
+  position: relative;
+  &::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 100%;
+    transform: scaleX(0);
+    transform-origin: bottom right;
+    background-color: currentColor;
+    transition: transform 0.3s ease;
+  }
+  &:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
