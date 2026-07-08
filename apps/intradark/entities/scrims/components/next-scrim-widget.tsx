@@ -67,7 +67,7 @@ export function NextScrimWidget({
   return (
     <Link
       href={`/scrims/match/${scrim.id}`}
-      className="group relative block overflow-hidden rounded-xl border bg-card transition-colors hover:border-primary/50"
+      className="group relative block overflow-hidden rounded-xl border bg-card shadow-sm transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       {scrim.map?.screenshot ? (
         <>

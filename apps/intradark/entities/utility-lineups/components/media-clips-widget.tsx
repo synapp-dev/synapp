@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Play } from "lucide-react";
 
+import { EmptyState } from "@/components/atoms/empty-state";
 import type { RecentUtilityClip } from "@/entities/utility-lineups/lib/queries";
 
 function titleCase(value: string): string {
@@ -13,9 +14,7 @@ function titleCase(value: string): string {
 export function MediaClipsWidget({ clips }: { clips: RecentUtilityClip[] }) {
   if (clips.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
-        No clips published yet.
-      </div>
+      <EmptyState>No clips published yet.</EmptyState>
     );
   }
 
@@ -25,7 +24,7 @@ export function MediaClipsWidget({ clips }: { clips: RecentUtilityClip[] }) {
         <Link
           key={clip.id}
           href={`/utility/${clip.mapSlug}`}
-          className="group bg-card focus-visible:ring-ring relative aspect-video overflow-hidden rounded-xl border focus-visible:ring-2 focus-visible:outline-none"
+          className="group bg-card hover:border-primary/50 focus-visible:ring-ring relative aspect-video overflow-hidden rounded-xl border shadow-sm transition-colors focus-visible:ring-2 focus-visible:outline-none"
         >
           {clip.thumbnailUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element -- Supabase CDN map assets */

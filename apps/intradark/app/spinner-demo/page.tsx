@@ -669,7 +669,7 @@ function MerkabaCanvas({
         mount.removeChild(renderer.domElement);
       }
     };
-  }, [paramsRef, size]);
+  }, [paramsRef, size, lite, orbitRef, pausedRef, spinResetRef]);
 
   return <div ref={mountRef} style={{ width: size, height: size }} />;
 }

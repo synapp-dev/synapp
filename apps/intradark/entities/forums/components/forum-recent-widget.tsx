@@ -4,6 +4,8 @@ import { MessageSquare } from "lucide-react";
 
 import { Badge } from "@workspace/ui/components/badge";
 
+import { EmptyState } from "@/components/atoms/empty-state";
+
 export type RecentForumThread = {
   id: string;
   slug: string;
@@ -24,9 +26,9 @@ export function ForumRecentWidget({
 }) {
   if (threads.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
+      <EmptyState>
         No discussions yet. Start the first thread on the forums.
-      </div>
+      </EmptyState>
     );
   }
 

@@ -20,8 +20,26 @@ export interface SteamClientOptions {
   gameName?: string;
 }
 
+/** SteamID object shape passed to steam-user relationship/message events. */
+interface SteamIdLike {
+  getSteamID64(): string;
+}
+
+/**
+ * Minimal structural surface of the untyped steam-user client (see
+ * steam-modules.d.ts); only the members this wrapper touches.
+ */
+interface SteamUserLike {
+  on(event: string, handler: (...args: never[]) => void): void;
+  setPersona(state: number): void;
+  gamesPlayed(apps: (string | number)[]): void;
+  logOn(options: Record<string, unknown>): void;
+  addFriend(sid: SteamIdLike): void;
+  chatMessage(steamid64: string, text: string): void;
+}
+
 export class SteamClient {
-  private user: any;
+  private user: SteamUserLike;
   private ready = false;
   private usedRefreshToken = false;
 
@@ -77,7 +95,7 @@ export class SteamClient {
     });
 
     // Auto-accept incoming friend requests (relationship 2 = RequestRecipient).
-    this.user.on("friendRelationship", (sid: any, relationship: number) => {
+    this.user.on("friendRelationship", (sid: SteamIdLike, relationship: number) => {
       if (relationship === SteamUser.EFriendRelationship.RequestRecipient) {
         const steamid64 = sid.getSteamID64();
         console.log(`[friends] incoming request from ${steamid64} — accepting`);
@@ -96,7 +114,7 @@ export class SteamClient {
       }
     });
 
-    this.user.on("friendMessage", (sid: any, message: string) => {
+    this.user.on("friendMessage", (sid: SteamIdLike, message: string) => {
       void this.onFriendMessage?.(sid.getSteamID64(), message);
     });
   }

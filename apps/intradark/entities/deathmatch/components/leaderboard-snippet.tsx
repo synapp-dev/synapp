@@ -6,6 +6,7 @@ import {
   AvatarImage,
 } from "@workspace/ui/components/avatar";
 
+import { EmptyState } from "@/components/atoms/empty-state";
 import { canonicalPath } from "@/entities/players/lib/resolve";
 import type { DeathmatchRow } from "@/entities/deathmatch/types";
 
@@ -20,9 +21,7 @@ function rowName(row: DeathmatchRow): string {
 export function LeaderboardSnippet({ rows }: { rows: DeathmatchRow[] }) {
   if (rows.length === 0) {
     return (
-      <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
-        No deathmatch stats yet.
-      </div>
+      <EmptyState>No deathmatch stats yet.</EmptyState>
     );
   }
 
@@ -58,7 +57,7 @@ export function LeaderboardSnippet({ rows }: { rows: DeathmatchRow[] }) {
             {row.isTracked && row.steamid64 ? (
               <Link
                 href={canonicalPath(row.steamid64)}
-                className="hover:bg-accent block transition-colors"
+                className="hover:bg-accent/50 block transition-colors"
               >
                 {inner}
               </Link>

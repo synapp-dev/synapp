@@ -308,7 +308,6 @@ export function WizardSidebarVideoPeek({
         className="ring-offset-background focus-visible:ring-ring relative aspect-video w-full cursor-pointer overflow-hidden rounded-lg border border-border bg-black shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
         aria-label="Open full lineup video preview"
       >
-        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
           ref={previewVideoRef}
           src={videoSrc}
@@ -328,7 +327,6 @@ export function WizardSidebarVideoPeek({
         >
           <DialogTitle className="sr-only">Lineup video preview</DialogTitle>
           <div className="relative aspect-video w-full min-h-0 overflow-hidden rounded-xl">
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
               ref={dialogVideoRef}
               src={videoSrc}

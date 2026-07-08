@@ -8,8 +8,8 @@ export default async function TheoryCalloutsIndexPage() {
 
   return (
     <MainSectionShell
-      title="Theory · Callout zones"
-      description="Draw radar polygons for map callouts (normalized coordinates). Developer role only."
+      title="Callout zones"
+      description="Theory tooling: draw radar polygons for map callouts (normalized coordinates). Developer role only."
     >
       {rows.length === 0 ? (
         <p className="text-muted-foreground text-sm">

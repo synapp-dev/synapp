@@ -41,7 +41,7 @@ export function SandboxShell({
   onManualNavigate,
   children,
 }: SandboxShellProps) {
-  const scenarioList = scenarios ?? [];
+  const scenarioList = React.useMemo(() => scenarios ?? [], [scenarios]);
   const scenarioIds = React.useMemo(
     () => scenarioList.map((s) => s.id),
     [scenarioList],

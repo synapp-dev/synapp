@@ -16,6 +16,7 @@ describe("parseFaceit", () => {
     expect(parseFaceit(raw)).toEqual({
       faceit_player_id: "abc",
       nickname: "niko",
+      country: null,
       faceit_elo: 3200,
       skill_level: 10,
       region: "EU",
@@ -31,6 +32,7 @@ describe("parseFaceit", () => {
     expect(parseFaceit(null)).toEqual({
       faceit_player_id: null,
       nickname: null,
+      country: null,
       faceit_elo: null,
       skill_level: null,
       region: null,

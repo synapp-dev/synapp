@@ -22,9 +22,10 @@ async function pullAndFixSchema() {
         stdio: 'inherit',
         cwd: join(__dirname, '..')
       });
-    } catch (error: any) {
+    } catch (error) {
       // If 'pull' doesn't work, try 'introspect'
-      if (error.message?.includes('command not found') || error.status === 1) {
+      const err = error as { message?: string; status?: number };
+      if (err.message?.includes('command not found') || err.status === 1) {
         console.log('⚠️  "pull" command not found, trying "introspect"...\n');
         execSync('pnpm drizzle-kit introspect', { 
           stdio: 'inherit',
@@ -73,9 +74,9 @@ async function pullAndFixSchema() {
     
     console.log(`\n🎉 Done! Schema pulled and fixed.`);
     
-  } catch (error: any) {
+  } catch (error) {
     // Check if this is the known drizzle-kit check constraint error
-    const errorMessage = error?.message || error?.toString() || '';
+    const errorMessage = error instanceof Error ? error.message : String(error ?? '');
     const isCheckConstraintError = 
       errorMessage.includes("Cannot read properties of undefined (reading 'replace')") ||
       errorMessage.includes('checkValue') ||

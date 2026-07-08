@@ -43,7 +43,10 @@ export function useSandboxUrlState(
   const managesPreset = Boolean(opts.presetIds?.length);
   const defaultPresetId =
     opts.defaultPresetId ?? opts.presetIds?.[0] ?? "default";
-  const validPresetIds = opts.presetIds ?? [];
+  const validPresetIds = useMemo(
+    () => opts.presetIds ?? [],
+    [opts.presetIds],
+  );
 
   const readInput = useMemo(
     () => ({

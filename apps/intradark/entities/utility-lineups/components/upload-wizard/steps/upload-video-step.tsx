@@ -94,7 +94,6 @@ export function UploadVideoStep() {
               onFocus={() => setVideoPreviewShowControls(true)}
               onBlur={() => setVideoPreviewShowControls(false)}
             >
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
                 src={filePreviewUrl}
                 className="size-full object-contain"

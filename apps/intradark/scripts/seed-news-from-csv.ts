@@ -14,7 +14,7 @@
  */
 import { readFileSync } from "node:fs";
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { generateJSON } from "@tiptap/html";
 import type { JSONContent } from "@tiptap/core";
 import { eq } from "drizzle-orm";
@@ -133,7 +133,7 @@ async function resolveUserIdByUsername(
 }
 
 /** Create (idempotently) the Michael "ap0c" Aliferis user, return its auth id. */
-async function ensureMikeUser(admin: ReturnType<typeof createClient<any>>): Promise<string> {
+async function ensureMikeUser(admin: SupabaseClient): Promise<string> {
   const existing = await resolveUserIdByUsername(MIKE.username);
   if (existing) {
     console.log(`✓ Mike user already exists (${existing}).`);

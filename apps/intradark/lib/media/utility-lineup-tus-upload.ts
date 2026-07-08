@@ -47,26 +47,17 @@ export function uploadUtilityLineupVideoTusSigned(
   const endpoint = supabaseSignedTusResumableEndpoint(opts.supabaseUrl);
 
   return new Promise((resolve, reject) => {
-    let upload: Upload | undefined;
     const cleanupAbort = () => {
       opts.signal?.removeEventListener("abort", onAbort);
     };
 
     const onAbort = () => {
       cleanupAbort();
-      void upload?.abort().catch(() => {});
+      void upload.abort().catch(() => {});
       reject(new DOMException("The upload was aborted", "AbortError"));
     };
 
-    if (opts.signal) {
-      if (opts.signal.aborted) {
-        onAbort();
-        return;
-      }
-      opts.signal.addEventListener("abort", onAbort);
-    }
-
-    upload = new Upload(opts.file, {
+    const upload = new Upload(opts.file, {
       endpoint,
       retryDelays: [0, 3000, 5000, 10000, 20000],
       headers: {
@@ -100,14 +91,22 @@ export function uploadUtilityLineupVideoTusSigned(
       },
     });
 
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        onAbort();
+        return;
+      }
+      opts.signal.addEventListener("abort", onAbort);
+    }
+
     void upload
       .findPreviousUploads()
       .then((previous) => {
         const first = previous[0];
-        if (first && upload) {
+        if (first) {
           upload.resumeFromPreviousUpload(first);
         }
-        upload?.start();
+        upload.start();
       })
       .catch((e) => {
         cleanupAbort();

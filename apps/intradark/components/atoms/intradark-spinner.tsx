@@ -173,6 +173,9 @@ export function IntradarkSpinner({
   strokeWidth = 1,
 }: IntradarkSpinnerProps) {
   const mountRef = useRef<HTMLDivElement>(null);
+  // Compare the axis by component so a fresh [x, y, z] literal from the caller
+  // doesn't rebuild the scene every render.
+  const [spinAxisX, spinAxisY, spinAxisZ] = spinAxis;
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -298,7 +301,7 @@ export function IntradarkSpinner({
 
     // Orient the shared 3-fold axis (1,1,1) to vertical → tetA apex-up,
     // tetB apex-down: the canonical Merkaba pose.
-    const sAxis = new THREE.Vector3(...spinAxis).normalize();
+    const sAxis = new THREE.Vector3(spinAxisX, spinAxisY, spinAxisZ).normalize();
     const baseQ = new THREE.Quaternion().setFromUnitVectors(
       new THREE.Vector3(1, 1, 1).normalize(),
       sAxis,
@@ -334,9 +337,9 @@ export function IntradarkSpinner({
   }, [
     size,
     speed,
-    spinAxis[0],
-    spinAxis[1],
-    spinAxis[2],
+    spinAxisX,
+    spinAxisY,
+    spinAxisZ,
     faceColor,
     strokeColor,
     strokeOpacity,

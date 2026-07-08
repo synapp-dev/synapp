@@ -91,10 +91,13 @@ export function ScrimListings() {
     };
   }, [teamId, load]);
 
-  const dayStart = new Date(selectedDate);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(selectedDate);
-  dayEnd.setHours(23, 59, 59, 999);
+  const { dayStart, dayEnd } = useMemo(() => {
+    const start = new Date(selectedDate);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(selectedDate);
+    end.setHours(23, 59, 59, 999);
+    return { dayStart: start, dayEnd: end };
+  }, [selectedDate]);
 
   const mapFilterPass = useCallback(
     (listing: ListingItem) => {

@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 
+import { EmptyState } from "@/components/atoms/empty-state";
 import { UtilityMapCard } from "@/entities/utility-lineups/components/utility-map-card";
 import { UtilityMapCardsGrid } from "@/entities/utility-lineups/components/utility-map-cards-grid";
 import { groupMapsByUtilityPool } from "@/entities/utility-lineups/lib/utility-map-pool-groups";
@@ -25,10 +26,10 @@ export function UtilityMapList({ maps }: { maps: UtilityMapListItem[] }) {
 
   if (maps.length === 0) {
     return (
-      <p className="text-muted-foreground border-border rounded-lg border border-dashed py-12 text-center">
+      <EmptyState>
         No maps in the utility catalog yet. Check back after we publish radar
         data.
-      </p>
+      </EmptyState>
     );
   }
 

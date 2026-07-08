@@ -32,7 +32,9 @@ try {
 } catch (err) {
   try {
     await sql.unsafe("ROLLBACK");
-  } catch {}
+  } catch {
+    // best-effort rollback; the original error below is what matters
+  }
   console.error(`✗ failed: ${err.message}`);
   process.exitCode = 1;
 } finally {

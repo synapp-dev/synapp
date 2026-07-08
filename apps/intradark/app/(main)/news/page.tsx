@@ -1,5 +1,3 @@
-import { Newspaper } from "lucide-react";
-
 import { listRecentForumThreads } from "@/entities/forums/lib/queries";
 import { ForumRecentWidget } from "@/entities/forums/components/forum-recent-widget";
 import { NewsFeaturedHero } from "@/entities/news/components/news-featured-hero";
@@ -48,14 +46,13 @@ export default async function NewsPage({
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="flex items-center gap-2">
-          <Newspaper className="size-5" />
-          <h1 className="text-lg font-semibold tracking-tight">News</h1>
+      <div className="space-y-3">
+        <div>
+          <h1 className="text-3xl font-bold">News</h1>
+          <p className="text-muted-foreground mt-1">
+            Announcements, updates, and stories from the community.
+          </p>
         </div>
-        <span className="text-muted-foreground/40" aria-hidden>
-          ·
-        </span>
         <NewsTagFilter tags={allTags} active={activeTag} />
       </div>
 

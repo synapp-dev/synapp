@@ -87,7 +87,6 @@ export function EnemyPovStep() {
         >
           {enemyPovFile && enemyPovFilePreviewUrl ? (
             <div className="relative size-full min-h-0">
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
               <video
                 src={enemyPovFilePreviewUrl}
                 className="size-full object-contain"

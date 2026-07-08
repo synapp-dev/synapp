@@ -8,6 +8,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 
+import { MainSectionShell } from "@/components/organisms/main-section-shell";
 import { PlayerSearch } from "@/entities/players/components/player-search";
 import { canonicalPath } from "@/entities/players/lib/resolve";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -83,15 +84,11 @@ export default async function PlayersPage() {
   const recent = (recentRes.data ?? []) as unknown as PlayerRow[];
 
   return (
-    <div className="space-y-8 py-2">
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">Players</h1>
-        <p className="text-sm text-muted-foreground">
-          Look up any CS2 player by intradark name, SteamID64, Steam URL, or
-          Faceit nickname.
-        </p>
-        <PlayerSearch />
-      </div>
+    <MainSectionShell
+      title="Players"
+      description="Look up any CS2 player by intradark name, SteamID64, Steam URL, or Faceit nickname."
+    >
+      <PlayerSearch />
 
       <Card>
         <CardHeader>
@@ -126,6 +123,6 @@ export default async function PlayersPage() {
           </CardContent>
         </Card>
       ) : null}
-    </div>
+    </MainSectionShell>
   );
 }

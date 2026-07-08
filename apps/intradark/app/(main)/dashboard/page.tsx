@@ -8,6 +8,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 
+import { EmptyState } from "@/components/atoms/empty-state";
 import { DiscordLinkDialog } from "@/components/molecules/discord-link-dialog";
 import { getCurrentUserProfiles } from "@/lib/get-current-user-profiles";
 
@@ -68,20 +69,12 @@ function SignInPrompt() {
   );
 }
 
-function EmptyWidget({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-muted-foreground rounded-xl border border-dashed p-6 text-center text-sm">
-      {children}
-    </div>
-  );
-}
-
 /** Quick-launch card for the PUG queue. */
 function PlayCtaCard() {
   return (
     <Link
       href="/play"
-      className="group bg-card relative block overflow-hidden rounded-xl border p-5 transition-colors hover:border-primary/50"
+      className="group bg-card focus-visible:ring-ring relative block overflow-hidden rounded-xl border p-5 transition-colors hover:border-primary/50 focus-visible:ring-1 focus-visible:outline-none"
     >
       <div className="bg-primary/10 absolute -right-8 -top-8 size-28 rounded-full blur-2xl transition-opacity group-hover:opacity-80" />
       <div className="relative flex items-center gap-4">
@@ -186,9 +179,9 @@ export default async function DashboardPage() {
                 tags={featured.tags}
               />
             ) : (
-              <EmptyWidget>
+              <EmptyState>
                 No articles yet. Check back soon for updates.
-              </EmptyWidget>
+              </EmptyState>
             )}
 
             {sideStories.length > 0 ? (
@@ -216,13 +209,13 @@ export default async function DashboardPage() {
             {nextScrim ? (
               <NextScrimWidget scrim={nextScrim} myTeamIds={myTeamIds} />
             ) : (
-              <EmptyWidget>
+              <EmptyState>
                 No upcoming scrims.{" "}
                 <Link href="/scrims" className="text-primary hover:underline">
                   Book one
                 </Link>
                 .
-              </EmptyWidget>
+              </EmptyState>
             )}
           </section>
 

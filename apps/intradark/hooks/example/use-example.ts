@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 // Example API function
-const fetchExampleData = async (): Promise<any> => {
+const fetchExampleData = async (): Promise<unknown> => {
   const response = await fetch("/api/example");
   if (!response.ok) {
     throw new Error("Failed to fetch example data");
@@ -10,7 +10,7 @@ const fetchExampleData = async (): Promise<any> => {
 };
 
 // Example mutation function
-const createExampleData = async (data: any): Promise<any> => {
+const createExampleData = async (data: unknown): Promise<unknown> => {
   const response = await fetch("/api/example", {
     method: "POST",
     headers: {

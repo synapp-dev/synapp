@@ -85,6 +85,7 @@ export function useRegisterSandboxRightSidebar(
   React.useLayoutEffect(() => {
     if (!sidebarMountElement) return;
     setSidebarOccupied(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are caller-supplied by design (wrapper hook pattern), cannot be statically verified
   }, [sidebarMountElement, setSidebarOccupied, ...deps]);
 
   React.useLayoutEffect(() => {

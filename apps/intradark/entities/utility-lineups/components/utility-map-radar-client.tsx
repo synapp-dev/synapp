@@ -2018,6 +2018,7 @@ function AdminTimelineEditBlock({
   React.useEffect(() => {
     setTimeline(lineupToTimelineValues(lineup));
     setErr(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the saved primitive fields on purpose; depending on the `lineup` object identity would reset in-progress edits every render
   }, [
     lineup.id,
     lineup.videoStartMs,

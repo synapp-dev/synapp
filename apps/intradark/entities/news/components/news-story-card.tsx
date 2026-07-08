@@ -27,7 +27,7 @@ export function NewsStoryCard({
   return (
     <Link
       href={`/news/${slug}`}
-      className="group bg-card hover:border-foreground/20 relative flex h-full flex-col overflow-hidden rounded-xl border transition-colors"
+      className="group bg-card hover:border-primary/50 focus-visible:ring-ring relative flex h-full flex-col overflow-hidden rounded-xl border shadow-sm transition-colors focus-visible:ring-1 focus-visible:outline-none"
     >
       {hasCover ? (
         <div className="bg-muted relative aspect-[16/9] w-full overflow-hidden">

@@ -29,9 +29,27 @@ export interface GcClientOptions {
  *  3. Interactive Steam Guard — prompts on the terminal for an emailed/mobile
  *     code, then persists a refresh token so it's only needed once.
  */
+/**
+ * Minimal structural surface of the untyped steam-user / globaloffensive
+ * clients (see steam-modules.d.ts); only the members this wrapper touches.
+ */
+interface SteamUserLike {
+  on(event: string, handler: (...args: never[]) => void): void;
+  gamesPlayed(apps: number[]): void;
+  logOn(options: Record<string, unknown>): void;
+}
+
+interface GlobalOffensiveLike {
+  on(event: string, handler: (...args: never[]) => void): void;
+  requestPlayersProfile(
+    steamid64: string,
+    callback: (profile: unknown) => void,
+  ): void;
+}
+
 export class GcClient {
-  private user: any;
-  private cs: any;
+  private user: SteamUserLike;
+  private cs: GlobalOffensiveLike;
   private ready = false;
   private usedRefreshToken = false;
   private queue: Promise<unknown> = Promise.resolve();
