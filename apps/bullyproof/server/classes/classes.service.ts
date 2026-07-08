@@ -42,6 +42,13 @@ async function assertCanViewClasses(ctx: AuthContext, schoolId?: string) {
   throw new Error("Unauthorized to view classes");
 }
 
+// Drizzle wraps Postgres errors; the real code/message live on error.cause.
+function pgErrorMatches(error: any, code: string, fragment: string): boolean {
+  const codes = [error?.code, error?.cause?.code];
+  const text = `${error?.message ?? ""} ${error?.cause?.message ?? ""}`;
+  return codes.includes(code) || text.includes(fragment);
+}
+
 export const classesService = {
   async listClasses(ctx: AuthContext, query: unknown) {
     const params: ListClassesParams = listClassesSchema.parse(query);
@@ -77,7 +84,7 @@ export const classesService = {
     try {
       newClass = await classesRepo.create(classData);
     } catch (error: any) {
-      if (error?.code === "23505" || error?.message?.includes("duplicate key")) {
+      if (pgErrorMatches(error, "23505", "duplicate key")) {
         throw new Error(
           `An active class named "${classData.name}" already exists at this school. Archive the previous year's class (set it inactive) or choose a different name.`
         );
@@ -107,7 +114,7 @@ export const classesService = {
     try {
       updatedClass = await classesRepo.update(id, classData);
     } catch (error: any) {
-      if (error?.code === "23505" || error?.message?.includes("duplicate key")) {
+      if (pgErrorMatches(error, "23505", "duplicate key")) {
         throw new Error(
           `An active class with that name or code already exists at this school. Archive the previous year's class (set it inactive) or choose a different name.`
         );
@@ -143,7 +150,7 @@ export const classesService = {
     try {
       await classesRepo.delete(id);
     } catch (error: any) {
-      if (error?.code === "23503" || error?.message?.includes("foreign key")) {
+      if (pgErrorMatches(error, "23503", "foreign key")) {
         throw new Error(
           `"${existingClass[0].name}" has delivered lesson history and cannot be deleted. Archive it (set it inactive) to keep its records and free the name for a new class.`
         );
@@ -188,7 +195,7 @@ export const classesService = {
     try {
       await classesRepo.deleteBatch(ids);
     } catch (error: any) {
-      if (error?.code === "23503" || error?.message?.includes("foreign key")) {
+      if (pgErrorMatches(error, "23503", "foreign key")) {
         throw new Error(
           "One or more selected classes have delivered lesson history and cannot be deleted. Archive them (set them inactive) to keep their records and free the names for new classes."
         );
