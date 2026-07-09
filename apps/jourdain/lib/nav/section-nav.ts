@@ -1,3 +1,6 @@
+import type { LucideIcon } from "lucide-react";
+import { Dumbbell, HeartPulse } from "lucide-react";
+
 export type SectionNavItem = {
   title: string;
   href: string;
@@ -7,6 +10,7 @@ export type SectionNavItem = {
 export type SectionNav = {
   key: string;
   title: string;
+  icon?: LucideIcon;
   match: (p: string) => boolean;
   items: SectionNavItem[];
 };
@@ -15,6 +19,7 @@ export const SECTION_NAVS: SectionNav[] = [
   {
     key: "gym",
     title: "Gym",
+    icon: Dumbbell,
     match: (p) => p.startsWith("/health/gym"),
     items: [
       {
@@ -52,6 +57,7 @@ export const SECTION_NAVS: SectionNav[] = [
   {
     key: "vitals",
     title: "Vitals",
+    icon: HeartPulse,
     match: (p) => p.startsWith("/health/vitals"),
     items: [
       { title: "Body Composition", href: "/health/vitals/body-composition" },
