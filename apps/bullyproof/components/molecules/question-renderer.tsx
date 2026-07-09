@@ -1,6 +1,6 @@
 "use client";
 
-import { QuestionDefinition, QuestionAnswer } from "@/types/course-ratings";
+import { QuestionDefinition } from "@/types/course-ratings";
 import { QuestionTextInput } from "./question-text-input";
 import { QuestionRatingInput } from "./question-rating-input";
 import { QuestionMultipleChoice } from "./question-multiple-choice";

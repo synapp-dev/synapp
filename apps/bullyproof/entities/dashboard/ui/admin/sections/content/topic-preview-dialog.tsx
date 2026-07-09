@@ -152,7 +152,7 @@ export function TopicPreviewDialog({
             <div className="text-center text-muted-foreground">
               <p className="font-medium">No slides available</p>
               <p className="text-sm mt-2">
-                This topic doesn't have any slides yet.
+                This topic doesn&apos;t have any slides yet.
               </p>
             </div>
           ) : currentSlide ? (

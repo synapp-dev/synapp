@@ -2,9 +2,6 @@ import {
   getStatesSchema,
   getStateByIdSchema,
   getStateByCodeSchema,
-  type GetStatesParams,
-  type GetStateByIdParams,
-  type GetStateByCodeParams,
 } from "./states.validators";
 import { statesRepo } from "./states.repo";
 
@@ -14,14 +11,14 @@ type AuthContext = {
   roles?: string[];
 };
 
-async function assertCanViewStates(ctx: AuthContext) {
+async function assertCanViewStates(_ctx: AuthContext) {
   // States are public data - no authentication required
   return;
 }
 
 export const statesService = {
   async getStates(ctx: AuthContext, query: unknown) {
-    const params: GetStatesParams = getStatesSchema.parse(query);
+    getStatesSchema.parse(query);
     await assertCanViewStates(ctx);
 
     return await statesRepo.getAll();

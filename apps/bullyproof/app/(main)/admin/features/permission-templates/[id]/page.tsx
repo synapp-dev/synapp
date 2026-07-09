@@ -102,7 +102,6 @@ type MatrixCell = {
 
 type MatrixState = Record<string, Record<ScopeKey, MatrixCell>>;
 
-const EMPTY_SCOPES: ScopeKey[] = [];
 type PlatformRole = { id: string; key: string; name: string };
 const EMPTY_PLATFORM_ROLES: PlatformRole[] = [];
 
@@ -680,7 +679,7 @@ export default function PermissionTemplateDetailsPage() {
                                   onCheckedChange={(checked) =>
                                     updateCell(featureKey, scope, {
                                       enabled: Boolean(checked),
-                                      visible: Boolean(checked)
+                                      visible: checked
                                         ? true
                                         : cell.visible,
                                     })

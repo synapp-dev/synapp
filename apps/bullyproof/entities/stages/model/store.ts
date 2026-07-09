@@ -1,22 +1,5 @@
-import type { CurriculumStageRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { curriculumApi } from "@/entities/curriculum/api/endpoints";
-
-type Stage = CurriculumStageRow & {
-  years?: Array<{
-    id: string;
-    code: string;
-    displayName: string;
-    sortIndex: number;
-    level: {
-      id: string;
-      name: string;
-      key: string;
-    };
-  }>;
-};
-
-type StageWithYears = Stage;
 
 // React Query hooks for stages
 export function useStages() {

@@ -66,8 +66,8 @@ export const metricsService = {
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
-    let currentWhereConditions: any[] = [];
-    let previousWhereConditions: any[] = [];
+    const currentWhereConditions: any[] = [];
+    const previousWhereConditions: any[] = [];
 
     if (params.scope === "all") {
       if (!hasScopeAll) {
@@ -108,12 +108,12 @@ export const metricsService = {
       .from(schools)
       .where(and(...previousWhereConditions));
 
-    const [currentResult] = await currentQuery;
-    const [previousResult] = await previousQuery;
+    await currentQuery;
+    await previousQuery;
 
     // Get total count (not just this month's new schools)
-    let totalCurrentWhereConditions: any[] = [];
-    let totalPreviousWhereConditions: any[] = [];
+    const totalCurrentWhereConditions: any[] = [];
+    const totalPreviousWhereConditions: any[] = [];
 
     if (params.scope !== "all") {
       const schoolIds = await getUserSchoolIds(ctx.userId);
@@ -168,8 +168,8 @@ export const metricsService = {
     const hasScopeAll = await checkFeatureAccess(ctx.userId, "/admin/schools");
     const { previousMonthEnd } = getDateRanges();
 
-    let currentWhereConditions = [eq(roles.key, "TEACHER")];
-    let previousWhereConditions = [
+    const currentWhereConditions = [eq(roles.key, "TEACHER")];
+    const previousWhereConditions = [
       eq(roles.key, "TEACHER"),
       sql`${userRoles.assignedAt} <= ${previousMonthEnd}`,
     ];
@@ -231,12 +231,12 @@ export const metricsService = {
     const { currentMonthStart, previousMonthStart, previousMonthEnd } =
       getDateRanges();
 
-    let currentWhereConditions = [
+    const currentWhereConditions = [
       eq(lessons.status, "completed"),
       sql`${lessons.createdAt} >= ${currentMonthStart}`,
     ];
 
-    let previousWhereConditions = [
+    const previousWhereConditions = [
       eq(lessons.status, "completed"),
       sql`${lessons.createdAt} >= ${previousMonthStart}`,
       sql`${lessons.createdAt} <= ${previousMonthEnd}`,
@@ -350,7 +350,7 @@ export const metricsService = {
     }
 
     // Get completed lessons for current month
-    let currentLessonsQuery = db
+    const currentLessonsQuery = db
       .select({ count: sql<number>`count(*)` })
       .from(lessons)
       .where(
@@ -362,7 +362,7 @@ export const metricsService = {
       );
 
     // Get completed lessons for previous month
-    let previousLessonsQuery = db
+    const previousLessonsQuery = db
       .select({ count: sql<number>`count(*)` })
       .from(lessons)
       .where(

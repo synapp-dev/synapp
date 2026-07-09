@@ -6,8 +6,9 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar";
 
-interface ResponsiveSidebarProviderProps
-  extends React.ComponentProps<typeof SidebarProvider> {}
+type ResponsiveSidebarProviderProps = React.ComponentProps<
+  typeof SidebarProvider
+>;
 
 /**
  * Wrapper around SidebarProvider that adds auto-collapse behavior
@@ -56,7 +57,7 @@ export function ResponsiveSidebarProvider({
   // Always start with defaultOpen on both server and client to avoid hydration mismatch
   // Then update after mount based on window width
   const [open, setOpen] = React.useState(defaultOpen);
-  const [mounted, setMounted] = React.useState(false);
+  const [, setMounted] = React.useState(false);
 
   // Update state after mount to avoid hydration mismatch
   React.useEffect(() => {

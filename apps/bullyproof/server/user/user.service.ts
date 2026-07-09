@@ -11,7 +11,7 @@ import { createServerAdminClient } from "@/utils/supabase/admin";
 import { resolveSchoolId } from "@/server/school/resolve-school-ref";
 import { db } from "@/server/db/drizzle";
 import { userProfile, userSchoolPositions, userSessions } from "@/drizzle/schema";
-import { sql, desc, inArray, eq, and } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -267,7 +267,7 @@ export const userService = {
 
     // Note: user_profile should be created automatically by database trigger
     // But we verify it exists or create it if needed
-    const { data: profile, error: profileError } = await adminClient
+    const { error: profileError } = await adminClient
       .from("user_profile")
       .select("id")
       .eq("id", userId)

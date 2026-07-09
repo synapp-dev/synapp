@@ -78,7 +78,6 @@ function AuthFormContent({ className, ...props }: React.ComponentProps<"div">) {
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [isFirstOtpSubmission, setIsFirstOtpSubmission] = useState(true);
   const [hasOtpError, setHasOtpError] = useState(false);
-  const [devBypassOtp, setDevBypassOtp] = useState(false);
   const otpRef = React.useRef<HTMLInputElement>(null);
   const hasShownInitialAlertRef = React.useRef(false);
   const router = useRouter();

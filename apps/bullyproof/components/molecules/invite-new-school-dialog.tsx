@@ -106,9 +106,6 @@ export function InviteNewSchoolDialog({
     mode: "onChange",
   });
 
-  const name = form.watch("name");
-  const state = form.watch("state");
-
   // No slug generation/effect
 
   const steps = [
@@ -264,7 +261,7 @@ export function InviteNewSchoolDialog({
             <Alert>
               <AlertDescription>
                 This email should be a neutral email address that belongs to the
-                school's domain, like 'info@school.edu.au'. This account will be
+                school&apos;s domain, like &apos;info@school.edu.au&apos;. This account will be
                 the holder of the platform licence and is separate from the
                 school-admin account of the school, which will assign classes
                 and teachers.
@@ -396,7 +393,7 @@ export function InviteNewSchoolDialog({
       onOpenChange(false);
       setStep(0);
       form.reset();
-    } catch (e) {
+    } catch {
       // Error is displayed below via inviteMutation.error
     }
   }

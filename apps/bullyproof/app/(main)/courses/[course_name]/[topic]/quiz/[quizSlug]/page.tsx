@@ -2,17 +2,14 @@
 
 import type { CertificationCourseRow, CourseTopicQuizRow, CourseTopicRow, QuizAnswerRow, QuizQuestionRow } from "@/types/db";
 
-import { useEffect, useState, useCallback, Suspense, useRef } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Loader2,
   ArrowLeft,
-  ArrowRight,
-  CheckCircle2,
   XCircle,
   Trophy,
-  AlertCircle,
   ChevronsRight,
   ChevronsLeft,
   RotateCcw,
@@ -31,18 +28,10 @@ import { RadioGroup, RadioGroupItem } from "@workspace/ui/components/radio-group
 import { Checkbox } from "@workspace/ui/components/checkbox";
 import { Label } from "@workspace/ui/components/label";
 import { Progress } from "@workspace/ui/components/progress";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@workspace/ui/components/dialog";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { useMeStore } from "@/entities/me/model/store";
 import { StarRating } from "@/components/atoms/star-rating";
 import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
-import { Separator } from "@workspace/ui/components/separator";
 
 type Course = CertificationCourseRow;
 type Topic = CourseTopicRow;
@@ -52,11 +41,6 @@ type QuizAnswer = QuizAnswerRow;
 
 type QuestionWithAnswers = QuizQuestion & {
   answers: QuizAnswer[];
-};
-
-type AttemptAnswer = {
-  questionId: string;
-  answerIds: string[];
 };
 
 function QuizPageContent() {
@@ -369,7 +353,6 @@ function QuizPageContent() {
 
   // Results dialog
   if (showResults && results) {
-    const scorePercentage = results.scorePercentage ?? 0;
     const isPassed = results.isPassed ?? false;
     const correctAnswers = results.correctAnswers ?? 0;
     const totalQuestions = results.totalQuestions ?? questions.length;

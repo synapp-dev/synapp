@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
-import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import { Textarea } from "@workspace/ui/components/textarea";
@@ -156,7 +155,7 @@ export default function ContactPage() {
         <CardHeader>
           <CardTitle>Send us a Message</CardTitle>
           <CardDescription>
-            Fill out the form below and we'll get back to you as soon as
+            Fill out the form below and we&apos;ll get back to you as soon as
             possible
           </CardDescription>
         </CardHeader>

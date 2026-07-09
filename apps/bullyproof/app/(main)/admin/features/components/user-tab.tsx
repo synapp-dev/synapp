@@ -130,7 +130,7 @@ export function UserTab({
 
   const debouncedSearch = useDebouncedValue(searchQuery, 500);
 
-  const { data: searchResult, isFetching: isSearchingUsers } = useQuery({
+  const { data: searchResult } = useQuery({
     queryKey: ["users", "search", debouncedSearch],
     queryFn: async () => {
       const result = await meApi.get.listAllUsers({

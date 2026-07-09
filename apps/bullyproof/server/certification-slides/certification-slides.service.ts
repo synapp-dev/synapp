@@ -12,7 +12,7 @@ import { assertFeature } from "@/server/features/features.service";
 import { createServerClient } from "@/utils/supabase/server";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { db } from "@/server/db/drizzle";
-import { courseTopics, certificationCourses } from "@/server/db/schema";
+import { certificationCourses } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 
 type AuthContext = {

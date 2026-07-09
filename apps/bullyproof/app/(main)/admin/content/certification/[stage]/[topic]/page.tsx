@@ -106,7 +106,7 @@ export default function CertificationTopicPage() {
       <Card>
         <CardContent className="space-y-6 pt-6">
           <p className="text-sm text-muted-foreground">
-            Choose how you want to manage this topic's content:
+            Choose how you want to manage this topic&apos;s content:
           </p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -23,7 +23,6 @@
 import { NextResponse } from "next/server";
 import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
 import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 
 /**

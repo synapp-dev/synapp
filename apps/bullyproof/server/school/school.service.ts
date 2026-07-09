@@ -96,7 +96,7 @@ async function assertCanCreateSchool(ctx: AuthContext) {
   await assertFeature(ctx, "/admin/schools");
 }
 
-async function assertCanUpdateSchool(ctx: AuthContext, schoolId: string) {
+async function assertCanUpdateSchool(ctx: AuthContext, _schoolId: string) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");
   }

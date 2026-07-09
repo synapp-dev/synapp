@@ -14,8 +14,11 @@ import {
   VisibilityState,
 } from "@tanstack/react-table";
 
-// Extend ColumnMeta to include align property
+// Extend ColumnMeta to include align property.
+// TData/TValue are required to match the original interface for declaration
+// merging (TS2428), so they are intentionally unused here.
 declare module "@tanstack/react-table" {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData, TValue> {
     align?: "left" | "right" | "center";
   }
@@ -46,7 +49,6 @@ interface SchoolsDataTableProps {
 
 export function SchoolsDataTable({
   onSchoolClick,
-  refreshTrigger,
   schools,
   isLoading = false,
   error = null,

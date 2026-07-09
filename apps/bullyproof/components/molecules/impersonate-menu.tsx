@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,

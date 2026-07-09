@@ -10,25 +10,16 @@ import {
   Users,
   GraduationCap,
   Presentation,
-  BookOpenText,
   LibraryBig,
   FileText,
   Settings,
 } from "lucide-react";
-import { Separator } from "@workspace/ui/components/separator";
 import { useSchoolNavigationPermissions } from "@/hooks/use-school-navigation-permissions";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
-
-interface TabItem {
-  title: string;
-  url: string;
-  icon: React.ComponentType<{ className?: string }>;
-  disabled?: boolean;
-}
 
 interface HeaderTabSwitcherClientProps {
   schoolSlug: string;

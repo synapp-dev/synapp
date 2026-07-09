@@ -10,7 +10,6 @@ import { Button } from "@workspace/ui/components/button";
 import {
   Shield,
   Settings,
-  Users,
   BarChart3,
   Wrench,
   FileText,

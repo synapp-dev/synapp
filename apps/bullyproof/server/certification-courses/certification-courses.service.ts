@@ -6,13 +6,8 @@ import {
   createCourseSchema,
   updateCourseSchema,
   deleteCourseSchema,
-  type GetCoursesParams,
-  type GetCourseByIdParams,
-  type GetCourseByCodeParams,
-  type GetCourseBySlugParams,
   type CreateCourseParams,
   type UpdateCourseParams,
-  type DeleteCourseParams,
 } from "./certification-courses.validators";
 import { certificationCoursesRepo } from "./certification-courses.repo";
 import { assertFeature } from "@/server/features/features.service";
@@ -38,7 +33,7 @@ async function assertCanManageCertification(ctx: AuthContext) {
 
 export const certificationCoursesService = {
   async getCourses(ctx: AuthContext, query: unknown) {
-    const params: GetCoursesParams = getCoursesSchema.parse(query);
+    getCoursesSchema.parse(query);
     await assertCanViewCertification(ctx);
 
     return await certificationCoursesRepo.getCourses();

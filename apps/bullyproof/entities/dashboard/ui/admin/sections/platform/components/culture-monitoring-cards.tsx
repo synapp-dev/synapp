@@ -188,7 +188,7 @@ export function CultureMonitoringCards({
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-2">
-                {cultureMonitoring.scoreDistribution.map((range, index) => (
+                {cultureMonitoring.scoreDistribution.map((range, _index) => (
                   <div
                     key={range.range}
                     className="flex items-center justify-between"

@@ -38,7 +38,6 @@ import { checkFeatureAccess } from "@/server/features/features.service";
 import { refreshSignedUrlIfStale } from "@/server/lib/signed-url";
 import { db } from "@/server/db/drizzle";
 import { topicSlides } from "@/server/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
 import { getTopicSlideStoragePath } from "@/server/lib/slide-storage-path";
 import { generateNKeysBetween } from "fractional-indexing";
 import { compareSlidesByPosition } from "@/server/lib/fractional-position";

@@ -192,44 +192,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Listen for real-time status changes to user's lessons
   useUserLessonsStatusRealtime(effectiveUser?.id);
 
-  // When maintenance mode is enabled for the user (and not bypassed), show only the maintenance menu
-  if (effectiveMaintenanceMode) {
-    return (
-      <Sidebar collapsible="icon" {...props}>
-        <SidebarHeader className="mb-2 items-center">
-          <Link href="/" className="block">
-            {displayState === "expanded" ? (
-              <Image
-                src="/images/bullyproof-logo.svg"
-                alt="Bullyproof Logo"
-                width={500}
-                height={500}
-                className="h-16 mt-4 w-auto"
-              />
-            ) : (
-              <Image
-                src="/images/bp-small-logo.svg"
-                alt="Bullyproof Small Logo"
-                width={500}
-                height={500}
-                className="h-10 mt-4 w-auto"
-              />
-            )}
-          </Link>
-        </SidebarHeader>
-        <SidebarContent>
-          <ScrollArea className="h-full">
-            <NavMain items={maintenanceNavItems} title="Platform" />
-          </ScrollArea>
-        </SidebarContent>
-        <SidebarFooter>
-          <NavUser />
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-    );
-  }
-
   // Check if welcome tutorial is completed
   const isWelcomeCompleted = React.useMemo(() => {
     if (!effectiveUser?.metadata) return false;
@@ -254,7 +216,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
   const schoolSlugFromPath = React.useMemo(() => {
     // Match /schools/{slug}/...
-    const match = pathname.match(/^\/schools\/([^\/]+)/);
+    const match = pathname.match(/^\/schools\/([^/]+)/);
     return match ? match[1] : null;
   }, [pathname]);
 
@@ -517,6 +479,45 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     }
     return items;
   }, [filteredPlatformItems, isLive, liveUrl, liveLessonCount, isWelcomeCompleted, mounted, needsSchoolSelection, handleLiveLessonClick]);
+
+  // When maintenance mode is enabled for the user (and not bypassed), show only the maintenance menu.
+  // Declared after all hooks so hook order stays stable across renders (rules-of-hooks).
+  if (effectiveMaintenanceMode) {
+    return (
+      <Sidebar collapsible="icon" {...props}>
+        <SidebarHeader className="mb-2 items-center">
+          <Link href="/" className="block">
+            {displayState === "expanded" ? (
+              <Image
+                src="/images/bullyproof-logo.svg"
+                alt="Bullyproof Logo"
+                width={500}
+                height={500}
+                className="h-16 mt-4 w-auto"
+              />
+            ) : (
+              <Image
+                src="/images/bp-small-logo.svg"
+                alt="Bullyproof Small Logo"
+                width={500}
+                height={500}
+                className="h-10 mt-4 w-auto"
+              />
+            )}
+          </Link>
+        </SidebarHeader>
+        <SidebarContent>
+          <ScrollArea className="h-full">
+            <NavMain items={maintenanceNavItems} title="Platform" />
+          </ScrollArea>
+        </SidebarContent>
+        <SidebarFooter>
+          <NavUser />
+        </SidebarFooter>
+        <SidebarRail />
+      </Sidebar>
+    );
+  }
 
   return (
     <Sidebar collapsible="icon" {...props}>

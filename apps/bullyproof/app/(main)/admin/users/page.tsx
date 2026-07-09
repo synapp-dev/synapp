@@ -32,7 +32,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
-import { Badge } from "@workspace/ui/components/badge";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import {
@@ -806,7 +805,7 @@ function AdminUsersPageContent() {
           <DialogHeader>
             <DialogTitle>Delete Users</DialogTitle>
             <DialogDescription>
-              You're about to delete these users:
+              You&apos;re about to delete these users:
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[400px]">

@@ -8,7 +8,7 @@ import {
   schoolLevels, 
   schoolLevelAssignments 
 } from '../drizzle/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 // Types for the legacy JSON data
 interface LegacySchool {

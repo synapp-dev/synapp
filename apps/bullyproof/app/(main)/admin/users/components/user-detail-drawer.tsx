@@ -1,7 +1,5 @@
 "use client";
 
-import type { RoleRow } from "@/types/db";
-
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import {
@@ -10,31 +8,14 @@ import {
   SheetTitle,
 } from "@workspace/ui/components/sheet";
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarSeparator,
-} from "@workspace/ui/components/sidebar";
-import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Separator } from "@workspace/ui/components/separator";
-import { Input } from "@workspace/ui/components/input";
 import { cn } from "@workspace/ui/lib/utils";
-import { Label } from "@workspace/ui/components/label";
 import { Button } from "@workspace/ui/components/button";
-import { Checkbox } from "@workspace/ui/components/checkbox";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { Skeleton } from "@workspace/ui/components/skeleton";
 
 import {
   Alert,
@@ -54,29 +35,17 @@ import {
 
 import {
   meApi,
-  type UserWithRolesAndSchools,
 } from "@/entities/me/api/endpoints";
 import { rolesApi } from "@/entities/roles/api/endpoints";
-import { schoolApi } from "@/entities/school/api/endpoints";
-import { usersApi } from "@/entities/users/api/endpoints";
 import { useRoles } from "@/entities/users/model/store";
 import { useListSchoolsQuery } from "@/entities/school/model/useListSchoolsQuery";
-import type { School } from "@/entities/school/model/useListSchoolsQuery";
 import {
-  User,
-  Mail,
-  Calendar,
   ShieldCheck,
   Users as UsersIcon,
-  Settings,
   Loader2,
   FileBadge2,
-  Trash2,
   AlertCircle,
   Pencil,
-  Save,
-  History,
-  School as SchoolIcon,
   X,
   UserPlus,
 } from "lucide-react";
@@ -94,7 +63,6 @@ import { UserFeaturesTab } from "./user-detail-drawer/user-features-tab";
 import {
   extractSchoolMetadata,
   getDisplayName,
-  isSchoolLicenceAccount,
   PLATFORM_ROLE_KEYS,
   canTargetReceiveFirstPlatformRole,
 } from "./user-detail-drawer/utils";
@@ -111,8 +79,6 @@ import type {
   HistorySubTabType,
 } from "./user-detail-drawer/types";
 
-type Role = RoleRow;
-
 function UserDetailDrawerContent({
   user,
   open,
@@ -121,7 +87,7 @@ function UserDetailDrawerContent({
   onDeleteUserClick,
 }: UserDetailDrawerProps) {
   // Use React Query hooks with Zustand caching for roles and schools
-  const { roles, isLoading: loadingRoles } = useRoles();
+  const { roles } = useRoles();
   const { data: schools = [], isLoading: loadingSchools } = useListSchoolsQuery(
     { limit: 100 },
   );
@@ -419,13 +385,6 @@ function UserDetailDrawerContent({
   // Check if user has any school role
   const userHasSchoolRole = (user?.schoolRoles?.length ?? 0) > 0;
 
-  // Check if user has SCHOOL_LICENCE role
-  const userHasSchoolLicence = user ? isSchoolLicenceAccount(user) : false;
-
-  // Check if user has any non-SCHOOL_LICENCE school roles
-  const userHasNonLicenceSchoolRole =
-    user?.schoolRoles?.some((sr) => sr.roleKey !== "SCHOOL_LICENCE") ?? false;
-
   // Get the platform role name for display (if user has one)
   const userPlatformRoleKey = user?.platformRoles?.find((key) =>
     PLATFORM_ROLE_KEYS.includes(key),
@@ -435,31 +394,6 @@ function UserDetailDrawerContent({
     : null;
   const platformRoleName = platformRole?.name || "Platform Role";
 
-  const handleRemoveRoleClick = (
-    roleKey: string,
-    roleName: string,
-    isPlatform: boolean,
-    schoolId?: string,
-    schoolName?: string,
-  ) => {
-    if (!user) return;
-
-    const role = roles.find((r) => r.key === roleKey);
-    if (!role) {
-      alert("Role not found");
-      return;
-    }
-
-    setRoleToRemove({
-      roleId: role.id,
-      roleKey,
-      roleName,
-      schoolId,
-      schoolName,
-      isPlatform,
-    });
-    setIsRemoveRoleDialogOpen(true);
-  };
 
   const handleToggleRole = async () => {
     if (!user || !roleToToggle || !canMutateTargetUser) {
@@ -602,7 +536,6 @@ function UserDetailDrawerContent({
 
       // Close dialog first (but keep roleToToggle for loader)
       setIsToggleRoleDialogOpen(false);
-      const toggledRole = role;
 
       // Refresh user data
       onUserUpdate?.();
@@ -995,7 +928,7 @@ function UserDetailDrawerContent({
                             Platform Access Level Restriction
                           </AlertTitle>
                           <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-                            This user is a '{platformRoleName}' and can only
+                            This user is a &apos;{platformRoleName}&apos; and can only
                             have one access level. They cannot have any other
                             access levels.
                           </AlertDescription>

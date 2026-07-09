@@ -4,15 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Button } from "@workspace/ui/components/button";
 import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  X,
-  Settings,
-  Maximize,
-  Minimize,
-  Joystick,
-  CheckCircle2,
   Loader2,
   PartyPopper,
   ChevronsRight,
@@ -52,7 +43,6 @@ export function PresentationMode({
   const searchParams = useSearchParams();
   const {
     slides: allSlides,
-    currentSlideIndex,
     currentSlide,
     updateSlide,
     isLoading,
@@ -134,7 +124,7 @@ export function PresentationMode({
   );
 
   const [showControls, setShowControls] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [, setIsFullscreen] = useState(false);
   const [showCompletionSlide, setShowCompletionSlide] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);

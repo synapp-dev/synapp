@@ -1,10 +1,5 @@
-import type { CertificationCourseRow } from "@/types/db";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-
-type Course = CertificationCourseRow & {
-  topicCount?: number;
-};
 
 // React Query hooks for certification courses
 export function useCertificationCourses() {

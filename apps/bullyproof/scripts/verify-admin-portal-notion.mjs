@@ -69,16 +69,6 @@ const EXPECTED_SPRINT_STATUS = {
   "Admin Dashboard Redesign": "Current",
   "Culture Rating": "Next",
 };
-const EXPECTED_FUTURE = [
-  "Admin Dashboard Redesign",
-  "Culture Rating",
-  "Reports",
-  "Classes & Teachers UX",
-  "Content Types",
-  "Year Reset / Admin Operations",
-  "Lesson Feedback",
-];
-
 const EXPECTED_COUNTS = {
   "Sidebar & Quick Fixes": 3,
   "Prepare / Teach Lessons (Bugs & UX)": 9,

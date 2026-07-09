@@ -412,7 +412,7 @@ export default async function HelpPage({
             <MessageCircle className="h-5 w-5" />
             <span>Get Support</span>
           </CardTitle>
-          <CardDescription>Choose how you'd like to get help</CardDescription>
+          <CardDescription>Choose how you&apos;d like to get help</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
@@ -469,7 +469,7 @@ export default async function HelpPage({
         <CardHeader>
           <CardTitle>Send us a Message</CardTitle>
           <CardDescription>
-            Can't find what you're looking for? Send us a detailed message
+            Can&apos;t find what you&apos;re looking for? Send us a detailed message
           </CardDescription>
         </CardHeader>
         <CardContent>

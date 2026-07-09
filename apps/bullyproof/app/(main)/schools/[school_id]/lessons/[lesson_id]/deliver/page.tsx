@@ -188,7 +188,7 @@ export default function LessonRunLessonPage({
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Cmd + F1
                 </kbd>{" "}
-                (Mac) and select "Duplicate"
+                (Mac) and select &quot;Duplicate&quot;
               </p>
               <p>
                 <strong className="text-foreground">
@@ -202,7 +202,7 @@ export default function LessonRunLessonPage({
                 <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">
                   Cmd + F1
                 </kbd>{" "}
-                (Mac) and select "Extend". This allows you to see the controls
+                (Mac) and select &quot;Extend&quot;. This allows you to see the controls
                 on your main screen while the class sees the presentation on the
                 extended display.
               </p>

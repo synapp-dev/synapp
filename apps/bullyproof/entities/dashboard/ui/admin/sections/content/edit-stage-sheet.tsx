@@ -434,7 +434,7 @@ export function EditStageSheet({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the stage "{stage.name}". This action
+              This will permanently delete the stage &quot;{stage.name}&quot;. This action
               cannot be undone. All topics associated with this stage will also
               be affected.
             </AlertDialogDescription>

@@ -81,7 +81,7 @@ export async function POST(
     let parsedOperations;
     try {
       parsedOperations = JSON.parse(operationsJson);
-    } catch (parseError) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid operations JSON" },
         { status: 400 }

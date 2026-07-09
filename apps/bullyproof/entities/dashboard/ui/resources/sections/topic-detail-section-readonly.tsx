@@ -66,7 +66,7 @@ export function TopicDetailSectionReadonly({
   const [lessonPlans, setLessonPlans] = useState<
     Array<{ id: string; fileName: string; topicId: string }>
   >([]);
-  const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
+  const [_isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
   const [isDownloadingLessonPlan, setIsDownloadingLessonPlan] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
   const slideGalleryRef = useRef<HTMLDivElement | null>(null);

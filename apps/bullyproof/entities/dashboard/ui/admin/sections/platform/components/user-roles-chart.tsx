@@ -1,6 +1,6 @@
 "use client";
 
-import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
+import { PieChart, Pie, Cell } from "recharts";
 import {
   Card,
   CardContent,
@@ -76,7 +76,7 @@ export function UserRolesChart({ userRolesChart }: UserRolesChartProps) {
           </PieChart>
         </ChartContainer>
         <div className="mt-4 grid grid-cols-2 gap-2">
-          {userRolesChart.data.map((item, index) => (
+          {userRolesChart.data.map((item, _index) => (
             <div key={item.role} className="flex items-center gap-2">
               <div
                 className="w-3 h-3 rounded-full"

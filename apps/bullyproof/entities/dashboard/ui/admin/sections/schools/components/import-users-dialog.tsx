@@ -56,7 +56,6 @@ import {
   UserX,
   RefreshCw,
 } from "lucide-react";
-import { rolesApi } from "@/entities/roles/api/endpoints";
 import { useRoles } from "@/entities/users/model/store";
 import { userKeys } from "@/entities/users/model/keys";
 import { apiFetch } from "@/lib/api/fetcher.client";
@@ -103,7 +102,7 @@ export function ImportUsersDialog({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { roles } = useRoles();
+  useRoles();
 
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<
@@ -723,8 +722,6 @@ export function ImportUsersDialog({
 
   // CSV Table columns
   const headerButtonClassName = "h-auto p-0 -ml-3 hover:bg-transparent group";
-  const headerIconClassName =
-    "ml-2 h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors";
 
   const csvTableColumns = useMemo<ColumnDef<(typeof csvData)[0]>[]>(
     () => [

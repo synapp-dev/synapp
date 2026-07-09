@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useSchoolStore } from "@/stores/school-store";
 import { useFeatureAccess } from "@/hooks/use-feature-access";
 import { PAGE_FEATURES } from "@/lib/feature-keys";
 import { cultureRatingsSchoolApi } from "@/entities/culture-rating/api/culture-ratings-school-api";

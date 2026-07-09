@@ -26,7 +26,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import { useCertificationCourses } from "@/entities/certification/model/store";
 import {
   useCertificationTopicsByCourseCode,
   useInvalidateCertificationTopics,
@@ -47,8 +46,6 @@ import {
   GripHorizontal,
   MoreVertical,
   Trash2,
-  Edit,
-  FileText,
   FilePlus,
   ChevronsLeft,
   ChevronsRight,
@@ -728,8 +725,6 @@ export function CertificationCourseDetailSection({
   const [showDragHintIndex, setShowDragHintIndex] = useState<number | null>(
     null
   );
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hideButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const leaveDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -977,7 +972,7 @@ export function CertificationCourseDetailSection({
     }
   };
 
-  const handleTopicClick = (topic: TopicWithSlides, e?: React.MouseEvent) => {
+  const handleTopicClick = (topic: TopicWithSlides, _e?: React.MouseEvent) => {
     if (activeId || topic.id.startsWith("temp_")) return;
     if (topic.slug) {
       router.push(`${basePath}/${slug}/${topic.slug}`);
@@ -1007,7 +1002,7 @@ export function CertificationCourseDetailSection({
     }
   };
 
-  const handleAddTopicClick = (e: React.MouseEvent, index: number) => {
+  const handleAddTopicClick = (e: React.MouseEvent, _index: number) => {
     e.stopPropagation();
     // For now, just open the add topic drawer
     // In the future, we could add logic to insert at a specific position
@@ -1165,7 +1160,7 @@ export function CertificationCourseDetailSection({
             <div className="text-center text-muted-foreground">
               <p className="font-medium">Course not found</p>
               <p className="text-sm mt-2">
-                The certification course you're looking for doesn't exist.
+                The certification course you&apos;re looking for doesn&apos;t exist.
               </p>
             </div>
           </CardContent>
@@ -1621,7 +1616,7 @@ export function CertificationCourseDetailSection({
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the certification course "{course.name}". This action
+                This will permanently delete the certification course &quot;{course.name}&quot;. This action
                 cannot be undone. All topics associated with this course will also
                 be affected.
               </AlertDialogDescription>

@@ -191,7 +191,7 @@ export function BulkRoleDialog({
           <DialogTitle>Bulk Edit Roles</DialogTitle>
           <DialogDescription>
             Assign or remove roles for multiple users by pasting their email
-            addresses. Users will be added to this school if they don't already have roles here.
+            addresses. Users will be added to this school if they don&apos;t already have roles here.
             Supports comma-separated or newline-separated formats.
           </DialogDescription>
         </DialogHeader>

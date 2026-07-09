@@ -12,7 +12,6 @@ import {
   type CreateTopicParams,
   type UpdateTopicParams,
   type ListTopicsParams,
-  type GetTopicByIdParams,
   type CreateSlideParams,
   type CreateSlideWithPositionParams,
   type UpdateSlideParams,
@@ -110,7 +109,7 @@ export const topicsService = {
 
   async getTopicById(ctx: AuthContext, params: unknown) {
     const parsed = getTopicByIdSchema.parse(params);
-    const { id, includeSlides, includeUrls } = parsed as any;
+    const { id, includeUrls } = parsed as any;
     await assertCanViewTopics(ctx);
 
     // getWithDetails already includes slides, so we always use it if includeSlides is true or not specified
@@ -154,7 +153,7 @@ export const topicsService = {
     const data: UpdateTopicParams = updateTopicSchema.parse(params);
     await assertCanManageTopics(ctx);
 
-    const updatedTopic = await topicsRepo.update(id, data);
+    await topicsRepo.update(id, data);
     return await topicsRepo.getWithDetails(id);
   },
 

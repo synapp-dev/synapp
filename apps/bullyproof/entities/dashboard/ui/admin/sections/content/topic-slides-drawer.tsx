@@ -1,7 +1,7 @@
 "use client";
 
 import type { TopicRow, TopicSlideRow } from "@/types/db";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -176,6 +176,7 @@ export function TopicSlidesDrawer({
                     )}
                     {slide.kind === "image" && slide.imageUrl && (
                       <div className="space-y-2">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                         <img
                           src={toStorageUrl(slide.imageUrl) ?? slide.imageUrl}
                           alt={`Slide ${index + 1}`}

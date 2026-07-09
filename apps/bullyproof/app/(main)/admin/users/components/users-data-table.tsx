@@ -43,7 +43,6 @@ interface UsersDataTableProps {
 
 export function UsersDataTable({
   onUserClick,
-  refreshTrigger,
   users,
   roles,
   isLoading = false,
@@ -243,7 +242,7 @@ export function UsersDataTable({
 
                       {/* Render school roles grouped by school */}
                       {Array.from(rolesBySchool.entries()).map(
-                        ([schoolId, roles], schoolIdx) => {
+                        ([schoolId, roles]) => {
                           const schoolName = roles[0]?.schoolName;
 
                           // Sort roles in order: SCHOOL_STAFF, SCHOOL_ADMIN, TEACHER (or any teacher variant)

@@ -565,6 +565,7 @@ export function FeedbackDialog({
                         className="relative group rounded-md border overflow-hidden cursor-pointer"
                         onClick={() => setShowScreenshotPreview(true)}
                       >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                         <img
                           src={screenshotPreviewUrl}
                           alt="Screenshot preview"
@@ -698,6 +699,7 @@ export function FeedbackDialog({
                           {/* Screenshot thumbnail */}
                           {ticket.screenshotUrl ? (
                             <div className="shrink-0 w-20 h-14 rounded-md border overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                               <img
                                 src={ticket.screenshotUrl}
                                 alt="Ticket screenshot"
@@ -826,6 +828,7 @@ export function FeedbackDialog({
             Full size screenshot preview
           </DialogDescription>
           {screenshotPreviewUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable
             <img
               src={screenshotPreviewUrl}
               alt="Screenshot full preview"

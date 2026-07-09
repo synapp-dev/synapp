@@ -97,7 +97,7 @@ export async function uploadSlideImage(
   }
 
   // Upload the new file (with upsert: true to ensure it overwrites if rename failed)
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from("content")
     .upload(filePath, file, {
       cacheControl: "3600",

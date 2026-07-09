@@ -37,7 +37,6 @@ export async function GET(request: Request) {
     // Parse query parameters
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get("limit") || "10");
-    const random = url.searchParams.get("random") === "true";
     const userIdParam = url.searchParams.get("userId");
 
     // If userId is provided, get schools for that specific user

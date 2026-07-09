@@ -6,7 +6,7 @@ import {
   roles,
   schools,
 } from "@/drizzle/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export const meRepo = {
   getProfileByUserId: (id: string) =>

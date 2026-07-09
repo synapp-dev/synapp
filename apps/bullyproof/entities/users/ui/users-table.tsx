@@ -9,7 +9,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   SortingState,
   useReactTable,
@@ -26,7 +25,6 @@ import {
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Badge } from "@workspace/ui/components/badge";
 import { Checkbox } from "@workspace/ui/components/checkbox";
-import { Button } from "@workspace/ui/components/button";
 import {
   Select,
   SelectContent,
@@ -44,7 +42,6 @@ import {
   PaginationPrevious,
 } from "@workspace/ui/components/pagination";
 import { cn } from "@workspace/ui/lib/utils";
-import { Loader2 } from "lucide-react";
 import { RoleBadges } from "@/components/atoms/role-badges";
 import type { UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { columns } from "@/app/(main)/admin/users/components/users-table-columns";
@@ -77,7 +74,6 @@ export function UsersTable({
   users,
   roles,
   isLoading = false,
-  error = null,
   onUserClick,
   onRowSelectionChange,
   schoolId,
@@ -306,7 +302,7 @@ export function UsersTable({
       }
       return col;
     });
-  }, [roles, schoolId, showSelection, isRowSelectionLocked]);
+  }, [roles, schoolId, showSelection]);
 
   const table = useReactTable({
     data: users,

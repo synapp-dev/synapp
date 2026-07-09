@@ -93,7 +93,8 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    let { name, stateId, sectorId, levelIds, yearIds } = body;
+    const { stateId, sectorId, levelIds, yearIds } = body;
+    let { name } = body;
 
     if (!name || !stateId || !sectorId) {
       return NextResponse.json(

@@ -18,7 +18,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/utils/supabase/server";
 import { db } from "@/server/db/drizzle";
 import { courseProgress, certificationCourses, courseRatings } from "@/server/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 /**
  * Handle GET /api/certification/courses/unrated
@@ -29,7 +29,7 @@ import { eq, and, sql } from "drizzle-orm";
  * @param request The incoming HTTP request.
  * @returns A JSON `NextResponse` with array of unrated courses or an error payload.
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const supabase = await createServerClient();
     const {

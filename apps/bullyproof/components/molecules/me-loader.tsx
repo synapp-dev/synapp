@@ -3,7 +3,7 @@
 import { useCurrentUser } from "@/entities/me/api/getCurrentUser";
 
 export function MeLoader() {
-  const { data: currentUser, error } = useCurrentUser();
+  const { error } = useCurrentUser();
 
   if (error) {
     console.error("Error loading user profile:", error);

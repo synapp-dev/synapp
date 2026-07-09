@@ -2,8 +2,6 @@ import { SnapshotCardWithData } from "@/entities/dashboard/ui/admin/cards/snapsh
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import {
   Card,
-  CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,

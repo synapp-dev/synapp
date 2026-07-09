@@ -125,7 +125,7 @@ export default function WelcomePage() {
                 fadeDirection="up"
               >
                 <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mt-6">
-                  We're glad you're here. We're excited to share this journey
+                  We&apos;re glad you&apos;re here. We&apos;re excited to share this journey
                   with you.
                 </p>
               </StaggeredAnimation>

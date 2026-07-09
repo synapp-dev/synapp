@@ -42,7 +42,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnFiltersState,
@@ -52,12 +51,10 @@ import {
 import {
   UserPlus,
   Upload,
-  Shield,
   ArrowLeft,
   FileText,
   Check,
   X,
-  ArrowUpDown,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -67,8 +64,6 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
-import { usersApi } from "@/entities/users/api/endpoints";
-import { meApi } from "@/entities/me/api/endpoints";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { useRoles } from "@/entities/users/model/store";
 import { apiFetch } from "@/lib/api/fetcher.client";
@@ -113,7 +108,6 @@ export function AddUserDialog({
   school,
   onSuccess,
   skipToManual = false,
-  initialUserType,
 }: AddUserDialogProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -802,7 +796,7 @@ export function AddUserDialog({
   };
 
   // Function to update a cell value and re-validate the row (kept for backwards compatibility, but not used)
-  const updateCellValue = (
+  const _updateCellValue = (
     rowIndex: number,
     field: "firstName" | "lastName" | "email",
     value: string
@@ -868,8 +862,6 @@ export function AddUserDialog({
 
   // CSV Table columns
   const headerButtonClassName = "h-auto p-0 -ml-3 hover:bg-transparent group";
-  const headerIconClassName =
-    "ml-2 h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors";
 
   const csvTableColumns = useMemo<ColumnDef<(typeof csvData)[0]>[]>(
     () => [
@@ -1152,8 +1144,6 @@ export function AddUserDialog({
     onGlobalFilterChange: setCsvTableGlobalFilter,
   });
 
-  if (!school) return null;
-
   // Listen for file selection event from Import Data button
   useEffect(() => {
     if (!open) return;
@@ -1196,7 +1186,7 @@ export function AddUserDialog({
         handleFileSelected as EventListener
       );
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open, searchParams]);
 
   // Check dialog param and set step accordingly when dialog opens
@@ -1214,6 +1204,9 @@ export function AddUserDialog({
       }
     }
   }, [open, searchParams]);
+
+  // Declared after all hooks so hook order stays stable across renders (rules-of-hooks).
+  if (!school) return null;
 
   const isCsvStep = addUserStep === "csv";
 
@@ -1558,24 +1551,6 @@ export function AddUserDialog({
                       incompleteRows.length > 0 ||
                       invalidRows.length > 0 ||
                       duplicateRows.length > 0;
-
-                    const formatRowInfo = (row: (typeof csvData)[0]) => {
-                      const presentFields: string[] = [];
-                      if (row.firstName) presentFields.push(row.firstName);
-                      if (row.lastName) presentFields.push(row.lastName);
-                      if (row.email) presentFields.push(row.email);
-
-                      const missingFields: string[] = [];
-                      if (!row.email) missingFields.push("email");
-                      if (!row.firstName) missingFields.push("firstName");
-                      if (!row.lastName) missingFields.push("lastName");
-
-                      let info = `Row ${row.rowIndex}: ${presentFields.join(", ")}`;
-                      if (missingFields.length > 0) {
-                        info += ` (missing ${missingFields.join(", ")})`;
-                      }
-                      return info;
-                    };
 
                     // Combine all error rows into a single array with their error types
                     const allErrorRows = [

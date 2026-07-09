@@ -16,7 +16,7 @@ import { toStorageUrl } from "@/utils/supabase/storage-url";
 export function usePreloadAllSlideImages(
   slides: SlideData[],
   enabled: boolean = true,
-  isCertification: boolean = false
+  _isCertification: boolean = false
 ) {
   const preloadedRef = useRef<Set<string>>(new Set());
 

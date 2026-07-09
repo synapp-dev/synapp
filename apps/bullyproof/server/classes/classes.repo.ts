@@ -7,7 +7,7 @@ import {
   teacherClasses,
   userProfile,
 } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc, sql } from "drizzle-orm";
+import { eq, inArray, asc, sql } from "drizzle-orm";
 
 export const classesRepo = {
   getAll: () => db.select().from(classes),

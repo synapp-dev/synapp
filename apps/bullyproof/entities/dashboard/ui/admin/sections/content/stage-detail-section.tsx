@@ -1,6 +1,6 @@
 "use client";
 
-import type { CurriculumStageRow, TopicRow } from "@/types/db";
+import type { TopicRow } from "@/types/db";
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,7 +25,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { compareSlidesByPosition } from "@/lib/fractional-position";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import {
   useStageBySlug,
@@ -44,8 +43,6 @@ import {
   FileText,
   Image as ImageIcon,
   Video,
-  Check,
-  Edit,
   Plus,
   FilePlus,
   Save,
@@ -56,18 +53,12 @@ import {
   GripHorizontal,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
-import { Separator } from "@workspace/ui/components/separator";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import Marquee from "react-fast-marquee";
 import { EditStageSheet } from "./edit-stage-sheet";
 import { AddTopicDrawer } from "./add-topic-drawer";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@workspace/ui/components/tooltip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -77,33 +68,7 @@ import {
 } from "@workspace/ui/components/dropdown-menu";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import { AnimatedThumbnail } from "@/components/organisms/animated-thumbnail";
-import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { createSlug } from "@/utils/slug";
-
-// Component to handle thumbnail image with error fallback
-function ThumbnailImage({ signedUrl, alt }: { signedUrl: string | null; alt: string }) {
-  const [hasError, setHasError] = useState(false);
-
-  if (hasError || !signedUrl) {
-    return (
-      <div className="w-24 h-14 flex-shrink-0 rounded-md bg-muted border-2 border-dashed border-muted-foreground/30 flex items-center justify-center aspect-video">
-        <FileText className="h-5 w-5 text-muted-foreground" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative w-24 h-14 flex-shrink-0 rounded-md overflow-hidden bg-muted aspect-video">
-      <Image
-        src={toStorageUrl(signedUrl) ?? signedUrl}
-        alt={alt}
-        fill
-        className="object-cover"
-        onError={() => setHasError(true)}
-      />
-    </div>
-  );
-}
 
 // Helper function to get slide stats
 function getSlideStatsForCard(topic: TopicWithSlides) {
@@ -679,20 +644,6 @@ function TopicCard({
   );
 }
 
-type Stage = CurriculumStageRow & {
-  years?: Array<{
-    id: string;
-    code: string;
-    displayName: string;
-    sortIndex: number;
-    level: {
-      id: string;
-      name: string;
-      key: string;
-    };
-  }>;
-};
-
 type Topic = TopicRow;
 
 type TopicSlide = {
@@ -744,8 +695,6 @@ export function StageDetailSection({
   );
   const [hoveredReadonlyIndex, setHoveredReadonlyIndex] =
     useState<number | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hideButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const leaveDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -920,28 +869,6 @@ export function StageDetailSection({
     if (topicSegment) {
       router.push(`${basePath}/${slug}/${topicSegment}`);
     }
-  };
-
-  const getSlideStats = (topic: TopicWithSlides) => {
-    // Sort slides by position to ensure correct order
-    const slides = (topic.slides || []).sort(
-      (a, b) => a.position.localeCompare(b.position)
-    );
-    const totalSlides = slides.length;
-    const imageSlides = slides.filter((s) => s.kind === "image").length;
-    const videoSlides = slides.filter((s) => s.kind === "video").length;
-
-    // Find the first image slide by position (not just any image slide)
-    const firstImageSlide = slides.find(
-      (s) => s.kind === "image" && s.imageUrl
-    );
-
-    return {
-      totalSlides,
-      imageSlides,
-      videoSlides,
-      firstImageSlide,
-    };
   };
 
   // Drag and drop handlers with dnd-kit
@@ -1219,7 +1146,7 @@ export function StageDetailSection({
             <div className="text-center text-muted-foreground">
               <p className="font-medium">Stage not found</p>
               <p className="text-sm mt-2">
-                The curriculum stage you're looking for doesn't exist.
+                The curriculum stage you&apos;re looking for doesn&apos;t exist.
               </p>
             </div>
           </CardContent>

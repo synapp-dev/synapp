@@ -160,7 +160,7 @@ export function CourseRatingQuestionsEditor({
       {questions.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            <p className="text-sm">No questions configured. Click "Add Question" to get started.</p>
+            <p className="text-sm">No questions configured. Click &quot;Add Question&quot; to get started.</p>
           </CardContent>
         </Card>
       ) : (

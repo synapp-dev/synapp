@@ -35,21 +35,6 @@ function generateEmailFromSchoolName(schoolName: string): string {
   return `teacher@${emailPrefix}.edu.au`;
 }
 
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
-function hashPassword(password: string): string {
-  // This is a simple hash - in production you'd want to use proper bcrypt
-  // For Supabase, you might want to use their built-in password hashing
-  // For now, we'll use a placeholder that Supabase can handle
-  return '$2a$10$' + Buffer.from(password).toString('base64').substring(0, 22);
-}
-
 function generateSQLInserts(schools: School[]): string {
   const functionDefinition = `-- Function to create users (run this first if it doesn't exist)
 CREATE OR REPLACE FUNCTION public.create_user(

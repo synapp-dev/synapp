@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from "react";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp, HelpCircle, SquareArrowOutUpRight } from "lucide-react";
+import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsLeft, ChevronsUp, HelpCircle, SquareArrowOutUpRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -741,7 +741,7 @@ export default function LessonRunLessonPage({
             <AlertDialogTitle>Update Scheduled Time?</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="space-y-4">
-                <p>You're about to change the scheduled time for this lesson.</p>
+                <p>You&apos;re about to change the scheduled time for this lesson.</p>
                 
                 <div className="bg-muted/50 rounded-lg p-3 space-y-3">
                   <div>

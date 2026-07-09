@@ -71,9 +71,6 @@ export function useLessons(filters?: {
     refetchOnMount: true,
   });
 
-  // Get lesson IDs from the list
-  const lessonIdsFromList = listQuery.data?.map((l) => l.id) || [];
-
   // Only fetch details for lessons that don't have full details cached
   const lessonsNeedingDetails = useMemo(() => {
     if (!listQuery.data) return [];

@@ -12,7 +12,6 @@ import { RoleBadges } from "@/components/atoms/role-badges";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { AlertTriangle, ArrowLeft, BadgeCheck, Loader2, Search } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Progress } from "@workspace/ui/components/progress";
 import { Input } from "@workspace/ui/components/input";
@@ -47,7 +46,6 @@ export function CertificationPageClient({
   });
   const schoolId = school?.id ?? currentSchool?.id ?? null;
   const {
-    course,
     rows,
     isLoading: isLoadingCertification,
     error: certificationError,

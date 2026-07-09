@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sql, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 import { userProfile } from "@/server/db/schema";
 import {

@@ -11,12 +11,6 @@ import { Input } from "@workspace/ui/components/input";
 import {
   BookOpen,
   Search,
-  FileText,
-  Users,
-  Shield,
-  BarChart3,
-  Settings,
-  MessageCircle,
 } from "lucide-react";
 import { generateMetadataFromSegments } from "@/utils/metadata";
 
@@ -215,7 +209,7 @@ export default function GlossaryPage() {
                   management
                 </div>
                 <div>
-                  • <strong>Parent:</strong> View child's progress and
+                  • <strong>Parent:</strong> View child&apos;s progress and
                   communicate
                 </div>
               </div>

@@ -49,7 +49,6 @@ export function SlideRenderer({
   className,
   forceRefresh = false,
   thumbnailOnly = false,
-  isCertification = false,
 }: SlideRendererProps) {
   // ─── Resolve the image URL ───
   // Priority:
@@ -140,7 +139,7 @@ export function SlideRenderer({
           />
         );
 
-      case "image":
+      case "image": {
         // Check if this is a temp slide or has no image URL
         const isTempSlide = slide.id.startsWith("temp_");
         const hasImageUrl =
@@ -152,6 +151,7 @@ export function SlideRenderer({
           <div className="flex items-center justify-center h-full w-full">
             {!isTempSlide && loading ? (
               <div className="flex items-center justify-center">
+                {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                 <img
                   src="/images/bp-small-logo.svg"
                   alt="Loading"
@@ -161,6 +161,7 @@ export function SlideRenderer({
             ) : !isTempSlide && error ? (
               <div className="text-destructive">Error: {error}</div>
             ) : hasImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable
               <img
                 src={toStorageUrl(hasImageUrl) ?? hasImageUrl}
                 alt="Slide content"
@@ -188,6 +189,7 @@ export function SlideRenderer({
             )}
           </div>
         );
+      }
 
       case "video":
         if (!slide.videoUrl) {
@@ -209,6 +211,7 @@ export function SlideRenderer({
             if (thumbnailUrl) {
               return (
                 <div className="flex items-center justify-center h-full w-full relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                   <img
                     src={thumbnailUrl}
                     alt="Video thumbnail"

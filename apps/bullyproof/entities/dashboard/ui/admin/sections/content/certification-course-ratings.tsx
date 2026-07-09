@@ -173,34 +173,6 @@ export function CertificationCourseRatings({
     }
   }, [courseId]);
 
-  const handleSaveQuestions = async () => {
-    if (!course) return;
-
-    setIsSavingQuestions(true);
-    try {
-      const result = await certificationApi.courses.update(course.id, {
-        ratingQuestions: ratingQuestions.length > 0 ? ratingQuestions : [],
-      });
-
-      if (result.error) {
-        toast.error(result.error.message || "Failed to save rating questions");
-        return;
-      }
-
-      toast.success("Rating questions saved successfully");
-      onCourseUpdated?.();
-    } catch (err) {
-      console.error("Failed to save rating questions:", err);
-      toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to save rating questions. Please try again."
-      );
-    } finally {
-      setIsSavingQuestions(false);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString("en-US", {

@@ -337,7 +337,7 @@ export default async function FaqPage({
             <span>Still Need Help?</span>
           </CardTitle>
           <CardDescription>
-            Can't find what you're looking for? Our support team is here to
+            Can&apos;t find what you&apos;re looking for? Our support team is here to
             help.
           </CardDescription>
         </CardHeader>

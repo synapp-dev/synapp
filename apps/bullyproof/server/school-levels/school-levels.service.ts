@@ -2,12 +2,8 @@ import {
   getSchoolLevelsSchema,
   getSchoolLevelByIdSchema,
   getSchoolLevelByKeySchema,
-  type GetSchoolLevelsParams,
-  type GetSchoolLevelByIdParams,
-  type GetSchoolLevelByKeyParams,
 } from "./school-levels.validators";
 import { schoolLevelsRepo } from "./school-levels.repo";
-import { getUserScopedRoles } from "../auth/rbac";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -26,7 +22,7 @@ async function assertCanViewSchoolLevels(ctx: AuthContext) {
 
 export const schoolLevelsService = {
   async getSchoolLevels(ctx: AuthContext, query: unknown) {
-    const params: GetSchoolLevelsParams = getSchoolLevelsSchema.parse(query);
+    getSchoolLevelsSchema.parse(query);
     await assertCanViewSchoolLevels(ctx);
 
     return await schoolLevelsRepo.getAll();

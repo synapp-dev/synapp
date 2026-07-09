@@ -12,7 +12,6 @@ import {
 } from "@workspace/ui/components/dialog";
 import { Card } from "@workspace/ui/components/card";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { Skeleton } from "@workspace/ui/components/skeleton";
 import { useMySchoolsQuery, type School as SchoolType } from "@/entities/me/model/useMySchoolsQuery";
 import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { cn } from "@workspace/ui/lib/utils";
@@ -60,7 +59,7 @@ export function SelectSchoolForLiveLessonsDialog({
   onOpenChange,
 }: SelectSchoolForLiveLessonsDialogProps) {
   const router = useRouter();
-  const { getUniqueSchools, liveLessonsBySchool } = useLiveLessonStore();
+  const { getUniqueSchools } = useLiveLessonStore();
   const uniqueSchools = getUniqueSchools();
 
   // Fetch full school details for display
@@ -93,7 +92,7 @@ export function SelectSchoolForLiveLessonsDialog({
             Select a School
           </DialogTitle>
           <DialogDescription className="text-center">
-            You have live lessons in multiple schools. Choose which school you'd like to view.
+            You have live lessons in multiple schools. Choose which school you&apos;d like to view.
           </DialogDescription>
         </DialogHeader>
 

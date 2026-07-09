@@ -474,7 +474,7 @@ export default function TeachersPageClient() {
         <div>
           <h1 className="text-3xl font-bold">School not found</h1>
           <p className="text-muted-foreground">
-            The school you're looking for doesn't exist.
+            The school you&apos;re looking for doesn&apos;t exist.
           </p>
         </div>
       </div>

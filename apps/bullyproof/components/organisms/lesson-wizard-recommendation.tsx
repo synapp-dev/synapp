@@ -27,7 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
-import { AlertTriangle, CheckCircle2, Info, Star, ChevronsRight, ChevronsUp, ChevronsDown } from "lucide-react";
+import { AlertTriangle, Info, Star, ChevronsRight, ChevronsUp, ChevronsDown } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { ClassOption } from "@/types/lesson-wizard";
@@ -85,7 +85,6 @@ function TopicThumbnail({ topic, horizontal = false }: { topic: TopicWithSlides;
   }, [topic.slides]);
 
   const firstImageSlide = imageSlides[0];
-  const slideId = firstImageSlide?.id;
 
   // Use signedUrl from API response (DB-cached)
   const imageUrl = firstImageSlide?.signedUrl || null;
@@ -214,7 +213,6 @@ export function LessonWizardRecommendation({
   isLoading,
   selectedClasses,
   schoolSlug,
-  onProceedWithRecommendation,
   onChooseDifferentLesson,
   onGoToLiveLesson,
   onBack,
@@ -229,7 +227,7 @@ export function LessonWizardRecommendation({
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   
   // Fetch all stages to compare sortIndex values for determining higher/lower stages
-  const { stages: allStages } = useStages();
+  useStages();
   
   // Fetch stage data with years for each stage option (when multiple stages detected)
   const stageIdsForFetch = useMemo(() => {
@@ -615,7 +613,7 @@ export function LessonWizardRecommendation({
     );
   }
 
-  const { warning, reason, completedLessonInfo, incompatibleClasses, stageComplete, invalidSelection } =
+  const { warning, incompatibleClasses, stageComplete, invalidSelection } =
     recommendationData;
 
   const showIncompatiblePanel = !!incompatibleClasses && !hasConflict;
@@ -627,14 +625,10 @@ export function LessonWizardRecommendation({
   const liveLessons = activeLessons.filter(l => l.status === "in_progress" || l.status === "feedback");
   const readyLessons = activeLessons.filter(l => l.status === "ready");
   const preparingLessons = activeLessons.filter(l => l.status === "preparing");
-  
-  const hasLiveLessons = liveLessons.length > 0;
-  const canProceed = !hasConflict;
 
   // Calculate which classes conflict and which don't (for conflict handling)
   const conflictingClassIds = conflictingLessons.flatMap(lesson => lesson.classIds);
   const nonConflictingClasses = selectedClasses.filter(c => !conflictingClassIds.includes(c.id));
-  const conflictingClasses = selectedClasses.filter(c => conflictingClassIds.includes(c.id));
   const isSingleClass = selectedClasses.length === 1;
   const conflictLessonOwner = conflictLesson ? currentUser?.id === conflictLesson.createdByUserId : false;
 
@@ -1191,7 +1185,7 @@ export function LessonWizardRecommendation({
           </AlertTitle>
           <AlertDescription className="text-amber-800 mt-2">
             <p className="text-sm">
-              The classes you've selected {selectedClasses.length === 1 ? (
+              The classes you&apos;ve selected {selectedClasses.length === 1 ? (
                 <>(<span className="font-bold">{selectedClasses[0].name}</span>)</>
               ) : selectedClasses.length === 2 ? (
                 <>(<span className="font-bold">{selectedClasses[0].name}</span> and <span className="font-bold">{selectedClasses[1].name}</span>)</>
@@ -1204,7 +1198,7 @@ export function LessonWizardRecommendation({
                     </span>
                   ))} and <span className="font-bold">{selectedClasses[selectedClasses.length - 1].name}</span>)
                 </>
-              )} belong to different lesson levels. If you're sure you've chosen the correct classes, please choose which level you'd like to use for this lesson.
+              )} belong to different lesson levels. If you&apos;re sure you&apos;ve chosen the correct classes, please choose which level you&apos;d like to use for this lesson.
             </p>
           </AlertDescription>
         </Alert>
@@ -1657,7 +1651,6 @@ export function LessonWizardRecommendation({
             <div className="space-y-3">
               {preparingLessons.filter(l => !conflictingLessons.includes(l)).map((lesson) => {
                 const isOwner = currentUser?.id === lesson.createdByUserId;
-                const selectedClassIds = selectedClasses.map(c => c.id);
                 const lessonClassIds = lesson.classIds;
                 const classesNotInLesson = selectedClasses.filter(c => !lessonClassIds.includes(c.id));
                 const canAddClasses = classesNotInLesson.length > 0 && isOwner;

@@ -43,7 +43,6 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@workspace/ui/components/hover-card";
-import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
 import { Alert, AlertTitle } from "@workspace/ui/components/alert";
@@ -127,7 +126,6 @@ export function LessonWizard({
     data: recommendationData,
     isLoading: isLoadingRecommendation,
     isFetching: isFetchingRecommendation,
-    error: recommendationError,
   } = useQuery({
     queryKey: ["lesson-recommendations", classIdsString],
     queryFn: async () => {
@@ -167,7 +165,6 @@ export function LessonWizard({
     enabled: open,
     staleTime: 0, // Always fresh - user may have just completed feedback
   });
-  const hasOutstandingFeedback = outstandingFeedbackLessons.length > 0;
 
   // Reset state when drawer closes to ensure clean state on next open
   useEffect(() => {
@@ -874,10 +871,10 @@ export function LessonWizard({
                     </div>
                   </CardHeader>
                   <CardContent className="text-base font-light group-hover/prepare-card:text-secondary transition-colors">
-                    Set up a lesson to <span className="font-medium">deliver to a class</span>. Choose the class(es) you're teaching, select a lesson, and review slides and notes before starting.
+                    Set up a lesson to <span className="font-medium">deliver to a class</span>. Choose the class(es) you&apos;re teaching, select a lesson, and review slides and notes before starting.
                   </CardContent>
                   <CardFooter className="text-xs text-muted-foreground group-hover/prepare-card:text-secondary/70 italic mt-6 transition-colors">
-                    Use this option if you're planning to teach now or schedule a lesson for later.
+                    Use this option if you&apos;re planning to teach now or schedule a lesson for later.
                   </CardFooter>
                 </Card>
 

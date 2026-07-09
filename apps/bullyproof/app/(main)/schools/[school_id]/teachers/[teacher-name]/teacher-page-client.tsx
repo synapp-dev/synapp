@@ -1,12 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import {
   ArrowLeft,
@@ -196,21 +190,6 @@ export default function TeacherPageClient({
     return `${firstName} ${lastName}`.trim() || user.email;
   };
 
-  const getInitials = (user: UserWithRolesAndSchools) => {
-    const firstName = user.firstName || "";
-    const lastName = user.lastName || "";
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) {
-      return firstName[0].toUpperCase();
-    }
-    if (user.email) {
-      return user.email[0].toUpperCase();
-    }
-    return "U";
-  };
-
   const getSchoolRoles = (user: UserWithRolesAndSchools) => {
     if (!schoolId) return [];
     return user.schoolRoles.filter(
@@ -237,7 +216,7 @@ export default function TeacherPageClient({
         <div>
           <h1 className="text-3xl font-bold">Teacher not found</h1>
           <p className="text-muted-foreground">
-            The teacher you're looking for doesn't exist.
+            The teacher you&apos;re looking for doesn&apos;t exist.
           </p>
         </div>
       </div>

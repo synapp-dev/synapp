@@ -80,7 +80,6 @@ function TopicThumbnail({ topic, horizontal = false }: { topic: TopicWithSlides;
   }, [topic.slides]);
 
   const firstImageSlide = imageSlides[0];
-  const slideId = firstImageSlide?.id;
 
   // Use signedUrl from API response (DB-cached)
   const imageUrl = firstImageSlide?.signedUrl || null;
@@ -116,7 +115,6 @@ export function LessonWizardConfirm({
   selectedClasses,
   selectedTopic,
   schoolId,
-  schoolSlug,
   onBehalfOfUserId,
   onOnBehalfOfUserIdChange,
   isAdminRestricted,
@@ -190,9 +188,6 @@ export function LessonWizardConfirm({
         "Unknown Teacher"
       : [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ") || "Unknown Teacher";
 
-  // Calculate slide count
-  const slideCount = topicData?.slides?.length || topicData?.slideCount || 0;
-  
   // Get stage name
   const stageName = topicData?.stageName || selectedTopic?.stageName || stageData?.name;
 
