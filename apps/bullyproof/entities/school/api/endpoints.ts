@@ -118,6 +118,7 @@ export const schoolApi = {
       sectorId: string;
       levelIds?: string[];
       yearIds?: string[];
+      contentTypeId?: string;
     }): Promise<ApiResult<School>> {
       return apiFetch<School>("/schools", {
         method: "POST",
