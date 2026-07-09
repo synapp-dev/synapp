@@ -17,6 +17,7 @@ import {
   isPast,
   isToday,
   isTomorrow,
+  parse,
   parseISO,
   startOfDay,
 } from "date-fns";
@@ -79,6 +80,14 @@ function dueMeta(dueDate: string): { label: string; className: string } {
   return { label: format(date, "EEE d MMM"), className: "text-muted-foreground" };
 }
 
+function loggedLabel(hhmm: string): string {
+  try {
+    return format(parse(hhmm, "HH:mm", new Date()), "h:mm a");
+  } catch {
+    return hhmm;
+  }
+}
+
 export function TaskRow({ task, onToggle, onDelete, onOpen }: TaskRowProps) {
   const done = task.status === "done";
   const missed = task.status === "missed";
@@ -139,8 +148,13 @@ export function TaskRow({ task, onToggle, onDelete, onOpen }: TaskRowProps) {
         >
           {task.title}
         </p>
-        {due || missed || task.notes ? (
+        {due || missed || task.notes || task.loggedTime ? (
           <div className="mt-0.5 flex items-center gap-3 text-xs">
+            {task.loggedTime ? (
+              <span className="rounded-full bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
+                Taken {loggedLabel(task.loggedTime)}
+              </span>
+            ) : null}
             {missed ? (
               <span className="flex items-center gap-1.5">
                 <span className="rounded-full bg-rose-500/10 px-1.5 py-px text-[10px] font-medium text-rose-500">

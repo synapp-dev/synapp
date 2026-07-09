@@ -18,6 +18,7 @@ type ReviewRow = {
   priority: TaskPriority;
   due_date: string | null;
   occurrence_date: string | null;
+  routines: { track_time: boolean } | null;
 };
 
 /** Today's YYYY-MM-DD in the given timezone (en-CA formats as ISO). */
@@ -44,47 +45,78 @@ export async function expireMissedTasksForUser(userId: string): Promise<number> 
   return (data as number) ?? 0;
 }
 
-/** Unresolved items needing review: recent misses + overdue one-offs. */
+/** Resolve auto-complete routine occurrences as done on app open (tz-aware). */
+export async function autoCompleteRoutineTasksForUser(
+  userId: string
+): Promise<number> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("auto_complete_routine_tasks", {
+    p_user_id: userId,
+  });
+  if (error) throw new Error(error.message);
+  return (data as number) ?? 0;
+}
+
+/** Unresolved items needing review: recent misses, today's routines, overdue one-offs. */
 export async function getCheckinReview(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  clientDate?: string
 ): Promise<CheckinReview> {
+  // Resolve auto-completes first, then lock in stale misses, so the review list
+  // is authoritative before we read it.
+  await autoCompleteRoutineTasksForUser(userId);
+  await expireMissedTasksForUser(userId);
+
   const { data: settings } = await supabase
     .from("notification_settings")
     .select("timezone, last_checkin_at")
     .eq("user_id", userId)
     .maybeSingle();
 
-  const today = localDate(
-    (settings?.timezone as string | undefined) ?? FALLBACK_TIMEZONE
-  );
+  const today =
+    clientDate ??
+    localDate((settings?.timezone as string | undefined) ?? FALLBACK_TIMEZONE);
   const missedFloor = addDays(today, -MISSED_REVIEW_DAYS);
-  const columns = "id, title, domains, priority, due_date, occurrence_date";
+  const routineColumns =
+    "id, title, domains, priority, due_date, occurrence_date, routines!inner(track_time, auto_complete)";
+  const oneoffColumns =
+    "id, title, domains, priority, due_date, occurrence_date";
 
-  const [missedRes, overdueRes] = await Promise.all([
+  const [missedRes, todayRes, overdueRes] = await Promise.all([
     supabase
       .from("tasks")
-      .select(columns)
+      .select(routineColumns)
       .eq("status", "missed")
-      .not("routine_id", "is", null)
+      .eq("routines.auto_complete", false)
       .gte("occurrence_date", missedFloor)
       .lt("occurrence_date", today),
     supabase
       .from("tasks")
-      .select(columns)
+      .select(routineColumns)
+      .eq("status", "open")
+      .eq("routines.auto_complete", false)
+      .eq("occurrence_date", today),
+    supabase
+      .from("tasks")
+      .select(oneoffColumns)
       .eq("status", "open")
       .is("routine_id", null)
       .not("due_date", "is", null)
       .lt("due_date", today),
   ]);
   if (missedRes.error) throw new Error(missedRes.error.message);
+  if (todayRes.error) throw new Error(todayRes.error.message);
   if (overdueRes.error) throw new Error(overdueRes.error.message);
 
   const items: CheckinItem[] = [
-    ...((missedRes.data as ReviewRow[]) ?? []).map((row) =>
-      toItem(row, "routine")
+    ...((missedRes.data as unknown as ReviewRow[]) ?? []).map((row) =>
+      toItem(row, "missed")
     ),
-    ...((overdueRes.data as ReviewRow[]) ?? []).map((row) =>
+    ...((todayRes.data as unknown as ReviewRow[]) ?? []).map((row) =>
+      toItem(row, "today")
+    ),
+    ...((overdueRes.data as unknown as ReviewRow[]) ?? []).map((row) =>
       toItem(row, "oneoff")
     ),
   ];
@@ -116,5 +148,6 @@ function toItem(row: ReviewRow, kind: CheckinItem["kind"]): CheckinItem {
     date: (row.occurrence_date ?? row.due_date)!,
     domains: row.domains ?? [],
     priority: row.priority,
+    trackTime: kind === "oneoff" ? false : Boolean(row.routines?.track_time),
   };
 }

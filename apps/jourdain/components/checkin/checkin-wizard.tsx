@@ -5,13 +5,16 @@ import { AnimatePresence, motion } from "framer-motion";
 import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowLeft,
   CalendarArrowDown,
   Check,
+  Clock,
   Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
+import { Input } from "@workspace/ui/components/input";
 import { cn } from "@workspace/ui/lib/utils";
 import { DOMAIN_CONFIG } from "@/components/molecules/task-row";
 import {
@@ -39,8 +42,14 @@ const PILLAR_DOT: Record<TaskDomain, string> = {
 };
 
 function dateLabel(date: string, today: string): string {
+  if (date === today) return "Today";
   if (date === addDays(today, -1)) return "Yesterday";
   return format(parseISO(date), "EEEE d MMMM");
+}
+
+/** Current local time as HH:mm, for the track-time default. */
+function nowHhmm(): string {
+  return format(new Date(), "HH:mm");
 }
 
 function PillarChip({ domain }: { domain: TaskDomain }) {
@@ -53,6 +62,61 @@ function PillarChip({ domain }: { domain: TaskDomain }) {
   );
 }
 
+function TimeStep({
+  onConfirm,
+  onBack,
+}: {
+  onConfirm: (time: string) => void;
+  onBack: () => void;
+}) {
+  const [time, setTime] = useState(nowHhmm);
+  return (
+    <motion.div
+      key="time"
+      initial={{ x: 24, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      exit={{ x: -24, opacity: 0 }}
+      transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+      className="mt-6 space-y-3"
+    >
+      <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <Clock className="h-4 w-4" />
+        What time?
+      </p>
+      <Input
+        type="time"
+        value={time}
+        onChange={(event) => setTime(event.target.value)}
+        className="h-12 text-base"
+      />
+      <div className="space-y-2">
+        <Button
+          className="h-12 w-full text-base"
+          onClick={() => onConfirm(time)}
+        >
+          <Check className="mr-1.5 h-5 w-5" />
+          Confirm
+        </Button>
+        <Button
+          variant="outline"
+          className="h-12 w-full text-base"
+          onClick={() => onConfirm(nowHhmm())}
+        >
+          Just now
+        </Button>
+        <Button
+          variant="ghost"
+          className="h-10 w-full text-sm text-muted-foreground"
+          onClick={onBack}
+        >
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Back
+        </Button>
+      </div>
+    </motion.div>
+  );
+}
+
 function ItemCard({
   item,
   today,
@@ -60,8 +124,15 @@ function ItemCard({
 }: {
   item: CheckinItem;
   today: string;
-  onAnswer: (item: CheckinItem, answer: CheckinAnswer) => void;
+  onAnswer: (item: CheckinItem, answer: CheckinAnswer, completedTime?: string) => void;
 }) {
+  const [askTime, setAskTime] = useState(false);
+
+  function handleDid() {
+    if (item.trackTime) setAskTime(true);
+    else onAnswer(item, "did");
+  }
+
   return (
     <div className="rounded-2xl border border-border/60 bg-card p-6 shadow-lg">
       <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
@@ -76,53 +147,86 @@ function ItemCard({
         </div>
       ) : null}
 
-      <div className="mt-6 space-y-2">
-        {item.kind === "routine" ? (
-          <>
-            <Button
-              className="h-12 w-full text-base"
-              onClick={() => onAnswer(item, "did")}
-            >
-              <Check className="mr-1.5 h-5 w-5" />
-              Yes, done
-            </Button>
-            <Button
-              variant="outline"
-              className="h-12 w-full text-base text-muted-foreground hover:text-rose-500"
-              onClick={() => onAnswer(item, "missed")}
-            >
-              <X className="mr-1.5 h-5 w-5" />
-              No, missed it
-            </Button>
-          </>
+      <AnimatePresence mode="popLayout" initial={false}>
+        {askTime ? (
+          <TimeStep
+            key="time"
+            onConfirm={(time) => onAnswer(item, "did", time)}
+            onBack={() => setAskTime(false)}
+          />
         ) : (
-          <>
-            <Button
-              className="h-12 w-full text-base"
-              onClick={() => onAnswer(item, "did")}
-            >
-              <Check className="mr-1.5 h-5 w-5" />
-              Done
-            </Button>
-            <Button
-              variant="outline"
-              className="h-12 w-full text-base"
-              onClick={() => onAnswer(item, "move_today")}
-            >
-              <CalendarArrowDown className="mr-1.5 h-5 w-5" />
-              Move to today
-            </Button>
-            <Button
-              variant="ghost"
-              className="h-12 w-full text-base text-muted-foreground"
-              onClick={() => onAnswer(item, "drop")}
-            >
-              <Trash2 className="mr-1.5 h-5 w-5" />
-              Drop it
-            </Button>
-          </>
+          <motion.div
+            key="answer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="mt-6 space-y-2"
+          >
+            {item.kind === "missed" ? (
+              <>
+                <Button className="h-12 w-full text-base" onClick={handleDid}>
+                  <Check className="mr-1.5 h-5 w-5" />
+                  Yes, I did it
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-12 w-full text-base text-muted-foreground hover:text-rose-500"
+                  onClick={() => onAnswer(item, "missed")}
+                >
+                  <X className="mr-1.5 h-5 w-5" />
+                  No, I missed it
+                </Button>
+              </>
+            ) : item.kind === "today" ? (
+              <>
+                <Button className="h-12 w-full text-base" onClick={handleDid}>
+                  <Check className="mr-1.5 h-5 w-5" />
+                  Done
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-12 w-full text-base"
+                  onClick={() => onAnswer(item, "not_yet")}
+                >
+                  Not yet
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-12 w-full text-base text-muted-foreground"
+                  onClick={() => onAnswer(item, "drop")}
+                >
+                  <Trash2 className="mr-1.5 h-5 w-5" />
+                  Skip
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button className="h-12 w-full text-base" onClick={handleDid}>
+                  <Check className="mr-1.5 h-5 w-5" />
+                  Done
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-12 w-full text-base"
+                  onClick={() => onAnswer(item, "move_today")}
+                >
+                  <CalendarArrowDown className="mr-1.5 h-5 w-5" />
+                  Move to today
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="h-12 w-full text-base text-muted-foreground"
+                  onClick={() => onAnswer(item, "drop")}
+                >
+                  <Trash2 className="mr-1.5 h-5 w-5" />
+                  Drop it
+                </Button>
+              </>
+            )}
+          </motion.div>
         )}
-      </div>
+      </AnimatePresence>
     </div>
   );
 }
@@ -197,9 +301,14 @@ export function CheckinWizard() {
     }
   }, [open, finished, complete]);
 
-  function answer(item: CheckinItem, value: CheckinAnswer) {
+  function answer(
+    item: CheckinItem,
+    value: CheckinAnswer,
+    completedTime?: string
+  ) {
     const input: CheckinRespondInput = { taskId: item.taskId, answer: value };
     if (value === "move_today") input.clientDate = today;
+    if (completedTime) input.completedTime = completedTime;
     respond.mutate(input, {
       // Answers move the ring, so refresh the score straight away.
       onSettled: () =>
