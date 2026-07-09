@@ -36,10 +36,13 @@ export const curriculumApi = {
     list(params?: {
       limit?: number;
       offset?: number;
+      contentTypeId?: string;
     }): Promise<ApiResult<StageWithYears[]>> {
       const searchParams = new URLSearchParams();
       if (params?.limit) searchParams.set("limit", params.limit.toString());
       if (params?.offset) searchParams.set("offset", params.offset.toString());
+      if (params?.contentTypeId)
+        searchParams.set("contentTypeId", params.contentTypeId);
 
       const query = searchParams.toString();
       return apiFetch<StageWithYears[]>(`/curriculum/stages${query ? `?${query}` : ""}`);
