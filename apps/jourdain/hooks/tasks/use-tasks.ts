@@ -62,6 +62,7 @@ export function useCreateTask() {
         projectId: input.projectId ?? null,
         remindAt: input.remindAt ?? null,
         completedAt: null,
+        loggedTime: null,
         createdAt: now,
         updatedAt: now,
       };
