@@ -86,6 +86,19 @@ Parallel content and progress model for accreditation courses: courses, course t
 
 A curriculum band (e.g. primary, junior secondary) containing Topics matched to school **year codes** on Classes.
 
+## Content Type
+
+A configurable curriculum family (module M1): a `content_types` row with a name, a level count, and ordered level names. Every **Curriculum** Stage, **Certification** course, and **School** belongs to exactly one content type. A protected **Default** type holds the original K–12 curriculum; existing data was backfilled to it so reads that omit a content type behave as before.
+
+- **Owns:** its Stages (materialised one per level), and the Schools assigned to it.
+- **Gate:** managed behind the `/admin/content-types` feature, dark-launched to `INTRADARK_DEV` only until commissioned.
+
+## Content Type Level
+
+One level of a Content Type, materialised as a **`curriculum_stages`** row scoped to that type (code `S1..Sn` within the type). `content_types.level_names` is authoring input only; every tree read comes from `curriculum_stages`.
+
+- **Distinct from:** **School Level** (`school_levels`: primary/secondary) and **School Year** (`school_years`: Year 7 etc.).
+
 ## Feature permission
 
 Fine-grained access keyed by path-like strings (e.g. `/school/lessons`, `/admin/schools`). Resolved hierarchically: User → School Role → School → Role → Global (`checkFeatureAccess`).
