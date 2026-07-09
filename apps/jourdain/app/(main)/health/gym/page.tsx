@@ -15,6 +15,7 @@ import {
 } from "@/hooks/gym/use-gym";
 import { useCreateTask } from "@/hooks/tasks/use-tasks";
 import { StartSessionButton } from "@/components/gym/start-session-button";
+import { NewSessionButton } from "@/components/gym/new-session-button";
 import { formatDate } from "@/lib/format";
 import { MUSCLE_GROUP_LABELS, type Program } from "@/entities/gym/model/types";
 import { toast } from "sonner";
@@ -119,6 +120,8 @@ export default function GymTodayPage() {
         </Card>
       ) : null}
 
+      <NewSessionButton className="h-12 w-full" size="lg" />
+
       <section className="space-y-3">
         <h2 className="text-lg font-medium tracking-tight">
           Today · {DAY_LABELS[today]}
@@ -134,8 +137,8 @@ export default function GymTodayPage() {
             <CardContent className="flex items-center justify-between gap-3 p-4">
               <p className="text-sm text-muted-foreground">
                 {todayProgramId
-                  ? "Today's program is missing — set it again."
-                  : "Rest day — nothing scheduled."}
+                  ? "Today's program is missing. Set it again, or start a session anyway."
+                  : "Rest day, or start a session anyway."}
               </p>
               <Button size="sm" variant="outline" asChild>
                 <Link href="/health/gym/schedule">
