@@ -1,3 +1,5 @@
+"use client";
+
 import { Shield } from "lucide-react";
 import { ComingSoon } from "@/components/coming-soon";
 

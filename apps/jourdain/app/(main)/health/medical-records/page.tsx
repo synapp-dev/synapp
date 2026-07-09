@@ -1,3 +1,5 @@
+"use client";
+
 import { FileHeart } from "lucide-react";
 import { ComingSoon } from "@/components/coming-soon";
 
