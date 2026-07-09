@@ -34,6 +34,8 @@ export type Routine = {
   triggerType: RoutineTrigger;
   parentRoutineId: string | null;
   offsetMinutes: number | null;
+  autoComplete: boolean;
+  trackTime: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -55,6 +57,8 @@ export type CreateRoutineInput = {
   triggerType?: RoutineTrigger;
   parentRoutineId?: string | null;
   offsetMinutes?: number | null;
+  autoComplete?: boolean;
+  trackTime?: boolean;
 };
 
 export type UpdateRoutineInput = Partial<CreateRoutineInput>;
@@ -85,6 +89,8 @@ function applyRoutinePatch(
     next.parentRoutineId = input.parentRoutineId ?? null;
   if (input.offsetMinutes !== undefined)
     next.offsetMinutes = input.offsetMinutes ?? null;
+  if (input.autoComplete !== undefined) next.autoComplete = input.autoComplete;
+  if (input.trackTime !== undefined) next.trackTime = input.trackTime;
   return next;
 }
 
