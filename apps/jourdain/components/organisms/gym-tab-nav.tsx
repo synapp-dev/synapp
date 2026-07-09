@@ -4,47 +4,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@workspace/ui/lib/utils";
+import { SECTION_NAVS } from "@/lib/nav/section-nav";
 
-const GYM_TABS = [
-  {
-    title: "Progress",
-    href: "/health/gym/progress",
-    match: (p: string) => p.startsWith("/health/gym/progress"),
-  },
-  { title: "Today", href: "/health/gym", match: (p: string) => p === "/health/gym" },
-  {
-    title: "Schedule",
-    href: "/health/gym/schedule",
-    match: (p: string) => p.startsWith("/health/gym/schedule"),
-  },
-  {
-    title: "Session",
-    href: "/health/gym/session",
-    match: (p: string) => p.startsWith("/health/gym/session"),
-  },
-  {
-    title: "Programs",
-    href: "/health/gym/programs",
-    match: (p: string) => p.startsWith("/health/gym/programs"),
-  },
-  {
-    title: "Exercises",
-    href: "/health/gym/exercises",
-    match: (p: string) => p.startsWith("/health/gym/exercises"),
-  },
-] as const;
+const GYM_NAV = SECTION_NAVS.find((nav) => nav.key === "gym")!;
 
 export function GymTabNav() {
   const pathname = usePathname();
 
   return (
-    <div className="overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div className="hidden overflow-x-auto pb-1 md:block [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <nav
         className="bg-muted text-muted-foreground inline-flex h-9 w-max min-w-full items-center justify-start rounded-lg p-[3px] sm:min-w-0"
         aria-label="Gym sections"
       >
-        {GYM_TABS.map((tab) => {
-          const isActive = tab.match(pathname);
+        {GYM_NAV.items.map((tab) => {
+          const isActive = (tab.match ?? ((p) => p === tab.href))(pathname);
           return (
             <Link
               key={tab.href}
