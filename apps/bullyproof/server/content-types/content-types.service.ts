@@ -30,7 +30,9 @@ export class ContentTypeError extends Error {
 }
 
 async function assertCanManage(ctx: AuthContext) {
-  await assertFeature(ctx, "/admin/content");
+  // Dedicated gate so the feature can ship dark (granted to INTRADARK_DEV only),
+  // separate from the /admin/content gate school admins already hold.
+  await assertFeature(ctx, "/admin/content-types");
 }
 
 export const contentTypesService = {

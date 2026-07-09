@@ -59,7 +59,7 @@ describe("create", () => {
     };
     const result = await contentTypesService.create(ctx, body);
 
-    expect(assertFeature).toHaveBeenCalledWith(ctx, "/admin/content");
+    expect(assertFeature).toHaveBeenCalledWith(ctx, "/admin/content-types");
     expect(repo.insertWithLevels).toHaveBeenCalledWith(expect.anything(), {
       name: "Thursday Island",
       levelNames: ["Level 1", "Level 2", "Level 3"],
