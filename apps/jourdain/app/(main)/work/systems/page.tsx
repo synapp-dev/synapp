@@ -1,3 +1,5 @@
+"use client";
+
 import { Server } from "lucide-react";
 import { ComingSoon } from "@/components/coming-soon";
 
