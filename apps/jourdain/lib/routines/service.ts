@@ -37,6 +37,9 @@ export type Routine = {
   triggerType: RoutineTrigger;
   parentRoutineId: string | null;
   offsetMinutes: number | null;
+  // Check-in behaviour flags.
+  autoComplete: boolean;
+  trackTime: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -58,6 +61,8 @@ export type CreateRoutineInput = {
   triggerType?: RoutineTrigger;
   parentRoutineId?: string | null;
   offsetMinutes?: number | null;
+  autoComplete?: boolean;
+  trackTime?: boolean;
 };
 
 export type UpdateRoutineInput = Partial<CreateRoutineInput>;
@@ -82,12 +87,14 @@ type RoutineRow = {
   trigger_type: RoutineTrigger;
   parent_routine_id: string | null;
   offset_minutes: number | null;
+  auto_complete: boolean;
+  track_time: boolean;
   created_at: string;
   updated_at: string;
 };
 
 const COLUMNS =
-  "id, title, notes, domain, priority, freq, days_of_week, day_of_month, remind_time, timezone, active, interval_minutes, window_start, window_end, next_fire_at, last_acked_at, trigger_type, parent_routine_id, offset_minutes, created_at, updated_at";
+  "id, title, notes, domain, priority, freq, days_of_week, day_of_month, remind_time, timezone, active, interval_minutes, window_start, window_end, next_fire_at, last_acked_at, trigger_type, parent_routine_id, offset_minutes, auto_complete, track_time, created_at, updated_at";
 
 function toRoutine(row: RoutineRow): Routine {
   return {
@@ -110,6 +117,8 @@ function toRoutine(row: RoutineRow): Routine {
     triggerType: row.trigger_type,
     parentRoutineId: row.parent_routine_id,
     offsetMinutes: row.offset_minutes,
+    autoComplete: row.auto_complete,
+    trackTime: row.track_time,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -166,6 +175,8 @@ export async function createRoutine(
       trigger_type: input.triggerType ?? "schedule",
       parent_routine_id: input.parentRoutineId ?? null,
       offset_minutes: input.offsetMinutes ?? null,
+      auto_complete: input.autoComplete ?? false,
+      track_time: input.trackTime ?? false,
     })
     .select(COLUMNS)
     .single();
@@ -203,6 +214,8 @@ export async function updateRoutine(
     patch.parent_routine_id = input.parentRoutineId;
   if (input.offsetMinutes !== undefined)
     patch.offset_minutes = input.offsetMinutes;
+  if (input.autoComplete !== undefined) patch.auto_complete = input.autoComplete;
+  if (input.trackTime !== undefined) patch.track_time = input.trackTime;
 
   const { data, error } = await supabase
     .from("routines")

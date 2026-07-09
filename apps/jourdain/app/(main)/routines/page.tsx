@@ -514,6 +514,8 @@ function RoutineDialog({
   const [parentId, setParentId] = useState<string>("");
   const [offsetValue, setOffsetValue] = useState(5);
   const [offsetUnit, setOffsetUnit] = useState(1);
+  const [autoComplete, setAutoComplete] = useState(false);
+  const [trackTime, setTrackTime] = useState(false);
 
   const formKey = `${open ? "open" : "closed"}:${editing?.id ?? "new"}`;
   const [lastKey, setLastKey] = useState<string | null>(null);
@@ -540,6 +542,8 @@ function RoutineDialog({
     const unit = off % 1440 === 0 ? 1440 : off % 60 === 0 ? 60 : 1;
     setOffsetUnit(unit);
     setOffsetValue(off / unit);
+    setAutoComplete(editing?.autoComplete ?? false);
+    setTrackTime(editing?.trackTime ?? false);
   }
   if (!open && lastKey !== null) setLastKey(null);
 
@@ -583,6 +587,8 @@ function RoutineDialog({
       intervalMinutes: mode === "interval" ? intervalMinutes : null,
       windowStart: mode === "interval" ? windowStart : undefined,
       windowEnd: mode === "interval" ? windowEnd : undefined,
+      autoComplete,
+      trackTime,
     };
     if (editing) {
       updateRoutine.mutate(
@@ -804,6 +810,40 @@ function RoutineDialog({
               />
             </div>
           ) : null}
+
+          <div className="space-y-3 rounded-lg border border-border/60 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <label className="text-sm font-medium">
+                  Auto-complete when I open the app
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  For things that are true just by using the app, like waking up.
+                  Never counted as missed.
+                </p>
+              </div>
+              <Switch
+                checked={autoComplete}
+                onCheckedChange={setAutoComplete}
+                aria-label="Auto-complete when I open the app"
+              />
+            </div>
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-0.5">
+                <label className="text-sm font-medium">
+                  Ask what time I did it
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  The check-in will ask what time, good for meds.
+                </p>
+              </div>
+              <Switch
+                checked={trackTime}
+                onCheckedChange={setTrackTime}
+                aria-label="Ask what time I did it"
+              />
+            </div>
+          </div>
 
           <Textarea
             value={notes}

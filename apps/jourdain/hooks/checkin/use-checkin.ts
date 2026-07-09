@@ -1,9 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { tasksQueryKey } from "@/hooks/tasks/use-tasks";
+import { scoreQueryKey } from "@/hooks/scoring/use-score";
 import type {
   CheckinRespondInput,
   CheckinReview,
@@ -13,11 +15,15 @@ import type { Task } from "@/entities/tasks/model/types";
 export const checkinQueryKey = ["checkin"] as const;
 
 export function useCheckin(enabled = true) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: checkinQueryKey,
     queryFn: async (): Promise<CheckinReview> => {
-      const result = await apiFetch<CheckinReview>("/checkin");
+      const today = format(new Date(), "yyyy-MM-dd");
+      const result = await apiFetch<CheckinReview>(`/checkin?date=${today}`);
       if (result.error) throw new Error(result.error.message);
+      // Loading the review may auto-complete routines, moving the score ring.
+      queryClient.invalidateQueries({ queryKey: scoreQueryKey });
       return result.data;
     },
     enabled,

@@ -26,6 +26,8 @@ export type Task = {
   /** ISO timestamp to push a reminder, or null for none. */
   remindAt: string | null;
   completedAt: string | null;
+  /** User-entered HH:mm time-of-day for time-tracked completions. */
+  loggedTime: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -49,4 +51,6 @@ export type UpdateTaskInput = {
   remindAt?: string | null;
   priority?: TaskPriority;
   domains?: TaskDomain[];
+  /** HH:mm time-of-day, or null to clear. */
+  loggedTime?: string | null;
 };

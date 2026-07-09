@@ -32,6 +32,8 @@ const updateRoutineSchema = z.object({
   triggerType: z.enum(ROUTINE_TRIGGERS).optional(),
   parentRoutineId: z.string().uuid().nullish(),
   offsetMinutes: z.number().int().min(0).max(525600).nullish(),
+  autoComplete: z.boolean().optional(),
+  trackTime: z.boolean().optional(),
 });
 
 function unauthorized() {

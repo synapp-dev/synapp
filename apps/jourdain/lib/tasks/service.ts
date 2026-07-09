@@ -19,12 +19,13 @@ type TaskRow = {
   project_id: string | null;
   remind_at: string | null;
   completed_at: string | null;
+  logged_time: string | null;
   created_at: string;
   updated_at: string;
 };
 
 const TASK_COLUMNS =
-  "id, title, notes, status, priority, domains, due_date, project_id, remind_at, completed_at, created_at, updated_at";
+  "id, title, notes, status, priority, domains, due_date, project_id, remind_at, completed_at, logged_time, created_at, updated_at";
 
 function toTask(row: TaskRow): Task {
   return {
@@ -38,6 +39,7 @@ function toTask(row: TaskRow): Task {
     projectId: row.project_id,
     remindAt: row.remind_at,
     completedAt: row.completed_at,
+    loggedTime: row.logged_time ? row.logged_time.slice(0, 5) : null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -108,6 +110,7 @@ export async function updateTask(
   }
   if (input.priority !== undefined) patch.priority = input.priority;
   if (input.domains !== undefined) patch.domains = input.domains;
+  if (input.loggedTime !== undefined) patch.logged_time = input.loggedTime;
   if (input.status !== undefined) {
     patch.status = input.status;
     patch.completed_at = input.status === "done" ? new Date().toISOString() : null;
