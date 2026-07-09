@@ -4,6 +4,8 @@ import { z } from "zod";
 export const getStagesSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),
   offset: z.coerce.number().int().min(0).max(10000).optional().default(0),
+  /** Scope stages to a content type; omitted resolves to the Default type. */
+  contentTypeId: z.string().uuid().optional(),
 });
 
 export type GetStagesParams = z.infer<typeof getStagesSchema>;

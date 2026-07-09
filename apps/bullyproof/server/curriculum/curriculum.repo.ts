@@ -1,5 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import {
+  contentTypes,
   curriculumStages,
   schoolYears,
   stageYearLinks,
@@ -7,6 +8,18 @@ import {
   schoolYearAssignments,
 } from "@/server/db/schema";
 import { eq, and, ne, inArray, desc, asc, sql } from "drizzle-orm";
+
+/** Resolve a content type id, falling back to the Default type when omitted. */
+async function resolveContentTypeId(contentTypeId?: string): Promise<string> {
+  if (contentTypeId) return contentTypeId;
+  const [row] = await db
+    .select({ id: contentTypes.id })
+    .from(contentTypes)
+    .where(eq(contentTypes.isDefault, true))
+    .limit(1);
+  if (!row) throw new Error("No default content type is configured");
+  return row.id;
+}
 
 function generateSlug(name: string): string {
   return name
@@ -46,10 +59,17 @@ async function findUniqueSlug(
 
 export const curriculumRepo = {
   generateSlug,
-  getStages: () =>
-    db.select().from(curriculumStages).orderBy(asc(curriculumStages.sortIndex)),
+  getStages: async (contentTypeId?: string) => {
+    const typeId = await resolveContentTypeId(contentTypeId);
+    return db
+      .select()
+      .from(curriculumStages)
+      .where(eq(curriculumStages.contentTypeId, typeId))
+      .orderBy(asc(curriculumStages.sortIndex));
+  },
 
-  getStagesWithYears: async () => {
+  getStagesWithYears: async (contentTypeId?: string) => {
+    const typeId = await resolveContentTypeId(contentTypeId);
     // Fetch all stages with their years in a single query using LEFT JOIN
     const stagesWithYearsData = await db
       .select({
@@ -61,6 +81,7 @@ export const curriculumRepo = {
       .leftJoin(stageYearLinks, eq(curriculumStages.id, stageYearLinks.stageId))
       .leftJoin(schoolYears, eq(stageYearLinks.schoolYearId, schoolYears.id))
       .leftJoin(schoolLevels, eq(schoolYears.levelId, schoolLevels.id))
+      .where(eq(curriculumStages.contentTypeId, typeId))
       .orderBy(asc(curriculumStages.sortIndex), asc(schoolYears.sortIndex));
 
     // Group years by stage
@@ -340,8 +361,8 @@ export const curriculumRepo = {
       );
     }
 
-    // Recalculate all stages' sort_index based on their minimum year levels
-    await curriculumRepo.recalculateStageSortIndexes();
+    // Recalculate this type's stages' sort_index based on their minimum year levels
+    await curriculumRepo.recalculateStageSortIndexes(stage.contentTypeId);
 
     // Fetch the updated stage
     const updatedStage = await db
@@ -407,8 +428,10 @@ export const curriculumRepo = {
       );
     }
 
-    // Recalculate all stages' sort_index based on their minimum year levels
-    await curriculumRepo.recalculateStageSortIndexes();
+    // Recalculate this type's stages' sort_index based on their minimum year levels
+    await curriculumRepo.recalculateStageSortIndexes(
+      existingStage[0].contentTypeId,
+    );
 
     // Fetch the updated stage
     const updatedStage = await db
@@ -435,16 +458,23 @@ export const curriculumRepo = {
     // Delete the stage (cascade will handle stage_year_links deletion)
     await db.delete(curriculumStages).where(eq(curriculumStages.id, stageId));
 
-    // Recalculate all remaining stages' sort_index
-    await curriculumRepo.recalculateStageSortIndexes();
+    // Recalculate this type's remaining stages' sort_index
+    await curriculumRepo.recalculateStageSortIndexes(
+      existingStage[0].contentTypeId,
+    );
 
     return { success: true };
   },
 
   // Recalculate all stages' sort_index based on their minimum year level's sort_index
-  recalculateStageSortIndexes: async () => {
-    // Get all stages
-    const allStages = await db.select().from(curriculumStages);
+  recalculateStageSortIndexes: async (contentTypeId?: string) => {
+    const typeId = await resolveContentTypeId(contentTypeId);
+    // Get the stages for this content type only, so reordering one type's
+    // year-based ladder never disturbs another type's materialised order.
+    const allStages = await db
+      .select()
+      .from(curriculumStages)
+      .where(eq(curriculumStages.contentTypeId, typeId));
 
     // For each stage, get its minimum year sort_index
     const stagesWithMinYear: Array<{

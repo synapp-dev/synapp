@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    let { name, stateId, sectorId, levelIds, yearIds } = body;
+    let { name, stateId, sectorId, levelIds, yearIds, contentTypeId } = body;
 
     if (!name || !stateId || !sectorId) {
       return NextResponse.json(
@@ -115,7 +115,7 @@ export async function POST(request: Request) {
 
     const createdSchool = await schoolService.createSchool(
       { userId },
-      { name, stateId, sectorId, levelIds: hasLevelIds ? levelIds : undefined, yearIds: hasYearIds ? yearIds : undefined }
+      { name, stateId, sectorId, levelIds: hasLevelIds ? levelIds : undefined, yearIds: hasYearIds ? yearIds : undefined, contentTypeId: typeof contentTypeId === "string" ? contentTypeId : undefined }
     );
 
     if (!createdSchool) {

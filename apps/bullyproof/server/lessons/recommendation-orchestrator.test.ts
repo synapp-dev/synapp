@@ -135,6 +135,7 @@ describe("orchestrateRecommendations", () => {
           stageOrder: 1,
         },
       ]),
+      getContentTypeIdForSchool: vi.fn().mockResolvedValue(undefined),
       getCompletedTopicIdsByClass: vi
         .fn()
         .mockResolvedValue(new Map<string, Set<string>>()),
@@ -158,6 +159,7 @@ describe("orchestrateRecommendations", () => {
       getActiveLessons: vi.fn(),
       getStagesWithYears: vi.fn(),
       getAllTopics: vi.fn(),
+      getContentTypeIdForSchool: vi.fn().mockResolvedValue(undefined),
       getCompletedTopicIdsByClass: vi.fn(),
     };
 

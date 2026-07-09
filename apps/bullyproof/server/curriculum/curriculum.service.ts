@@ -47,8 +47,9 @@ export const curriculumService = {
     const params: GetStagesParams = getStagesSchema.parse(query);
     await assertCanViewCurriculum(ctx);
 
-    // Use the optimized method that includes years
-    return await curriculumRepo.getStagesWithYears();
+    // Use the optimized method that includes years, scoped to the content type
+    // (defaults to the Default type when the param is omitted).
+    return await curriculumRepo.getStagesWithYears(params.contentTypeId);
   },
 
   async getYears(ctx: AuthContext, query: unknown) {

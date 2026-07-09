@@ -8,6 +8,7 @@ import {
   classes,
   lessonClasses,
   lessons,
+  schools,
   topics,
 } from "@/server/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
@@ -55,8 +56,9 @@ export type RecommendationOrchestratorDeps = {
   assertCanAccessSchools: (schoolIds: string[]) => Promise<void>;
   getRecommendationData: (classIds: string[]) => Promise<RecommendationRepoData | null>;
   getActiveLessons: (classIds: string[]) => Promise<RawActiveLesson[]>;
-  getStagesWithYears: () => Promise<StageWithYears[]>;
-  getAllTopics: () => Promise<TopicRow[]>;
+  getStagesWithYears: (contentTypeId?: string) => Promise<StageWithYears[]>;
+  getAllTopics: (contentTypeId?: string) => Promise<TopicRow[]>;
+  getContentTypeIdForSchool: (schoolId: string) => Promise<string | undefined>;
   getCompletedTopicIdsByClass: (
     classIds: string[]
   ) => Promise<Map<string, Set<string>>>;
@@ -215,6 +217,9 @@ export async function orchestrateRecommendations(
   const schoolIds = [...new Set(classRows.map((c) => c.schoolId))];
   await deps.assertCanAccessSchools(schoolIds);
 
+  // A recommendation is drawn from one school's content type; scope the tree to it.
+  const contentTypeId = await deps.getContentTypeIdForSchool(schoolIds[0]);
+
   const recommendationData = await deps.getRecommendationData(classIds);
   if (!recommendationData) {
     throw new Error("Failed to get recommendation data from repository");
@@ -233,8 +238,8 @@ export async function orchestrateRecommendations(
     )
   );
 
-  const allStages = (await deps.getStagesWithYears()) || [];
-  const allTopics = (await deps.getAllTopics()) || [];
+  const allStages = (await deps.getStagesWithYears(contentTypeId)) || [];
+  const allTopics = (await deps.getAllTopics(contentTypeId)) || [];
   const completedTopicIdsByClass = await deps.getCompletedTopicIdsByClass(
     classIds
   );
@@ -274,13 +279,15 @@ export async function orchestrateClassProgress(
   const schoolIds = [...new Set(classRows.map((c) => c.schoolId))];
   await deps.assertCanAccessSchools(schoolIds);
 
+  const contentTypeId = await deps.getContentTypeIdForSchool(schoolIds[0]);
+
   const foundIds = classRows.map((c) => c.id);
   const recommendationData = await deps.getRecommendationData(foundIds);
   if (!recommendationData) return [];
 
   const [allStages, allTopics, completedTopicIdsByClass] = await Promise.all([
-    deps.getStagesWithYears().then((rows) => rows || []),
-    deps.getAllTopics().then((rows) => rows || []),
+    deps.getStagesWithYears(contentTypeId).then((rows) => rows || []),
+    deps.getAllTopics(contentTypeId).then((rows) => rows || []),
     deps.getCompletedTopicIdsByClass(foundIds),
   ]);
 
@@ -324,16 +331,26 @@ export function createServerRecommendationDeps(
     getActiveLessons: async (classIds) =>
       (await lessonsRepo.getActiveLessonsForClasses(classIds)) || [],
 
-    getStagesWithYears: () => curriculumRepo.getStagesWithYears(),
+    getStagesWithYears: (contentTypeId) =>
+      curriculumRepo.getStagesWithYears(contentTypeId),
 
-    getAllTopics: async () => {
-      const rows = (await topicsRepo.getAll()) || [];
+    getAllTopics: async (contentTypeId) => {
+      const rows = (await topicsRepo.getAll(contentTypeId)) || [];
       return rows.map((t) => ({
         id: t.id,
         title: t.title,
         stageId: t.stageId,
         stageOrder: t.stageOrder,
       }));
+    },
+
+    getContentTypeIdForSchool: async (schoolId) => {
+      const [row] = await db
+        .select({ contentTypeId: schools.contentTypeId })
+        .from(schools)
+        .where(eq(schools.id, schoolId))
+        .limit(1);
+      return row?.contentTypeId ?? undefined;
     },
 
     getCompletedTopicIdsByClass: async (classIds) => {
