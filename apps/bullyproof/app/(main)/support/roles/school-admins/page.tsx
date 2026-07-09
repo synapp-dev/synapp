@@ -15,7 +15,6 @@ import {
   Shield,
   FileText,
   Download,
-  MessageCircle,
   AlertTriangle,
 } from "lucide-react";
 import { generateMetadataFromSegments } from "@/utils/metadata";

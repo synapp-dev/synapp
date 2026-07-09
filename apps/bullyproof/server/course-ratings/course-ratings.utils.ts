@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
-import { courseTopics, courseRatings } from "@/server/db/schema";
-import { eq, and, max, sql } from "drizzle-orm";
+import { courseTopics } from "@/server/db/schema";
+import { eq, max } from "drizzle-orm";
 import { courseRatingsRepo } from "./course-ratings.repo";
 
 /**

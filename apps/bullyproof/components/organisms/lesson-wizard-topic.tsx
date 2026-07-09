@@ -3,17 +3,16 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@workspace/ui/components/input";
-import { Card, CardHeader, CardTitle, CardContent } from "@workspace/ui/components/card";
+import { Card, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { Star, FileText, AlertTriangle, BookOpen, ChevronLeft } from "lucide-react";
+import { Star, AlertTriangle, BookOpen, ChevronLeft } from "lucide-react";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import Image from "next/image";
 import type { TopicOption, ClassOption } from "@/types/lesson-wizard";
 import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { topicsApi } from "@/entities/topics/api/endpoints";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { classesApi } from "@/entities/classes/api/endpoints";
 import { toStorageUrl } from "@/utils/supabase/storage-url";
 import { useStages } from "@/entities/stages/model/store";
@@ -52,7 +51,6 @@ function TopicThumbnail({ topic }: { topic: TopicWithSlides }) {
   }, [topic.slides]);
 
   const firstImageSlide = imageSlides[0];
-  const slideId = firstImageSlide?.id;
 
   // Use signedUrl from API response (DB-cached)
   const imageUrl = firstImageSlide?.signedUrl || null;
@@ -92,11 +90,11 @@ export function LessonWizardTopic({
 }: LessonWizardTopicProps) {
   const [selectedStageId, setSelectedStageId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [recommendedTopicIds, setRecommendedTopicIds] = useState<Set<string>>(
+  const [recommendedTopicIds] = useState<Set<string>>(
     new Set()
   );
-  const [loadingRecommended, setLoadingRecommended] = useState(false);
-  const [classProgressWarning, setClassProgressWarning] = useState<{
+  const [loadingRecommended] = useState(false);
+  const [classProgressWarning] = useState<{
     show: boolean;
     classes: Array<{ classId: string; className: string; topicTitle: string; stageName: string }>;
   } | null>(null);
@@ -259,15 +257,6 @@ export function LessonWizardTopic({
       ? (topicsError as Error).message
       : null;
 
-  // Memoize selected class IDs string for stable comparison
-  const selectedClassIdsString = useMemo(
-    () => selectedClassIds.join(","),
-    [selectedClassIds]
-  );
-
-  // Memoize topics IDs for stable comparison
-  const topicsIds = useMemo(() => topics.map((t) => t.id), [topics]);
-  const topicsIdsString = useMemo(() => topicsIds.join(","), [topicsIds]);
 
   // Use refs to access latest values without triggering re-renders
   const topicsRef = useRef(topics);
@@ -355,7 +344,7 @@ export function LessonWizardTopic({
   };
 
   // Sort stages by year level (½ → 12), then topics within each stage by stageOrder
-  const sortedStages = Object.values(topicsByStage)
+  const _sortedStages = Object.values(topicsByStage)
     .sort(sortStagesByYear)
     .map((stage) => ({
       ...stage,

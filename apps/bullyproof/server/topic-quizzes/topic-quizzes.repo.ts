@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { courseTopicQuizzes, courseTopics } from "@/server/db/schema";
+import { courseTopicQuizzes } from "@/server/db/schema";
 import { eq, asc, sql, desc, and } from "drizzle-orm";
 import { createSlug } from "@/utils/slug";
 
@@ -42,7 +42,7 @@ export const topicQuizzesRepo = {
     }
 
     // Generate slug from title, handling collisions
-    let baseSlug = createSlug(data.title);
+    const baseSlug = createSlug(data.title);
     let finalSlug = baseSlug;
     let counter = 1;
 

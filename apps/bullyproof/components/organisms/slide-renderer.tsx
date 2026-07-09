@@ -49,7 +49,6 @@ export function SlideRenderer({
   className,
   forceRefresh = false,
   thumbnailOnly = false,
-  isCertification = false,
 }: SlideRendererProps) {
   // ─── Resolve the image URL ───
   // Priority:

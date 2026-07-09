@@ -7,13 +7,9 @@ import {
   getClassProgressSchema,
   type CreateLessonParams,
   type UpdateLessonParams,
-  type ListLessonsParams,
-  type GetLessonByIdParams,
-  type GetRecommendationsParams,
 } from "./lessons.validators";
 import { lessonsRepo } from "./lessons.repo";
 import { resolveSchoolId } from "../school/resolve-school-ref";
-import { classesRepo } from "../classes/classes.repo";
 import { getUserScopedRoles, hasPlatformRole } from "../auth/rbac";
 import { checkFeatureAccess } from "@/server/features/features.service";
 import {
@@ -35,8 +31,8 @@ import {
   evaluateLessonStatusChange,
   statusChangeRequiresPlatformAdmin,
 } from "@/lib/lesson-lifecycle";
-import { classes, lessons, userProfile } from "@/server/db/schema";
-import { inArray, eq, and } from "drizzle-orm";
+import { classes, userProfile } from "@/server/db/schema";
+import { inArray, eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
 
 // Placeholder auth context type; adapt to your actual session/context

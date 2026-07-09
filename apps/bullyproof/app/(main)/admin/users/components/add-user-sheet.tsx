@@ -75,7 +75,6 @@ export function AddUserSheet({
   open,
   onOpenChange,
   onUserCreated,
-  onOpenExistingUser,
 }: AddUserSheetProps) {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");

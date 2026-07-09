@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { schoolLicences, schools, userProfile } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 export const licencesRepo = {
   getAll: () => db.select().from(schoolLicences),

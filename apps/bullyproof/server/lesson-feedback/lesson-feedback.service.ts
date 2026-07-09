@@ -4,7 +4,6 @@ import {
   getFeedbackByLessonIdSchema,
   type CreateFeedbackParams,
   type UpdateFeedbackParams,
-  type GetFeedbackByLessonIdParams,
 } from "./lesson-feedback.validators";
 import { lessonFeedbackRepo } from "./lesson-feedback.repo";
 import { lessonsRepo } from "../lessons/lessons.repo";
@@ -19,7 +18,7 @@ type AuthContext = {
 async function assertCanManageFeedback(
   ctx: AuthContext,
   lessonId: string,
-  teacherUserId?: string
+  _teacherUserId?: string
 ) {
   if (!ctx.userId) {
     throw new Error("Unauthorized");

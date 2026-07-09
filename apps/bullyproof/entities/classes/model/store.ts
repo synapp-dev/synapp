@@ -1,5 +1,5 @@
 import type { ClassRow } from "@/types/db";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { classesApi } from "../api/endpoints";
 import { classesKeys } from "./keys";

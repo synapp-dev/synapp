@@ -1,6 +1,5 @@
 import {
   Card,
-  CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -15,7 +14,6 @@ interface SnapshotCardSkeletonProps {
 
 export function SnapshotCardSkeleton({
   title,
-  icon,
 }: SnapshotCardSkeletonProps) {
   const IconComponent = School; // Default icon, could be enhanced to use icon prop
 

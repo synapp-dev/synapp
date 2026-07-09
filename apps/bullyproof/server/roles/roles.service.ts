@@ -11,8 +11,6 @@ import {
   type AssignRoleParams,
   type RemoveRoleParams,
   type ListRolesParams,
-  type GetRoleByIdParams,
-  type GetUserRolesParams,
 } from "./roles.validators";
 import { rolesRepo } from "./roles.repo";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -24,8 +22,8 @@ import { checkFeatureAccess, assertFeature } from "@/server/features/features.se
 import { db } from "@/server/db/drizzle";
 
 const SCHOOL_ROLE_KEYS = ["TEACHER", "SCHOOL_ADMIN", "SCHOOL_STAFF"] as const;
-import { userProfile, userRoles } from "@/server/db/schema";
-import { eq, and, inArray, sql, ilike, or } from "drizzle-orm";
+import { userProfile } from "@/server/db/schema";
+import { ilike, or } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {

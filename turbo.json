@@ -28,7 +28,10 @@
         "VAPID_SUBJECT",
         "CRON_SECRET",
         "NEWS_BOT_USER_ID",
-        "REDLINE_*"
+        "REDLINE_*",
+        "NODE_ENV",
+        "NOTION_BULLYPROOF_TOKEN",
+        "MAINTENANCE_BYPASS_DEV_KEY"
       ]
     },
     "lint": {

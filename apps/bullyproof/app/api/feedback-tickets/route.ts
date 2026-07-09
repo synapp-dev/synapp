@@ -11,7 +11,6 @@ import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { createServerClient } from "@/utils/supabase/server";
 import { sendTicketNotificationEmail } from "@/server/lib/email";
 import { db } from "@/server/db/drizzle";
-import { userProfile } from "@/server/db/schema";
 import { vUsersWithRolesAndSchools } from "@/drizzle/schema";
 import { roles as rolesTable } from "@/drizzle/schema";
 import { eq, inArray } from "drizzle-orm";

@@ -6,11 +6,10 @@ import {
   type CreateClassParams,
   type UpdateClassParams,
   type ListClassesParams,
-  type GetClassByIdParams,
 } from "./classes.validators";
 import { classesRepo } from "./classes.repo";
 import { getUserScopedRoles } from "../auth/rbac";
-import { checkFeatureAccess, assertFeature } from "@/server/features/features.service";
+import { checkFeatureAccess } from "@/server/features/features.service";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -110,9 +109,8 @@ export const classesService = {
     await assertCanManageClasses(ctx, existingClass[0].schoolId);
 
     const { yearIds, teacherIds, ...classData } = data;
-    let updatedClass;
     try {
-      updatedClass = await classesRepo.update(id, classData);
+      await classesRepo.update(id, classData);
     } catch (error: any) {
       if (pgErrorMatches(error, "23505", "duplicate key")) {
         throw new Error(

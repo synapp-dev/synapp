@@ -75,7 +75,6 @@ export function FeatureRoleMatrixDialog({
   open,
   onOpenChange,
   featureKey,
-  featureTitle,
 }: FeatureRoleMatrixDialogProps) {
   const queryClient = useQueryClient();
   const [draftByRoleId, setDraftByRoleId] = useState<Record<string, DraftPermission>>(

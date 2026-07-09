@@ -9,16 +9,9 @@ import {
   createStageSchema,
   updateStageSchema,
   deleteStageSchema,
-  type GetStagesParams,
   type GetYearsParams,
-  type GetStageByIdParams,
-  type GetStageByCodeParams,
-  type GetStageBySlugParams,
-  type GetYearByIdParams,
-  type GetLevelsParams,
   type CreateStageParams,
   type UpdateStageParams,
-  type DeleteStageParams,
 } from "./curriculum.validators";
 import { curriculumRepo } from "./curriculum.repo";
 import { assertFeature } from "@/server/features/features.service";
@@ -44,7 +37,7 @@ async function assertCanManageCurriculum(ctx: AuthContext) {
 
 export const curriculumService = {
   async getStages(ctx: AuthContext, query: unknown) {
-    const params: GetStagesParams = getStagesSchema.parse(query);
+    getStagesSchema.parse(query);
     await assertCanViewCurriculum(ctx);
 
     // Use the optimized method that includes years
@@ -68,7 +61,7 @@ export const curriculumService = {
   },
 
   async getLevels(ctx: AuthContext, query: unknown) {
-    const params: GetLevelsParams = getLevelsSchema.parse(query);
+    getLevelsSchema.parse(query);
     await assertCanViewCurriculum(ctx);
 
     return await curriculumRepo.getLevels();

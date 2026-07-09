@@ -1,6 +1,5 @@
 "use client";
 
-import type { CertificationCourseRow, CourseTopicRow } from "@/types/db";
 import {
   useEffect,
   useState,
@@ -12,7 +11,6 @@ import { useParams, useRouter, useSearchParams, usePathname } from "next/navigat
 import { usePageTitle } from "@/hooks/use-page-title";
 import {
   Loader2,
-  CheckCircle2,
   AlertTriangle,
   Maximize,
   Minimize,
@@ -44,9 +42,6 @@ import {
 import { usePreloadAllSlideImages } from "@/hooks/use-preload-all-slide-images";
 import { createSlug } from "@/utils/slug";
 import { cn } from "@workspace/ui/lib/utils";
-
-type Course = CertificationCourseRow;
-type Topic = CourseTopicRow;
 
 type ExtendedSlideData = SlideData & {
   signedUrl?: string | null;
@@ -499,11 +494,8 @@ function CourseTopicSlidesPageContent() {
 
   // Page exit detection - update current slide on browser close or navigation away
   useEffect(() => {
-    const slidesPathPattern = `/courses/${courseNameSlug}/${topicSlug}/slides`;
-    const isOnSlidesPage = pathname.startsWith(slidesPathPattern);
-
     // Handle beforeunload (browser/tab close)
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = (_e: BeforeUnloadEvent) => {
       // Update current slide before page unloads
       // Use fetch with keepalive for reliable delivery during page exit
       // Note: sendBeacon doesn't support PATCH method, so we use fetch instead

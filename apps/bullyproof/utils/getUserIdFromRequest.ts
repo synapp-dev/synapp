@@ -17,7 +17,7 @@ export async function getUserIdFromRequest(
     const sub = verified.payload?.sub;
     const userId = (typeof sub === "string" && sub) || null;
     return userId;
-  } catch (error: any) {
+  } catch {
     return null;
   }
 }

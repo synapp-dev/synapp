@@ -30,7 +30,6 @@ import {
   X as ClearIcon,
   MousePointer2,
   School,
-  Pointer,
 } from "lucide-react";
 import { useRouter, usePathname } from "next/navigation";
 import {
@@ -161,9 +160,7 @@ export function SchoolSwitcher() {
   const isViewMode = !!viewAsUser;
 
   // School store
-  const activeSchoolFromStore = useSchoolStore((s) => s.getActiveSchool());
   const currentSchool = useSchoolStore((s) => s.currentSchool);
-  const lastAccessedSchool = useSchoolStore((s) => s.lastAccessedSchool);
   const setCurrentSchool = useSchoolStore((s) => s.setCurrentSchool);
   const setLastAccessedSchool = useSchoolStore((s) => s.setLastAccessedSchool);
   const clearCurrentSchool = useSchoolStore((s) => s.clearCurrentSchool);
@@ -207,7 +204,6 @@ export function SchoolSwitcher() {
   const {
     data: allSchools = [],
     isLoading: allSchoolsLoading,
-    isFetching: allSchoolsFetching,
     error: allSchoolsError,
   } = useListSchoolsQuery({ limit: 5 }, { enabled: canAccessAllSchoolsForSwitcher });
 

@@ -184,7 +184,7 @@ export const meService = {
       throw new Error("Unauthorized");
     }
 
-    const updateData = updateUserProfileSchema.parse(params);
+    updateUserProfileSchema.parse(params);
 
     // For now, just return the current user - you'll need to implement actual update logic
     // This would typically involve updating the user_profile table

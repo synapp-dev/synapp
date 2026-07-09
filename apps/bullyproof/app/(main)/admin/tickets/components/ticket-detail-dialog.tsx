@@ -10,7 +10,6 @@ import {
   Send,
   Loader2,
   Eye,
-  ExternalLink,
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";

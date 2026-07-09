@@ -1,7 +1,7 @@
 import { Card } from "@workspace/ui/components/card";
 import { Calendar } from "@workspace/ui/components/calendar";
 import { useState, useEffect, useMemo } from "react";
-import { Calendar as CalendarIcon, BookOpen, School, ChevronRight, ChevronsRight, Plus } from "lucide-react";
+import { Calendar as CalendarIcon, School, ChevronsRight, Plus } from "lucide-react";
 import Image from "next/image";
 import { Separator } from "@workspace/ui/components/separator";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
@@ -12,7 +12,7 @@ import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { cn } from "@workspace/ui/lib/utils";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useMySchoolsQuery, type School as SchoolType } from "@/entities/me/model/useMySchoolsQuery";
+import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
 import {
   Dialog,
   DialogContent,

@@ -17,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table";
-import { ReportsRatingsShortcut } from "@/entities/dashboard/ui/admin/sections/reports/reports-ratings-shortcut";
 import { useReportsOverview } from "@/entities/dashboard/ui/admin/sections/reports/reports-overview-context";
 import {
   formatDate,

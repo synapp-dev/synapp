@@ -30,24 +30,9 @@ import { createServerClient } from "@/utils/supabase/server";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
 import { courseTopicSlidesRepo } from "@/server/course-topic-slides/course-topic-slides.repo";
 import { userSlideViewsRepo } from "@/server/user-slide-views/user-slide-views.repo";
-import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
-import { quizQuestionsRepo } from "@/server/quiz-questions/quiz-questions.repo";
-import { courseTopicsRepo } from "@/server/course-topics/course-topics.repo";
 import { courseTopics } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { db } from "@/server/db/drizzle";
-
-// Helper function to check if topic has valid quizzes (quizzes with questions)
-async function topicHasValidQuizzes(topicId: string): Promise<boolean> {
-  const quizzes = await courseTopicQuizzesRepo.getByTopicId(topicId);
-  if (quizzes.length === 0) return false;
-  
-  for (const quiz of quizzes) {
-    const questions = await quizQuestionsRepo.getByQuizId(quiz.id);
-    if (questions.length > 0) return true;
-  }
-  return false;
-}
 
 /**
  * Handle GET /api/certification/topics/[topicId]/progress

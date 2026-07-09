@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { quizQuestions, courseTopicQuizzes } from "@/server/db/schema";
+import { quizQuestions } from "@/server/db/schema";
 import { eq, asc, sql, desc } from "drizzle-orm";
 
 export const quizQuestionsRepo = {

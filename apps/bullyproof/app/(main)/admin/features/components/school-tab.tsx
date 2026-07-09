@@ -455,7 +455,6 @@ function SchoolGlobalTable({
 
 function SchoolRoleTable({
   features,
-  selectedSchoolId,
   selectedRoleId,
   globalByFeatureId,
   schoolByFeatureId,

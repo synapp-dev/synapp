@@ -43,7 +43,6 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@workspace/ui/components/hover-card";
-import { useLiveLessonStore } from "@/stores/live-lesson-store";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
 import { Alert, AlertTitle } from "@workspace/ui/components/alert";
@@ -127,7 +126,6 @@ export function LessonWizard({
     data: recommendationData,
     isLoading: isLoadingRecommendation,
     isFetching: isFetchingRecommendation,
-    error: recommendationError,
   } = useQuery({
     queryKey: ["lesson-recommendations", classIdsString],
     queryFn: async () => {
@@ -167,7 +165,6 @@ export function LessonWizard({
     enabled: open,
     staleTime: 0, // Always fresh - user may have just completed feedback
   });
-  const hasOutstandingFeedback = outstandingFeedbackLessons.length > 0;
 
   // Reset state when drawer closes to ensure clean state on next open
   useEffect(() => {

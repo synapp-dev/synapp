@@ -106,9 +106,6 @@ export function InviteNewSchoolDialog({
     mode: "onChange",
   });
 
-  const name = form.watch("name");
-  const state = form.watch("state");
-
   // No slug generation/effect
 
   const steps = [
@@ -396,7 +393,7 @@ export function InviteNewSchoolDialog({
       onOpenChange(false);
       setStep(0);
       form.reset();
-    } catch (e) {
+    } catch {
       // Error is displayed below via inviteMutation.error
     }
   }

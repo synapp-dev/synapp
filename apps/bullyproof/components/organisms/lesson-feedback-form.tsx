@@ -5,7 +5,6 @@ import { Star, Loader2, Pencil, MessageSquare, ChevronsRight } from "lucide-reac
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog";

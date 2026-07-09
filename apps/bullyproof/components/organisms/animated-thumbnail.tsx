@@ -28,7 +28,6 @@ export function AnimatedThumbnail({
   topicTitle,
   cardIndex = 0,
   isPaused = false,
-  isCertification = false,
 }: AnimatedThumbnailProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);

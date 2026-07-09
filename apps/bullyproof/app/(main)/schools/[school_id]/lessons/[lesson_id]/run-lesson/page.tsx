@@ -2,7 +2,7 @@
 
 import { useState, use, useEffect } from "react";
 import { Card, CardContent } from "@workspace/ui/components/card";
-import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsRight, ChevronsLeft, ChevronsUp, HelpCircle, SquareArrowOutUpRight } from "lucide-react";
+import { Presentation, Loader2, CalendarIcon, Clock, AlertCircle, HandMetal, ArrowLeft, ChevronsLeft, ChevronsUp, HelpCircle, SquareArrowOutUpRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,

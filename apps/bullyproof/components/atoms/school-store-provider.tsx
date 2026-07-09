@@ -15,7 +15,7 @@ export function SchoolStoreProvider({ slug }: SchoolStoreProviderProps) {
   );
 
   // Fetch school details by slug
-  const { data: school, isLoading, error } = useSchoolBySlugQuery(slug ?? null, {
+  const { data: school, isLoading } = useSchoolBySlugQuery(slug ?? null, {
     enabled: !!slug,
   });
 

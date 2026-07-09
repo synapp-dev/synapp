@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import {
   Card,
-  CardContent,
   CardFooter,
   CardHeader,
   CardTitle,

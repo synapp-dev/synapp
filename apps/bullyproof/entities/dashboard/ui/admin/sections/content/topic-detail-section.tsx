@@ -30,7 +30,6 @@ import {
   compareSlidesByPosition,
   computePositionsForOrder,
 } from "@/lib/fractional-position";
-import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { topicsApi } from "@/entities/topics/api/endpoints";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import type { QuizData } from "@/components/organisms/quiz-slide-editor";
@@ -38,8 +37,6 @@ import { renderQuestionWithUrls } from "@/utils/parse-question-urls";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import {
@@ -59,7 +56,6 @@ import {
   Save,
   GripHorizontal,
   Pencil,
-  Download,
   ExternalLink,
 } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
@@ -75,7 +71,6 @@ import {
   SlideRenderer,
   type SlideData,
 } from "@/components/organisms/slide-renderer";
-import { Separator } from "@workspace/ui/components/separator";
 import {
   Dialog,
   DialogContent,
@@ -89,7 +84,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@workspace/ui/components/select";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -101,22 +95,14 @@ import {
   TooltipContent,
 } from "@workspace/ui/components/tooltip";
 import {
-  HoverCard,
-  HoverCardTrigger,
-  HoverCardContent,
-} from "@workspace/ui/components/hover-card";
-import {
   RadioGroup,
   RadioGroupItem,
 } from "@workspace/ui/components/radio-group";
-import { uploadSlideImage } from "@/utils/supabase/upload";
 import {
   useTopicsByStage,
-  useInvalidateTopics,
 } from "@/entities/topics/model/store-enhanced";
 import {
   useStageBySlug,
-  useInvalidateStage,
 } from "@/entities/stages/model/store";
 import { useMutationInvalidation } from "@/hooks/use-mutation-invalidation";
 import { ImageSelectorDialog } from "@/components/organisms/image-selector-dialog";
@@ -212,18 +198,15 @@ function slideHasContent(
 function SortableSlideItem({
   slide,
   index,
-  isActive,
   currentSlideIndex,
   slideRefreshKey,
   isReordering,
-  hoveredSlideIndex,
   showAddButton,
   isCertification,
   onSlideClick,
   onMouseEnter,
   onMouseLeave,
   onCreateSlide,
-  hoverTimeoutRef,
   hideButtonTimeoutRef,
 }: {
   slide: SlideData;
@@ -396,7 +379,7 @@ export function TopicDetailSection({
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const slideGalleryRef = useRef<HTMLDivElement>(null);
   const wheelHandlerRef = useRef<((e: WheelEvent) => void) | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageUrlValue, setImageUrlValue] = useState<string>("");
@@ -414,9 +397,9 @@ export function TopicDetailSection({
   const [showAddButton, setShowAddButton] = useState<number | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const hideButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [isCreatingSlide, setIsCreatingSlide] = useState(false);
+  const [isCreatingSlide] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeletingSlide, setIsDeletingSlide] = useState(false);
+  const [isDeletingSlide] = useState(false);
   const [showBulkDeleteDialog, setShowBulkDeleteDialog] = useState(false);
   const [bulkDeleteSelectedIds, setBulkDeleteSelectedIds] = useState<
     Set<string>
@@ -455,7 +438,7 @@ export function TopicDetailSection({
       changesToShow.length,
     );
   }, [showChangesDialog, changesToShow]);
-  const [pendingSave, setPendingSave] = useState(false);
+  const [, setPendingSave] = useState(false);
   const [showImageSelectorDialog, setShowImageSelectorDialog] = useState(false);
   const [insertAfterIndexForDialog, setInsertAfterIndexForDialog] = useState<
     number | null
@@ -595,18 +578,6 @@ export function TopicDetailSection({
   }, []);
 
   // Wrapper for safe navigation that checks for unsaved changes
-  const safeNavigate = useCallback(
-    (url: string) => {
-      if (hasUnsavedChanges) {
-        setPendingNavigation(url);
-        setShowUnsavedChangesDialog(true);
-      } else {
-        router.push(url);
-      }
-    },
-    [hasUnsavedChanges, router],
-  );
-
   // Handle navigation confirmation
   const handleConfirmNavigation = () => {
     setHasUnsavedChanges(false);
@@ -662,9 +633,6 @@ export function TopicDetailSection({
         },
   );
 
-  // Invalidation hooks for curriculum topics
-  const { invalidateTopicsByStage, invalidateTopic } = useInvalidateTopics();
-  const { invalidateStage } = useInvalidateStage();
   const { invalidateAfterMutation } = useMutationInvalidation();
 
   // Extract fetchData function so it can be reused after save (for certification and manual refetch)
@@ -832,14 +800,6 @@ export function TopicDetailSection({
 
   // Find the current topic from cached data (memoized to prevent unnecessary recalculations)
   // Use topic IDs as a stable reference to detect actual changes
-  const topicsKey = useMemo(() => {
-    if (!cachedTopics || cachedTopics.length === 0) return null;
-    return cachedTopics
-      .map((t) => t.id)
-      .sort()
-      .join(",");
-  }, [cachedTopics]);
-
   const foundTopic = useMemo(() => {
     if (isCertification || !cachedTopics || !topicSlug) return null;
     return (
@@ -1091,11 +1051,6 @@ export function TopicDetailSection({
   const canGoNext = currentSlideIndex < slides.length - 1;
   const isImageOrVideo =
     currentSlide?.kind === "image" || currentSlide?.kind === "video";
-  const isImageVideoOrQuiz =
-    currentSlide?.kind === "image" ||
-    currentSlide?.kind === "video" ||
-    (isCertification && currentSlide?.kind === "quiz");
-
   // Sync URL values with current slide and clear errors
   useEffect(() => {
     if (currentSlide?.kind === "image") {
@@ -1187,36 +1142,6 @@ export function TopicDetailSection({
     setHasUnsavedChanges(true);
   };
 
-  const handleVideoStartTimeChange = (value: string) => {
-    if (!currentSlide) return;
-
-    const numValue = value === "" ? null : Number(value);
-    if (numValue !== null && (isNaN(numValue) || numValue < 0)) return;
-
-    // Update local slide state
-    const updatedSlides = localSlides.map((slide) =>
-      slide.id === currentSlide.id
-        ? { ...slide, videoStartS: numValue }
-        : slide,
-    );
-    setLocalSlides(updatedSlides);
-    setHasUnsavedChanges(true);
-  };
-
-  const handleVideoEndTimeChange = (value: string) => {
-    if (!currentSlide) return;
-
-    const numValue = value === "" ? null : Number(value);
-    if (numValue !== null && (isNaN(numValue) || numValue < 0)) return;
-
-    // Update local slide state
-    const updatedSlides = localSlides.map((slide) =>
-      slide.id === currentSlide.id ? { ...slide, videoEndS: numValue } : slide,
-    );
-    setLocalSlides(updatedSlides);
-    setHasUnsavedChanges(true);
-  };
-
   const handleFileUpload = (file: File) => {
     if (!file || !currentSlide) return;
 
@@ -1286,15 +1211,6 @@ export function TopicDetailSection({
     }
   };
 
-  const handleFileSelect = async (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      await handleFileUpload(file);
-    }
-  };
-
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1316,70 +1232,6 @@ export function TopicDetailSection({
     if (file) {
       await handleFileUpload(file);
     }
-  };
-
-  const handleImageUrlChange = (newUrl: string) => {
-    if (!currentSlide) return;
-
-    setImageUrlValue(newUrl);
-
-    // Clear existing timeout
-    if (urlUpdateTimeoutRef.current) {
-      clearTimeout(urlUpdateTimeoutRef.current);
-    }
-
-    // Debounce API call - update after user stops typing
-    urlUpdateTimeoutRef.current = setTimeout(async () => {
-      try {
-        const result = await topicsApi.slides.update(currentSlide.id, {
-          imageUrl: newUrl || null,
-        });
-
-        if (result.error) {
-          throw new Error(result.error.message || "Failed to update slide");
-        }
-
-        // Refresh topic data with slides and URLs
-        if (topic) {
-          const topicResult = await topicsApi.get.byId(topic.id, {
-            includeSlides: true,
-            includeUrls: true,
-          });
-          if (topicResult.data) {
-            setTopic(topicResult.data);
-            // Update slides if they exist
-            if ((topicResult.data as any).slides) {
-              const updatedSlides = (topicResult.data as any).slides
-                .sort(compareSlidesByPosition)
-                .map((slide: any) => ({
-                  id: slide.id,
-                  kind: slide.kind as "text" | "image" | "video",
-                  position: slide.position,
-                  textHtml: slide.textHtml ?? null,
-                  imageUrl: slide.imageUrl ?? null,
-                  videoUrl: slide.videoUrl ?? null,
-                  videoStartS: slide.videoStartS ?? null,
-                  videoEndS: slide.videoEndS ?? null,
-                  effectiveNotes: slide.officialNotes ?? null,
-                  signedUrl: slide.signedUrl ?? null,
-                }));
-              setLocalSlides(updatedSlides);
-              // Cache signed URLs
-              updatedSlides.forEach((slide) => {
-                if (slide.kind === "image" && (slide as any).signedUrl) {
-                  setSlideUrl(slide.id, (slide as any).signedUrl);
-                }
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Update error:", err);
-        setUploadError(
-          err instanceof Error ? err.message : "Failed to update URL",
-        );
-      }
-    }, 1000); // Wait 1 second after user stops typing
   };
 
   // Cleanup timeout on unmount
@@ -1716,7 +1568,6 @@ export function TopicDetailSection({
     );
 
     for (const slide of newSlides) {
-      const extendedSlide = slide as ExtendedSlideData;
       const hasFileUpload = pendingFileUploads.has(slide.id);
       const hasImageUrl = !!slide.imageUrl;
       const hasVideoUrl = !!slide.videoUrl;
@@ -1942,13 +1793,11 @@ export function TopicDetailSection({
     }
 
     try {
-      // Extract stage code/number for file paths
-      let stageCodeForPath: string;
+      // Extract stage number for file paths
       let topicNumber: number | null | undefined;
 
       if (isCertification) {
         // For certification, use stageCode prop or extract from topic
-        stageCodeForPath = stageCode || (topic as any).stage?.code || "C";
         topicNumber = (topic as CertificationTopic).courseOrder;
       } else {
         // For curriculum, extract stage number from stage.code (e.g., "S1" -> 1)
@@ -1956,7 +1805,6 @@ export function TopicDetailSection({
         if (!stageNumberMatch) {
           throw new Error("Invalid stage code format");
         }
-        stageCodeForPath = `s${parseInt(stageNumberMatch[1], 10)}`;
         topicNumber = (topic as Topic).stageOrder;
       }
 
@@ -3537,10 +3385,6 @@ export function TopicDetailSection({
                   >
                     {slides.map((slide, index) => {
                       const isLastSlide = index === slides.length - 1;
-                      const showAddButtonForSlide =
-                        (isLastSlide || showAddButton === index) &&
-                        !activeSlideId &&
-                        !isReordering;
 
                       return (
                         <SortableSlideItem

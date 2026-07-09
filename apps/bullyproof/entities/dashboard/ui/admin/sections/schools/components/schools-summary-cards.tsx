@@ -4,7 +4,6 @@ import { SnapshotCard } from "@/entities/dashboard/ui/admin/cards/hero-card";
 import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
 import schoolsData from "../dummy-data/schools-dummy-data.json";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
-import { Button } from "@workspace/ui/components/button";
 import { Plus } from "lucide-react";
 
 interface SchoolsSummaryCardsProps {

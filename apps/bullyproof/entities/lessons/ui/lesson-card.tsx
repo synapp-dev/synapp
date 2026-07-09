@@ -49,31 +49,6 @@ function formatTimeAgo(timestamp: string): string {
   }
 }
 
-// Format time as relative "time until" string (for future dates)
-function formatTimeUntil(timestamp: string): string {
-  const now = new Date();
-  const eventTime = new Date(timestamp);
-  const diffInSeconds = Math.floor(
-    (eventTime.getTime() - now.getTime()) / 1000
-  );
-
-  if (diffInSeconds < 60) {
-    return "in less than a minute";
-  } else if (diffInSeconds < 3600) {
-    const minutes = Math.floor(diffInSeconds / 60);
-    return `in ${minutes}m`;
-  } else if (diffInSeconds < 86400) {
-    const hours = Math.floor(diffInSeconds / 3600);
-    return `in ${hours}h`;
-  } else if (diffInSeconds < 604800) {
-    const days = Math.floor(diffInSeconds / 86400);
-    return `in ${days}d`;
-  } else {
-    const weeks = Math.floor(diffInSeconds / 604800);
-    return `in ${weeks}w`;
-  }
-}
-
 // Live countdown component for scheduled lessons
 function LiveCountdown({ scheduledFor }: { scheduledFor: string }) {
   const [timeLeft, setTimeLeft] = useState(() => {
@@ -216,7 +191,6 @@ export function LessonTopicThumbnail({
   }, [topicData?.slides]);
 
   const firstImageSlide = imageSlides[0];
-  const slideId = firstImageSlide?.id;
 
   // Use signedUrl from API response (DB-cached)
   const imageUrl = firstImageSlide?.signedUrl || null;

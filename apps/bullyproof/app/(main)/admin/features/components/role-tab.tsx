@@ -1,6 +1,5 @@
 "use client";
 
-import type { RoleRow } from "@/types/db";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { rolesApi } from "@/entities/roles/api/endpoints";
@@ -28,8 +27,6 @@ import {
 } from "@workspace/ui/components/tooltip";
 import { Globe, Unlock, Lock, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import type { Feature } from "./global-tab";
-
-type Role = RoleRow;
 
 type RoleTabProps = {
   features: Feature[];

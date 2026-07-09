@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useCallback } from "react";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
-import { ChevronLeft, ChevronRight, Presentation } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 import { SlideRenderer } from "./slide-renderer";
 import { useLessonLiveState } from "@/hooks/use-lesson-live-state";
@@ -15,7 +14,6 @@ interface ControlModeProps {
 }
 
 export function ControlMode({ lessonId }: ControlModeProps) {
-  const router = useRouter();
   const { slides, currentSlideIndex, currentSlide, updateSlide, isLoading, error } = useLessonLiveState(lessonId);
 
   const nextSlide = useCallback(() => {

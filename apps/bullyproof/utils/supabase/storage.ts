@@ -17,7 +17,7 @@ function extractStoragePath(urlOrPath: string): string {
   }
 
   // Try to extract path from Supabase public URL
-  const publicUrlPattern = /\/storage\/v1\/object\/public\/([^\/]+)\/(.+)$/;
+  const publicUrlPattern = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;
   const match = urlOrPath.match(publicUrlPattern);
   
   if (match) {

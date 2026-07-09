@@ -1,6 +1,6 @@
 "use client";
 
-import type { CertificationCourseRow, CourseTopicRow, QuizAnswerRow, QuizQuestionRow } from "@/types/db";
+import type { CourseTopicRow, QuizAnswerRow, QuizQuestionRow } from "@/types/db";
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -26,7 +26,6 @@ import {
 import { Badge } from "@workspace/ui/components/badge";
 
 type Topic = CourseTopicRow;
-type Course = CertificationCourseRow;
 import {
   Dialog,
   DialogContent,

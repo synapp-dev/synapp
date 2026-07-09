@@ -1,12 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
 import {
   ArrowLeft,
@@ -194,21 +188,6 @@ export default function TeacherPageClient({
     const firstName = user.firstName || "";
     const lastName = user.lastName || "";
     return `${firstName} ${lastName}`.trim() || user.email;
-  };
-
-  const getInitials = (user: UserWithRolesAndSchools) => {
-    const firstName = user.firstName || "";
-    const lastName = user.lastName || "";
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) {
-      return firstName[0].toUpperCase();
-    }
-    if (user.email) {
-      return user.email[0].toUpperCase();
-    }
-    return "U";
   };
 
   const getSchoolRoles = (user: UserWithRolesAndSchools) => {

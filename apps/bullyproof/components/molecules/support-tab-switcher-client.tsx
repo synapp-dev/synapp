@@ -10,22 +10,10 @@ import {
   Users,
   FileText,
   Download,
-  Bug,
-  Lightbulb,
-  MessageCircle,
-  AlertTriangle,
   Activity,
   GitCommit,
-  Map,
-  Shield,
   Mail,
 } from "lucide-react";
-
-interface TabItem {
-  title: string;
-  url: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
 
 interface SupportTabSwitcherClientProps {
   className?: string;

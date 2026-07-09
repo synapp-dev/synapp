@@ -81,7 +81,6 @@ function TopicImageThumbnail({
   topic,
   onTopicClick,
   index = 0,
-  type = "curriculum",
   isCardHovered = false,
 }: TopicImageThumbnailProps) {
   // Get all image slides sorted by position
@@ -244,7 +243,6 @@ function StageCard({ stage, index, onStageClick, basePath, type = "curriculum", 
   const displayedTopics = type === "certification" 
     ? topics.slice(0, 3)
     : topics.slice(0, 3); // Show 3 topics in a single row
-  const hasMoreTopics = topics.length > displayedTopics.length;
 
   // Curriculum uses slug for pretty URLs; certification uses code
   const stageSegment = type === "curriculum"

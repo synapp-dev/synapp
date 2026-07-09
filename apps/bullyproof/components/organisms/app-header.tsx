@@ -45,7 +45,7 @@ export function AppHeader() {
     null
   );
   const [showTutorialDialog, setShowTutorialDialog] = useState(false);
-  const [isSchoolPage, setIsSchoolPage] = useState(false);
+  const [, setIsSchoolPage] = useState(false);
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false);
   const [screenshotBlob, setScreenshotBlob] = useState<Blob | null>(null);
   const [isCapturingScreenshot, setIsCapturingScreenshot] = useState(false);

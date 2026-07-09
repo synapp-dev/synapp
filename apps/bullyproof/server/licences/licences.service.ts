@@ -6,7 +6,6 @@ import {
   type CreateLicenceParams,
   type UpdateLicenceParams,
   type ListLicencesParams,
-  type GetLicenceByIdParams,
 } from "./licences.validators";
 import { licencesRepo } from "./licences.repo";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -202,7 +201,7 @@ export const licencesService = {
 
     await assertCanManageLicences(ctx, existingLicence[0].schoolId);
 
-    const updatedLicence = await licencesRepo.update(id, data);
+    await licencesRepo.update(id, data);
     return await licencesRepo.getWithDetails(id);
   },
 

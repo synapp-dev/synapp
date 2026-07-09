@@ -17,7 +17,6 @@ interface QuestionRatingInputProps {
 }
 
 export function QuestionRatingInput({
-  id,
   label,
   value,
   onChange,
@@ -28,7 +27,6 @@ export function QuestionRatingInput({
   className,
 }: QuestionRatingInputProps) {
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
-  const inputId = `question-${id}`;
 
   const handleClick = (rating: number) => {
     if (!disabled) {
@@ -48,7 +46,6 @@ export function QuestionRatingInput({
     }
   };
 
-  const displayRating = hoveredRating ?? value ?? 0;
   const range = Array.from({ length: max - min + 1 }, (_, i) => min + i);
 
   return (

@@ -53,31 +53,6 @@ const ENDPOINT_TO_QUERY_KEYS: Record<string, string[][]> = {
 };
 
 /**
- * Extracts dynamic parameters from an endpoint path.
- * For example: "/topics/123" with pattern "/topics/{id}" returns { id: "123" }
- */
-function extractParams(
-  endpoint: string,
-  pattern: string
-): Record<string, string> {
-  const params: Record<string, string> = {};
-  const patternParts = pattern.split("/");
-  const endpointParts = endpoint.split("/");
-
-  for (let i = 0; i < patternParts.length; i++) {
-    const patternPart = patternParts[i];
-    if (patternPart.startsWith("{") && patternPart.endsWith("}")) {
-      const paramName = patternPart.slice(1, -1);
-      if (endpointParts[i]) {
-        params[paramName] = endpointParts[i];
-      }
-    }
-  }
-
-  return params;
-}
-
-/**
  * Finds matching query keys for an endpoint by matching against patterns.
  */
 function findMatchingQueryKeys(

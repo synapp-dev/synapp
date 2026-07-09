@@ -3,7 +3,6 @@
 import type { SchoolReadableRow } from "@/types/db";
 import { useState, useEffect } from "react";
 import {
-  Command,
   CommandDialog,
   CommandEmpty,
   CommandGroup,
@@ -12,7 +11,7 @@ import {
   CommandList,
 } from "@workspace/ui/components/command";
 import { Button } from "@workspace/ui/components/button";
-import { Command as CommandIcon, SquareTerminal, ShieldCheck, BadgeCheck } from "lucide-react";
+import { SquareTerminal, ShieldCheck, BadgeCheck } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
 import { useRouter } from "next/navigation";
 import { schoolApi } from "@/entities/school/api/endpoints";

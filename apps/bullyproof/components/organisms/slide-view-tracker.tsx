@@ -3,13 +3,6 @@
 import { useEffect, useRef, useCallback } from "react";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 
-interface SlideViewTrackerProps {
-  slideId: string;
-  topicId: string;
-  courseId: string;
-  enabled?: boolean;
-}
-
 /**
  * SlideViewTracker component for tracking active viewing time on slides.
  * 

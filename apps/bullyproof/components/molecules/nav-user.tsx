@@ -2,7 +2,6 @@
 
 import {
   ChevronsRight,
-  ChevronsUpDown,
   Cpu,
   LogOut,
   Settings,
@@ -19,7 +18,6 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";

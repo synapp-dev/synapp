@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { quizAttempts, courseTopicQuizzes, quizQuestions, quizAnswers, quizAttemptAnswers, vQuizAttemptsEnriched } from "@/server/db/schema";
-import { eq, and, desc, max, sql, count, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 
 export const quizAttemptsRepo = {
   getLatestAttempt: async (userId: string, quizId: string) => {
@@ -191,9 +191,9 @@ export const quizAttemptsRepo = {
 
   updateAnswer: async (
     attemptId: string,
-    questionId: string,
-    answerId: string,
-    isCorrect: boolean
+    _questionId: string,
+    _answerId: string,
+    _isCorrect: boolean
   ) => {
     // This will be handled by quiz-attempt-answers repo, but we update correct_answers count here
     const attempt = await db

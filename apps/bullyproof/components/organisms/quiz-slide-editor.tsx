@@ -164,38 +164,6 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
     }
   };
 
-  const handleAnswerTextChange = (id: string, text: string) => {
-    setAnswers((prev) =>
-      prev.map((answer) => (answer.id === id ? { ...answer, text } : answer))
-    );
-  };
-
-  const handleAnswerCorrectChange = (id: string) => {
-    setAnswers((prev) =>
-      prev.map((answer) => ({
-        ...answer,
-        isCorrect: answer.id === id ? true : false, // Only one correct answer
-      }))
-    );
-  };
-
-  const handleAddAnswer = () => {
-    setAnswers((prev) => [
-      ...prev,
-      { id: generateId(), text: "", isCorrect: false },
-    ]);
-  };
-
-  const handleRemoveAnswer = (id: string) => {
-    // Filter out empty answers to check how many valid answers exist
-    const validAnswers = answers.filter((a) => a.text.trim().length > 0);
-    if (validAnswers.length <= 2) {
-      // Keep at least 2 valid (non-empty) answers
-      return;
-    }
-    setAnswers((prev) => prev.filter((answer) => answer.id !== id));
-  };
-
   const handleOpenAnswersDialog = () => {
     // Copy current answers to temp state, or initialize with default if empty
     const answersToCopy =
@@ -255,7 +223,6 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
   const validAnswers = answers.filter((a) => a.text.trim().length > 0);
   const hasCorrectAnswer = validAnswers.some((a) => a.isCorrect);
   const hasEnoughAnswers = validAnswers.length >= 2;
-  const hasReachedMaxAnswers = answers.length >= 4;
 
   // Validation for temp answers (in dialog)
   const tempValidAnswers = tempAnswers.filter((a) => a.text.trim().length > 0);

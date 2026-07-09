@@ -20,13 +20,6 @@ import { db } from "@/server/db/drizzle";
 import { userProfile } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";
 
-type DialogProgress = {
-  [key: string]: {
-    dismissed: boolean;
-    dismissedAt?: string;
-  };
-};
-
 /**
  * Handle PATCH /api/me/dialogs
  *

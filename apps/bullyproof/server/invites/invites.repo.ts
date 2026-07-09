@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
-import { schoolInvites, schools, userProfile } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc } from "drizzle-orm";
+import { schoolInvites, schools } from "@/server/db/schema";
+import { eq, and, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export const invitesRepo = {

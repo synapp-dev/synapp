@@ -4,7 +4,6 @@ import type {
   CertificationCourseRow,
   CourseTopicQuizRow,
   CourseTopicRow,
-  QuizQuestionRow,
 } from "@/types/db";
 import { useEffect, useState, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -23,12 +22,10 @@ import { Badge } from "@workspace/ui/components/badge";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { createSlug } from "@/utils/slug";
 import { useMeStore } from "@/entities/me/model/store";
-import { StarRating } from "@/components/atoms/star-rating";
 
 type Course = CertificationCourseRow;
 type Topic = CourseTopicRow;
 type Quiz = CourseTopicQuizRow;
-type QuizQuestion = QuizQuestionRow;
 
 type QuizWithDetails = Quiz & {
   questionCount: number;

@@ -17,7 +17,6 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { createServerClient } from "@/utils/supabase/server";
 import { db } from "@/server/db/drizzle";
 import { userProfile } from "@/drizzle/schema";
 import { eq } from "drizzle-orm";

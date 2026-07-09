@@ -4,7 +4,13 @@ import { nextJsConfig } from "@workspace/eslint-config/next-js";
 export default [
   ...nextJsConfig,
   {
-    ignores: ["drizzle/schema.ts", "drizzle/relations.ts", "drizzle/**/*.ts"],
+    ignores: [
+      "drizzle/schema.ts",
+      "drizzle/relations.ts",
+      "drizzle/**/*.ts",
+      // Vendored/minified static assets (e.g. pdf.js worker) are not our source.
+      "public/**",
+    ],
   },
   {
     files: [
@@ -29,6 +35,20 @@ export default [
   },
   {
     rules: {
+      // Allow an underscore prefix to mark an intentionally-unused binding
+      // (e.g. a parameter kept for a shared signature/API contract). Genuinely
+      // dead imports and locals must still be removed, not underscored.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
