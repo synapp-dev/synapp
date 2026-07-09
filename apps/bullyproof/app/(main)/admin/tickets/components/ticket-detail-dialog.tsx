@@ -339,6 +339,7 @@ export function TicketDetailDialog({
                   className="relative group rounded-md border overflow-hidden cursor-pointer max-h-48"
                   onClick={() => setShowScreenshot(true)}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                   <img
                     src={ticket.screenshotUrl}
                     alt="Ticket screenshot"
@@ -490,6 +491,7 @@ export function TicketDetailDialog({
             Full size screenshot preview
           </DialogDescription>
           {ticket.screenshotUrl && (
+            // eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable
             <img
               src={ticket.screenshotUrl}
               alt="Screenshot full preview"

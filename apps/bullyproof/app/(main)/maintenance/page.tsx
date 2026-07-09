@@ -12,7 +12,7 @@ export default function MaintenancePage() {
       />
       <h1 className="text-2xl font-semibold mb-2">Bullyproof is currently under maintenance!</h1>
       <p className="text-muted-foreground max-w-md">
-          We're working hard on upgrades to the platform. Please check back later!
+          We&apos;re working hard on upgrades to the platform. Please check back later!
       </p>
     </div>
   );

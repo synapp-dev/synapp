@@ -216,7 +216,7 @@ export function CertificationCourseResults({
             // Group by day: YYYY-MM-DD
             key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
             break;
-          case "week":
+          case "week": {
             // Group by week: YYYY-MM-DD (start of week, Monday)
             const weekStart = new Date(date);
             const day = weekStart.getDay();
@@ -224,6 +224,7 @@ export function CertificationCourseResults({
             weekStart.setDate(diff);
             key = `${weekStart.getFullYear()}-${String(weekStart.getMonth() + 1).padStart(2, "0")}-${String(weekStart.getDate()).padStart(2, "0")}`;
             break;
+          }
           case "month":
             // Group by month: YYYY-MM
             key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;

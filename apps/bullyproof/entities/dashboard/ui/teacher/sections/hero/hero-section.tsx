@@ -520,7 +520,7 @@ export function TeacherHeroSection() {
               Select a School
             </DialogTitle>
             <DialogDescription className="text-center">
-              You are assigned to multiple schools. Choose which school you'd like to prepare a lesson for.
+              You are assigned to multiple schools. Choose which school you&apos;d like to prepare a lesson for.
             </DialogDescription>
           </DialogHeader>
 

@@ -805,7 +805,7 @@ function AdminUsersPageContent() {
           <DialogHeader>
             <DialogTitle>Delete Users</DialogTitle>
             <DialogDescription>
-              You're about to delete these users:
+              You&apos;re about to delete these users:
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="max-h-[400px]">

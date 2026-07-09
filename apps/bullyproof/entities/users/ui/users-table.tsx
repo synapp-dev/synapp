@@ -302,7 +302,7 @@ export function UsersTable({
       }
       return col;
     });
-  }, [roles, schoolId, showSelection, isRowSelectionLocked]);
+  }, [roles, schoolId, showSelection]);
 
   const table = useReactTable({
     data: users,

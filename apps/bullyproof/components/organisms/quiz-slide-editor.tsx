@@ -328,7 +328,7 @@ export function QuizSlideEditor({ quizData, onChange }: QuizSlideEditorProps) {
                 </TooltipTrigger>
                 {tempHasReachedMaxAnswers && (
                   <TooltipContent>
-                    <p>You've reached the maximum amount of answer options</p>
+                    <p>You&apos;ve reached the maximum amount of answer options</p>
                   </TooltipContent>
                 )}
               </Tooltip>

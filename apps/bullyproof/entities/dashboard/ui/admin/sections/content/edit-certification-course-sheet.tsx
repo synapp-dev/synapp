@@ -319,7 +319,7 @@ export function EditCertificationCourseSheet({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the certification course "{course.name}". This action
+              This will permanently delete the certification course &quot;{course.name}&quot;. This action
               cannot be undone. All topics associated with this course will also
               be affected.
             </AlertDialogDescription>

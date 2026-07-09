@@ -366,7 +366,7 @@ export function AddUserSheet({
             <DialogHeader>
               <DialogTitle>Add New User</DialogTitle>
               <DialogDescription>
-                Enter the user's basic information.
+                Enter the user&apos;s basic information.
               </DialogDescription>
             </DialogHeader>
             {userExists && (

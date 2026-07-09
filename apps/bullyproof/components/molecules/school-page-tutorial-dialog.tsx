@@ -124,7 +124,7 @@ export function SchoolPageTutorialDialog({
                   )}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  Don't show this again
+                  Don&apos;t show this again
                 </Label>
               </div>
             </Card>

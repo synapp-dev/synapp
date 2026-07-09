@@ -261,7 +261,7 @@ export function InviteNewSchoolDialog({
             <Alert>
               <AlertDescription>
                 This email should be a neutral email address that belongs to the
-                school's domain, like 'info@school.edu.au'. This account will be
+                school&apos;s domain, like &apos;info@school.edu.au&apos;. This account will be
                 the holder of the platform licence and is separate from the
                 school-admin account of the school, which will assign classes
                 and teachers.

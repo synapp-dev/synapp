@@ -928,7 +928,7 @@ function UserDetailDrawerContent({
                             Platform Access Level Restriction
                           </AlertTitle>
                           <AlertDescription className="text-yellow-700 dark:text-yellow-300">
-                            This user is a '{platformRoleName}' and can only
+                            This user is a &apos;{platformRoleName}&apos; and can only
                             have one access level. They cannot have any other
                             access levels.
                           </AlertDescription>

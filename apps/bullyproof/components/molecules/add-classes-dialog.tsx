@@ -204,7 +204,7 @@ export function AddClassesDialog({
               Select a School
             </DialogTitle>
             <DialogDescription className="text-center">
-              Choose which school you'd like to add classes for.
+              Choose which school you&apos;d like to add classes for.
             </DialogDescription>
           </DialogHeader>
 
@@ -368,7 +368,7 @@ export function AddClassesDialog({
                     )}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Don't show this again
+                    Don&apos;t show this again
                   </Label>
                 </div>
               </Card>

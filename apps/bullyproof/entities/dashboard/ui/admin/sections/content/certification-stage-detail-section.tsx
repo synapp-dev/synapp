@@ -1160,7 +1160,7 @@ export function CertificationCourseDetailSection({
             <div className="text-center text-muted-foreground">
               <p className="font-medium">Course not found</p>
               <p className="text-sm mt-2">
-                The certification course you're looking for doesn't exist.
+                The certification course you&apos;re looking for doesn&apos;t exist.
               </p>
             </div>
           </CardContent>
@@ -1616,7 +1616,7 @@ export function CertificationCourseDetailSection({
             <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete the certification course "{course.name}". This action
+                This will permanently delete the certification course &quot;{course.name}&quot;. This action
                 cannot be undone. All topics associated with this course will also
                 be affected.
               </AlertDialogDescription>

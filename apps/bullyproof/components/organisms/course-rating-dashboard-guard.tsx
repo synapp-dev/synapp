@@ -63,7 +63,6 @@ export function CourseRatingDashboardGuard() {
                   const index = result.data.findIndex((c) => c.id === currentCourseInUnrated.id);
                   setCurrentCourseIndex(index >= 0 ? index : 0);
                   setShowRatingModal(true);
-                } else {
                 }
               }
             } catch (err) {

@@ -92,7 +92,7 @@ export function SelectSchoolForLiveLessonsDialog({
             Select a School
           </DialogTitle>
           <DialogDescription className="text-center">
-            You have live lessons in multiple schools. Choose which school you'd like to view.
+            You have live lessons in multiple schools. Choose which school you&apos;d like to view.
           </DialogDescription>
         </DialogHeader>
 

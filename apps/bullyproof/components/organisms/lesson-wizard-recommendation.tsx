@@ -1185,7 +1185,7 @@ export function LessonWizardRecommendation({
           </AlertTitle>
           <AlertDescription className="text-amber-800 mt-2">
             <p className="text-sm">
-              The classes you've selected {selectedClasses.length === 1 ? (
+              The classes you&apos;ve selected {selectedClasses.length === 1 ? (
                 <>(<span className="font-bold">{selectedClasses[0].name}</span>)</>
               ) : selectedClasses.length === 2 ? (
                 <>(<span className="font-bold">{selectedClasses[0].name}</span> and <span className="font-bold">{selectedClasses[1].name}</span>)</>
@@ -1198,7 +1198,7 @@ export function LessonWizardRecommendation({
                     </span>
                   ))} and <span className="font-bold">{selectedClasses[selectedClasses.length - 1].name}</span>)
                 </>
-              )} belong to different lesson levels. If you're sure you've chosen the correct classes, please choose which level you'd like to use for this lesson.
+              )} belong to different lesson levels. If you&apos;re sure you&apos;ve chosen the correct classes, please choose which level you&apos;d like to use for this lesson.
             </p>
           </AlertDescription>
         </Alert>

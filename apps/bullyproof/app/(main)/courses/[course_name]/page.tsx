@@ -461,7 +461,7 @@ export default function CoursePage() {
       return dateB - dateA;
     });
     return sorted[0]?.completedAt || null;
-  }, [completedTopics, totalTopics, topicProgress, isCertificationComplete]);
+  }, [topicProgress, isCertificationComplete]);
 
   if (isLoading) {
     return (

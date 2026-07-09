@@ -138,6 +138,7 @@ export function PresentationTemplate({
                   <CardContent className="pt-0">
                     {slide.thumbnail ? (
                       <div className="aspect-video bg-gray-100 rounded border">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- dynamic runtime src (user upload / storage / object URL); next/image not applicable */}
                         <img
                           src={slide.thumbnail}
                           alt={slide.title}

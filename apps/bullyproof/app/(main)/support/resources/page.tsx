@@ -262,7 +262,7 @@ export default function ResourcesPage() {
       {/* Resource Request */}
       <Card>
         <CardHeader>
-          <CardTitle>Can't Find What You Need?</CardTitle>
+          <CardTitle>Can&apos;t Find What You Need?</CardTitle>
           <CardDescription>
             Request specific resources or templates that would help your school
           </CardDescription>
@@ -270,9 +270,9 @@ export default function ResourcesPage() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              We're always looking to add new resources that help our schools
+              We&apos;re always looking to add new resources that help our schools
               succeed. If you need a specific template, guide, or document that
-              isn't available, let us know and we'll work to create it for you.
+              isn&apos;t available, let us know and we&apos;ll work to create it for you.
             </p>
             <Button className="w-full">Request New Resource</Button>
           </div>

@@ -324,7 +324,6 @@ export function SchoolSwitcher() {
     setCurrentSchool,
     mounted,
     isLoading,
-    schools,
   ]);
 
   // In view mode, keep school store consistent with the viewed user's assignments.

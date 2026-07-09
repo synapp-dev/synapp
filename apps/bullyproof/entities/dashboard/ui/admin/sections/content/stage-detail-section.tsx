@@ -1146,7 +1146,7 @@ export function StageDetailSection({
             <div className="text-center text-muted-foreground">
               <p className="font-medium">Stage not found</p>
               <p className="text-sm mt-2">
-                The curriculum stage you're looking for doesn't exist.
+                The curriculum stage you&apos;re looking for doesn&apos;t exist.
               </p>
             </div>
           </CardContent>

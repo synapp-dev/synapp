@@ -620,7 +620,7 @@ function CourseTopicSlidesPageContent() {
                   Topic Locked
                 </DialogTitle>
                 <DialogDescription className="text-center text-base">
-                  You haven't unlocked these slides yet!
+                  You haven&apos;t unlocked these slides yet!
                 </DialogDescription>
               </div>
             </DialogHeader>
@@ -953,7 +953,7 @@ function CourseTopicSlidesPageContent() {
                 Topic Locked
               </DialogTitle>
               <DialogDescription className="text-center text-base">
-                You haven't unlocked these slides yet?
+                You haven&apos;t unlocked these slides yet?
               </DialogDescription>
             </div>
           </DialogHeader>

@@ -788,7 +788,7 @@ export function TopicDetailSection({
         }
       }
     },
-    [isCertification, topicId, excludeQuizSlides, invalidateCertificationSlide],
+    [isCertification, topicId, excludeQuizSlides],
   );
 
   // Handle certification flow
@@ -2856,7 +2856,7 @@ export function TopicDetailSection({
             <div className="text-center text-muted-foreground">
               <p className="font-medium">Topic not found</p>
               <p className="text-sm mt-2">
-                The topic you're looking for doesn't exist.
+                The topic you&apos;re looking for doesn&apos;t exist.
               </p>
             </div>
           </CardContent>
@@ -3013,7 +3013,7 @@ export function TopicDetailSection({
             <div className="text-center py-12 text-muted-foreground">
               <p className="font-medium">No slides available</p>
               <p className="text-sm mt-2">
-                This topic doesn't have any slides yet.
+                This topic doesn&apos;t have any slides yet.
               </p>
               <Button
                 onClick={() => handleCreateSlide(-1)}

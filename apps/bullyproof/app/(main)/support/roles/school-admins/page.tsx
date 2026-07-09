@@ -107,7 +107,7 @@ export default function SchoolAdminsPage() {
               School Administrator Resources
             </h1>
             <p className="text-muted-foreground">
-              Administrative tools and resources for managing your school's
+              Administrative tools and resources for managing your school&apos;s
               Bullyproof implementation
             </p>
           </div>

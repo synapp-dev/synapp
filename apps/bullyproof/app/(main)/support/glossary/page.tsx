@@ -209,7 +209,7 @@ export default function GlossaryPage() {
                   management
                 </div>
                 <div>
-                  • <strong>Parent:</strong> View child's progress and
+                  • <strong>Parent:</strong> View child&apos;s progress and
                   communicate
                 </div>
               </div>

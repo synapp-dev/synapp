@@ -236,7 +236,7 @@ export function EditCertificationTopicDrawer({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the topic "{topic.title}". This
+              This will permanently delete the topic &quot;{topic.title}&quot;. This
               action cannot be undone. All slides associated with this topic
               will also be deleted.
             </AlertDialogDescription>
