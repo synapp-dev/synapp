@@ -170,11 +170,11 @@ export default function DashboardPage() {
         animate="show"
         className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start"
       >
-        <motion.div variants={section} className="lg:sticky lg:top-6">
+        <motion.div variants={section} className="min-w-0 lg:sticky lg:top-6">
           <PillarScorecard />
         </motion.div>
 
-        <motion.div variants={taskColumn} className="space-y-4">
+        <motion.div variants={taskColumn} className="min-w-0 space-y-4">
         <motion.div variants={section}>
           <Card>
             <CardHeader className="pb-3">

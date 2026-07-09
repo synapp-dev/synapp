@@ -87,7 +87,7 @@ export function PillarScorecard() {
       <CardContent className="space-y-6">
         <div className="flex flex-col items-center gap-4">
           <ScoreRing score={today.score} />
-          <div className="w-full">
+          <div className="w-full min-w-0 overflow-hidden">
             <ScoreSparkline history={history} />
           </div>
         </div>
