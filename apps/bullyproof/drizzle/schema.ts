@@ -544,6 +544,24 @@ export const courseTopicQuizzes = pgTable("course_topic_quizzes", {
 	check("course_topic_quizzes_status_check", sql`status = ANY (ARRAY['draft'::text, 'published'::text, 'archived'::text])`),
 ]);
 
+/** Configurable curriculum family (M1). A "Level" of a type materialises as one
+ * curriculum_stages row scoped to the type; level_names is authoring input only. */
+export const contentTypes = pgTable("content_types", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	name: text().notNull(),
+	levelCount: smallint("level_count").notNull(),
+	levelNames: jsonb("level_names").notNull(),
+	isDefault: boolean("is_default").default(false).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	uniqueIndex("ux_content_types_name_lower").using("btree", sql`lower(name)`),
+	uniqueIndex("ux_content_types_single_default").using("btree", table.isDefault.asc().nullsLast().op("bool_ops")).where(sql`is_default`),
+	unique("content_types_name_key").on(table.name),
+	pgPolicy("content_types_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`true` }),
+	check("content_types_level_count_chk", sql`level_count >= 1`),
+]);
+
 export const schools = pgTable("schools", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	name: text().notNull(),
@@ -557,10 +575,17 @@ export const schools = pgTable("schools", {
 	slug: text(),
 	bannerUrl: text("banner_url"),
 	avatarUrl: text("avatar_url"),
+	contentTypeId: uuid("content_type_id").notNull(),
 }, (table) => [
+	index("idx_schools_content_type_id").using("btree", table.contentTypeId.asc().nullsLast().op("uuid_ops")),
 	index("idx_schools_sector_id").using("btree", table.sectorId.asc().nullsLast().op("uuid_ops")),
 	index("idx_schools_state_id").using("btree", table.stateId.asc().nullsLast().op("uuid_ops")),
 	uniqueIndex("ux_schools_name_lower").using("btree", sql`lower(name)`),
+	foreignKey({
+			columns: [table.contentTypeId],
+			foreignColumns: [contentTypes.id],
+			name: "schools_content_type_id_fkey"
+		}).onDelete("restrict"),
 	foreignKey({
 			columns: [table.sectorId],
 			foreignColumns: [schoolSectors.id],
@@ -1152,9 +1177,15 @@ export const certificationCourses = pgTable("certification_courses", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	ratingQuestions: jsonb("rating_questions"),
+	contentTypeId: uuid("content_type_id"),
 }, (table) => [
 	index("idx_certification_courses_rating_questions").using("gin", table.ratingQuestions.asc().nullsLast().op("jsonb_ops")),
 	index("idx_certification_courses_sort_index").using("btree", table.sortIndex.asc().nullsLast().op("int2_ops")),
+	foreignKey({
+			columns: [table.contentTypeId],
+			foreignColumns: [contentTypes.id],
+			name: "certification_courses_content_type_id_fkey"
+		}).onDelete("set null"),
 	unique("certification_courses_code_key").on(table.code),
 	unique("certification_courses_name_key").on(table.name),
 	unique("certification_courses_sort_index_key").on(table.sortIndex),
@@ -1285,11 +1316,18 @@ export const curriculumStages = pgTable("curriculum_stages", {
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	slug: text().notNull(),
+	contentTypeId: uuid("content_type_id").notNull(),
 }, (table) => [
-	unique("curriculum_stages_code_key").on(table.code),
-	unique("curriculum_stages_name_key").on(table.name),
-	unique("curriculum_stages_sort_index_key").on(table.sortIndex),
-	unique("curriculum_stages_slug_key").on(table.slug),
+	index("idx_curriculum_stages_content_type_id").using("btree", table.contentTypeId.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.contentTypeId],
+			foreignColumns: [contentTypes.id],
+			name: "curriculum_stages_content_type_id_fkey"
+		}).onDelete("restrict"),
+	unique("curriculum_stages_type_code_key").on(table.contentTypeId, table.code),
+	unique("curriculum_stages_type_name_key").on(table.contentTypeId, table.name),
+	unique("curriculum_stages_type_sort_index_key").on(table.contentTypeId, table.sortIndex),
+	unique("curriculum_stages_type_slug_key").on(table.contentTypeId, table.slug),
 	check("curriculum_stages_code_chk", sql`code ~ '^S[0-9]+$'::text`),
 ]);
 

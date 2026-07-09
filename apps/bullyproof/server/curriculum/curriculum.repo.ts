@@ -289,6 +289,7 @@ export const curriculumRepo = {
     code: string;
     name: string;
     minimumYearLevelIds: string[];
+    contentTypeId?: string;
   }) => {
     // First, get the selected years to validate they exist
     const selectedYears = await db
@@ -323,6 +324,9 @@ export const curriculumRepo = {
         name: data.name,
         slug,
         sortIndex: tempSortIndex,
+        contentTypeId:
+          data.contentTypeId ??
+          sql`(select id from content_types where is_default)`,
       })
       .returning();
 
