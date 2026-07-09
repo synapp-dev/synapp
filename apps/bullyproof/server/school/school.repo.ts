@@ -3,6 +3,7 @@ import {
   vSchoolsReadable,
   vSchoolsStatistics,
   schools,
+  contentTypes,
   lessons,
   userRoles,
   roles,
@@ -69,12 +70,16 @@ export const schoolRepo = {
           sql<boolean>`COALESCE(${vSchoolsStatistics.activeLicence}, false)`.as(
             "active_licence"
           ),
+        contentTypeId: schools.contentTypeId,
+        contentTypeName: contentTypes.name,
       })
       .from(vSchoolsReadable)
       .leftJoin(
         vSchoolsStatistics,
         eq(vSchoolsStatistics.id, vSchoolsReadable.id)
-      );
+      )
+      .leftJoin(schools, eq(schools.id, vSchoolsReadable.id))
+      .leftJoin(contentTypes, eq(contentTypes.id, schools.contentTypeId));
 
     // Build where conditions
     const whereConditions = [];
