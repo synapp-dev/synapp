@@ -623,6 +623,75 @@ export async function previewSessionPlan(
   }));
 }
 
+/**
+ * Build an ad-hoc session's exercise list from muscle subgroups chosen in the
+ * "New session" wizard (no program). Same smart generator as the program path,
+ * but the caller passes the subgroups and desired size directly, and rotation
+ * looks at the last couple of sessions globally (any program).
+ */
+async function generateAdhocSeed(
+  supabase: SupabaseClient,
+  userId: string,
+  subgroups: MuscleSubgroup[],
+  size: number
+): Promise<{ exerciseId: string; name: string; subgroup: MuscleSubgroup; targetSets: number | null }[]> {
+  const [exercises, summaries, recent] = await Promise.all([
+    listExercises(supabase, userId),
+    getMuscleSummary(supabase, userId),
+    supabase
+      .from("gym_sessions")
+      .select("gym_session_exercises ( exercise_id )")
+      .eq("user_id", userId)
+      .order("performed_on", { ascending: false })
+      .limit(2),
+  ]);
+
+  const recentIds = (
+    (recent.data as { gym_session_exercises: { exercise_id: string | null }[] | null }[] | null) ?? []
+  ).flatMap((s) => (s.gym_session_exercises ?? []).map((e) => e.exercise_id).filter(Boolean) as string[]);
+
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const assessments = assessSubgroups(summaries, todayISO);
+  const picks = generateSmartSession({
+    subgroups,
+    exercises,
+    assessments,
+    recentExerciseIds: recentIds,
+    size,
+  });
+
+  const byId = new Map(exercises.map((e) => [e.id, e]));
+  return picks.map((p) => ({
+    exerciseId: p.exerciseId,
+    name: byId.get(p.exerciseId)?.name ?? "Exercise",
+    subgroup: p.subgroup,
+    targetSets: p.targetSets,
+  }));
+}
+
+/**
+ * The exercise list an ad-hoc session would start with for the chosen subgroups
+ * and size, without persisting anything. Same per-row mapping as
+ * previewSessionPlan (default warmup/drop, working from the pick, auto rest).
+ */
+export async function previewAdhocPlan(
+  supabase: SupabaseClient,
+  userId: string,
+  subgroups: MuscleSubgroup[],
+  size: number
+): Promise<SessionPreviewExercise[]> {
+  const rows = await generateAdhocSeed(supabase, userId, subgroups, size);
+  return rows.map((r) => ({
+    exerciseId: r.exerciseId,
+    name: r.name,
+    subgroup: r.subgroup,
+    warmupSets: SESSION_DEFAULTS.warmupSets,
+    workingSets: r.targetSets ?? SESSION_DEFAULTS.workingSets,
+    dropSets: SESSION_DEFAULTS.dropSets,
+    restSeconds: null,
+  }));
+}
+
 type SeedExercise = {
   exerciseId: string;
   name: string;

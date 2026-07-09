@@ -213,6 +213,16 @@ export function useSessionPreview() {
   });
 }
 
+/** Ad-hoc "New session" preview: generate a right-sized plan for the chosen
+ *  muscle subgroups. A mutation so "Regenerate" can roll a fresh list. */
+export function useSessionPreviewAdhoc() {
+  return useMutation({
+    mutationFn: (input: { subgroups: string[]; size: number }) =>
+      send<SessionPreviewExercise[]>("/gym/sessions/preview", "POST", input),
+    onError: (err: Error) => toast.error(err.message),
+  });
+}
+
 // ── Sessions ─────────────────────────────────────────────────────────────────
 export function useSessions() {
   return useQuery({
