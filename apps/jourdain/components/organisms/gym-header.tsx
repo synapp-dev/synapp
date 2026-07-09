@@ -18,16 +18,20 @@ export function GymHeader({ children }: { children: ReactNode }) {
   return (
     <SlotContext.Provider value={slot}>
       <div className="flex min-h-0 flex-col gap-6">
-        <PageHeader
-          title="Gym"
-          icon={<Dumbbell className="h-6 w-6" />}
-          actions={
-            <>
-              <GymTabNav />
-              <div ref={setSlot} className="flex items-center gap-2" />
-            </>
-          }
-        />
+        {/* The section title moves to the app header on mobile, so the in-page
+            header is desktop-only. */}
+        <div className="hidden md:block">
+          <PageHeader
+            title="Gym"
+            icon={<Dumbbell className="h-6 w-6" />}
+            actions={
+              <>
+                <GymTabNav />
+                <div ref={setSlot} className="flex items-center gap-2" />
+              </>
+            }
+          />
+        </div>
         <div className="min-h-0 flex-1">{children}</div>
       </div>
     </SlotContext.Provider>

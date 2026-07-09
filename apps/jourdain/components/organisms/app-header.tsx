@@ -17,20 +17,15 @@ export function AppHeader() {
 
   return (
     <header className="flex min-h-16 shrink-0 items-center gap-2 justify-between transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:min-h-14 sticky top-0 z-50 bg-background pt-[env(safe-area-inset-top)]">
-      <div className="flex min-w-0 items-center gap-2 px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-2 px-4">
         <SidebarTrigger className="-ml-1 shrink-0" />
         <Separator
           orientation="vertical"
-          className={cn(
-            "mr-2 shrink-0 data-[orientation=vertical]:h-4",
-            section && "hidden md:block",
-          )}
+          className="mr-2 shrink-0 data-[orientation=vertical]:h-4"
         />
         <div className={cn("min-w-0", section && "hidden md:block")}>
           <Breadcrumb />
         </div>
-      </div>
-      <div className="flex min-w-0 flex-1 items-center justify-center px-2">
         <MobileSectionNav />
       </div>
       <div className="flex items-center gap-2 px-4">
