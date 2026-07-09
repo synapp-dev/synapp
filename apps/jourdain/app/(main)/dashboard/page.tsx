@@ -23,7 +23,7 @@ import { PageHeader } from "@/components/page-header";
 import { TaskRow } from "@/components/molecules/task-row";
 import { TaskDetailDialog } from "@/components/organisms/task-detail-dialog";
 import { GymTodayCard } from "@/components/dashboard/gym-today-card";
-import { ScoreHero } from "@/components/dashboard/score-hero";
+import { PillarScorecard } from "@/components/dashboard/pillar-scorecard";
 import { TouchBaseCard } from "@/components/dashboard/touch-base-card";
 import { useTasks, useUpdateTask } from "@/hooks/tasks/use-tasks";
 import { scoreQueryKey } from "@/hooks/scoring/use-score";
@@ -43,6 +43,12 @@ const section: Variants = {
     y: 0,
     transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
   },
+};
+
+// Groups the right-hand task sections so they cascade after the pillar card.
+const taskColumn: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.09, delayChildren: 0.09 } },
 };
 
 function TasksSkeleton() {
@@ -162,12 +168,13 @@ export default function DashboardPage() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="space-y-4"
+        className="grid gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start"
       >
-        <motion.div variants={section}>
-          <ScoreHero />
+        <motion.div variants={section} className="lg:sticky lg:top-6">
+          <PillarScorecard />
         </motion.div>
 
+        <motion.div variants={taskColumn} className="space-y-4">
         <motion.div variants={section}>
           <Card>
             <CardHeader className="pb-3">
@@ -263,6 +270,7 @@ export default function DashboardPage() {
               <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </Button>
+        </motion.div>
         </motion.div>
       </motion.div>
 
