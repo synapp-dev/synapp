@@ -46,6 +46,13 @@ export const PAGE_FEATURES = {
   // Admin pages
   ADMIN: "/admin",
   ADMIN_CONTENT: "/admin/content",
+  /**
+   * Content Type management (module M1). Separate from ADMIN_CONTENT so it can be
+   * deployed dark: disabled-by-default, granted only to INTRADARK_DEV until the
+   * client commissions it. Gates the type switcher, Add/Edit sheets and the
+   * /api/admin/content-types routes.
+   */
+  ADMIN_CONTENT_TYPES: "/admin/content-types",
   ADMIN_SCHOOLS: "/admin/schools",
   ADMIN_USERS: "/admin/users",
   ADMIN_FEATURES: "/admin/features",

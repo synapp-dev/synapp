@@ -33,7 +33,11 @@ import {
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import { cn } from "@workspace/ui/lib/utils";
 
-import { columns, type School } from "./schools-table-columns";
+import {
+  columns,
+  contentTypeColumn,
+  type School,
+} from "./schools-table-columns";
 
 interface SchoolsDataTableProps {
   onSchoolClick: (school: School) => void;
@@ -42,6 +46,8 @@ interface SchoolsDataTableProps {
   isLoading?: boolean;
   error?: string | null;
   onRowSelectionChange?: (selection: Record<string, boolean>) => void;
+  /** M1: show the Content Type column (gated to INTRADARK_DEV). */
+  showContentType?: boolean;
 }
 
 export function SchoolsDataTable({
@@ -51,6 +57,7 @@ export function SchoolsDataTable({
   isLoading = false,
   error = null,
   onRowSelectionChange,
+  showContentType = false,
 }: SchoolsDataTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
@@ -95,8 +102,11 @@ export function SchoolsDataTable({
       enableHiding: false,
     };
 
-    return [selectionColumn, ...columns];
-  }, []);
+    const base = showContentType
+      ? [...columns, contentTypeColumn]
+      : columns;
+    return [selectionColumn, ...base];
+  }, [showContentType]);
 
   const data = schools;
 

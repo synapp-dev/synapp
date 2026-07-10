@@ -21,6 +21,8 @@ export type School = {
   levelBadge?: string | null;
   bannerUrl?: string | null;
   avatarUrl?: string | null;
+  contentTypeId?: string | null;
+  contentTypeName?: string | null;
   // Editable details: the school drawer's details form initialises from these,
   // so dropping them here makes a successful save look like it never persisted.
   address?: string | null;
@@ -71,6 +73,8 @@ function transformSchoolData(school: any): School {
     levelBadge: school.levelBadge ?? school.level_badge ?? null,
     bannerUrl: school.bannerUrl ?? school.banner_url ?? null,
     avatarUrl: school.avatarUrl ?? school.avatar_url ?? null,
+    contentTypeId: school.contentTypeId ?? school.content_type_id ?? null,
+    contentTypeName: school.contentTypeName ?? school.content_type_name ?? null,
     address: school.address ?? null,
     emailDomain: school.emailDomain ?? school.email_domain ?? null,
     stateId: school.stateId ?? school.state_id ?? null,

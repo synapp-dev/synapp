@@ -223,6 +223,7 @@ export const schoolService = {
       name: schoolData.name,
       stateId: schoolData.stateId,
       sectorId: schoolData.sectorId,
+      contentTypeId: schoolData.contentTypeId,
     });
     const createdSchool = result[0];
 

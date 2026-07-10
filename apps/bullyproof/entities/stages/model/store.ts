@@ -18,12 +18,16 @@ type Stage = CurriculumStageRow & {
 
 type StageWithYears = Stage;
 
-// React Query hooks for stages
-export function useStages() {
+// React Query hooks for stages. Passing a contentTypeId scopes the tree to that
+// content type and keys the cache per type, so switching types never cross-bleeds.
+export function useStages(contentTypeId?: string) {
   const query = useQuery({
-    queryKey: ["stages"],
+    queryKey: contentTypeId ? ["stages", { contentTypeId }] : ["stages"],
     queryFn: async () => {
-      const result = await curriculumApi.stages.list({ limit: 100 });
+      const result = await curriculumApi.stages.list({
+        limit: 100,
+        contentTypeId,
+      });
       if (result.error) {
         throw new Error(result.error.message || "Failed to fetch stages");
       }

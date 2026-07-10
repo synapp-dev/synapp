@@ -13,7 +13,22 @@ import {
 import { topicSlidesRepo } from "@/server/topic-slides/topic-slides.repo";
 
 export const topicsRepo = {
-  getAll: () => db.select().from(topics),
+  getAll: (contentTypeId?: string) => {
+    if (!contentTypeId) return db.select().from(topics);
+    // Topics belong to a content type through their stage.
+    return db
+      .select()
+      .from(topics)
+      .where(
+        inArray(
+          topics.stageId,
+          db
+            .select({ id: curriculumStages.id })
+            .from(curriculumStages)
+            .where(eq(curriculumStages.contentTypeId, contentTypeId)),
+        ),
+      );
+  },
 
   getById: (id: string) =>
     db.select().from(topics).where(eq(topics.id, id)).limit(1),

@@ -23,6 +23,8 @@ export type School = {
   levelBadge?: string | null; // From school_year_assignments: "Primary" | "Secondary" | "P–12" | "P–10" | "Custom"
   bannerUrl?: string | null;
   avatarUrl?: string | null;
+  contentTypeId?: string | null; // M1: assigned content type
+  contentTypeName?: string | null;
 }
 
 // Helper function to format school levels
@@ -62,6 +64,38 @@ function formatSchoolLevel(levels: string[] | null | undefined): string {
     ? firstLevel.charAt(0).toUpperCase() + firstLevel.slice(1).toLowerCase()
     : "—";
 }
+
+/** M1: optional Content Type column, appended only when the viewer is gated on. */
+export const contentTypeColumn: ColumnDef<School> = {
+  id: "contentType",
+  accessorKey: "contentTypeName",
+  header: ({ column }) => (
+    <div className="text-left pl-2">
+      <Button
+        variant="ghost"
+        onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+        className="h-8 px-2 lg:px-3"
+      >
+        Content Type
+        <ArrowUpDown className="ml-2 h-4 w-4" />
+      </Button>
+    </div>
+  ),
+  cell: ({ row }) => {
+    const name = row.original.contentTypeName;
+    return (
+      <div className="text-left">
+        {name ? (
+          <Badge variant="outline" className="text-xs">
+            {name}
+          </Badge>
+        ) : (
+          <span className="text-sm text-muted-foreground">—</span>
+        )}
+      </div>
+    );
+  },
+};
 
 export const columns: ColumnDef<School>[] = [
   {

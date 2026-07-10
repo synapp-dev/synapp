@@ -45,6 +45,8 @@ export const createSchoolSchema = z
     sectorId: z.string().uuid("Invalid sector ID"),
     levelIds: z.array(z.string().uuid("Invalid level ID")).optional(),
     yearIds: z.array(z.string().uuid("Invalid year ID")).optional(),
+    /** Content type the school runs; defaults to the Default type when omitted. */
+    contentTypeId: z.string().uuid("Invalid content type ID").optional(),
   })
   .refine((data) => (data.levelIds?.length ?? 0) > 0 || (data.yearIds?.length ?? 0) > 0, {
     message: "At least one school level or year level is required",

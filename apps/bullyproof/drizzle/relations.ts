@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, resourceFolders, resourceFiles, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, teacherSlideNotes, topicSlides, classes, topics, curriculumStages, schoolLevels, schoolYears, lessonSlideNotes, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, permissionTemplates, permissionTemplateRules, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, resourceFileTopics, schoolCultureBenchmarks, schoolCultureComparativePeriods, schoolCultureReportRequests } from "./schema";
+import { contentTypes, ssoProvidersInAuth, ssoDomainsInAuth, samlProvidersInAuth, certificationCourses, courseTopics, usersInAuth, mfaFactorsInAuth, sessionsInAuth, refreshTokensInAuth, flowStateInAuth, samlRelayStatesInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaChallengesInAuth, userProfile, oauthClientsInAuth, scopes, roles, slideViewingSessions, courseTopicSlides, quizQuestions, quizAnswers, courseTopicQuizzes, schoolSectors, schools, states, resourceFolders, resourceFiles, schoolLicences, schoolInvites, featurePermissions, features, oauthAuthorizationsInAuth, courseTopicProgress, oauthConsentsInAuth, lessons, lessonFeedback, userSlideViews, quizAttempts, quizAttemptAnswers, teacherSlideNotes, topicSlides, classes, topics, curriculumStages, schoolLevels, schoolYears, lessonSlideNotes, lessonLiveState, userRoles, lessonSessions, lessonEvents, userSessions, userSchoolPositions, courseProgress, courseTopicQuizCompletions, courseRatings, permissionTemplates, permissionTemplateRules, topicLessonPlans, feedbackTickets, schoolLevelAssignments, stageYearLinks, classYears, lessonClasses, schoolYearAssignments, teacherClasses, resourceFileTopics, schoolCultureBenchmarks, schoolCultureComparativePeriods, schoolCultureReportRequests } from "./schema";
 
 export const ssoDomainsInAuthRelations = relations(ssoDomainsInAuth, ({one}) => ({
 	ssoProvidersInAuth: one(ssoProvidersInAuth, {
@@ -36,7 +36,11 @@ export const courseTopicsRelations = relations(courseTopics, ({one, many}) => ({
 	courseTopicQuizCompletions: many(courseTopicQuizCompletions),
 }));
 
-export const certificationCoursesRelations = relations(certificationCourses, ({many}) => ({
+export const certificationCoursesRelations = relations(certificationCourses, ({one, many}) => ({
+	contentType: one(contentTypes, {
+		fields: [certificationCourses.contentTypeId],
+		references: [contentTypes.id]
+	}),
 	courseTopics: many(courseTopics),
 	slideViewingSessions: many(slideViewingSessions),
 	courseTopicProgresses: many(courseTopicProgress),
@@ -44,6 +48,12 @@ export const certificationCoursesRelations = relations(certificationCourses, ({m
 	quizAttempts: many(quizAttempts),
 	courseProgresses: many(courseProgress),
 	courseRatings: many(courseRatings),
+}));
+
+export const contentTypesRelations = relations(contentTypes, ({many}) => ({
+	curriculumStages: many(curriculumStages),
+	certificationCourses: many(certificationCourses),
+	schools: many(schools),
 }));
 
 export const mfaFactorsInAuthRelations = relations(mfaFactorsInAuth, ({one, many}) => ({
@@ -235,6 +245,10 @@ export const courseTopicQuizzesRelations = relations(courseTopicQuizzes, ({one, 
 }));
 
 export const schoolsRelations = relations(schools, ({one, many}) => ({
+	contentType: one(contentTypes, {
+		fields: [schools.contentTypeId],
+		references: [contentTypes.id]
+	}),
 	schoolSector: one(schoolSectors, {
 		fields: [schools.sectorId],
 		references: [schoolSectors.id]
@@ -544,7 +558,11 @@ export const topicsRelations = relations(topics, ({one, many}) => ({
 	resourceFileTopics: many(resourceFileTopics),
 }));
 
-export const curriculumStagesRelations = relations(curriculumStages, ({many}) => ({
+export const curriculumStagesRelations = relations(curriculumStages, ({one, many}) => ({
+	contentType: one(contentTypes, {
+		fields: [curriculumStages.contentTypeId],
+		references: [contentTypes.id]
+	}),
 	topics: many(topics),
 	stageYearLinks: many(stageYearLinks),
 }));

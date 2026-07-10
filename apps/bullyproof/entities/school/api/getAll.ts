@@ -7,7 +7,9 @@ import {
 import { api } from "@/lib/api/client";
 import { schoolKeys } from "@/entities/school/model/keys";
 
-type School = SchoolRow;
+// The list endpoint returns readable rows without content_type_id; the admin
+// schools table adds a content type column separately (see schools-section).
+type School = Omit<SchoolRow, "contentTypeId">;
 
 export const getAllSchoolsOptions = () =>
   queryOptions<School[]>({

@@ -170,7 +170,7 @@ apps/bullyproof/
 └── entities/stages/model/store.ts       # useStages keyed ["stages", contentTypeId]
 ```
 
-Empty state for a type with no levels/topics yet ("Add your first level"), loading skeletons and error states across all new screens, dark-mode + responsive pass. Content Types management lives inside `/admin/content` behind the existing `PAGE_FEATURES.ADMIN_CONTENT` gate; no new sidebar entry.
+Empty state for a type with no levels/topics yet ("Add your first level"), loading skeletons and error states across all new screens, dark-mode + responsive pass. Content Types management lives inside `/admin/content` (no new sidebar entry) but is gated by a **dedicated** `PAGE_FEATURES.ADMIN_CONTENT_TYPES` (`/admin/content-types`) feature, not the existing `/admin/content` gate. This is a deliberate change from the original single-gate plan: the new gate is disabled-by-default and granted only to `INTRADARK_DEV` (migration 0030), so the whole feature ships **dark** to production - the switcher, sheets, add-school dropdown and API routes are all invisible to school admins until the key is granted to more roles. Revealing it at commissioning is a grant, not a redeploy.
 
 ### 6.1 M1b: class-selection guidance (companion)
 

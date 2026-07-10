@@ -3,6 +3,7 @@ import {
   vSchoolsReadable,
   vSchoolsStatistics,
   schools,
+  contentTypes,
   lessons,
   userRoles,
   roles,
@@ -69,12 +70,16 @@ export const schoolRepo = {
           sql<boolean>`COALESCE(${vSchoolsStatistics.activeLicence}, false)`.as(
             "active_licence"
           ),
+        contentTypeId: schools.contentTypeId,
+        contentTypeName: contentTypes.name,
       })
       .from(vSchoolsReadable)
       .leftJoin(
         vSchoolsStatistics,
         eq(vSchoolsStatistics.id, vSchoolsReadable.id)
-      );
+      )
+      .leftJoin(schools, eq(schools.id, vSchoolsReadable.id))
+      .leftJoin(contentTypes, eq(contentTypes.id, schools.contentTypeId));
 
     // Build where conditions
     const whereConditions = [];
@@ -397,7 +402,12 @@ export const schoolRepo = {
     }
   },
 
-  async create(data: { name: string; stateId: string; sectorId: string }) {
+  async create(data: {
+    name: string;
+    stateId: string;
+    sectorId: string;
+    contentTypeId?: string;
+  }) {
     const baseSlug = this.generateSlug(data.name);
     const uniqueSlug = await this.findUniqueSlug(baseSlug);
 
@@ -408,6 +418,9 @@ export const schoolRepo = {
         stateId: data.stateId,
         sectorId: data.sectorId,
         slug: uniqueSlug,
+        contentTypeId:
+          data.contentTypeId ??
+          sql`(select id from content_types where is_default)`,
       })
       .returning();
 

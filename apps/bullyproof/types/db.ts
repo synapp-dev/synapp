@@ -6,6 +6,7 @@ import type { InferSelectModel } from "drizzle-orm";
 import {
   classes,
   certificationCourses,
+  contentTypes,
   courseTopicQuizzes,
   courseTopicSlides,
   courseTopics,
@@ -32,6 +33,7 @@ export type ClassRow = InferSelectModel<typeof classes>;
 export type CertificationCourseRow = InferSelectModel<
   typeof certificationCourses
 >;
+export type ContentTypeRow = InferSelectModel<typeof contentTypes>;
 export type CourseTopicRow = InferSelectModel<typeof courseTopics>;
 export type CourseTopicQuizRow = InferSelectModel<typeof courseTopicQuizzes>;
 export type CourseTopicSlideRow = InferSelectModel<typeof courseTopicSlides>;

@@ -27,6 +27,9 @@ import { curriculumApi } from "@/entities/curriculum/api/endpoints";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
 import { capitalizeSchoolName } from "@/utils/school-name";
+import { useContentTypes } from "@/entities/content-types/api/hooks";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { PAGE_FEATURES } from "@/lib/feature-keys";
 
 interface AddSchoolWizardProps {
   open: boolean;
@@ -79,6 +82,22 @@ export function AddSchoolWizard({
     sectorId: "",
     levelSelection: "",
   });
+
+  // Content Type assignment is dark-launched (INTRADARK_DEV only). When the gate
+  // is off the dropdown is hidden and the school defaults to the Default type.
+  const { hasAccess: canManageTypes } = useFeatureAccess(
+    PAGE_FEATURES.ADMIN_CONTENT_TYPES,
+  );
+  const { contentTypes } = useContentTypes(canManageTypes);
+  const [contentTypeId, setContentTypeId] = useState<string>("");
+
+  useEffect(() => {
+    if (canManageTypes && !contentTypeId && contentTypes.length > 0) {
+      setContentTypeId(
+        (contentTypes.find((t) => t.isDefault) ?? contentTypes[0])?.id ?? "",
+      );
+    }
+  }, [canManageTypes, contentTypeId, contentTypes]);
 
   useEffect(() => {
     if (open) {
@@ -224,6 +243,7 @@ export function AddSchoolWizard({
         sectorId: formData.sectorId,
         ...(levelIds?.length ? { levelIds } : {}),
         ...(yearIds?.length ? { yearIds } : {}),
+        ...(canManageTypes && contentTypeId ? { contentTypeId } : {}),
       });
 
       if (result.error) {
@@ -388,6 +408,33 @@ export function AddSchoolWizard({
                     </SelectContent>
                   </Select>
                 </div>
+
+                {canManageTypes && (
+                  <div className="space-y-2">
+                    <Label
+                      htmlFor="content-type"
+                      className="pl-2 text-muted-foreground"
+                    >
+                      Content Type
+                    </Label>
+                    <Select
+                      value={contentTypeId}
+                      onValueChange={setContentTypeId}
+                    >
+                      <SelectTrigger id="content-type" className="w-full">
+                        <SelectValue placeholder="Select content type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contentTypes.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}
+                            {t.isDefault ? " (Default)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {error && (
                   <div className="p-4 text-sm text-destructive bg-destructive/10 rounded-md">

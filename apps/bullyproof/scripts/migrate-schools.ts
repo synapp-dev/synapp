@@ -8,7 +8,7 @@ import {
   schoolLevels, 
   schoolLevelAssignments 
 } from '../drizzle/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 
 // Types for the legacy JSON data
 interface LegacySchool {
@@ -143,6 +143,7 @@ async function migrateSchools() {
             sectorId,
             slug,
             joinedAt: school.joiningDate ? new Date(school.joiningDate).toISOString() : null,
+            contentTypeId: sql`(select id from content_types where is_default)`,
           })
           .returning({ id: schools.id });
         

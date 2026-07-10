@@ -14,6 +14,8 @@ import { SchoolDetailDrawer } from "./components/school-detail-drawer";
 import { AddSchoolWizard } from "./components/add-school-wizard";
 import { type School } from "./components/schools-table-columns";
 import { useSchools } from "@/entities/school/model/store";
+import { useFeatureAccess } from "@/hooks/use-feature-access";
+import { PAGE_FEATURES } from "@/lib/feature-keys";
 import { Button } from "@workspace/ui/components/button";
 import { Input } from "@workspace/ui/components/input";
 import {
@@ -65,6 +67,13 @@ function SchoolsSectionContent() {
   );
   const [typeFilter, setTypeFilter] = useState(
     searchParams?.get("type") || "all"
+  );
+  // M1: Content Type column + filter, dark-launched to INTRADARK_DEV only.
+  const { hasAccess: canManageTypes } = useFeatureAccess(
+    PAGE_FEATURES.ADMIN_CONTENT_TYPES,
+  );
+  const [contentTypeFilter, setContentTypeFilter] = useState(
+    searchParams?.get("contentType") || "all",
   );
   const isClosingRef = useRef(false);
   const isWizardClosingRef = useRef(false);
@@ -272,8 +281,26 @@ function SchoolsSectionContent() {
       return false;
     }
 
+    // Content type filter (M1, gated)
+    if (
+      canManageTypes &&
+      contentTypeFilter !== "all" &&
+      school.contentTypeId !== contentTypeFilter
+    ) {
+      return false;
+    }
+
     return true;
   });
+
+  // Distinct content types present, for the gated filter options.
+  const availableContentTypes = Array.from(
+    new Map(
+      schools
+        .filter((s) => s.contentTypeId)
+        .map((s) => [s.contentTypeId as string, s.contentTypeName ?? "—"]),
+    ).entries(),
+  ).sort((a, b) => a[1].localeCompare(b[1]));
 
   // Get unique states and sectors from ALL schools for filter options
   const allUniqueStates = Array.from(
@@ -318,7 +345,8 @@ function SchoolsSectionContent() {
     stateFilter !== "all" ||
     sectorFilter !== "all" ||
     statusFilter !== "all" ||
-    typeFilter !== "all";
+    typeFilter !== "all" ||
+    (canManageTypes && contentTypeFilter !== "all");
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -327,6 +355,7 @@ function SchoolsSectionContent() {
     setSectorFilter("all");
     setStatusFilter("all");
     setTypeFilter("all");
+    setContentTypeFilter("all");
     router.replace("/admin/schools", { scroll: false });
   };
 
@@ -928,6 +957,34 @@ function SchoolsSectionContent() {
                 <SelectItem value="p-12">P-12</SelectItem>
               </SelectContent>
             </Select>
+
+            {canManageTypes && (
+              <Select
+                value={contentTypeFilter || "all"}
+                onValueChange={setContentTypeFilter}
+                disabled={isLoading && schools.length === 0}
+              >
+                <SelectTrigger
+                  className={cn(
+                    "w-[160px]",
+                    contentTypeFilter &&
+                      contentTypeFilter !== "all" &&
+                      "border-orange-500 bg-orange-500/10"
+                  )}
+                  disabled={isLoading && schools.length === 0}
+                >
+                  <SelectValue placeholder="Content Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Content Types</SelectItem>
+                  {availableContentTypes.map(([id, name]) => (
+                    <SelectItem key={id} value={id}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
 
@@ -971,6 +1028,7 @@ function SchoolsSectionContent() {
             isLoading={isLoading}
             error={error}
             onRowSelectionChange={setRowSelection}
+            showContentType={canManageTypes}
           />
         )}
       </div>
