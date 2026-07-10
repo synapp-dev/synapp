@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Mail,
   MessageSquare,
+  Phone,
   Settings,
   Shield,
   User,
@@ -71,6 +72,12 @@ function makeCaseNavItems(caseSlug: string): NavMainItem[] {
       title: "Support Contacts",
       url: `${base}/support-contacts`,
       icon: Users,
+      exact: false,
+    },
+    {
+      title: "Meetings",
+      url: `${base}/meetings`,
+      icon: Phone,
       exact: false,
     },
   ];
@@ -221,7 +228,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <Separator className="my-0.5" />
         <CaseSwitcher
           currentCaseSlug={selectedCaseSlug}
-          onCaseChange={(selectedCase) => setSelectedCaseSlug(selectedCase.slug)}
+          onCaseChange={(selectedCase) =>
+            setSelectedCaseSlug(selectedCase.slug)
+          }
         />
         {scopedNavItems.length > 0 ? (
           <NavMain
