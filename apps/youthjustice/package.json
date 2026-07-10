@@ -5,7 +5,7 @@
   "private": true,
   "description": "Youth Justice — Next.js app (from monorepo template)",
   "scripts": {
-    "dev": "next dev -p 3006 --turbopack",
+    "dev": "cross-env NODE_OPTIONS=--max-http-header-size=65536 next dev -p 3006 --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -53,6 +53,7 @@
     "@workspace/eslint-config": "workspace:^",
     "@workspace/typescript-config": "workspace:*",
     "@vitejs/plugin-react": "catalog:",
+    "cross-env": "^10.1.0",
     "dotenv-cli": "^8.0.0",
     "eslint": "catalog:",
     "drizzle-kit": "^0.31.4",
