@@ -1,3 +1,8 @@
+export type OrderGuideDemandSource =
+  | "consumption_14d"
+  | "consumption_28d"
+  | "revenue_proxy";
+
 export type OrderGuideSuggestionBreakdown = {
   forecastedDemandBaseUnits: number;
   currentStockBaseUnits: number;
@@ -9,6 +14,8 @@ export type OrderGuideSuggestionBreakdown = {
   unitsPerPack: number;
   packUnit: string;
   suggestedPackQuantity: number;
+  demandSource: OrderGuideDemandSource;
+  avgDailyBaseUnits: number | null;
   assumptions: string[];
 };
 
@@ -30,6 +37,10 @@ export type OrderGuideSuggestionInput = {
   bufferPercent: number;
   minimumOrderCents: number;
   supplierSubtotalCents: number;
+  /** How the demand figure was derived; defaults to revenue_proxy. */
+  demandSource?: OrderGuideDemandSource;
+  /** Trailing average daily usage when demand comes from consumption facts. */
+  avgDailyBaseUnits?: number | null;
 };
 
 export type OrderGuideSuggestion = OrderGuideSuggestionInput & {
@@ -51,10 +62,17 @@ export function computeSuggestion(
 ): OrderGuideSuggestion | null {
   const assumptions: string[] = [];
   const unitsPerPack = input.unitsPerPack > 0 ? input.unitsPerPack : 1;
+  const demandSource = input.demandSource ?? "revenue_proxy";
 
   let demand = input.forecastedDemandBaseUnits;
   if (demand <= 0) {
     return null;
+  }
+
+  if (demandSource === "revenue_proxy") {
+    assumptions.push(
+      "Demand is a rough revenue-based estimate — no sales-driven consumption history for this ingredient yet",
+    );
   }
 
   const stock = Math.max(0, input.currentStockBaseUnits);
@@ -97,6 +115,8 @@ export function computeSuggestion(
       unitsPerPack,
       packUnit: input.packUnit,
       suggestedPackQuantity,
+      demandSource,
+      avgDailyBaseUnits: input.avgDailyBaseUnits ?? null,
       assumptions,
     },
   };

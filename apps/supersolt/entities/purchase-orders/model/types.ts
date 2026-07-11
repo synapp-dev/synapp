@@ -83,6 +83,11 @@ export type PurchaseOrderListResponse = {
 
 export type OrderGuidePeriodPreset = "3d" | "7d" | "14d" | "custom";
 
+export type OrderGuideDemandSource =
+  | "consumption_14d"
+  | "consumption_28d"
+  | "revenue_proxy";
+
 export type OrderGuideSuggestionBreakdown = {
   forecastedDemandBaseUnits: number;
   currentStockBaseUnits: number;
@@ -94,6 +99,8 @@ export type OrderGuideSuggestionBreakdown = {
   unitsPerPack: number;
   packUnit: string;
   suggestedPackQuantity: number;
+  demandSource?: OrderGuideDemandSource;
+  avgDailyBaseUnits?: number | null;
   assumptions: string[];
 };
 

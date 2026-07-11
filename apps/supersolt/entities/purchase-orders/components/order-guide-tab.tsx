@@ -31,6 +31,7 @@ import {
 } from "@workspace/ui/components/select";
 import { buildScopedPath } from "@/lib/build-scoped-path";
 import { cn } from "@workspace/ui/lib/utils";
+import { OrderGuideReasoningCard } from "@/entities/purchase-orders/components/order-guide-reasoning-card";
 import { purchaseOrdersApi } from "@/entities/purchase-orders/api/endpoints";
 import { purchaseOrderKeys } from "@/entities/purchase-orders/model/keys";
 import type {
@@ -275,6 +276,14 @@ export function OrderGuideTab({ organisation, venue, onPosCreated }: OrderGuideT
         </p>
       ) : null}
 
+      <OrderGuideReasoningCard
+        organisation={organisation}
+        venue={venue}
+        periodPreset={period}
+        runKey={data.computedAt ? `${data.computedAt}:${period}` : null}
+        enabled={data.suggestionsBySupplier.length > 0}
+      />
+
       {data.suggestionsBySupplier.map((group) => (
         <div key={group.supplierId} className="rounded-lg border">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
@@ -353,6 +362,13 @@ export function OrderGuideTab({ organisation, venue, onPosCreated }: OrderGuideT
                       </Button>
                     </CollapsibleTrigger>
                     <CollapsibleContent className="bg-muted/30 rounded-md p-3 font-mono text-xs">
+                      <p className="text-muted-foreground">
+                        {b.demandSource === "consumption_14d"
+                          ? `Demand from 14-day usage (${(b.avgDailyBaseUnits ?? 0).toFixed(2)}/day)`
+                          : b.demandSource === "consumption_28d"
+                            ? `Demand from 28-day usage (${(b.avgDailyBaseUnits ?? 0).toFixed(2)}/day)`
+                            : "Demand from revenue estimate"}
+                      </p>
                       <p>Forecasted demand: {b.forecastedDemandBaseUnits.toFixed(2)}</p>
                       <p>− Current stock: {b.currentStockBaseUnits.toFixed(2)}</p>
                       <p>− Pending deliveries: {b.pendingDeliveriesBaseUnits.toFixed(2)}</p>

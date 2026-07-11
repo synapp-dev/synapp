@@ -1,5 +1,7 @@
 import type { RequestAuthContext } from "@/server/auth/context";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
+import { formatShiftDateInVenue } from "@/lib/roster/venue-time";
+import { consumptionRepo } from "@/server/consumption/consumption.repo";
 import {
   orderGuideRepo,
   type SupplierProductWithSupplier,
@@ -7,6 +9,7 @@ import {
 import {
   computeSuggestion,
   sumForecastRevenueCents,
+  type OrderGuideDemandSource,
   type OrderGuideSuggestion,
 } from "./order-guide.compute";
 import { PurchaseOrdersServiceError } from "./purchase-orders.service";
@@ -35,6 +38,7 @@ export type OrderGuideResponse = {
   meta: {
     defaultBufferPercent: number;
     revenueForecastCents: number;
+    demandRatesAvailable?: boolean;
   };
 };
 
@@ -123,6 +127,7 @@ export const orderGuideService = {
         venueId: string;
         venueName: string;
         organisationName: string;
+        timezone?: string;
       };
       periodPreset: OrderGuidePeriodPreset;
     },
@@ -131,9 +136,31 @@ export const orderGuideService = {
       orderGuideRepo.getForecastState(tx, args.context.venueId),
     );
 
+    // Trailing per-ingredient usage from the consumption engine (final
+    // daily facts, 14/28-day windows). When present this is the demand
+    // model; the revenue proxy only backstops ingredients with no
+    // sales-driven history yet.
+    const venueToday = formatShiftDateInVenue(
+      new Date().toISOString(),
+      args.context.timezone ?? "Australia/Melbourne",
+    );
+    const demandRates = await ctx.appDb.rls((tx) =>
+      consumptionRepo.demandRates(tx, {
+        venueId: args.context.venueId,
+        endDateExclusive: venueToday,
+      }),
+    );
+    const rateByIngredient = new Map(
+      demandRates.map((r) => [r.ingredientId, r]),
+    );
+    const demandRatesAvailable = demandRates.some(
+      (r) => r.qty14 > 0 || r.qty28 > 0,
+    );
+
     const forecastReady = forecastState?.forecastReady ?? false;
     const coldStart =
-      !forecastReady || (forecastState?.availableHistoryDays ?? 0) < 14;
+      (!forecastReady || (forecastState?.availableHistoryDays ?? 0) < 14) &&
+      !demandRatesAvailable;
 
     const orgBuffer = await ctx.appDb.rls((tx) =>
       orderGuideRepo.getDefaultBufferPercent(tx, args.context.organisationId),
@@ -234,18 +261,47 @@ export const orderGuideService = {
           )
         : [];
 
-    const demandPerIngredient = new Map<string, number>();
+    const proxyDemandPerIngredient = new Map<string, number>();
     const recipeCount = Math.max(1, recipeIngredientRows.length);
     const revenuePerRecipe = coldStart ? 0 : revenueForecastCents / recipeCount;
 
     for (const ri of recipeIngredientRows) {
       if (!ri.ingredientId) continue;
       const qty = Number(ri.quantity);
-      demandPerIngredient.set(
+      proxyDemandPerIngredient.set(
         ri.ingredientId,
-        (demandPerIngredient.get(ri.ingredientId) ?? 0) +
+        (proxyDemandPerIngredient.get(ri.ingredientId) ?? 0) +
           (revenuePerRecipe / 100) * qty * 0.01,
       );
+    }
+
+    // Demand per ingredient over the horizon: prefer the 14-day trailing
+    // consumption rate, fall back to 28-day, then the revenue proxy.
+    function demandForIngredient(ingredientId: string): {
+      demand: number;
+      source: OrderGuideDemandSource;
+      avgDaily: number | null;
+    } {
+      const rate = rateByIngredient.get(ingredientId);
+      if (rate && rate.qty14 > 0) {
+        return {
+          demand: rate.avgDaily14 * horizon,
+          source: "consumption_14d",
+          avgDaily: rate.avgDaily14,
+        };
+      }
+      if (rate && rate.qty28 > 0) {
+        return {
+          demand: rate.avgDaily28 * horizon,
+          source: "consumption_28d",
+          avgDaily: rate.avgDaily28,
+        };
+      }
+      return {
+        demand: proxyDemandPerIngredient.get(ingredientId) ?? 0,
+        source: "revenue_proxy",
+        avgDaily: null,
+      };
     }
 
     const bySupplier = new Map<
@@ -265,10 +321,12 @@ export const orderGuideService = {
       const supplier = product.supplier;
 
       const bufferPercent = bufferEntry?.bufferPercent ?? defaultBufferPercent;
-      const demand = demandPerIngredient.get(ingId) ?? 0;
+      const { demand, source, avgDaily } = demandForIngredient(ingId);
       const stock = Number(ing.currentStockLevel ?? 0);
 
       const suggestion = computeSuggestion({
+        demandSource: source,
+        avgDailyBaseUnits: avgDaily,
         ingredientId: ingId,
         ingredientName: ing.name,
         supplierId: supplier.id,
@@ -335,6 +393,7 @@ export const orderGuideService = {
       meta: {
         defaultBufferPercent,
         revenueForecastCents,
+        demandRatesAvailable,
       },
     };
 
@@ -352,6 +411,7 @@ export const orderGuideService = {
           noSupplierProducts,
           defaultBufferPercent,
           revenueForecastCents,
+          demandRatesAvailable,
         },
       }),
     );
