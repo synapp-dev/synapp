@@ -7,6 +7,7 @@ import {
   venues,
 } from "@/server/db/schema";
 import { forecastRepo } from "@/server/forecast/forecast.repo";
+import { squareConnectionsRepo } from "@/server/square/square-connections.repo";
 import { runIncrementalSquareSync } from "@/server/square/square-sync.service";
 
 function authorizeCron(request: Request): boolean {
@@ -30,9 +31,6 @@ export async function GET(request: Request) {
       venueId: venueSquareConnections.venueId,
       organisationId: venues.organisationId,
       timezone: venues.timezone,
-      accessToken: venueSquareConnections.squareAccessToken,
-      environment: venueSquareConnections.environment,
-      locationId: venueSquareConnections.squareLocationId,
     })
     .from(venueSquareConnections)
     .innerJoin(venues, eq(venues.id, venueSquareConnections.venueId))
@@ -48,13 +46,22 @@ export async function GET(request: Request) {
         serviceDb,
         row.venueId,
       );
+      // Load via the connection loader so an expired access token is
+      // auto-refreshed with the stored refresh token before we hit Square;
+      // the raw table token may be up to a month stale.
+      const connection = await squareConnectionsRepo.loadConnectionForVenue(
+        serviceDb,
+        row.venueId,
+        false,
+      );
+      if (!connection) continue;
       await runIncrementalSquareSync(serviceDb, {
         venueId: row.venueId,
         organisationId: row.organisationId,
         timezone: row.timezone ?? "Australia/Melbourne",
-        accessToken: row.accessToken,
-        environment: row.environment,
-        locationId: row.locationId,
+        accessToken: connection.squareAccessToken,
+        environment: connection.environment,
+        locationId: connection.squareLocationId,
         dataStartsFrom: state?.dataStartsFrom ?? null,
       });
       synced += 1;

@@ -1,2 +1,4 @@
 # Supabase CLI local cache (version pin file)
 supabase/.temp/
+.vercel
+.env*

@@ -44,7 +44,7 @@ function defaultSettingsUrl(
 
 function squareOAuthReturnUrl(
   request: NextRequest,
-  payload: { next?: string; orgSlug: string; venueSlug: string },
+  payload: { next?: string | null; orgSlug: string; venueSlug: string },
   extraParams?: Record<string, string>,
 ): URL {
   const nextPath = safeRelativeNextPath(payload.next);

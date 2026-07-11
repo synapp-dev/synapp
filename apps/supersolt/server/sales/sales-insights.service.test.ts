@@ -29,6 +29,8 @@ const venueScope = {
   venueId: "venue-1",
   organisationSlug: "acme",
   venueSlug: "main",
+  organisationName: "Acme",
+  venueName: "Main",
   timezone: "Australia/Melbourne",
 };
 

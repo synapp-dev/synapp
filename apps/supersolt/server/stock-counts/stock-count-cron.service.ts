@@ -115,6 +115,11 @@ export const stockCountCronService = {
 
       if (ingredientRows.length === 0) continue;
 
+      // A count row requires a creator; schedules without a default
+      // assignee have no user to attribute it to, so they stay dormant.
+      const scheduleOwnerId = schedule.defaultAssigneeUserId;
+      if (!scheduleOwnerId) continue;
+
       const { count: prevCount, entries: prevEntries } =
         await stockCountsRepo.getPreviousApprovedEntriesAdmin(appDb, {
           venueId: schedule.venueId,
@@ -132,8 +137,8 @@ export const stockCountCronService = {
         status: "in_progress",
         scopeType,
         scopeFilter,
-        assigneeUserId: schedule.defaultAssigneeUserId,
-        createdByUserId: schedule.defaultAssigneeUserId,
+        assigneeUserId: scheduleOwnerId,
+        createdByUserId: scheduleOwnerId,
         startedAt: now,
         isBaseline: !prevCount,
         scheduledAt: now,
