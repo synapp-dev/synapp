@@ -1442,6 +1442,10 @@ export const purchaseOrderLines = pgTable("purchase_order_lines", {
 	sortOrder: integer("sort_order").default(0).notNull(),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	skuCode: text("sku_code"),
+	packLabel: text("pack_label"),
+	unitsPerPack: numeric("units_per_pack"),
+	packUnit: text("pack_unit"),
 }, (table) => [
 	index("idx_purchase_order_lines_po").using("btree", table.poId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
@@ -4402,6 +4406,13 @@ export const purchaseOrderNumberSequences = pgTable("purchase_order_number_seque
 			name: "purchase_order_number_sequences_venue_id_fkey"
 		}).onDelete("cascade"),
 	primaryKey({ columns: [table.venueId, table.year], name: "purchase_order_number_sequences_pkey"}),
+	pgPolicy("purchase_order_number_sequences_all", { as: "permissive", for: "all", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM (venues v
+     JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
+  WHERE ((v.id = purchase_order_number_sequences.venue_id) AND (uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`, withCheck: sql`(EXISTS ( SELECT 1
+   FROM (venues v
+     JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
+  WHERE ((v.id = purchase_order_number_sequences.venue_id) AND (uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
 ]);
 
 export const forecasts = pgTable("forecasts", {
@@ -4524,3 +4535,4 @@ export const employeePayrollProfiles = pgTable("employee_payroll_profiles", {
 	pgPolicy("employee_payroll_profiles_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	pgPolicy("employee_payroll_profiles_update", { as: "permissive", for: "update", to: ["authenticated"] }),
 ]);
+

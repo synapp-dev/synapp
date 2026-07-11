@@ -18,6 +18,7 @@ import {
   purchaseOrderNumberSequences,
   purchaseOrderReceivingEvents,
   purchaseOrders,
+  supplierProducts,
   suppliers,
 } from "@/server/db/schema";
 
@@ -76,6 +77,10 @@ export type PoLineRow = {
   outstanding_resolution: string | null;
   expected_delivery_date: string | null;
   sort_order: number;
+  sku_code: string | null;
+  pack_label: string | null;
+  units_per_pack: number | null;
+  pack_unit: string | null;
 };
 
 type PurchaseOrderSelect = typeof purchaseOrders.$inferSelect;
@@ -130,6 +135,10 @@ function toPoLineRow(row: PurchaseOrderLineSelect): PoLineRow {
     outstanding_resolution: row.outstandingResolution,
     expected_delivery_date: row.expectedDeliveryDate,
     sort_order: row.sortOrder,
+    sku_code: row.skuCode,
+    pack_label: row.packLabel,
+    units_per_pack: row.unitsPerPack !== null ? Number(row.unitsPerPack) : null,
+    pack_unit: row.packUnit,
   };
 }
 
@@ -256,6 +265,32 @@ export const purchaseOrdersRepo = {
       afterValue: args.afterValue ?? null,
       changedByUserId: args.userId,
     });
+  },
+
+  /** Supplier-catalog fields to snapshot onto PO lines at write time. */
+  async listSupplierProductSnapshots(
+    tx: RlsTx,
+    ids: string[],
+  ): Promise<
+    Array<{
+      id: string;
+      skuCode: string | null;
+      packLabel: string | null;
+      unitsPerPack: string | null;
+      packUnit: string | null;
+    }>
+  > {
+    if (ids.length === 0) return [];
+    return tx
+      .select({
+        id: supplierProducts.id,
+        skuCode: supplierProducts.skuCode,
+        packLabel: supplierProducts.packLabel,
+        unitsPerPack: supplierProducts.unitsPerPack,
+        packUnit: supplierProducts.packUnit,
+      })
+      .from(supplierProducts)
+      .where(inArray(supplierProducts.id, ids));
   },
 
   async insertLines(

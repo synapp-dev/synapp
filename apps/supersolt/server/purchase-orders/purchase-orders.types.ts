@@ -13,6 +13,10 @@ export type PurchaseOrderLineDto = {
   isOutstanding: boolean;
   outstandingResolution: string | null;
   expectedDeliveryDate: string | null;
+  skuCode: string | null;
+  packLabel: string | null;
+  unitsPerPack: number | null;
+  packUnit: string | null;
 };
 
 export type PurchaseOrderSummaryDto = {

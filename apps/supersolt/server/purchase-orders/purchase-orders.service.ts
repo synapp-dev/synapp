@@ -43,6 +43,52 @@ function lineSubtotal(qty: number, unitCents: number): number {
   return Math.round(qty * unitCents);
 }
 
+/**
+ * PO lines are point-in-time documents written in the supplier's own
+ * catalog language: SKU code and pack description are snapshotted from
+ * the supplier product at write time (server-side, never trusted from
+ * the client) so later catalog edits don't rewrite sent orders.
+ */
+async function buildLineInserts(
+  tx: Parameters<typeof purchaseOrdersRepo.listSupplierProductSnapshots>[0],
+  poId: string,
+  lines: UpsertPoLineInput[],
+): Promise<Array<typeof purchaseOrderLines.$inferInsert>> {
+  const productIds = [
+    ...new Set(
+      lines
+        .map((line) => line.supplierProductId)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const snapshots = await purchaseOrdersRepo.listSupplierProductSnapshots(
+    tx,
+    productIds,
+  );
+  const snapshotById = new Map(snapshots.map((s) => [s.id, s]));
+
+  return lines.map((line, index) => {
+    const snap = line.supplierProductId
+      ? snapshotById.get(line.supplierProductId)
+      : undefined;
+    return {
+      poId,
+      supplierProductId: line.supplierProductId ?? null,
+      ingredientId: line.ingredientId ?? null,
+      productName: line.productName,
+      quantityOrdered: String(line.quantityOrdered),
+      unitPriceCents: line.unitPriceCents,
+      subtotalCents: lineSubtotal(line.quantityOrdered, line.unitPriceCents),
+      notes: line.notes ?? null,
+      sortOrder: index,
+      skuCode: snap?.skuCode ?? null,
+      packLabel: snap?.packLabel ?? null,
+      unitsPerPack: snap?.unitsPerPack ?? null,
+      packUnit: snap?.packUnit ?? null,
+    };
+  });
+}
+
 function isOverdue(po: PoRow): boolean {
   if (!po.expected_delivery_date) return false;
   if (po.status === "delivered" || po.status === "closed" || po.status === "cancelled") {
@@ -122,6 +168,10 @@ function toLineDto(row: PoLineRow) {
     notes: row.notes,
     isOutstanding: row.is_outstanding,
     outstandingResolution: row.outstanding_resolution,
+    skuCode: row.sku_code,
+    packLabel: row.pack_label,
+    unitsPerPack: row.units_per_pack,
+    packUnit: row.pack_unit,
     expectedDeliveryDate: row.expected_delivery_date,
   };
 }
@@ -361,17 +411,7 @@ export const purchaseOrdersService = {
 
       await purchaseOrdersRepo.insertLines(
         tx,
-        args.input.lines.map((line, index) => ({
-          poId: created.id,
-          supplierProductId: line.supplierProductId ?? null,
-          ingredientId: line.ingredientId ?? null,
-          productName: line.productName,
-          quantityOrdered: String(line.quantityOrdered),
-          unitPriceCents: line.unitPriceCents,
-          subtotalCents: lineSubtotal(line.quantityOrdered, line.unitPriceCents),
-          notes: line.notes ?? null,
-          sortOrder: index,
-        })),
+        await buildLineInserts(tx, created.id, args.input.lines),
       );
 
       await purchaseOrdersRepo.insertAudit(tx, {
@@ -436,17 +476,7 @@ export const purchaseOrdersService = {
         await purchaseOrdersRepo.deleteLinesForPo(tx, po.id);
         await purchaseOrdersRepo.insertLines(
           tx,
-          args.lines.map((line, index) => ({
-            poId: po.id,
-            supplierProductId: line.supplierProductId ?? null,
-            ingredientId: line.ingredientId ?? null,
-            productName: line.productName,
-            quantityOrdered: String(line.quantityOrdered),
-            unitPriceCents: line.unitPriceCents,
-            subtotalCents: lineSubtotal(line.quantityOrdered, line.unitPriceCents),
-            notes: line.notes ?? null,
-            sortOrder: index,
-          })),
+          await buildLineInserts(tx, po.id, args.lines),
         );
         await purchaseOrdersRepo.recalculatePoTotals(tx, po.id, po.gst_treatment);
       }

@@ -244,9 +244,24 @@ export function PurchaseOrderDetailSheet({
                 <TableBody>
                   {po.lines.map((line) => (
                     <TableRow key={line.id}>
-                      <TableCell className="text-sm">{line.productName}</TableCell>
+                      <TableCell className="text-sm">
+                        <span>{line.productName}</span>
+                        {line.skuCode || line.packLabel ? (
+                          <span className="text-muted-foreground block text-xs">
+                            {[
+                              line.skuCode ? `SKU ${line.skuCode}` : null,
+                              line.packLabel && line.unitsPerPack && line.packUnit
+                                ? `${line.packLabel} of ${line.unitsPerPack} ${line.packUnit}`
+                                : line.packLabel,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        ) : null}
+                      </TableCell>
                       <TableCell className="text-right text-sm">
                         {line.quantityOrdered}
+                        {line.packLabel ? ` ${line.packLabel}` : ""}
                         {line.quantityReceived > 0 ? ` / ${line.quantityReceived} rcv` : ""}
                       </TableCell>
                       <TableCell className="text-right text-sm">

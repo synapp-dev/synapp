@@ -16,13 +16,30 @@ export function buildPoEmailSubject(payload: PoEmailPayload): string {
   return `PO #${payload.po.po_number} from ${payload.venueName}`;
 }
 
+/**
+ * One PO line in the supplier's own catalog language: their SKU code,
+ * their product description, quantities in their sell unit (packs), with
+ * pack contents spelled out so "12" can never be misread as loose units.
+ * e.g. "• [FDL-1KG] Fior Di Latte — 12 box (1 kg per box) @ $16.50 per box"
+ */
+export function formatPoEmailLine(line: PoLineRow): string {
+  const sku = line.sku_code ? `[${line.sku_code}] ` : "";
+  const packLabel = line.pack_label ?? "unit";
+  const unitsPerPack = line.units_per_pack;
+  const showContents =
+    unitsPerPack !== null &&
+    line.pack_unit !== null &&
+    !(unitsPerPack === 1 && ["each", "unit", "ea"].includes(line.pack_unit));
+  const contents = showContents
+    ? ` (${Number.isInteger(unitsPerPack) ? unitsPerPack : unitsPerPack.toFixed(2)} ${line.pack_unit} per ${packLabel})`
+    : "";
+  const price = `$${(line.unit_price_cents / 100).toFixed(2)}`;
+
+  return `• ${sku}${line.product_name} — ${line.quantity_ordered} ${packLabel}${contents} @ ${price} per ${packLabel}`;
+}
+
 export function buildPoEmailBody(payload: PoEmailPayload): string {
-  const lineSummary = payload.lines
-    .map(
-      (line) =>
-        `• ${line.product_name} × ${line.quantity_ordered} @ $${(line.unit_price_cents / 100).toFixed(2)}`,
-    )
-    .join("\n");
+  const lineSummary = payload.lines.map(formatPoEmailLine).join("\n");
 
   return `Hello ${payload.supplierName},
 
