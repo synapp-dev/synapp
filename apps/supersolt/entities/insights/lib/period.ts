@@ -4,7 +4,7 @@ export const INSIGHTS_PERIOD_PARAM = "preset";
 export const INSIGHTS_FROM_PARAM = "from";
 export const INSIGHTS_TO_PARAM = "to";
 
-export const DEFAULT_INSIGHTS_PRESET: InsightsDatePreset = "last-week";
+export const DEFAULT_INSIGHTS_PRESET: InsightsDatePreset = "this-week";
 
 const VALID_PRESETS: InsightsDatePreset[] = [
   "today",

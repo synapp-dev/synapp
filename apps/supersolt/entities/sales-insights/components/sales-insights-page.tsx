@@ -51,6 +51,7 @@ import {
 } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
 import { SquareWordmark } from "@/components/branding/square-wordmark";
+import { InsightsPeriodControls } from "@/entities/insights/components/insights-period-controls";
 import { useInsightsAlertsQuery } from "@/entities/insights/model/use-insights-alerts-query";
 import { useInsightsPeriod } from "@/entities/insights/model/insights-period-provider";
 import { SalesKpiMetricCard } from "@/entities/sales-insights/components/sales-kpi-metric-card";
@@ -652,10 +653,13 @@ export function SalesInsightsPageClient({
             </Badge>
           )}
         </div>
-        <Button className="gap-2" onClick={handleExportCsv}>
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <InsightsPeriodControls />
+          <Button className="gap-2" onClick={handleExportCsv}>
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
       </div>
 
       {squareIntegrationNeedsAttention ? (
