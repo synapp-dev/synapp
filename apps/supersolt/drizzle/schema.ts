@@ -471,56 +471,6 @@ export const oauthClientsInAuth = auth.table("oauth_clients", {
 	check("oauth_clients_token_endpoint_auth_method_check", sql`token_endpoint_auth_method = ANY (ARRAY['client_secret_basic'::text, 'client_secret_post'::text, 'none'::text])`),
 ]);
 
-export const customOauthProvidersInAuth = auth.table("custom_oauth_providers", {
-	id: uuid().defaultRandom().notNull(),
-	providerType: text("provider_type").notNull(),
-	identifier: text().notNull(),
-	name: text().notNull(),
-	clientId: text("client_id").notNull(),
-	clientSecret: text("client_secret").notNull(),
-	acceptableClientIds: text("acceptable_client_ids").array().default([""]).notNull(),
-	scopes: text().array().default([""]).notNull(),
-	pkceEnabled: boolean("pkce_enabled").default(true).notNull(),
-	attributeMapping: jsonb("attribute_mapping").default({}).notNull(),
-	authorizationParams: jsonb("authorization_params").default({}).notNull(),
-	enabled: boolean().default(true).notNull(),
-	emailOptional: boolean("email_optional").default(false).notNull(),
-	issuer: text(),
-	discoveryUrl: text("discovery_url"),
-	skipNonceCheck: boolean("skip_nonce_check").default(false).notNull(),
-	cachedDiscovery: jsonb("cached_discovery"),
-	discoveryCachedAt: timestamp("discovery_cached_at", { withTimezone: true, mode: 'string' }),
-	authorizationUrl: text("authorization_url"),
-	tokenUrl: text("token_url"),
-	userinfoUrl: text("userinfo_url"),
-	jwksUri: text("jwks_uri"),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("custom_oauth_providers_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
-	index("custom_oauth_providers_enabled_idx").using("btree", table.enabled.asc().nullsLast().op("bool_ops")),
-	index("custom_oauth_providers_identifier_idx").using("btree", table.identifier.asc().nullsLast().op("text_ops")),
-	index("custom_oauth_providers_provider_type_idx").using("btree", table.providerType.asc().nullsLast().op("text_ops")),
-	check("custom_oauth_providers_authorization_url_https", sql`(authorization_url IS NULL) OR (authorization_url ~~ 'https://%'::text)`),
-	check("custom_oauth_providers_authorization_url_length", sql`(authorization_url IS NULL) OR (char_length(authorization_url) <= 2048)`),
-	check("custom_oauth_providers_client_id_length", sql`(char_length(client_id) >= 1) AND (char_length(client_id) <= 512)`),
-	check("custom_oauth_providers_discovery_url_length", sql`(discovery_url IS NULL) OR (char_length(discovery_url) <= 2048)`),
-	check("custom_oauth_providers_identifier_format", sql`identifier ~ '^[a-z0-9][a-z0-9:-]{0,48}[a-z0-9]$'::text`),
-	check("custom_oauth_providers_issuer_length", sql`(issuer IS NULL) OR ((char_length(issuer) >= 1) AND (char_length(issuer) <= 2048))`),
-	check("custom_oauth_providers_jwks_uri_https", sql`(jwks_uri IS NULL) OR (jwks_uri ~~ 'https://%'::text)`),
-	check("custom_oauth_providers_jwks_uri_length", sql`(jwks_uri IS NULL) OR (char_length(jwks_uri) <= 2048)`),
-	check("custom_oauth_providers_name_length", sql`(char_length(name) >= 1) AND (char_length(name) <= 100)`),
-	check("custom_oauth_providers_oauth2_requires_endpoints", sql`(provider_type <> 'oauth2'::text) OR ((authorization_url IS NOT NULL) AND (token_url IS NOT NULL) AND (userinfo_url IS NOT NULL))`),
-	check("custom_oauth_providers_oidc_discovery_url_https", sql`(provider_type <> 'oidc'::text) OR (discovery_url IS NULL) OR (discovery_url ~~ 'https://%'::text)`),
-	check("custom_oauth_providers_oidc_issuer_https", sql`(provider_type <> 'oidc'::text) OR (issuer IS NULL) OR (issuer ~~ 'https://%'::text)`),
-	check("custom_oauth_providers_oidc_requires_issuer", sql`(provider_type <> 'oidc'::text) OR (issuer IS NOT NULL)`),
-	check("custom_oauth_providers_provider_type_check", sql`provider_type = ANY (ARRAY['oauth2'::text, 'oidc'::text])`),
-	check("custom_oauth_providers_token_url_https", sql`(token_url IS NULL) OR (token_url ~~ 'https://%'::text)`),
-	check("custom_oauth_providers_token_url_length", sql`(token_url IS NULL) OR (char_length(token_url) <= 2048)`),
-	check("custom_oauth_providers_userinfo_url_https", sql`(userinfo_url IS NULL) OR (userinfo_url ~~ 'https://%'::text)`),
-	check("custom_oauth_providers_userinfo_url_length", sql`(userinfo_url IS NULL) OR (char_length(userinfo_url) <= 2048)`),
-]);
-
 export const webauthnCredentialsInAuth = auth.table("webauthn_credentials", {
 	id: uuid().defaultRandom().notNull(),
 	userId: uuid("user_id").notNull(),
@@ -547,6 +497,57 @@ export const webauthnCredentialsInAuth = auth.table("webauthn_credentials", {
 			foreignColumns: [usersInAuth.id],
 			name: "webauthn_credentials_user_id_fkey"
 		}).onDelete("cascade"),
+]);
+
+export const customOauthProvidersInAuth = auth.table("custom_oauth_providers", {
+	id: uuid().defaultRandom().notNull(),
+	providerType: text("provider_type").notNull(),
+	identifier: text().notNull(),
+	name: text().notNull(),
+	clientId: text("client_id").notNull(),
+	clientSecret: text("client_secret").notNull(),
+	acceptableClientIds: text("acceptable_client_ids").array().default([""]).notNull(),
+	scopes: text().array().default([""]).notNull(),
+	pkceEnabled: boolean("pkce_enabled").default(true).notNull(),
+	attributeMapping: jsonb("attribute_mapping").default({}).notNull(),
+	authorizationParams: jsonb("authorization_params").default({}).notNull(),
+	enabled: boolean().default(true).notNull(),
+	emailOptional: boolean("email_optional").default(false).notNull(),
+	issuer: text(),
+	discoveryUrl: text("discovery_url"),
+	skipNonceCheck: boolean("skip_nonce_check").default(false).notNull(),
+	cachedDiscovery: jsonb("cached_discovery"),
+	discoveryCachedAt: timestamp("discovery_cached_at", { withTimezone: true, mode: 'string' }),
+	authorizationUrl: text("authorization_url"),
+	tokenUrl: text("token_url"),
+	userinfoUrl: text("userinfo_url"),
+	jwksUri: text("jwks_uri"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	customClaimsAllowlist: text("custom_claims_allowlist").array().default([""]).notNull(),
+}, (table) => [
+	index("custom_oauth_providers_created_at_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+	index("custom_oauth_providers_enabled_idx").using("btree", table.enabled.asc().nullsLast().op("bool_ops")),
+	index("custom_oauth_providers_identifier_idx").using("btree", table.identifier.asc().nullsLast().op("text_ops")),
+	index("custom_oauth_providers_provider_type_idx").using("btree", table.providerType.asc().nullsLast().op("text_ops")),
+	check("custom_oauth_providers_authorization_url_https", sql`(authorization_url IS NULL) OR (authorization_url ~~ 'https://%'::text)`),
+	check("custom_oauth_providers_authorization_url_length", sql`(authorization_url IS NULL) OR (char_length(authorization_url) <= 2048)`),
+	check("custom_oauth_providers_client_id_length", sql`(char_length(client_id) >= 1) AND (char_length(client_id) <= 512)`),
+	check("custom_oauth_providers_discovery_url_length", sql`(discovery_url IS NULL) OR (char_length(discovery_url) <= 2048)`),
+	check("custom_oauth_providers_identifier_format", sql`identifier ~ '^[a-z0-9][a-z0-9:-]{0,48}[a-z0-9]$'::text`),
+	check("custom_oauth_providers_issuer_length", sql`(issuer IS NULL) OR ((char_length(issuer) >= 1) AND (char_length(issuer) <= 2048))`),
+	check("custom_oauth_providers_jwks_uri_https", sql`(jwks_uri IS NULL) OR (jwks_uri ~~ 'https://%'::text)`),
+	check("custom_oauth_providers_jwks_uri_length", sql`(jwks_uri IS NULL) OR (char_length(jwks_uri) <= 2048)`),
+	check("custom_oauth_providers_name_length", sql`(char_length(name) >= 1) AND (char_length(name) <= 100)`),
+	check("custom_oauth_providers_oauth2_requires_endpoints", sql`(provider_type <> 'oauth2'::text) OR ((authorization_url IS NOT NULL) AND (token_url IS NOT NULL) AND (userinfo_url IS NOT NULL))`),
+	check("custom_oauth_providers_oidc_discovery_url_https", sql`(provider_type <> 'oidc'::text) OR (discovery_url IS NULL) OR (discovery_url ~~ 'https://%'::text)`),
+	check("custom_oauth_providers_oidc_issuer_https", sql`(provider_type <> 'oidc'::text) OR (issuer IS NULL) OR (issuer ~~ 'https://%'::text)`),
+	check("custom_oauth_providers_oidc_requires_issuer", sql`(provider_type <> 'oidc'::text) OR (issuer IS NOT NULL)`),
+	check("custom_oauth_providers_provider_type_check", sql`provider_type = ANY (ARRAY['oauth2'::text, 'oidc'::text])`),
+	check("custom_oauth_providers_token_url_https", sql`(token_url IS NULL) OR (token_url ~~ 'https://%'::text)`),
+	check("custom_oauth_providers_token_url_length", sql`(token_url IS NULL) OR (char_length(token_url) <= 2048)`),
+	check("custom_oauth_providers_userinfo_url_https", sql`(userinfo_url IS NULL) OR (userinfo_url ~~ 'https://%'::text)`),
+	check("custom_oauth_providers_userinfo_url_length", sql`(userinfo_url IS NULL) OR (char_length(userinfo_url) <= 2048)`),
 ]);
 
 export const webauthnChallengesInAuth = auth.table("webauthn_challenges", {
@@ -1610,9 +1611,9 @@ export const venueInvoiceLineItems = pgTable("venue_invoice_line_items", {
 	mappingMethod: text("mapping_method"),
 	sortOrder: integer("sort_order").default(0).notNull(),
 	notes: text(),
-	isLikelyInventory: boolean("is_likely_inventory"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	isLikelyInventory: boolean("is_likely_inventory"),
 }, (table) => [
 	index("idx_venue_invoice_line_items_invoice").using("btree", table.invoiceId.asc().nullsLast().op("int4_ops"), table.sortOrder.asc().nullsLast().op("int4_ops")),
 	foreignKey({
@@ -1646,6 +1647,93 @@ export const venueInvoiceLineItems = pgTable("venue_invoice_line_items", {
   WHERE ((v.id = venue_invoice_line_items.venue_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
 	pgPolicy("venue_invoice_line_items_write", { as: "permissive", for: "all", to: ["authenticated"] }),
 	check("venue_invoice_line_items_mapping_method_chk", sql`(mapping_method IS NULL) OR (mapping_method = ANY (ARRAY['auto'::text, 'manual'::text]))`),
+]);
+
+export const venueInvoices = pgTable("venue_invoices", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	venueId: uuid("venue_id").notNull(),
+	organisationId: uuid("organisation_id").notNull(),
+	xeroInvoiceId: uuid("xero_invoice_id"),
+	invoiceNumber: text("invoice_number"),
+	supplierName: text("supplier_name"),
+	xeroContactId: text("xero_contact_id"),
+	invoiceDate: date("invoice_date"),
+	dueDate: date("due_date"),
+	documentType: text("document_type").default('invoice').notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	totalCents: bigint("total_cents", { mode: "number" }).notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	amountDueCents: bigint("amount_due_cents", { mode: "number" }),
+	currencyCode: text("currency_code").default('AUD').notNull(),
+	xeroStatus: text("xero_status").notNull(),
+	reviewStatus: text("review_status").default('pending_review').notNull(),
+	source: text().default('xero').notNull(),
+	reference: text(),
+	xeroUpdatedAt: timestamp("xero_updated_at", { withTimezone: true, mode: 'string' }),
+	syncedAt: timestamp("synced_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	purchaseOrderId: uuid("purchase_order_id"),
+	supplierId: uuid("supplier_id"),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	subtotalCents: bigint("subtotal_cents", { mode: "number" }),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	gstCents: bigint("gst_cents", { mode: "number" }),
+	gstTreatment: text("gst_treatment"),
+	parseConfidence: text("parse_confidence"),
+	matchMethod: text("match_method"),
+	disputeReason: text("dispute_reason"),
+	disputeNotes: text("dispute_notes"),
+	notes: text(),
+	attachmentStoragePath: text("attachment_storage_path"),
+	emailMessageId: uuid("email_message_id"),
+	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
+	confirmedByUserId: uuid("confirmed_by_user_id"),
+	disputedAt: timestamp("disputed_at", { withTimezone: true, mode: 'string' }),
+	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
+	attachmentParsedAt: timestamp("attachment_parsed_at", { withTimezone: true, mode: 'string' }),
+	attachmentParseFingerprint: text("attachment_parse_fingerprint"),
+	attachmentParseError: text("attachment_parse_error"),
+	hasAttachments: boolean("has_attachments"),
+}, (table) => [
+	index("venue_invoices_org_idx").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")),
+	index("venue_invoices_po_idx").using("btree", table.purchaseOrderId.asc().nullsLast().op("uuid_ops")).where(sql`(purchase_order_id IS NOT NULL)`),
+	index("venue_invoices_review_status_idx").using("btree", table.venueId.asc().nullsLast().op("uuid_ops"), table.reviewStatus.asc().nullsLast().op("uuid_ops")),
+	index("venue_invoices_supplier_idx").using("btree", table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`(supplier_id IS NOT NULL)`),
+	index("venue_invoices_venue_date_idx").using("btree", table.venueId.asc().nullsLast().op("uuid_ops"), table.invoiceDate.desc().nullsLast().op("date_ops")),
+	foreignKey({
+			columns: [table.organisationId],
+			foreignColumns: [organisations.id],
+			name: "venue_invoices_organisation_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.purchaseOrderId],
+			foreignColumns: [purchaseOrders.id],
+			name: "venue_invoices_purchase_order_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.supplierId],
+			foreignColumns: [suppliers.id],
+			name: "venue_invoices_supplier_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "venue_invoices_venue_id_fkey"
+		}).onDelete("cascade"),
+	unique("venue_invoices_venue_xero_uq").on(table.venueId, table.xeroInvoiceId),
+	pgPolicy("venue_invoices_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(EXISTS ( SELECT 1
+   FROM (venues v
+     JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
+  WHERE ((v.id = venue_invoices.venue_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
+	pgPolicy("venue_invoices_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	pgPolicy("venue_invoices_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	check("venue_invoices_document_type_chk", sql`document_type = ANY (ARRAY['invoice'::text, 'credit_note'::text])`),
+	check("venue_invoices_gst_treatment_chk", sql`(gst_treatment IS NULL) OR (gst_treatment = ANY (ARRAY['inclusive'::text, 'exclusive'::text, 'mixed'::text]))`),
+	check("venue_invoices_match_method_chk", sql`(match_method IS NULL) OR (match_method = ANY (ARRAY['auto'::text, 'manual'::text, 'standalone'::text]))`),
+	check("venue_invoices_parse_confidence_chk", sql`(parse_confidence IS NULL) OR (parse_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))`),
+	check("venue_invoices_review_status_chk", sql`review_status = ANY (ARRAY['pending_review'::text, 'pending_approval'::text, 'confirmed'::text, 'disputed'::text, 'duplicate'::text, 'archived'::text])`),
+	check("venue_invoices_source_chk", sql`source = ANY (ARRAY['xero'::text, 'upload'::text, 'email'::text])`),
 ]);
 
 export const invoiceCostChangeEvents = pgTable("invoice_cost_change_events", {
@@ -1909,93 +1997,6 @@ export const venueInvoiceAuditLog = pgTable("venue_invoice_audit_log", {
      JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
   WHERE ((vi.id = venue_invoice_audit_log.invoice_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
 	pgPolicy("venue_invoice_audit_log_select", { as: "permissive", for: "select", to: ["authenticated"] }),
-]);
-
-export const venueInvoices = pgTable("venue_invoices", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	venueId: uuid("venue_id").notNull(),
-	organisationId: uuid("organisation_id").notNull(),
-	xeroInvoiceId: uuid("xero_invoice_id"),
-	invoiceNumber: text("invoice_number"),
-	supplierName: text("supplier_name"),
-	xeroContactId: text("xero_contact_id"),
-	invoiceDate: date("invoice_date"),
-	dueDate: date("due_date"),
-	documentType: text("document_type").default('invoice').notNull(),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	totalCents: bigint("total_cents", { mode: "number" }).notNull(),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	amountDueCents: bigint("amount_due_cents", { mode: "number" }),
-	currencyCode: text("currency_code").default('AUD').notNull(),
-	xeroStatus: text("xero_status").notNull(),
-	reviewStatus: text("review_status").default('pending_review').notNull(),
-	source: text().default('xero').notNull(),
-	reference: text(),
-	xeroUpdatedAt: timestamp("xero_updated_at", { withTimezone: true, mode: 'string' }),
-	syncedAt: timestamp("synced_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	purchaseOrderId: uuid("purchase_order_id"),
-	supplierId: uuid("supplier_id"),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	subtotalCents: bigint("subtotal_cents", { mode: "number" }),
-	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
-	gstCents: bigint("gst_cents", { mode: "number" }),
-	gstTreatment: text("gst_treatment"),
-	parseConfidence: text("parse_confidence"),
-	matchMethod: text("match_method"),
-	disputeReason: text("dispute_reason"),
-	disputeNotes: text("dispute_notes"),
-	notes: text(),
-	attachmentStoragePath: text("attachment_storage_path"),
-	emailMessageId: uuid("email_message_id"),
-	confirmedAt: timestamp("confirmed_at", { withTimezone: true, mode: 'string' }),
-	confirmedByUserId: uuid("confirmed_by_user_id"),
-	disputedAt: timestamp("disputed_at", { withTimezone: true, mode: 'string' }),
-	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
-	attachmentParsedAt: timestamp("attachment_parsed_at", { withTimezone: true, mode: 'string' }),
-	attachmentParseFingerprint: text("attachment_parse_fingerprint"),
-	attachmentParseError: text("attachment_parse_error"),
-	hasAttachments: boolean("has_attachments"),
-}, (table) => [
-	index("venue_invoices_org_idx").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")),
-	index("venue_invoices_po_idx").using("btree", table.purchaseOrderId.asc().nullsLast().op("uuid_ops")).where(sql`(purchase_order_id IS NOT NULL)`),
-	index("venue_invoices_review_status_idx").using("btree", table.venueId.asc().nullsLast().op("uuid_ops"), table.reviewStatus.asc().nullsLast().op("uuid_ops")),
-	index("venue_invoices_supplier_idx").using("btree", table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`(supplier_id IS NOT NULL)`),
-	index("venue_invoices_venue_date_idx").using("btree", table.venueId.asc().nullsLast().op("uuid_ops"), table.invoiceDate.desc().nullsLast().op("date_ops")),
-	foreignKey({
-			columns: [table.organisationId],
-			foreignColumns: [organisations.id],
-			name: "venue_invoices_organisation_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.purchaseOrderId],
-			foreignColumns: [purchaseOrders.id],
-			name: "venue_invoices_purchase_order_id_fkey"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.supplierId],
-			foreignColumns: [suppliers.id],
-			name: "venue_invoices_supplier_id_fkey"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.venueId],
-			foreignColumns: [venues.id],
-			name: "venue_invoices_venue_id_fkey"
-		}).onDelete("cascade"),
-	unique("venue_invoices_venue_xero_uq").on(table.venueId, table.xeroInvoiceId),
-	pgPolicy("venue_invoices_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`(EXISTS ( SELECT 1
-   FROM (venues v
-     JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
-  WHERE ((v.id = venue_invoices.venue_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
-	pgPolicy("venue_invoices_select", { as: "permissive", for: "select", to: ["authenticated"] }),
-	pgPolicy("venue_invoices_update", { as: "permissive", for: "update", to: ["authenticated"] }),
-	check("venue_invoices_document_type_chk", sql`document_type = ANY (ARRAY['invoice'::text, 'credit_note'::text])`),
-	check("venue_invoices_gst_treatment_chk", sql`(gst_treatment IS NULL) OR (gst_treatment = ANY (ARRAY['inclusive'::text, 'exclusive'::text, 'mixed'::text]))`),
-	check("venue_invoices_match_method_chk", sql`(match_method IS NULL) OR (match_method = ANY (ARRAY['auto'::text, 'manual'::text, 'standalone'::text]))`),
-	check("venue_invoices_parse_confidence_chk", sql`(parse_confidence IS NULL) OR (parse_confidence = ANY (ARRAY['high'::text, 'medium'::text, 'low'::text]))`),
-	check("venue_invoices_review_status_chk", sql`review_status = ANY (ARRAY['pending_review'::text, 'pending_approval'::text, 'confirmed'::text, 'disputed'::text, 'duplicate'::text, 'archived'::text])`),
-	check("venue_invoices_source_chk", sql`source = ANY (ARRAY['xero'::text, 'upload'::text, 'email'::text])`),
 ]);
 
 export const rosterShifts = pgTable("roster_shifts", {
@@ -2272,6 +2273,109 @@ export const shiftBreaks = pgTable("shift_breaks", {
 	pgPolicy("shift_breaks_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	check("shift_breaks_break_type_check", sql`break_type = ANY (ARRAY['meal_unpaid'::text, 'rest_paid'::text])`),
 	check("shift_breaks_minutes_check", sql`minutes >= 0`),
+]);
+
+export const consumptionExceptions = pgTable("consumption_exceptions", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	organisationId: uuid("organisation_id").notNull(),
+	venueId: uuid("venue_id").notNull(),
+	date: date().notNull(),
+	kind: text().notNull(),
+	menuItemId: uuid("menu_item_id"),
+	recipeId: uuid("recipe_id"),
+	ingredientId: uuid("ingredient_id"),
+	detail: jsonb().default({}).notNull(),
+	qty: numeric(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	valueCents: bigint("value_cents", { mode: "number" }),
+	computedAt: timestamp("computed_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_consumption_exceptions_venue_date").using("btree", table.venueId.asc().nullsLast().op("date_ops"), table.date.desc().nullsFirst().op("date_ops")),
+	foreignKey({
+			columns: [table.ingredientId],
+			foreignColumns: [ingredients.id],
+			name: "consumption_exceptions_ingredient_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.menuItemId],
+			foreignColumns: [menuItems.id],
+			name: "consumption_exceptions_menu_item_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.organisationId],
+			foreignColumns: [organisations.id],
+			name: "consumption_exceptions_organisation_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.recipeId],
+			foreignColumns: [recipes.id],
+			name: "consumption_exceptions_recipe_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "consumption_exceptions_venue_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("consumption_exceptions_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM user_organisations uo
+  WHERE ((uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.organisation_id = consumption_exceptions.organisation_id) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
+	check("consumption_exceptions_kind_chk", sql`kind = ANY (ARRAY['unmapped_sale'::text, 'empty_recipe'::text, 'missing_modifier_recipe'::text, 'unit_conversion_failure'::text, 'recipe_cycle'::text])`),
+]);
+
+export const wasteEntries = pgTable("waste_entries", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	organisationId: uuid("organisation_id").notNull(),
+	venueId: uuid("venue_id").notNull(),
+	ingredientId: uuid("ingredient_id"),
+	recipeId: uuid("recipe_id"),
+	parentEntryId: uuid("parent_entry_id"),
+	qty: numeric().notNull(),
+	unit: text().notNull(),
+	qtyBaseUnits: numeric("qty_base_units"),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	costCents: bigint("cost_cents", { mode: "number" }).default(0).notNull(),
+	reason: text().notNull(),
+	note: text(),
+	source: text().default('manual').notNull(),
+	occurredAt: timestamp("occurred_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("idx_waste_entries_parent").using("btree", table.parentEntryId.asc().nullsLast().op("uuid_ops")).where(sql`(parent_entry_id IS NOT NULL)`),
+	index("idx_waste_entries_venue_occurred").using("btree", table.venueId.asc().nullsLast().op("timestamptz_ops"), table.occurredAt.desc().nullsFirst().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.ingredientId],
+			foreignColumns: [ingredients.id],
+			name: "waste_entries_ingredient_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.organisationId],
+			foreignColumns: [organisations.id],
+			name: "waste_entries_organisation_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.parentEntryId],
+			foreignColumns: [table.id],
+			name: "waste_entries_parent_entry_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.recipeId],
+			foreignColumns: [recipes.id],
+			name: "waste_entries_recipe_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "waste_entries_venue_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("waste_entries_delete", { as: "permissive", for: "delete", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM user_organisations uo
+  WHERE ((uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.organisation_id = waste_entries.organisation_id) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
+	pgPolicy("waste_entries_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("waste_entries_select", { as: "permissive", for: "select", to: ["authenticated"] }),
+	check("waste_entries_reason_chk", sql`reason = ANY (ARRAY['spoilage'::text, 'prep_error'::text, 'breakage'::text, 'theft'::text, 'correction'::text, 'other'::text])`),
+	check("waste_entries_source_chk", sql`source = ANY (ARRAY['manual'::text, 'batch_explosion'::text])`),
+	check("waste_entries_target_chk", sql`(ingredient_id IS NOT NULL) OR (recipe_id IS NOT NULL)`),
 ]);
 
 export const leaveTypes = pgTable("leave_types", {
@@ -3694,6 +3798,9 @@ export const ingredientConsumptionDaily = pgTable("ingredient_consumption_daily"
 	sourceRecipeCount: integer("source_recipe_count").default(0).notNull(),
 	sourceSalesCount: integer("source_sales_count").default(0).notNull(),
 	computedAt: timestamp("computed_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
+	costCents: bigint("cost_cents", { mode: "number" }).default(0).notNull(),
+	isFinal: boolean("is_final").default(false).notNull(),
 }, (table) => [
 	index("idx_ingredient_consumption_daily_venue_date").using("btree", table.venueId.asc().nullsLast().op("date_ops"), table.date.desc().nullsFirst().op("uuid_ops")),
 	foreignKey({
@@ -4091,6 +4198,57 @@ export const employeeOnboardingTokens = pgTable("employee_onboarding_tokens", {
 	pgPolicy("employee_onboarding_tokens_admin", { as: "permissive", for: "all", to: ["authenticated"], using: sql`is_org_admin(organisation_id)`, withCheck: sql`is_org_admin(organisation_id)`  }),
 ]);
 
+export const supplierProducts = pgTable("supplier_products", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	organisationId: uuid("organisation_id").notNull(),
+	venueId: uuid("venue_id"),
+	supplierId: uuid("supplier_id").notNull(),
+	ingredientId: uuid("ingredient_id"),
+	name: text().notNull(),
+	skuCode: text("sku_code"),
+	packLabel: text("pack_label").default('each').notNull(),
+	unitsPerPack: numeric("units_per_pack").default('1').notNull(),
+	packUnit: text("pack_unit").default('each').notNull(),
+	unitPriceCents: integer("unit_price_cents").default(0).notNull(),
+	isActiveForIngredient: boolean("is_active_for_ingredient").default(false).notNull(),
+	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	createdBy: uuid("created_by"),
+	updatedBy: uuid("updated_by"),
+	portionSize: numeric("portion_size"),
+	portionUnit: text("portion_unit"),
+	portionLabel: text("portion_label"),
+}, (table) => [
+	index("idx_supplier_products_ingredient").using("btree", table.ingredientId.asc().nullsLast().op("uuid_ops")).where(sql`((archived_at IS NULL) AND (is_active_for_ingredient = true))`),
+	index("idx_supplier_products_supplier").using("btree", table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
+	foreignKey({
+			columns: [table.ingredientId],
+			foreignColumns: [ingredients.id],
+			name: "supplier_products_ingredient_id_fkey"
+		}).onDelete("set null"),
+	foreignKey({
+			columns: [table.organisationId],
+			foreignColumns: [organisations.id],
+			name: "supplier_products_organisation_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.supplierId],
+			foreignColumns: [suppliers.id],
+			name: "supplier_products_supplier_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "supplier_products_venue_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("supplier_products_all", { as: "permissive", for: "all", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM user_organisations uo
+  WHERE ((uo.organisation_id = supplier_products.organisation_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`, withCheck: sql`(EXISTS ( SELECT 1
+   FROM user_organisations uo
+  WHERE ((uo.organisation_id = supplier_products.organisation_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
+]);
+
 export const supplierRawItems = pgTable("supplier_raw_items", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
 	organisationId: uuid("organisation_id").notNull(),
@@ -4098,7 +4256,6 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
 	rawDescription: text("raw_description").notNull(),
 	rawDescriptionNormalized: text("raw_description_normalized").notNull(),
 	rawUnit: text("raw_unit"),
-	rawUnitNormalized: text("raw_unit_normalized").default('').notNull(),
 	lastQuantity: numeric("last_quantity"),
 	lastUnitPriceCents: integer("last_unit_price_cents"),
 	lastLineTotalCents: integer("last_line_total_cents"),
@@ -4108,15 +4265,16 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
 	lastInvoiceId: uuid("last_invoice_id"),
 	normalisationStatus: text("normalisation_status").default('pending').notNull(),
 	supplierProductId: uuid("supplier_product_id"),
-	isLikelyInventory: boolean("is_likely_inventory"),
 	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	createdBy: uuid("created_by"),
 	updatedBy: uuid("updated_by"),
+	isLikelyInventory: boolean("is_likely_inventory"),
 	reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: 'string' }),
 	reviewedBy: uuid("reviewed_by"),
 	normalisationSuggestion: jsonb("normalisation_suggestion"),
+	rawUnitNormalized: text("raw_unit_normalized").default(sql`NULL`).notNull(),
 }, (table) => [
 	index("idx_supplier_raw_items_org_supplier").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops"), table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
 	index("idx_supplier_raw_items_pending").using("btree", table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`((archived_at IS NULL) AND (normalisation_status = 'pending'::text))`),
@@ -4148,57 +4306,6 @@ export const supplierRawItems = pgTable("supplier_raw_items", {
   WHERE ((uo.organisation_id = supplier_raw_items.organisation_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
 	check("supplier_raw_items_normalisation_status_check", sql`normalisation_status = ANY (ARRAY['pending'::text, 'normalised'::text, 'skipped'::text])`),
 	check("supplier_raw_items_source_check", sql`source = ANY (ARRAY['xero_api'::text, 'invoice_parse'::text, 'manual'::text])`),
-]);
-
-export const supplierProducts = pgTable("supplier_products", {
-	id: uuid().defaultRandom().primaryKey().notNull(),
-	organisationId: uuid("organisation_id").notNull(),
-	venueId: uuid("venue_id"),
-	supplierId: uuid("supplier_id").notNull(),
-	ingredientId: uuid("ingredient_id"),
-	name: text().notNull(),
-	skuCode: text("sku_code"),
-	packLabel: text("pack_label").default('each').notNull(),
-	unitsPerPack: numeric("units_per_pack").default('1').notNull(),
-	packUnit: text("pack_unit").default('each').notNull(),
-	unitPriceCents: integer("unit_price_cents").default(0).notNull(),
-	portionSize: numeric("portion_size"),
-	portionUnit: text("portion_unit"),
-	portionLabel: text("portion_label"),
-	isActiveForIngredient: boolean("is_active_for_ingredient").default(false).notNull(),
-	archivedAt: timestamp("archived_at", { withTimezone: true, mode: 'string' }),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	createdBy: uuid("created_by"),
-	updatedBy: uuid("updated_by"),
-}, (table) => [
-	index("idx_supplier_products_ingredient").using("btree", table.ingredientId.asc().nullsLast().op("uuid_ops")).where(sql`((archived_at IS NULL) AND (is_active_for_ingredient = true))`),
-	index("idx_supplier_products_supplier").using("btree", table.supplierId.asc().nullsLast().op("uuid_ops")).where(sql`(archived_at IS NULL)`),
-	foreignKey({
-			columns: [table.ingredientId],
-			foreignColumns: [ingredients.id],
-			name: "supplier_products_ingredient_id_fkey"
-		}).onDelete("set null"),
-	foreignKey({
-			columns: [table.organisationId],
-			foreignColumns: [organisations.id],
-			name: "supplier_products_organisation_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.supplierId],
-			foreignColumns: [suppliers.id],
-			name: "supplier_products_supplier_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.venueId],
-			foreignColumns: [venues.id],
-			name: "supplier_products_venue_id_fkey"
-		}).onDelete("cascade"),
-	pgPolicy("supplier_products_all", { as: "permissive", for: "all", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
-   FROM user_organisations uo
-  WHERE ((uo.organisation_id = supplier_products.organisation_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`, withCheck: sql`(EXISTS ( SELECT 1
-   FROM user_organisations uo
-  WHERE ((uo.organisation_id = supplier_products.organisation_id) AND (uo.user_profile_id = auth.uid()) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))`  }),
 ]);
 
 export const ingredients = pgTable("ingredients", {

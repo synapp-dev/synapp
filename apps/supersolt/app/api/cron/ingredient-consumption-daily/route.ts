@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceAppDb } from "@/server/db/create-app-db";
-import { consumptionDailyService } from "@/server/stock-counts/consumption-daily.service";
+import { consumptionService } from "@/server/consumption/consumption.service";
 
 function authorizeCron(request: Request): boolean {
   const secret = process.env.CRON_SECRET?.trim();
@@ -14,6 +14,6 @@ export async function GET(request: Request) {
   }
 
   const appDb = createServiceAppDb();
-  const result = await consumptionDailyService.recomputeAllVenues(appDb);
+  const result = await consumptionService.runNightly(appDb);
   return NextResponse.json({ ok: true, ...result });
 }

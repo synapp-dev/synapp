@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { flowStateInAuth, samlRelayStatesInAuth, ssoProvidersInAuth, samlProvidersInAuth, sessionsInAuth, refreshTokensInAuth, oauthClientsInAuth, usersInAuth, ssoDomainsInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaFactorsInAuth, mfaChallengesInAuth, oauthConsentsInAuth, oauthAuthorizationsInAuth, webauthnCredentialsInAuth, webauthnChallengesInAuth, positions, userVenues, roles, userOrganisations, venues, venueForecastState, organisations, venueSquareConnections, recipes, recipeMethodSteps, menuItems, menuItemSquareCatalogLinks, recipeAllergens, menuItemRecipes, menuItemGroups, venueSquareOrderLines, ingredients, ingredientOrderBuffers, suppliers, rosterTemplates, rosterTemplateShifts, userProfiles, dashboardUserPreferences, agentDigestCache, venueStaffWeeklyAvailability, insightsAlerts, venueXeroConnections, organisationPurchasingSettings, inventorySetupImportJobs, venueStaffWeekInstanceAvailability, purchaseOrders, purchaseOrderEmails, purchaseOrderLines, supplierProducts, purchaseOrderReceivingEvents, venueInvoices, purchaseOrderAuditLog, orderGuideCache, venueInvoiceLineItems, invoiceCostChangeEvents, venueModifierLists, venueModifiers, menuItemGroupModifierLists, venueEmailInboxes, venueInvoiceAttachments, venueInvoiceAuditLog, rosterShifts, rosterWeeks, supplierProductPriceHistory, inboundEmailLog, shiftComplianceFlags, rosterPublishDeliveries, shiftBreaks, leaveTypes, leaveBalances, leaveRequests, leaveAuditLog, leaveAccrualEvents, payrollLeaveLines, payRuns, awards, awardClassifications, awardRates, penaltyRates, juniorRateScales, minimumEngagements, awardAllowances, libraryUpdateLog, organisationAwardConfig, awrUpliftEvents, employeePayRateHistory, timesheets, payPeriods, payrollTimesheetLines, timesheetClockEvents, timesheetDisputes, timesheetAuditLog, organisationPayrollSettings, payRunLineItems, payrollPreflightChecks, payrollAuditLog, payrollXeroPushLog, authWhitelist, organisationMemberInvites, venueSquarePayments, venueStorageLocations, ingredientStorageLocations, stockCountSchedules, stockCountTemplates, stockCounts, ingredientConsumptionDaily, stockCountEntries, stockCountVarianceEvents, stockCountAuditEvents, venueReadinessUserState, employeeCertifications, employeeDocuments, employeeAuditLog, xeroEmployeeSyncLog, employeeOnboardingTokens, supplierRawItems, recipeIngredients, purchaseOrderNumberSequences, forecasts, dailySales, employeePayrollProfiles } from "./schema";
+import { flowStateInAuth, samlRelayStatesInAuth, ssoProvidersInAuth, samlProvidersInAuth, sessionsInAuth, refreshTokensInAuth, oauthClientsInAuth, usersInAuth, ssoDomainsInAuth, mfaAmrClaimsInAuth, identitiesInAuth, oneTimeTokensInAuth, mfaFactorsInAuth, mfaChallengesInAuth, oauthConsentsInAuth, oauthAuthorizationsInAuth, webauthnCredentialsInAuth, webauthnChallengesInAuth, positions, userVenues, roles, userOrganisations, venues, venueForecastState, organisations, venueSquareConnections, recipes, recipeMethodSteps, menuItems, menuItemSquareCatalogLinks, recipeAllergens, menuItemRecipes, menuItemGroups, venueSquareOrderLines, ingredients, ingredientOrderBuffers, suppliers, rosterTemplates, rosterTemplateShifts, userProfiles, dashboardUserPreferences, agentDigestCache, venueStaffWeeklyAvailability, insightsAlerts, venueXeroConnections, organisationPurchasingSettings, inventorySetupImportJobs, venueStaffWeekInstanceAvailability, purchaseOrders, purchaseOrderEmails, purchaseOrderLines, supplierProducts, purchaseOrderReceivingEvents, venueInvoices, purchaseOrderAuditLog, orderGuideCache, venueInvoiceLineItems, invoiceCostChangeEvents, venueModifierLists, venueModifiers, menuItemGroupModifierLists, venueEmailInboxes, venueInvoiceAttachments, venueInvoiceAuditLog, rosterShifts, rosterWeeks, supplierProductPriceHistory, inboundEmailLog, shiftComplianceFlags, rosterPublishDeliveries, shiftBreaks, consumptionExceptions, wasteEntries, leaveTypes, leaveBalances, leaveRequests, leaveAuditLog, leaveAccrualEvents, payrollLeaveLines, payRuns, awards, awardClassifications, awardRates, penaltyRates, juniorRateScales, minimumEngagements, awardAllowances, libraryUpdateLog, organisationAwardConfig, awrUpliftEvents, employeePayRateHistory, timesheets, payPeriods, payrollTimesheetLines, timesheetClockEvents, timesheetDisputes, timesheetAuditLog, organisationPayrollSettings, payRunLineItems, payrollPreflightChecks, payrollAuditLog, payrollXeroPushLog, authWhitelist, organisationMemberInvites, venueSquarePayments, venueStorageLocations, ingredientStorageLocations, stockCountSchedules, stockCountTemplates, stockCounts, ingredientConsumptionDaily, stockCountEntries, stockCountVarianceEvents, stockCountAuditEvents, venueReadinessUserState, employeeCertifications, employeeDocuments, employeeAuditLog, xeroEmployeeSyncLog, employeeOnboardingTokens, supplierRawItems, recipeIngredients, purchaseOrderNumberSequences, forecasts, dailySales, employeePayrollProfiles } from "./schema";
 
 export const samlRelayStatesInAuthRelations = relations(samlRelayStatesInAuth, ({one}) => ({
 	flowStateInAuth: one(flowStateInAuth, {
@@ -228,16 +228,18 @@ export const venuesRelations = relations(venues, ({one, many}) => ({
 	purchaseOrders: many(purchaseOrders),
 	orderGuideCaches: many(orderGuideCache),
 	venueInvoiceLineItems: many(venueInvoiceLineItems),
+	venueInvoices: many(venueInvoices),
 	menuItemGroups: many(menuItemGroups),
 	venueModifierLists: many(venueModifierLists),
 	venueModifiers: many(venueModifiers),
 	menuItemGroupModifierLists: many(menuItemGroupModifierLists),
 	venueEmailInboxes: many(venueEmailInboxes),
 	venueInvoiceAttachments: many(venueInvoiceAttachments),
-	venueInvoices: many(venueInvoices),
 	rosterShifts: many(rosterShifts),
 	inboundEmailLogs: many(inboundEmailLog),
 	rosterWeeks: many(rosterWeeks),
+	consumptionExceptions: many(consumptionExceptions),
+	wasteEntries: many(wasteEntries),
 	leaveRequests: many(leaveRequests),
 	organisation: one(organisations, {
 		fields: [venues.organisationId],
@@ -298,17 +300,19 @@ export const organisationsRelations = relations(organisations, ({many}) => ({
 	venueStaffWeekInstanceAvailabilities: many(venueStaffWeekInstanceAvailability),
 	purchaseOrders: many(purchaseOrders),
 	venueInvoiceLineItems: many(venueInvoiceLineItems),
+	venueInvoices: many(venueInvoices),
 	menuItemGroups: many(menuItemGroups),
 	venueModifierLists: many(venueModifierLists),
 	venueModifiers: many(venueModifiers),
 	menuItemGroupModifierLists: many(menuItemGroupModifierLists),
 	venueEmailInboxes: many(venueEmailInboxes),
 	venueInvoiceAttachments: many(venueInvoiceAttachments),
-	venueInvoices: many(venueInvoices),
 	rosterShifts: many(rosterShifts),
 	supplierProductPriceHistories: many(supplierProductPriceHistory),
 	inboundEmailLogs: many(inboundEmailLog),
 	rosterWeeks: many(rosterWeeks),
+	consumptionExceptions: many(consumptionExceptions),
+	wasteEntries: many(wasteEntries),
 	leaveTypes: many(leaveTypes),
 	leaveBalances: many(leaveBalances),
 	leaveRequests: many(leaveRequests),
@@ -343,8 +347,8 @@ export const organisationsRelations = relations(organisations, ({many}) => ({
 	employeeAuditLogs: many(employeeAuditLog),
 	xeroEmployeeSyncLogs: many(xeroEmployeeSyncLog),
 	employeeOnboardingTokens: many(employeeOnboardingTokens),
-	supplierRawItems: many(supplierRawItems),
 	supplierProducts: many(supplierProducts),
+	supplierRawItems: many(supplierRawItems),
 	ingredients: many(ingredients),
 	employeePayrollProfiles: many(employeePayrollProfiles),
 }));
@@ -361,6 +365,8 @@ export const recipesRelations = relations(recipes, ({one, many}) => ({
 	recipeMethodSteps: many(recipeMethodSteps),
 	recipeAllergens: many(recipeAllergens),
 	menuItemRecipes: many(menuItemRecipes),
+	consumptionExceptions: many(consumptionExceptions),
+	wasteEntries: many(wasteEntries),
 	recipeIngredients_recipeId: many(recipeIngredients, {
 		relationName: "recipeIngredients_recipeId_recipes_id"
 	}),
@@ -407,6 +413,7 @@ export const menuItemsRelations = relations(menuItems, ({one, many}) => ({
 		references: [venues.id]
 	}),
 	venueSquareOrderLines: many(venueSquareOrderLines),
+	consumptionExceptions: many(consumptionExceptions),
 }));
 
 export const recipeAllergensRelations = relations(recipeAllergens, ({one}) => ({
@@ -474,6 +481,8 @@ export const ingredientsRelations = relations(ingredients, ({one, many}) => ({
 	ingredientOrderBuffers: many(ingredientOrderBuffers),
 	purchaseOrderLines: many(purchaseOrderLines),
 	venueInvoiceLineItems: many(venueInvoiceLineItems),
+	consumptionExceptions: many(consumptionExceptions),
+	wasteEntries: many(wasteEntries),
 	ingredientStorageLocations: many(ingredientStorageLocations),
 	ingredientConsumptionDailies: many(ingredientConsumptionDaily),
 	stockCountEntries: many(stockCountEntries),
@@ -512,8 +521,8 @@ export const suppliersRelations = relations(suppliers, ({one, many}) => ({
 	}),
 	purchaseOrders: many(purchaseOrders),
 	venueInvoices: many(venueInvoices),
-	supplierRawItems: many(supplierRawItems),
 	supplierProducts: many(supplierProducts),
+	supplierRawItems: many(supplierRawItems),
 	ingredients: many(ingredients),
 }));
 
@@ -795,7 +804,6 @@ export const supplierProductsRelations = relations(supplierProducts, ({one, many
 	venueInvoiceLineItems: many(venueInvoiceLineItems),
 	invoiceCostChangeEvents: many(invoiceCostChangeEvents),
 	supplierProductPriceHistories: many(supplierProductPriceHistory),
-	supplierRawItems: many(supplierRawItems),
 	ingredient: one(ingredients, {
 		fields: [supplierProducts.ingredientId],
 		references: [ingredients.id],
@@ -813,6 +821,7 @@ export const supplierProductsRelations = relations(supplierProducts, ({one, many
 		fields: [supplierProducts.venueId],
 		references: [venues.id]
 	}),
+	supplierRawItems: many(supplierRawItems),
 	ingredients: many(ingredients, {
 		relationName: "ingredients_activeSupplierProductId_supplierProducts_id"
 	}),
@@ -830,9 +839,6 @@ export const venueInvoicesRelations = relations(venueInvoices, ({one, many}) => 
 		relationName: "purchaseOrders_linkedInvoiceId_venueInvoices_id"
 	}),
 	venueInvoiceLineItems: many(venueInvoiceLineItems),
-	invoiceCostChangeEvents: many(invoiceCostChangeEvents),
-	venueInvoiceAttachments: many(venueInvoiceAttachments),
-	venueInvoiceAuditLogs: many(venueInvoiceAuditLog),
 	organisation: one(organisations, {
 		fields: [venueInvoices.organisationId],
 		references: [organisations.id]
@@ -850,6 +856,9 @@ export const venueInvoicesRelations = relations(venueInvoices, ({one, many}) => 
 		fields: [venueInvoices.venueId],
 		references: [venues.id]
 	}),
+	invoiceCostChangeEvents: many(invoiceCostChangeEvents),
+	venueInvoiceAttachments: many(venueInvoiceAttachments),
+	venueInvoiceAuditLogs: many(venueInvoiceAuditLog),
 	inboundEmailLogs: many(inboundEmailLog),
 	supplierRawItems: many(supplierRawItems),
 }));
@@ -1092,6 +1101,56 @@ export const shiftBreaksRelations = relations(shiftBreaks, ({one}) => ({
 	rosterShift: one(rosterShifts, {
 		fields: [shiftBreaks.shiftId],
 		references: [rosterShifts.id]
+	}),
+}));
+
+export const consumptionExceptionsRelations = relations(consumptionExceptions, ({one}) => ({
+	ingredient: one(ingredients, {
+		fields: [consumptionExceptions.ingredientId],
+		references: [ingredients.id]
+	}),
+	menuItem: one(menuItems, {
+		fields: [consumptionExceptions.menuItemId],
+		references: [menuItems.id]
+	}),
+	organisation: one(organisations, {
+		fields: [consumptionExceptions.organisationId],
+		references: [organisations.id]
+	}),
+	recipe: one(recipes, {
+		fields: [consumptionExceptions.recipeId],
+		references: [recipes.id]
+	}),
+	venue: one(venues, {
+		fields: [consumptionExceptions.venueId],
+		references: [venues.id]
+	}),
+}));
+
+export const wasteEntriesRelations = relations(wasteEntries, ({one, many}) => ({
+	ingredient: one(ingredients, {
+		fields: [wasteEntries.ingredientId],
+		references: [ingredients.id]
+	}),
+	organisation: one(organisations, {
+		fields: [wasteEntries.organisationId],
+		references: [organisations.id]
+	}),
+	wasteEntry: one(wasteEntries, {
+		fields: [wasteEntries.parentEntryId],
+		references: [wasteEntries.id],
+		relationName: "wasteEntries_parentEntryId_wasteEntries_id"
+	}),
+	wasteEntries: many(wasteEntries, {
+		relationName: "wasteEntries_parentEntryId_wasteEntries_id"
+	}),
+	recipe: one(recipes, {
+		fields: [wasteEntries.recipeId],
+		references: [recipes.id]
+	}),
+	venue: one(venues, {
+		fields: [wasteEntries.venueId],
+		references: [venues.id]
 	}),
 }));
 
