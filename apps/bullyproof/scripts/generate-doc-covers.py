@@ -52,7 +52,7 @@ h1 { font-family:Georgia,'Times New Roman',serif; font-size:57px; font-weight:70
        background:linear-gradient(90deg,#008490 0%,#0483c8 55%,#00497d 100%); }
 """
 
-def cover_html(num, eyebrow, title, subtitle, reference):
+def cover_html(num, eyebrow, title, subtitle, reference, date="7 July 2026"):
     return f"""<!doctype html><html><head><meta charset="utf-8"><style>{CSS}</style></head><body>
 <div class="glow"></div><div class="glow2"></div>{MERKABA}<div class="docnum">{num}</div>
 <div class="page">
@@ -66,7 +66,7 @@ def cover_html(num, eyebrow, title, subtitle, reference):
   <div class="meta">
     <div><div class="label">PREPARED FOR</div><div class="v">Bullyproof Australia</div><div class="s">Amayda Pty Ltd &middot; Attn: Glenn Rushton</div></div>
     <div><div class="label">PREPARED BY</div><div class="v">Intradark Pty Ltd</div><div class="s">ABN 38 696 182 457 &middot; Aaron J. Girton</div></div>
-    <div><div class="label">DATE</div><div class="v">7 July 2026</div></div>
+    <div><div class="label">DATE</div><div class="v">{date}</div></div>
     <div><div class="label">REFERENCE</div><div class="v">{reference}</div></div>
   </div>
 </div>
@@ -102,16 +102,24 @@ COVERS = {
         "System Administrator Guide",
         "Architecture, configuration, deployment and technical operation of the platform.",
         "Deliverable D6"),
+    "04-intradark-dev-capability-schedule": ("08", "BULLYPROOF PLATFORM &middot; HANDOVER",
+        "Developer Capability &amp; Handover Disposition",
+        "Every developer-level capability, its disposition at handover, and who holds it afterwards.",
+        "Handover", "11 July 2026"),
+    "05-minimum-audit-trail-scope": ("09", "BULLYPROOF PLATFORM &middot; PROPOSAL",
+        "Minimum Content Audit Trail",
+        "Technical scope, acceptance criteria and itemised pricing for the minimum audit capability.",
+        "M5 carve-out", "11 July 2026"),
 }
 
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     only = set(sys.argv[1:])
-    for key, (num, eyebrow, title, subtitle, ref) in COVERS.items():
+    for key, spec in COVERS.items():
         if only and key not in only:
             continue
         html_path = OUT / f"{key}.html"
-        html_path.write_text(cover_html(num, eyebrow, title, subtitle, ref), encoding="utf-8")
+        html_path.write_text(cover_html(*spec), encoding="utf-8")
         png_path = OUT / f"{key}.png"
         subprocess.run([CHROME, "--headless", "--disable-gpu", "--force-device-scale-factor=2",
                         f"--screenshot={png_path}", "--window-size=827,1169",

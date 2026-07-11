@@ -50,6 +50,8 @@ COVER_FOR = {
     "variation-deliverables-verification": "variation-deliverables-verification",
     "system-administrator-guide": "system-administrator-guide",
     "01-M2-M8-classification": "01-M2-M8-classification",
+    "04-intradark-dev-capability-schedule": "04-intradark-dev-capability-schedule",
+    "05-minimum-audit-trail-scope": "05-minimum-audit-trail-scope",
 }
 A4_WIDTH_EMU = 7560310    # 21.0 cm
 A4_HEIGHT_EMU = 10692130  # 29.7 cm
