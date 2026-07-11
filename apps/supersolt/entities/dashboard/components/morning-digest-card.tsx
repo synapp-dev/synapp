@@ -1,27 +1,38 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
-import Link from "next/link";
+import { RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@workspace/ui/components/button";
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
 
-import type { DashboardMorningDigestData } from "@/entities/dashboard/model/dummy-dashboard-data";
+import type { DashboardDigestStatus } from "@/entities/dashboard/model/use-dashboard-digest";
 
 export type MorningDigestCardProps = {
-  digest: DashboardMorningDigestData;
+  text: string;
+  status: DashboardDigestStatus;
+  onRegenerate: () => void;
+  onAskAgent?: () => void;
   className?: string;
 };
 
-export function MorningDigestCard({ digest, className }: MorningDigestCardProps) {
+export function MorningDigestCard({
+  text,
+  status,
+  onRegenerate,
+  onAskAgent,
+  className,
+}: MorningDigestCardProps) {
+  if (status === "idle" || status === "unavailable") {
+    return null;
+  }
+
   return (
     <Card
       className={cn(
@@ -38,30 +49,41 @@ export function MorningDigestCard({ digest, className }: MorningDigestCardProps)
             Morning digest
           </CardTitle>
           <CardDescription className="text-xs uppercase tracking-wide">
-            Agent · today&apos;s read
+            Superbot · today&apos;s read
           </CardDescription>
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 gap-1.5 text-xs"
+          onClick={onRegenerate}
+          disabled={status === "streaming"}
+        >
+          <RefreshCw
+            className={cn("h-3 w-3", status === "streaming" && "animate-spin")}
+          />
+          Refresh
+        </Button>
       </CardHeader>
-      <CardContent className="space-y-3 text-sm leading-relaxed text-muted-foreground">
-        {digest.lines.map((line) => (
-          <p key={line}>{line}</p>
-        ))}
-        {digest.insightHeadline ? (
-          <div className="rounded-lg border border-border/80 bg-muted/40 px-3 py-2 text-foreground">
-            <p className="text-xs font-medium text-muted-foreground">
-              {digest.insightHeadline}
-            </p>
-            {digest.insightBody ? (
-              <p className="mt-1 text-sm text-foreground/90">{digest.insightBody}</p>
+      <CardContent className="space-y-3 text-sm leading-relaxed">
+        {status === "error" ? (
+          <p className="text-muted-foreground">
+            Couldn&apos;t generate today&apos;s digest. Try refresh.
+          </p>
+        ) : (
+          <p className="whitespace-pre-wrap">
+            {text}
+            {status === "streaming" ? (
+              <span className="bg-foreground/70 ml-0.5 inline-block h-4 w-[2px] animate-pulse align-middle" />
             ) : null}
-          </div>
+          </p>
+        )}
+        {status === "done" && onAskAgent ? (
+          <Button size="sm" variant="outline" onClick={onAskAgent}>
+            Ask the agent more
+          </Button>
         ) : null}
       </CardContent>
-      <CardFooter className="flex flex-wrap gap-2 border-t pt-4">
-        <Button size="sm" asChild>
-          <Link href="/agent">Ask the agent more</Link>
-        </Button>
-      </CardFooter>
     </Card>
   );
 }
