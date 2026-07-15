@@ -34,6 +34,7 @@ export type SupplierProductWithSupplier = {
     email: string | null;
     leadTimeDays: number;
     minimumOrderCents: number;
+    deliverySchedule: unknown;
   };
 };
 
@@ -135,6 +136,7 @@ export const orderGuideRepo = {
         email: suppliers.email,
         leadTimeDays: suppliers.leadTimeDays,
         minimumOrderCents: suppliers.minimumOrderCents,
+        deliverySchedule: suppliers.deliverySchedule,
       })
       .from(supplierProducts)
       .innerJoin(suppliers, eq(suppliers.id, supplierProducts.supplierId))
@@ -166,8 +168,35 @@ export const orderGuideRepo = {
         email: r.email,
         leadTimeDays: r.leadTimeDays ?? 3,
         minimumOrderCents: r.minimumOrderCents ?? 0,
+        deliverySchedule: r.deliverySchedule,
       },
     }));
+  },
+
+  async listSupplierSchedules(
+    tx: RlsTx,
+    supplierIds: string[],
+  ): Promise<
+    Map<string, { deliverySchedule: unknown; leadTimeDays: number }>
+  > {
+    if (supplierIds.length === 0) return new Map();
+    const rows = await tx
+      .select({
+        id: suppliers.id,
+        deliverySchedule: suppliers.deliverySchedule,
+        leadTimeDays: suppliers.leadTimeDays,
+      })
+      .from(suppliers)
+      .where(inArray(suppliers.id, supplierIds));
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          deliverySchedule: row.deliverySchedule,
+          leadTimeDays: row.leadTimeDays ?? 3,
+        },
+      ]),
+    );
   },
 
   async listVenueIngredients(tx: RlsTx, venueId: string) {

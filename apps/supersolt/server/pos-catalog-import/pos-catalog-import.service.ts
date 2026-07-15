@@ -16,6 +16,9 @@ import {
 import { posCatalogImportRepo } from "@/server/pos-catalog-import/pos-catalog-import.repo";
 import { computeMissingFromSquare } from "@/server/inventory-setup/map-square-catalog-to-menu-drafts";
 
+/** No sale inside this window flags an in-use item as possibly not in use. */
+const STALE_SALES_WINDOW_DAYS = 30;
+
 export class PosCatalogImportServiceError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -42,6 +45,21 @@ export const posCatalogImportService = {
   ) {
     const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
 
+    const staleCutoffIso = new Date(
+      Date.now() - STALE_SALES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const lastSoldAtByMenuItemId = await posCatalogImportRepo.lastSoldAtByMenuItem(
+      ctx.appDb,
+      scope.venueId,
+    );
+    const firstSaleAt = await posCatalogImportRepo.firstSaleObservedAt(
+      ctx.appDb,
+      scope.venueId,
+    );
+    // Only flag staleness once the sales mirror covers the whole window;
+    // otherwise a fresh venue would see every item flagged on day one.
+    const staleFlaggingActive = firstSaleAt !== null && firstSaleAt <= staleCutoffIso;
+
     return ctx.appDb.rls(async (tx) => {
       const seenIds = await posCatalogImportRepo.getLastCompletedSquareImportSeenIds(
         tx,
@@ -57,6 +75,8 @@ export const posCatalogImportService = {
         organisationId: scope.organisationId,
         venueId: scope.venueId,
         missingCatalogObjectIds: missing,
+        lastSoldAtByMenuItemId,
+        staleCutoffIso: staleFlaggingActive ? staleCutoffIso : null,
       });
 
       const posImportRan = await posCatalogImportRepo.hasCompletedSquareImport(tx, scope.venueId);
@@ -157,6 +177,53 @@ export const posCatalogImportService = {
     });
 
     return result;
+  },
+
+  async setModifierListEnabled(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      menuItemId: string;
+      modifierListId: string;
+      enabled: boolean;
+    },
+  ) {
+    const scope = await resolveScope(ctx, args.organisationSlug, args.venueSlug);
+    assertInventorySetupWriteAccess(ctx.tenantRoles, {
+      organisationId: scope.organisationId,
+      venueId: scope.venueId,
+    });
+
+    await ctx.appDb.rls(async (tx) => {
+      const menuItem = await menuItemsRepo.getMenuItemById(tx, {
+        organisationId: scope.organisationId,
+        venueId: scope.venueId,
+        menuItemId: args.menuItemId,
+      });
+      if (!menuItem) {
+        throw new PosCatalogImportServiceError(404, "POS item not found");
+      }
+      if (!menuItem.groupId) {
+        throw new PosCatalogImportServiceError(404, "POS item has no modifier lists");
+      }
+
+      const updated = await posCatalogGroupsRepo.setGroupModifierListEnabled(tx, {
+        groupId: menuItem.groupId,
+        modifierListId: args.modifierListId,
+        enabled: args.enabled,
+        updatedAt: new Date().toISOString(),
+      });
+      if (!updated) {
+        throw new PosCatalogImportServiceError(404, "Modifier list not found for this item");
+      }
+    });
+
+    console.info("[pos-catalog-import] modifier_list_toggled", {
+      menuItemId: args.menuItemId,
+      modifierListId: args.modifierListId,
+      enabled: args.enabled,
+    });
   },
 
   async updateShowOnMenu(

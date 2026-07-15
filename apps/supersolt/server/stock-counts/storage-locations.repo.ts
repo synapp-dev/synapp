@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { asc, count, eq, inArray } from "drizzle-orm";
 
 import type { RlsTx } from "@/server/db/drizzle";
 import {
@@ -93,6 +93,30 @@ export const storageLocationsRepo = {
         isPrimary: locationId === args.primaryLocationId,
       })),
     );
+  },
+
+  /**
+   * Add a location link for an ingredient without touching existing links.
+   * Becomes primary when the ingredient has no location yet.
+   */
+  async ensureIngredientLocation(
+    tx: RlsTx,
+    args: { ingredientId: string; locationId: string },
+  ): Promise<void> {
+    const existing = await tx
+      .select({
+        locationId: ingredientStorageLocations.locationId,
+      })
+      .from(ingredientStorageLocations)
+      .where(eq(ingredientStorageLocations.ingredientId, args.ingredientId));
+
+    if (existing.some((row) => row.locationId === args.locationId)) return;
+
+    await tx.insert(ingredientStorageLocations).values({
+      ingredientId: args.ingredientId,
+      locationId: args.locationId,
+      isPrimary: existing.length === 0,
+    });
   },
 
   async listForIngredient(tx: RlsTx, ingredientId: string) {

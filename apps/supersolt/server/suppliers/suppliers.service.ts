@@ -4,7 +4,6 @@ import type {
 } from "@/entities/suppliers/model/schedule-types";
 import type { RequestAuthContext } from "@/server/auth/context";
 import type { RlsTx } from "@/server/db/drizzle";
-import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import { supplierRawItemsRepo } from "@/server/supplier-raw-items/supplier-raw-items.repo";
 import {
@@ -122,13 +121,6 @@ export class SuppliersServiceError extends Error {
     super(message);
     this.status = status;
   }
-}
-
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new SuppliersServiceError(error.status, error.message);
-  }
-  throw error;
 }
 
 function clampNumber(value: number, min: number, max: number): number {

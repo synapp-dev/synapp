@@ -50,6 +50,12 @@ export type AppNavigationCatalogEntry = {
    * `/{organisationSlug}/{venueSlug}{pathSuffix}` (access is still checked against the given org/venue).
    */
   globalHref?: string;
+  /**
+   * The page reads the insights period params (`preset`/`from`/`to`, see
+   * `entities/insights/lib/period.ts`), so agent deep links may carry a
+   * date range in the query string.
+   */
+  supportsInsightsPeriod?: boolean;
 };
 
 export const APP_NAVIGATION_CATALOG: Record<
@@ -73,12 +79,14 @@ export const APP_NAVIGATION_CATALOG: Record<
     title: "Sales",
     description: "Sales insights for this venue.",
     pathSuffix: "/insights/sales",
+    supportsInsightsPeriod: true,
   },
   insights_labour: {
     key: "insights_labour",
     title: "Labour",
     description: "Labour insights for this venue.",
     pathSuffix: "/insights/labour",
+    supportsInsightsPeriod: true,
   },
   insights_inventory: {
     key: "insights_inventory",
@@ -253,4 +261,31 @@ export function isAppNavigationDestinationKey(
   value: string,
 ): value is AppNavigationDestinationKey {
   return (APP_NAVIGATION_DESTINATION_KEYS as readonly string[]).includes(value);
+}
+
+/**
+ * Destinations locked until Phase 2 (see `lib/phase2-modules.ts`). Kept in the
+ * catalog so keys stay valid, but excluded from agent suggestions while the
+ * gate is off.
+ */
+export const PHASE2_LOCKED_DESTINATION_KEYS = [
+  "insights_labour",
+  "insights_p_and_l",
+  "workforce",
+  "workforce_people",
+  "workforce_roster",
+  "workforce_availability",
+  "workforce_leave",
+  "workforce_timesheets",
+  "workforce_payroll_export",
+  "operations",
+  "operations_daybook",
+] as const satisfies readonly AppNavigationDestinationKey[];
+
+export function isPhase2LockedDestinationKey(
+  key: AppNavigationDestinationKey,
+): boolean {
+  return (
+    PHASE2_LOCKED_DESTINATION_KEYS as readonly AppNavigationDestinationKey[]
+  ).includes(key);
 }

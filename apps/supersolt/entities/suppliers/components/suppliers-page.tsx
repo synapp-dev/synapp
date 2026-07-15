@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SuperbotFocusBanner } from "@/entities/ai-agent-chat/components/superbot-focus";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -536,6 +537,7 @@ export function SuppliersPageClient({
             : "min-h-[calc(100vh-10rem)]",
         )}
       >
+        <SuperbotFocusBanner destination="inventory_suppliers" />
         {hidePageHeader ? null : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">

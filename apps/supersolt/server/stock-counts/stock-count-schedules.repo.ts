@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lt } from "drizzle-orm";
 
 import type { AppDb } from "@/server/db/create-app-db";
 import type { RlsTx } from "@/server/db/drizzle";

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { AppDb } from "@/server/db/create-app-db";
 import type { RlsTx } from "@/server/db/drizzle";
@@ -12,6 +12,22 @@ import {
 export type SquareOrderLineInsert = typeof venueSquareOrderLines.$inferInsert;
 
 export const salesInsightsRepo = {
+  async listMenuItemSections(
+    tx: RlsTx,
+    venueId: string,
+  ): Promise<Array<{ id: string; sectionName: string }>> {
+    return tx
+      .select({ id: menuItems.id, sectionName: menuItems.sectionName })
+      .from(menuItems)
+      .where(
+        and(
+          eq(menuItems.venueId, venueId),
+          isNull(menuItems.archivedAt),
+          eq(menuItems.isActive, true),
+        ),
+      );
+  },
+
   async loadSquareLineMappingContext(
     tx: RlsTx,
     venueId: string,
@@ -91,17 +107,21 @@ export const salesInsightsRepo = {
             venueSquareOrderLines.squarePaymentId,
             venueSquareOrderLines.squareLineUid,
           ],
+          // `excluded.*` takes the incoming row's values; referencing the
+          // table's own columns here is a self-assignment no-op on conflict.
           set: {
-            squareOrderId: venueSquareOrderLines.squareOrderId,
-            quantity: venueSquareOrderLines.quantity,
-            lineName: venueSquareOrderLines.lineName,
-            squareCatalogObjectId: venueSquareOrderLines.squareCatalogObjectId,
-            grossAmountCents: venueSquareOrderLines.grossAmountCents,
-            currency: venueSquareOrderLines.currency,
-            menuItemId: venueSquareOrderLines.menuItemId,
-            matchSource: venueSquareOrderLines.matchSource,
-            observedAt: venueSquareOrderLines.observedAt,
-            updatedAt: venueSquareOrderLines.updatedAt,
+            squareOrderId: sql`excluded.square_order_id`,
+            quantity: sql`excluded.quantity`,
+            lineName: sql`excluded.line_name`,
+            variationName: sql`excluded.variation_name`,
+            modifiers: sql`excluded.modifiers`,
+            squareCatalogObjectId: sql`excluded.square_catalog_object_id`,
+            grossAmountCents: sql`excluded.gross_amount_cents`,
+            currency: sql`excluded.currency`,
+            menuItemId: sql`excluded.menu_item_id`,
+            matchSource: sql`excluded.match_source`,
+            observedAt: sql`excluded.observed_at`,
+            updatedAt: sql`excluded.updated_at`,
           },
         });
     }

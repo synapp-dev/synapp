@@ -1,6 +1,5 @@
 import type { RequestAuthContext } from "@/server/auth/context";
 import {
-  canApplyAwrUplift,
   canManageAwardConfig,
   canViewAwardRates,
 } from "@/server/auth/capabilities";

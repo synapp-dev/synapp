@@ -12,6 +12,7 @@ import {
 import type { RlsTx } from "@/server/db/drizzle";
 import {
   organisationPurchasingSettings,
+  organisations,
   purchaseOrderAuditLog,
   purchaseOrderEmails,
   purchaseOrderLines,
@@ -20,6 +21,8 @@ import {
   purchaseOrders,
   supplierProducts,
   suppliers,
+  venueInvoices,
+  venues,
 } from "@/server/db/schema";
 
 export type PoStatus =
@@ -377,6 +380,7 @@ export const purchaseOrdersRepo = {
     defaultBufferPercent: number;
     poApprovalThresholdCents: number;
     gstTreatment: string;
+    poEmailTemplate: string | null;
   }> {
     const rows = await tx
       .select()
@@ -389,7 +393,42 @@ export const purchaseOrdersRepo = {
       defaultBufferPercent: Number(data?.defaultBufferPercent ?? 15),
       poApprovalThresholdCents: Number(data?.poApprovalThresholdCents ?? 50000),
       gstTreatment: data?.gstTreatment ?? "exclusive",
+      poEmailTemplate: data?.poEmailTemplate ?? null,
     };
+  },
+
+  async getOrgLogoUrl(tx: RlsTx, organisationId: string): Promise<string | null> {
+    const rows = await tx
+      .select({ logoUrl: organisations.logoUrl })
+      .from(organisations)
+      .where(eq(organisations.id, organisationId))
+      .limit(1);
+    return rows[0]?.logoUrl ?? null;
+  },
+
+  async getVenueContact(tx: RlsTx, venueId: string) {
+    const rows = await tx
+      .select({
+        addressLine1: venues.addressLine1,
+        addressLine2: venues.addressLine2,
+        suburb: venues.suburb,
+        state: venues.state,
+        postcode: venues.postcode,
+        phone: venues.phone,
+      })
+      .from(venues)
+      .where(eq(venues.id, venueId))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return null;
+    const address = [
+      row.addressLine1,
+      row.addressLine2,
+      [row.suburb, row.state, row.postcode].filter(Boolean).join(" "),
+    ]
+      .filter((part) => part && part.trim())
+      .join(", ");
+    return { address: address || null, phone: row.phone ?? null };
   },
 
   async loadSupplierName(tx: RlsTx, supplierId: string): Promise<string> {
@@ -481,6 +520,15 @@ export const purchaseOrdersRepo = {
       .where(eq(suppliers.id, supplierId))
       .limit(1);
     return rows[0] ?? null;
+  },
+
+  async isInvoiceConfirmed(tx: RlsTx, invoiceId: string): Promise<boolean> {
+    const rows = await tx
+      .select({ reviewStatus: venueInvoices.reviewStatus })
+      .from(venueInvoices)
+      .where(eq(venueInvoices.id, invoiceId))
+      .limit(1);
+    return rows[0]?.reviewStatus === "confirmed";
   },
 
   async listReceivingForPo(tx: RlsTx, poId: string) {

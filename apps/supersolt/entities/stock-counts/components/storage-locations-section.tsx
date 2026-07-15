@@ -117,7 +117,7 @@ export function StorageLocationsSection({
         <CardHeader>
           <CardTitle>Storage locations</CardTitle>
           <CardDescription>
-            Define where ingredients are stored for stock counts and cycle counts.
+            Define the rooms and areas you walk through during a stock count.
           </CardDescription>
         </CardHeader>
       )}

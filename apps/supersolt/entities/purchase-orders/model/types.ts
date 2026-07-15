@@ -121,6 +121,15 @@ export type OrderGuideSuggestion = {
   breakdown: OrderGuideSuggestionBreakdown;
 };
 
+export type SupplierScheduleInfo = {
+  source: "supplier_schedule" | "lead_time";
+  orderDaysLabel: string | null;
+  nextOrderDate: string;
+  nextOrderIsToday: boolean;
+  orderByTime: string | null;
+  nextDeliveryDate: string;
+};
+
 export type OrderGuideResponse = {
   computedAt: string | null;
   forecastReady: boolean;
@@ -138,6 +147,8 @@ export type OrderGuideResponse = {
     subtotalCents: number;
     belowMinimum: boolean;
     minimumShortfallCents: number;
+    /** Absent on cache entries computed before delivery schedules shipped. */
+    schedule?: SupplierScheduleInfo;
     lines: OrderGuideSuggestion[];
   }>;
   meta: {

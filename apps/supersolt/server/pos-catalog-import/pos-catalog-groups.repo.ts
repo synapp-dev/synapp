@@ -1,4 +1,4 @@
-import { asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 
 import type { RlsTx } from "@/server/db/drizzle";
 import {
@@ -227,6 +227,28 @@ export const posCatalogGroupsRepo = {
       maxSelected: list.maxSelected,
       modifiers: modifiersByList.get(list.modifierListId) ?? [],
     }));
+  },
+
+  async setGroupModifierListEnabled(
+    tx: RlsTx,
+    args: {
+      groupId: string;
+      modifierListId: string;
+      enabled: boolean;
+      updatedAt: string;
+    },
+  ): Promise<boolean> {
+    const updated = await tx
+      .update(menuItemGroupModifierLists)
+      .set({ enabled: args.enabled, updatedAt: args.updatedAt })
+      .where(
+        and(
+          eq(menuItemGroupModifierLists.groupId, args.groupId),
+          eq(menuItemGroupModifierLists.modifierListId, args.modifierListId),
+        ),
+      )
+      .returning({ id: menuItemGroupModifierLists.id });
+    return updated.length > 0;
   },
 
   async upsertGroupModifierLink(

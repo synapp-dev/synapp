@@ -1,5 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
+import {
+  createSupabaseMiddlewareClient,
+  copySessionCookies as copyCookies,
+} from "@workspace/supabase/middleware";
 import { buildScopedPath } from "@/lib/build-scoped-path";
 import { ONBOARDING_EARLY_SALES_COOKIE } from "@/entities/onboarding/lib/onboarding-cookies";
 import { isEarlyOnboardingScopedPathAllowed } from "@/lib/onboarding/module-gates";
@@ -9,48 +12,9 @@ import {
 } from "@/lib/venue-scope-cookie";
 import type { Database } from "@/utils/supabase/types";
 
-function copyCookies(
-  sourceResponse: NextResponse,
-  targetResponse: NextResponse
-): void {
-  sourceResponse.cookies.getAll().forEach((cookie) => {
-    targetResponse.cookies.set(cookie.name, cookie.value, {
-      path: cookie.path,
-      domain: cookie.domain,
-      sameSite: cookie.sameSite as "lax" | "strict" | "none" | undefined,
-      secure: cookie.secure,
-      httpOnly: cookie.httpOnly,
-      maxAge: cookie.maxAge,
-      expires: cookie.expires,
-    });
-  });
-}
-
 export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({
-    request,
-  });
-
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const { supabase, getResponse } =
+    createSupabaseMiddlewareClient<Database>(request);
 
   const {
     data: { user },
@@ -122,7 +86,7 @@ export async function updateSession(request: NextRequest) {
             : "/dashboard"
           : "/auth";
     const redirectResponse = NextResponse.redirect(new URL(target, request.url));
-    copyCookies(response, redirectResponse);
+    copyCookies(getResponse(), redirectResponse);
     return redirectResponse;
   }
 
@@ -130,7 +94,7 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = new URL("/auth", request.url);
     redirectUrl.searchParams.set("next", pathname);
     const redirectResponse = NextResponse.redirect(redirectUrl);
-    copyCookies(response, redirectResponse);
+    copyCookies(getResponse(), redirectResponse);
     return redirectResponse;
   }
 
@@ -144,7 +108,7 @@ export async function updateSession(request: NextRequest) {
     const redirectUrl = new URL("/auth", request.url);
     redirectUrl.searchParams.set("error", "confirm_email");
     const redirectResponse = NextResponse.redirect(redirectUrl);
-    copyCookies(response, redirectResponse);
+    copyCookies(getResponse(), redirectResponse);
     return redirectResponse;
   }
 
@@ -154,7 +118,7 @@ export async function updateSession(request: NextRequest) {
       isEarlyOnboardingScopedPathAllowed(pathname, true);
     if (!earlyOnboardingOk) {
       const redirectResponse = NextResponse.redirect(new URL("/setup", request.url));
-      copyCookies(response, redirectResponse);
+      copyCookies(getResponse(), redirectResponse);
       return redirectResponse;
     }
   }
@@ -163,14 +127,14 @@ export async function updateSession(request: NextRequest) {
     const redirectResponse = NextResponse.redirect(
       new URL("/dashboard", request.url)
     );
-    copyCookies(response, redirectResponse);
+    copyCookies(getResponse(), redirectResponse);
     return redirectResponse;
   }
 
   if (user && emailConfirmed && isAuthRoute && !isUpdatePasswordRoute) {
     const target = needsSetup ? "/setup" : "/dashboard";
     const redirectResponse = NextResponse.redirect(new URL(target, request.url));
-    copyCookies(response, redirectResponse);
+    copyCookies(getResponse(), redirectResponse);
     return redirectResponse;
   }
 
@@ -192,7 +156,7 @@ export async function updateSession(request: NextRequest) {
             request.url,
           ),
         );
-        copyCookies(response, redirectResponse);
+        copyCookies(getResponse(), redirectResponse);
         return redirectResponse;
       }
       if (pathname === "/agent") {
@@ -206,11 +170,11 @@ export async function updateSession(request: NextRequest) {
             request.url,
           ),
         );
-        copyCookies(response, redirectResponse);
+        copyCookies(getResponse(), redirectResponse);
         return redirectResponse;
       }
     }
   }
 
-  return response;
+  return getResponse();
 }

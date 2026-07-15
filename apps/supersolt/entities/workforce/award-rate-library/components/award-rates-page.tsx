@@ -54,7 +54,7 @@ function formatMoney(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export function AwardRatesPage({ organisation, venue }: AwardRatesPageProps) {
+export function AwardRatesPage({ organisation }: AwardRatesPageProps) {
   const access = useScopedSettingsAccess();
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);

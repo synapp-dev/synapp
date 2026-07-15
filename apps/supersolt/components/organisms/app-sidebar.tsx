@@ -72,6 +72,11 @@ import {
 import { useVenueReadinessQuery } from "@/entities/readiness/model/use-venue-readiness-query";
 import { applyReadinessToNavItems } from "@/lib/readiness/apply-readiness-to-nav";
 import { isFullSidebarUnlockedForDev } from "@/lib/dev-full-sidebar-unlock";
+import { markSplashSidebarReady } from "@/lib/splash-intro";
+import {
+  isPhase2ModulesEnabled,
+  PHASE2_FEATURE_FLAG,
+} from "@/lib/phase2-modules";
 
 type AccessControlledItem = {
   title: string;
@@ -167,6 +172,7 @@ function makePlatformNavItems(
           title: "Labour",
           url: buildScopedPath(organisationSlug, venueSlug, "insights/labour"),
           icon: HardHat,
+          featureFlag: PHASE2_FEATURE_FLAG,
         },
         {
           title: "Inventory",
@@ -181,6 +187,7 @@ function makePlatformNavItems(
           title: "P&L",
           url: buildScopedPath(organisationSlug, venueSlug, "insights/p-and-l"),
           icon: FileText,
+          featureFlag: PHASE2_FEATURE_FLAG,
         },
       ],
     },
@@ -251,6 +258,7 @@ function makePlatformNavItems(
       title: "Workforce",
       url: buildScopedPath(organisationSlug, venueSlug, "workforce"),
       icon: Users,
+      featureFlag: PHASE2_FEATURE_FLAG,
       items: [
         {
           title: "People",
@@ -300,6 +308,7 @@ function makePlatformNavItems(
       title: "Operations",
       url: buildScopedPath(organisationSlug, venueSlug, "operations"),
       icon: ClipboardList,
+      featureFlag: PHASE2_FEATURE_FLAG,
       items: [
         {
           title: "Daybook",
@@ -441,13 +450,15 @@ function getVisiblePlatformItems(
   features: string[],
 ): NavMainItem[] {
   return items.reduce<NavMainItem[]>((acc, item) => {
+    // A parent failing its own gate hides the whole subtree.
+    if (!canAccessNavItem(item, role, features)) {
+      return acc;
+    }
     const visibleChildren = (item.items ?? []).filter((child) =>
       canAccessNavItem(child, role, features),
     );
-    const parentVisible = canAccessNavItem(item, role, features);
     const hasVisibleChildren = visibleChildren.length > 0;
-
-    if (!parentVisible && !hasVisibleChildren) {
+    if (item.items && !hasVisibleChildren) {
       return acc;
     }
 
@@ -466,7 +477,10 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const router = useRouter();
   const currentUser = useMeStore((state) => state.currentUser);
-  const features = currentUser?.features ?? [];
+  const features = useMemo(() => {
+    const base = currentUser?.features ?? [];
+    return isPhase2ModulesEnabled() ? [...base, PHASE2_FEATURE_FLAG] : base;
+  }, [currentUser?.features]);
   const { data: onboardingState } = useOnboardingStateQuery();
   const needsSetupNav =
     !isFullSidebarUnlockedForDev() &&
@@ -560,6 +574,17 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     [visiblePlatformItems, venueReadiness],
   );
 
+  // Tell the first-load splash the sidebar is fully populated (scope, venues
+  // and nav resolved) so it can play its exit + sidebar-intro choreography.
+  const splashSidebarLoaded = needsSetupNav
+    ? Boolean(onboardingState)
+    : Boolean(resolvedScope) &&
+      accessOrganisations.length > 0 &&
+      readinessNavItems.length > 0;
+  useEffect(() => {
+    if (splashSidebarLoaded) markSplashSidebarReady();
+  }, [splashSidebarLoaded]);
+
   const [readinessModal, setReadinessModal] = useState<{
     moduleTitle: string;
     blockers: ReadinessBlockerDto[];
@@ -595,7 +620,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <div className="px-2">
+        <div
+          className="px-2"
+          data-ss-intro
+          style={{ "--ss-delay": "550ms" } as React.CSSProperties}
+        >
           <div className="flex min-h-10 items-center justify-center px-2 py-4 group-data-[collapsible=icon]:hidden">
             <SupersoltLogo
               variant="wordmark"
@@ -614,7 +643,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <NavMain title="Platform" items={topPlatformNavItems} />
         ) : null}
         {!needsSetupNav ? (
-          <>
+          <div
+            className="flex flex-col gap-2"
+            data-ss-intro
+            style={{ "--ss-delay": "780ms" } as React.CSSProperties}
+          >
             <Separator className="my-0.5" />
             <VenueSwitcher
               currentOrganisationSlug={
@@ -636,11 +669,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
                 router.push(nextPath);
               }}
             />
-          </>
+          </div>
         ) : null}
         {resolvedScope && !needsSetupNav ? (
           <NavMain
-            className="-mt-2"
+            className="ss-intro-stagger -mt-2"
             items={readinessNavItems}
             enableStaggeredAnimation
             staggerBaseDelay={0.06}
@@ -648,10 +681,21 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             onLockedNavClick={venueReadiness?.appliesGating ? handleLockedNavClick : undefined}
           />
         ) : null}
-        <NavMain className="mt-auto" items={helpNavItems} />
+        <div
+          className="mt-auto"
+          data-ss-intro
+          style={{ "--ss-delay": "1450ms" } as React.CSSProperties}
+        >
+          <NavMain items={helpNavItems} />
+        </div>
       </SidebarContent>
       <SidebarFooter>
-        <NavUser />
+        <div
+          data-ss-intro
+          style={{ "--ss-delay": "1550ms" } as React.CSSProperties}
+        >
+          <NavUser />
+        </div>
       </SidebarFooter>
       {resolvedScope && !needsSetupNav && venueReadiness?.appliesGating ? (
         <>

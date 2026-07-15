@@ -23,7 +23,9 @@ describe("deriveNavLogLabel", () => {
 
   it("looks up known venue routes from the navigation catalog", () => {
     expect(
-      deriveNavLogLabel("/piccolo-panini-bar/hawthorn/settings/inventory"),
+      deriveNavLogLabel(
+        "/piccolo-panini-bar/hawthorn/settings/inventory-setup/inventory/master-list",
+      ),
     ).toEqual({
       label: "Ingredients",
       scopeLabel: "Piccolo Panini Bar · Hawthorn",

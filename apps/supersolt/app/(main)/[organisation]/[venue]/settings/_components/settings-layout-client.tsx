@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Plug } from "lucide-react";
+import { CalendarDays, Plug } from "lucide-react";
 import { useScopedSettingsAccess } from "@/entities/access/model/use-scoped-settings-access";
 import {
   buildSettingsTabHref,
@@ -26,7 +26,8 @@ function usesSettingsTabs(pathname: string): boolean {
     pathname.includes("/settings/organisation") ||
     pathname.includes("/settings/venue") ||
     pathname.includes("/settings/award-rates") ||
-    pathname.includes("/settings/integrations")
+    pathname.includes("/settings/integrations") ||
+    pathname.includes("/settings/calendar")
   );
 }
 
@@ -77,7 +78,7 @@ export function SettingsLayoutClient({
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Permissions, organisation, venue, award rates, and integrations.
+          Permissions, organisation, venue, calendar, award rates, and integrations.
         </p>
       </div>
       <nav
@@ -106,6 +107,18 @@ export function SettingsLayoutClient({
             className={tabClassName(pathname.endsWith("/settings/venue"))}
           >
             Venue
+          </Link>
+        ) : null}
+        {access.canSeeCalendar ? (
+          <Link
+            href={buildScopedPath(organisationSlug, venueSlug, "settings/calendar")}
+            className={cn(
+              tabClassName(pathname.includes("/settings/calendar")),
+              "inline-flex items-center gap-1.5",
+            )}
+          >
+            <CalendarDays className="size-3.5 shrink-0" aria-hidden />
+            Calendar
           </Link>
         ) : null}
         {access.canSeeAwardRates ? (

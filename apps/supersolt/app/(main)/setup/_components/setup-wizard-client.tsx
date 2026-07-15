@@ -152,6 +152,8 @@ const XERO_ERROR_HINTS: Record<string, string> = {
   save_failed:
     "Could not save tokens. Apply the venue_xero_connections migration to your Supabase project, then try again.",
   connections: "Could not list Xero organisations after connecting.",
+  test_source_missing:
+    "Test mode could not find the shared source connection. Check TEST_MODE_SOURCE_VENUE_ID points at a venue with a real connection.",
   invalid_scope:
     "Xero rejected the requested permissions. In developer.xero.com → your app → Configuration, enable: accounting.invoices, accounting.attachments, accounting.contacts, accounting.settings. Then reconnect.",
 };
@@ -237,6 +239,7 @@ export function SetupWizardClient() {
   const [orgName, setOrgName] = useState("");
   const [abn, setAbn] = useState("");
   const [gst, setGst] = useState(false);
+  const [isTestRun, setIsTestRun] = useState(false);
 
   const [venueName, setVenueName] = useState("");
   const [venueAddress, setVenueAddress] = useState("");
@@ -277,11 +280,15 @@ export function SetupWizardClient() {
       setOrgName(onboardingData.organisation.name);
       setAbn(onboardingData.organisation.abn ?? "");
       setGst(onboardingData.organisation.isGstRegistered);
+      setIsTestRun(
+        Boolean(onboardingData.organisation.setupProgress?.isTestRun),
+      );
     } else {
       setOrganisation(null);
       setOrgName("");
       setAbn("");
       setGst(false);
+      setIsTestRun(false);
     }
     const loadedVenues = onboardingData.venues ?? [];
     setVenues(loadedVenues);
@@ -324,6 +331,10 @@ export function SetupWizardClient() {
   }, [searchParams]);
 
   const setupVenue = venues[0];
+
+  const testModeAvailable = Boolean(
+    onboardingData && !onboardingData.completed && onboardingData.testModeAvailable,
+  );
 
   const squareAuthorizeHref = useMemo(() => {
     if (!organisation || !setupVenue) {
@@ -616,6 +627,7 @@ export function SetupWizardClient() {
         abn: abn.trim() || null,
         isGstRegistered: gst,
         organisationId: organisation?.id,
+        ...(testModeAvailable ? { isTestRun } : {}),
       });
       setOrganisation(org);
       goStep(2, { organisation: org });
@@ -991,6 +1003,23 @@ export function SetupWizardClient() {
                       </div>
                       <Switch checked={gst} onCheckedChange={setGst} />
                     </div>
+                    {testModeAvailable ? (
+                      <div className="flex items-center justify-between gap-4 rounded-lg border border-dashed bg-muted/30 px-4 py-3">
+                        <div>
+                          <p className="text-sm font-semibold">
+                            This is a test run
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            The Square and Xero steps connect to a shared test
+                            account instantly — no real sign-in needed.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={isTestRun}
+                          onCheckedChange={setIsTestRun}
+                        />
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -1068,6 +1097,12 @@ export function SetupWizardClient() {
                         Square is required to go live. After connecting, you can
                         open Sales insights while you finish setup.
                       </p>
+                      {organisation?.setupProgress?.isTestRun ? (
+                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Test run — connecting links the shared test Square
+                          account. No sign-in required.
+                        </p>
+                      ) : null}
                     </div>
                     {squareConnectionQuery.isPending && setupVenue ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1170,6 +1205,12 @@ export function SetupWizardClient() {
                         Sync supplier invoices from your accounting system so
                         they flow into SuperSolt automatically.
                       </p>
+                      {organisation?.setupProgress?.isTestRun ? (
+                        <p className="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                          Test run — connecting links the shared test Xero
+                          account. No sign-in required.
+                        </p>
+                      ) : null}
                     </div>
                     {xeroConnectionQuery.isPending && setupVenue ? (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -146,8 +146,6 @@ async function recomputeRecipesForIngredient(
   const ing = ingRows[0];
   if (!ing) return 0;
 
-  const costPerUnit = ing.bestSupplierCostCents ?? ing.costPerUnitCents ?? 0;
-
   const links = await appDb.admin
     .select()
     .from(recipeIngredients)

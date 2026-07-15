@@ -364,7 +364,7 @@ export const inventoryNormalisationService = {
     const unitsPerPack = input.supplierProduct.unitsPerPack;
     const unitPriceCents = input.supplierProduct.unitPriceCents;
 
-    const { costPerBaseUnitCents } = computeCostPerBaseUnitCents({
+    computeCostPerBaseUnitCents({
       unitPriceCents,
       unitsPerPack,
       packUnit,

@@ -2,6 +2,7 @@
 
 import CountUp from "react-countup";
 import { cn } from "@workspace/ui/lib/utils";
+import { useSplashPageIntroHold } from "@/lib/ui/use-splash-page-intro-hold";
 
 /**
  * Slide-up + fade on the **counted value** (`--animate-slide-up-fade-in-superslow` in UI globals — 2s, 2× `slowest`).
@@ -9,7 +10,7 @@ import { cn } from "@workspace/ui/lib/utils";
 export const superslow = "animate-slide-up-fade-in-superslow";
 
 /** Strong ease-out: most change early, final digits crawl (Penner / countup.js–style). */
-function easeOutExpo(t: number, b: number, c: number, d: number): number {
+export function easeOutExpo(t: number, b: number, c: number, d: number): number {
   if (d === 0) return b + c;
   return c * (-Math.pow(2, (-10 * t) / d) + 1) * (1024 / 1023) + b;
 }
@@ -40,6 +41,14 @@ export function DashboardCountUp({
   className,
   onEnd,
 }: DashboardCountUpProps) {
+  // On a first-load splash, don't start counting behind the overlay — mount
+  // the CountUp only once the page fades into view so the run-up is seen.
+  const held = useSplashPageIntroHold();
+  if (held) {
+    return (
+      <span aria-hidden className={cn("tabular-nums opacity-0", className)} />
+    );
+  }
   return (
     <CountUp
       className={cn("tabular-nums opacity-0", superslow, className)}

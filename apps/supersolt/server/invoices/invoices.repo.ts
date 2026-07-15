@@ -172,6 +172,9 @@ export const invoicesRepo = {
           currencyCode: row.currencyCode,
           xeroStatus: row.xeroStatus,
           reviewStatus: row.reviewStatus,
+          // Monotonic: an invoice ingested during setup stays flagged even if a
+          // later operational sync re-upserts it.
+          setupImport: sql`(${venueInvoices.setupImport} or excluded.setup_import)`,
           source: row.source,
           reference: row.reference,
           xeroUpdatedAt: row.xeroUpdatedAt,

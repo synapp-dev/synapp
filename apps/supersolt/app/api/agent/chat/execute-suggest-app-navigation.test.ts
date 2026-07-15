@@ -93,6 +93,48 @@ describe("executeSuggestAppNavigation", () => {
     expect(out).toMatchObject({ error: { code: "ACCESS_DENIED" } });
   });
 
+  it("returns ACCESS_DENIED when every requested destination is Phase 2 locked", async () => {
+    resolveVenueScope.mockResolvedValue({
+      organisationId: "org-1",
+      venueId: "venue-1",
+      timezone: "UTC",
+      organisationName: "Acme",
+      venueName: "Richmond",
+    });
+
+    const out = await executeSuggestAppNavigation({
+      ctx: createMockCtx(),
+      rawInput: {
+        organisationSlug: "acme",
+        venueSlug: "richmond",
+        destinationKeys: ["workforce", "operations_daybook", "insights_p_and_l"],
+      },
+    });
+    expect(out).toMatchObject({ error: { code: "ACCESS_DENIED" } });
+  });
+
+  it("drops Phase 2 locked destinations but keeps unlocked ones", async () => {
+    resolveVenueScope.mockResolvedValue({
+      organisationId: "org-1",
+      venueId: "venue-1",
+      timezone: "UTC",
+      organisationName: "Acme",
+      venueName: "Richmond",
+    });
+
+    const out = await executeSuggestAppNavigation({
+      ctx: createMockCtx(),
+      rawInput: {
+        organisationSlug: "acme",
+        venueSlug: "richmond",
+        destinationKeys: ["workforce_roster", "dashboard"],
+      },
+    });
+    expect(out).toMatchObject({
+      cards: [expect.objectContaining({ destinationKey: "dashboard" })],
+    });
+  });
+
   it("returns navigation cards on success", async () => {
     resolveVenueScope.mockResolvedValue({
       organisationId: "org-1",
@@ -115,7 +157,7 @@ describe("executeSuggestAppNavigation", () => {
         {
           title: "Ingredients",
           description: "View and manage ingredients for this venue.",
-          href: "/acme/richmond/settings/inventory",
+          href: "/acme/richmond/settings/inventory-setup/inventory/master-list",
           destinationKey: "ingredients",
           organisationName: "Acme",
           venueName: "Richmond",

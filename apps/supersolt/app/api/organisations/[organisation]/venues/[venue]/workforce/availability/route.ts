@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireRequestAuth } from "@/lib/api/route-auth";
 import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import { availabilityService } from "@/server/workforce/availability.service";
-import { PeopleServiceError } from "@/server/workforce/people.service";
 
 type RouteParams = {
   organisation: string;

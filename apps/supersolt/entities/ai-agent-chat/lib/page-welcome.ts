@@ -162,7 +162,7 @@ export function buildPageWelcome(pathname: string): PageWelcome | null {
 
   const catalogHit = matchCatalogEntry(pathname);
   if (catalogHit) {
-    const { label, scopeLabel } = deriveNavLogLabel(pathname);
+    const { scopeLabel } = deriveNavLogLabel(pathname);
     const scopeNote = scopeLabel ? ` (${scopeLabel})` : "";
     const desc =
       catalogHit.description ??

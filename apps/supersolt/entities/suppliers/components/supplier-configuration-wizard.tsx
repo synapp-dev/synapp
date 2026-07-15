@@ -41,6 +41,7 @@ import { getDefaultDeliverySchedule } from "@/entities/suppliers/model/schedule-
 import { useSupplierMutations } from "@/entities/suppliers/model/useSupplierMutations";
 import { useSupplierQuery } from "@/entities/suppliers/model/useSupplierQuery";
 import { useSuppliersQuery } from "@/entities/suppliers/model/useSuppliersQuery";
+import { WIZARD_SUPPLIERS_LIST_FILTERS } from "@/entities/suppliers/model/wizard-query-input";
 import type {
   DeliveryScheduleEntry,
   SupplierCategory,
@@ -189,11 +190,7 @@ export function SupplierConfigurationWizard({
   const suppliersQuery = useSuppliersQuery({
     organisationSlug: organisation,
     venueSlug: venue,
-    inventorySource: true,
-    status: "active",
-    sort: "name",
-    page: 1,
-    pageSize: 200,
+    ...WIZARD_SUPPLIERS_LIST_FILTERS,
   });
 
   // Snapshot the list once when it first loads and walk that fixed queue. Saves

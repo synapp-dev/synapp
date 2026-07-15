@@ -9,6 +9,7 @@ import { getXeroOAuthEnvConfig } from "@/server/xero/config";
 import { getVenueXeroConnectionSummary } from "@/server/xero/venue-xero-connection";
 import { ensureVenueEmailInboxForIntegrations } from "@/server/invoices/invoice-inbox.facade";
 import { CopyTextButton } from "./_components/copy-text-button";
+import { PurchasingSettingsCard } from "./_components/purchasing-settings-card";
 import { SquareCatalogLinksCard } from "../_components/square-catalog-links-card";
 import { SquareLocationPicker } from "@/entities/square/components/square-location-picker";
 /** Origin for absolute links on this request (localhost vs 127.0.0.1 comes from how you opened the page). */
@@ -526,6 +527,21 @@ export default async function SettingsIntegrationsPage({
           </Button>
         )}
       </div>
+
+      {canManageSquareCatalogLinks ? (
+        <div className="space-y-3 border-t pt-6">
+          <h2 className="text-lg font-medium">Purchase order emails</h2>
+          <p className="text-muted-foreground max-w-xl text-sm">
+            Sent from{" "}
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">
+              {venue}@inbox.supersolt.com
+            </code>{" "}
+            to each supplier&apos;s ordering email with the PO PDF attached. The
+            approval threshold and email body apply organisation-wide.
+          </p>
+          <PurchasingSettingsCard organisation={organisation} />
+        </div>
+      ) : null}
     </section>
   );
 }

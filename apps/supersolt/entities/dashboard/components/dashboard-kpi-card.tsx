@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronsDown, ChevronsUp, Crosshair } from "lucide-react";
+import { Area, AreaChart, Bar, BarChart } from "recharts";
 import {
   Card,
   CardContent,
@@ -9,15 +10,104 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import {
+  ChartContainer,
+  type ChartConfig,
+} from "@workspace/ui/components/chart";
+import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
 import { DashboardCountUp } from "@/entities/dashboard/components/dashboard-count-up";
-import type { DashboardKpiData } from "@/entities/dashboard/model/dummy-dashboard-data";
+import type {
+  DashboardKpiData,
+  DashboardKpiSparkline,
+  DashboardKpiStatus,
+} from "@/entities/dashboard/model/dummy-dashboard-data";
 
 const KPI_COUNT_DURATION_S = 1.1;
+
+const SPARK_COLORS: Record<DashboardKpiStatus, string> = {
+  good: "var(--brand-supersolt-primary)",
+  watch: "#f59e0b",
+  bad: "#f43f5e",
+  neutral: "var(--muted-foreground)",
+};
+
+/**
+ * Decorative full-bleed trend chart along the card's bottom edge.
+ * Kept tooltip-free: the card clips overflow, and the headline + delta
+ * already carry the numbers.
+ */
+function KpiSparkline({
+  id,
+  spark,
+  status,
+  delaySeconds,
+}: {
+  id: string;
+  spark: DashboardKpiSparkline;
+  status: DashboardKpiStatus;
+  delaySeconds: number;
+}) {
+  const color = SPARK_COLORS[status];
+  const config = {
+    value: { label: spark.label, color },
+  } satisfies ChartConfig;
+  const fillId = `kpi-spark-fill-${id}`;
+  const animationBegin = Math.round(delaySeconds * 1000);
+
+  return (
+    <div aria-hidden className="pointer-events-none h-12 w-full">
+      <ChartContainer
+        id={`kpi-spark-${id}`}
+        config={config}
+        className="aspect-auto h-full w-full [&_.recharts-responsive-container]:!h-full"
+      >
+        {spark.kind === "area" ? (
+          <AreaChart
+            data={spark.points}
+            margin={{ left: 0, right: 0, top: 6, bottom: 0 }}
+          >
+            <defs>
+              <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-value)" stopOpacity={0.45} />
+                <stop offset="95%" stopColor="var(--color-value)" stopOpacity={0.04} />
+              </linearGradient>
+            </defs>
+            <Area
+              dataKey="value"
+              type="natural"
+              stroke="var(--color-value)"
+              strokeWidth={1.5}
+              fill={`url(#${fillId})`}
+              animationDuration={1200}
+              animationBegin={animationBegin}
+              animationEasing="ease-out"
+            />
+          </AreaChart>
+        ) : (
+          <BarChart
+            data={spark.points}
+            margin={{ left: 6, right: 6, top: 6, bottom: 0 }}
+            barCategoryGap="25%"
+          >
+            <Bar
+              dataKey="value"
+              fill="var(--color-value)"
+              fillOpacity={0.55}
+              radius={[2, 2, 0, 0]}
+              animationDuration={1200}
+              animationBegin={animationBegin}
+              animationEasing="ease-out"
+            />
+          </BarChart>
+        )}
+      </ChartContainer>
+    </div>
+  );
+}
 
 /** Text colours matching the net revenue hero delta badge (no pill background). */
 function kpiDeltaTextClassName(direction: "up" | "down"): string {
@@ -80,12 +170,17 @@ export function DashboardKpiCard({
           : undefined
       }
       className={cn(
-        "flex h-full min-h-0 flex-col gap-0 py-0",
+        "flex h-full min-h-0 flex-col gap-0 overflow-hidden py-0",
         agentInsight &&
           "cursor-pointer transition-colors hover:bg-muted/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
       )}
     >
-      <CardContent className="flex min-h-48 flex-1 flex-col justify-between gap-3 p-0 px-6 py-4 md:min-h-30 md:gap-4 md:py-5">
+      <CardContent
+        className={cn(
+          "flex min-h-48 flex-1 flex-col justify-between gap-3 p-0 px-6 pt-4 md:min-h-30 md:gap-4 md:pt-5",
+          kpi.sparkline ? "pb-2" : "pb-4 md:pb-5",
+        )}
+      >
         <div className="flex flex-row items-start justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {targetMissed ? (
@@ -170,6 +265,14 @@ export function DashboardKpiCard({
           ) : null}
         </div>
       </CardContent>
+      {kpi.sparkline ? (
+        <KpiSparkline
+          id={kpi.id}
+          spark={kpi.sparkline}
+          status={kpi.status}
+          delaySeconds={countUpDelaySeconds}
+        />
+      ) : null}
     </Card>
   );
 }

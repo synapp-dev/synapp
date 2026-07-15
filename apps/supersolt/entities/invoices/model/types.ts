@@ -38,6 +38,8 @@ export type InvoiceRow = {
   currencyCode: string;
   xeroStatus: string;
   reviewStatus: InvoiceReviewStatus;
+  /** Ingested during inventory setup to seed the supplier catalog — never part of the review queue. */
+  setupImport: boolean;
   source: InvoiceSource;
   reference: string | null;
   parseConfidence: ParseConfidence | null;

@@ -13,7 +13,6 @@ import { payPeriods, payRuns } from "@/server/db/schema";
 import {
   assertCanApprovePayroll,
   assertCanExecutePayroll,
-  assertCanPreparePayroll,
   viewerCanSeeFdv,
 } from "@/server/workforce/payroll-export/payroll-access";
 import {

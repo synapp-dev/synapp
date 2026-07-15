@@ -8,7 +8,7 @@ import {
 } from "@/components/branding/organisation-logo-avatar";
 import { SupersoltLogo } from "@/components/branding/supersolt-logo";
 import { usePathname } from "next/navigation";
-import { Bot, Building2 } from "lucide-react";
+import { Bot, Building2, MessageCircle } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import {
@@ -19,9 +19,9 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@workspace/ui/components/breadcrumb";
-import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { InventorySetupImportHeaderButton } from "@/entities/inventory-setup/components/inventory-setup-import-header-button";
 import { CommandMenu } from "@/components/shell/command-menu";
+import { isPhase2ModulesEnabled } from "@/lib/phase2-modules";
 import { shouldShowAgentRightShell } from "@/entities/ai-agent-chat/lib/agent-right-shell-pathname";
 import { useAccessibleVenueGroupsQuery } from "@/entities/venues/model/useAccessibleVenueGroupsQuery";
 import { RightSidebarTrigger } from "@workspace/ui/components/right-sidebar-trigger";
@@ -198,13 +198,24 @@ export function AppHeader() {
       </div>
       <div className="flex items-center gap-2 px-4">
         <InventorySetupImportHeaderButton />
-        <CommandMenu />
-        <div className="mx-2 h-0.5 w-0.5 rounded-full bg-muted-foreground" />
-        <ThemeToggle />
+        {isPhase2ModulesEnabled() ? <CommandMenu /> : null}
         {shouldShowAgentRightShell(pathname) ? (
-          <RightSidebarTrigger className="-mr-1">
-            <Bot />
-          </RightSidebarTrigger>
+          <>
+            {/* ≥ xl the mascot rail is the main affordance; keep the compact icon. */}
+            <RightSidebarTrigger className="-mr-1 hidden xl:inline-flex">
+              <Bot />
+            </RightSidebarTrigger>
+            {/* < xl (AGENT_DOCK_BREAKPOINT) the mascot is hidden, so the header
+                carries a labelled trigger instead. */}
+            <RightSidebarTrigger
+              variant="outline"
+              size="sm"
+              className="-mr-1 h-8 w-auto gap-1.5 px-3 xl:hidden"
+            >
+              <span className="text-sm font-medium">Superbot</span>
+              <MessageCircle className="size-4" />
+            </RightSidebarTrigger>
+          </>
         ) : null}
       </div>
     </header>

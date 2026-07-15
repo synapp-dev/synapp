@@ -52,6 +52,7 @@ function mapDbRowToDto(row: import("@/server/invoices/invoices.repo").VenueInvoi
     currencyCode: row.currencyCode,
     xeroStatus: row.xeroStatus,
     reviewStatus: row.reviewStatus as VenueXeroInvoiceRow["reviewStatus"],
+    setupImport: row.setupImport,
     source: row.source as VenueXeroInvoiceRow["source"],
     reference: row.reference,
     xeroUpdatedAt: row.xeroUpdatedAt,
@@ -262,6 +263,11 @@ export async function syncVenueXeroInvoices(
     daysBack?: number;
     /** When true, only sync invoice headers — line items come from attachment parse elsewhere. */
     skipApiLineItems?: boolean;
+    /** When true, this sync is seeding the supplier catalog (inventory setup /
+     * catalog lookback): newly-created invoices are flagged as setup imports
+     * and archived instead of entering the pending review queue. Only invoices
+     * that arrive after setup (e.g. against a sent PO) should be pending. */
+    setupImport?: boolean;
     /** Live progress for the import UI: listing pages, then per-row saves.
      * `event: true` marks a line worth keeping in the step's diagnostic log
      * (stage changes, pages, milestones) vs a rolling detail update. */
@@ -311,7 +317,6 @@ export async function syncVenueXeroInvoices(
   });
   const token = await ensureVenueXeroAccessToken(ctx.appDb, connection);
   if (!token.ok) {
-    const nowIso = new Date().toISOString();
     console.error("[xero] sync: token refresh failed", {
       venueId: context.venueId,
       message: token.message,
@@ -380,7 +385,6 @@ export async function syncVenueXeroInvoices(
   }
 
   if (!listed.ok) {
-    const nowIso = new Date().toISOString();
     console.error("[xero] sync: Xero list failed", {
       venueId: context.venueId,
       status: listed.status,
@@ -453,9 +457,15 @@ export async function syncVenueXeroInvoices(
       mapped.xero_invoice_id,
     );
 
-    const reviewStatus =
-      existingReview && shouldPreserveReviewStatus(existingReview)
+    // Setup/catalog imports never enter the review queue: brand-new rows land
+    // archived + flagged. Rows that already exist keep their current status so
+    // a catalog re-import can't archive a live operational invoice.
+    const reviewStatus = existingReview
+      ? shouldPreserveReviewStatus(existingReview) || args.setupImport
         ? existingReview
+        : mapped.review_status
+      : args.setupImport
+        ? "archived"
         : mapped.review_status;
 
     try {
@@ -480,6 +490,7 @@ export async function syncVenueXeroInvoices(
         currencyCode: mapped.currency_code,
         xeroStatus: mapped.xero_status,
         reviewStatus,
+        setupImport: Boolean(args.setupImport),
         source: "xero",
         reference: mapped.reference,
         xeroUpdatedAt: mapped.xero_updated_at,

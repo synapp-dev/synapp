@@ -8,9 +8,11 @@ import {
   type PoStatus,
 } from "./purchase-orders.repo";
 import {
+  resolvePoSenderAddresses,
   sendCancellationEmail,
   sendPurchaseOrderEmail,
 } from "./po-email.service";
+import { buildPoPdf } from "./po-pdf.service";
 import type {
   CreatePurchaseOrderInput,
   PurchaseOrderDetailDto,
@@ -242,16 +244,6 @@ async function buildDetail(
       quantitiesReceived: (r.quantitiesReceived as Record<string, number>) ?? {},
     })),
   };
-}
-
-async function recalculatePoTotals(
-  ctx: RequestAuthContext,
-  poId: string,
-  gstTreatment: string,
-): Promise<void> {
-  await ctx.appDb.rls((tx) =>
-    purchaseOrdersRepo.recalculatePoTotals(tx, poId, gstTreatment),
-  );
 }
 
 export const purchaseOrdersService = {
@@ -574,8 +566,29 @@ export const purchaseOrdersService = {
     }
 
     const lines = await ctx.appDb.rls((tx) => purchaseOrdersRepo.getLines(tx, po.id));
-    const venueSlug = args.venueSlug;
-    const fromAddress = `${venueSlug}@inbox.supersolt.com`;
+    const { fromAddress, replyTo } = resolvePoSenderAddresses(args.venueSlug);
+
+    const settings = await getPurchasingSettings(ctx, context.organisationId);
+    const [venueContact, orgLogoUrl] = await Promise.all([
+      ctx.appDb.rls((tx) => purchaseOrdersRepo.getVenueContact(tx, context.venueId)),
+      ctx.appDb.rls((tx) =>
+        purchaseOrdersRepo.getOrgLogoUrl(tx, context.organisationId),
+      ),
+    ]);
+    const pdfBytes = await buildPoPdf({
+      po,
+      lines,
+      venueName: context.venueName,
+      organisationName: context.organisationName,
+      supplierName: supplier?.name ?? "Supplier",
+      orderingEmail: orderingEmail.trim(),
+      // The PDF footer tells the supplier where replies land, so it always
+      // shows the venue inbox even when the SMTP From is overridden.
+      fromAddress: replyTo,
+      venueAddress: venueContact?.address,
+      venuePhone: venueContact?.phone,
+      orgLogoUrl,
+    });
 
     await sendPurchaseOrderEmail(ctx, {
       po,
@@ -585,6 +598,10 @@ export const purchaseOrdersService = {
       supplierName: supplier?.name ?? "Supplier",
       orderingEmail: orderingEmail.trim(),
       fromAddress,
+      replyTo,
+      bodyTemplate: settings.poEmailTemplate,
+      pdfBytes,
+      orgLogoUrl,
     });
 
     const now = new Date().toISOString();
@@ -631,14 +648,20 @@ export const purchaseOrdersService = {
       throw new PurchaseOrdersServiceError(400, "PO is not pending approval");
     }
 
-    await ctx.appDb.rls((tx) =>
-      purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
+    await ctx.appDb.rls(async (tx) => {
+      await purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
         approvalStatus: "approved",
         approvedByUserId: ctx.userId,
         approvalComment: args.comment ?? null,
         updatedAt: new Date().toISOString(),
-      }),
-    );
+      });
+      await purchaseOrdersRepo.insertAudit(tx, {
+        poId: po.id,
+        eventType: "approved",
+        userId: ctx.userId,
+        afterValue: args.comment ? { comment: args.comment } : undefined,
+      });
+    });
 
     return this.executeSend(ctx, {
       organisationSlug: args.organisationSlug,
@@ -670,15 +693,21 @@ export const purchaseOrdersService = {
       throw new PurchaseOrdersServiceError(400, "PO is not pending approval");
     }
 
-    await ctx.appDb.rls((tx) =>
-      purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
+    await ctx.appDb.rls(async (tx) => {
+      await purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
         status: "draft",
         approvalStatus: "rejected",
         approvalComment: args.comment,
         rejectedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }),
-    );
+      });
+      await purchaseOrdersRepo.insertAudit(tx, {
+        poId: po.id,
+        eventType: "rejected",
+        userId: ctx.userId,
+        afterValue: { comment: args.comment },
+      });
+    });
 
     return this.getDetail(ctx, { ...args });
   },
@@ -704,15 +733,24 @@ export const purchaseOrdersService = {
       throw new PurchaseOrdersServiceError(400, "PO must be submitted to confirm");
     }
 
-    await ctx.appDb.rls((tx) =>
-      purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
+    await ctx.appDb.rls(async (tx) => {
+      await purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
         status: "confirmed",
         expectedDeliveryDate:
           args.expectedDeliveryDate ?? po.expected_delivery_date,
         confirmedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }),
-    );
+      });
+      await purchaseOrdersRepo.insertAudit(tx, {
+        poId: po.id,
+        eventType: "confirmed",
+        userId: ctx.userId,
+        afterValue: {
+          expectedDeliveryDate:
+            args.expectedDeliveryDate ?? po.expected_delivery_date,
+        },
+      });
+    });
 
     return this.getDetail(ctx, { ...args });
   },
@@ -805,7 +843,38 @@ export const purchaseOrdersService = {
       });
 
       await purchaseOrdersRepo.recalculatePoTotals(tx, po.id, po.gst_treatment);
+
+      await purchaseOrdersRepo.insertAudit(tx, {
+        poId: po.id,
+        eventType: nextStatus === "delivered" ? "delivered" : "partially_received",
+        userId: ctx.userId,
+        afterValue: { quantitiesReceived, partial },
+      });
     });
+
+    // Spec: Closed auto-triggers once the PO is delivered AND its matched
+    // invoice is confirmed. The invoice side does this via closePoIfReady;
+    // this covers the reverse order (invoice confirmed before delivery).
+    if (nextStatus === "delivered" && po.linked_invoice_id) {
+      const invoiceConfirmed = await ctx.appDb.rls((tx) =>
+        purchaseOrdersRepo.isInvoiceConfirmed(tx, po.linked_invoice_id as string),
+      );
+      if (invoiceConfirmed) {
+        await ctx.appDb.rls(async (tx) => {
+          await purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
+            status: "closed",
+            closedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          await purchaseOrdersRepo.insertAudit(tx, {
+            poId: po.id,
+            eventType: "closed",
+            userId: ctx.userId,
+            afterValue: { reason: "auto_close_invoice_confirmed" },
+          });
+        });
+      }
+    }
 
     return this.getDetail(ctx, { ...args, poId: po.id });
   },
@@ -830,13 +899,18 @@ export const purchaseOrdersService = {
       throw new PurchaseOrdersServiceError(400, "Only delivered POs can be closed");
     }
 
-    await ctx.appDb.rls((tx) =>
-      purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
+    await ctx.appDb.rls(async (tx) => {
+      await purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
         status: "closed",
         closedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-      }),
-    );
+      });
+      await purchaseOrdersRepo.insertAudit(tx, {
+        poId: po.id,
+        eventType: "closed",
+        userId: ctx.userId,
+      });
+    });
 
     return this.getDetail(ctx, { ...args });
   },
@@ -868,25 +942,34 @@ export const purchaseOrdersService = {
       );
       const orderingEmail = supplier?.orderingEmail || supplier?.email;
       if (orderingEmail?.trim()) {
+        const { fromAddress, replyTo } = resolvePoSenderAddresses(args.venueSlug);
         await sendCancellationEmail(ctx, {
           po,
           venueName: context.venueName,
           supplierName: supplier?.name ?? "Supplier",
           orderingEmail: orderingEmail.trim(),
-          fromAddress: `${args.venueSlug}@inbox.supersolt.com`,
+          fromAddress,
+          replyTo,
           reason: args.reason,
         });
       }
     }
 
-    await ctx.appDb.rls((tx) =>
-      purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
+    await ctx.appDb.rls(async (tx) => {
+      await purchaseOrdersRepo.updatePurchaseOrder(tx, po.id, {
         status: "cancelled",
         cancelledAt: new Date().toISOString(),
         cancellationReason: args.reason,
         updatedAt: new Date().toISOString(),
-      }),
-    );
+      });
+      await purchaseOrdersRepo.insertAudit(tx, {
+        poId: po.id,
+        eventType: "cancelled",
+        userId: ctx.userId,
+        beforeValue: { status: po.status },
+        afterValue: { reason: args.reason },
+      });
+    });
 
     return this.getDetail(ctx, { ...args });
   },
@@ -913,5 +996,108 @@ export const purchaseOrdersService = {
       }
     }
     return { approved, failed };
+  },
+
+  async bulkSend(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      poIds: string[];
+    }
+  ): Promise<{
+    sent: string[];
+    pendingApproval: string[];
+    failed: Array<{ poId: string; message: string }>;
+  }> {
+    const sent: string[] = [];
+    const pendingApproval: string[] = [];
+    const failed: Array<{ poId: string; message: string }> = [];
+    for (const poId of args.poIds) {
+      try {
+        const detail = await this.send(ctx, { ...args, poId });
+        if (detail.status === "pending_approval") {
+          pendingApproval.push(poId);
+        } else {
+          sent.push(poId);
+        }
+      } catch (e) {
+        failed.push({
+          poId,
+          message: e instanceof Error ? e.message : "Failed",
+        });
+      }
+    }
+    return { sent, pendingApproval, failed };
+  },
+
+  async bulkClose(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      poIds: string[];
+    }
+  ): Promise<{ closed: string[]; failed: Array<{ poId: string; message: string }> }> {
+    const closed: string[] = [];
+    const failed: Array<{ poId: string; message: string }> = [];
+    for (const poId of args.poIds) {
+      try {
+        await this.close(ctx, { ...args, poId });
+        closed.push(poId);
+      } catch (e) {
+        failed.push({
+          poId,
+          message: e instanceof Error ? e.message : "Failed",
+        });
+      }
+    }
+    return { closed, failed };
+  },
+
+  /** Renders the PO PDF for preview/download at any lifecycle stage. */
+  async buildPdf(
+    ctx: RequestAuthContext,
+    args: {
+      organisationSlug: string;
+      venueSlug: string;
+      poId: string;
+    }
+  ): Promise<{ fileName: string; bytes: Uint8Array }> {
+    const context = await getContext(ctx,
+      args.organisationSlug,
+      args.venueSlug,
+    );
+    const po = await ctx.appDb.rls((tx) => purchaseOrdersRepo.getPurchaseOrder(tx, {
+      venueId: context.venueId,
+      poId: args.poId,
+    }));
+    if (!po) throw new PurchaseOrdersServiceError(404, "Purchase order not found");
+
+    const [lines, supplier, venueContact, orgLogoUrl] = await Promise.all([
+      ctx.appDb.rls((tx) => purchaseOrdersRepo.getLines(tx, po.id)),
+      ctx.appDb.rls((tx) =>
+        purchaseOrdersRepo.getSupplierOrderingInfo(tx, po.supplier_id),
+      ),
+      ctx.appDb.rls((tx) => purchaseOrdersRepo.getVenueContact(tx, context.venueId)),
+      ctx.appDb.rls((tx) =>
+        purchaseOrdersRepo.getOrgLogoUrl(tx, context.organisationId),
+      ),
+    ]);
+
+    const bytes = await buildPoPdf({
+      po,
+      lines,
+      venueName: context.venueName,
+      organisationName: context.organisationName,
+      supplierName: supplier?.name ?? "Supplier",
+      orderingEmail: supplier?.orderingEmail || supplier?.email || "",
+      fromAddress: `${args.venueSlug}@inbox.supersolt.com`,
+      venueAddress: venueContact?.address,
+      venuePhone: venueContact?.phone,
+      orgLogoUrl,
+    });
+
+    return { fileName: `${po.po_number}.pdf`, bytes };
   },
 };

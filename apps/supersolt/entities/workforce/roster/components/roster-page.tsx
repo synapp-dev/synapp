@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Info,
   Layers,
-  LayoutTemplate,
   Plus,
   Send,
   Trash2,

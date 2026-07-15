@@ -33,8 +33,7 @@ const VENUE_SLUG = process.argv[3] && !process.argv[3].startsWith("--") ? proces
 const DRY_RUN = process.argv.includes("--dry-run");
 const BATCH_SIZE = 10;
 
-const UNIT_VALUES = ["g", "kg", "mL", "L", "each"] as const;
-type FixUnit = (typeof UNIT_VALUES)[number];
+type FixUnit = "g" | "kg" | "mL" | "L" | "each";
 
 /** Tolerant unit normalisation — the model drifts ("ea", "ml", "litre"). */
 function normaliseUnit(value: string): FixUnit | null {
@@ -50,7 +49,7 @@ function normaliseUnit(value: string): FixUnit | null {
 }
 
 async function main() {
-  const { and, eq, inArray, isNull, sql } = await import("drizzle-orm");
+  const { and, eq, inArray, isNull } = await import("drizzle-orm");
   const { createServiceAppDb } = await import("@/server/db/create-app-db");
   const schema = await import("@/server/db/schema");
   const { anthropic } = await import("@ai-sdk/anthropic");

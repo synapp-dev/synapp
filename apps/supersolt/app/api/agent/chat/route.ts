@@ -1,4 +1,4 @@
-import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
 import {
   convertToModelMessages,
   stepCountIs,
@@ -22,14 +22,21 @@ import {
   buildPageContextSystemAppend,
   parseAgentChatPageContextFromBody,
 } from "@/entities/ai-agent-chat/lib/agent-chat-page-context-schema";
-import { APP_NAVIGATION_DESTINATION_KEYS } from "@/entities/ai-agent-chat/lib/app-navigation-catalog";
+import {
+  APP_NAVIGATION_DESTINATION_KEYS,
+  isPhase2LockedDestinationKey,
+} from "@/entities/ai-agent-chat/lib/app-navigation-catalog";
+import { isPhase2ModulesEnabled } from "@/lib/phase2-modules";
 import { suggestAppNavigationInputSchema } from "@/entities/ai-agent-chat/lib/app-navigation-tool-schema";
 import { loadAccessContextForUser } from "@/server/access/load-access-context-for-user";
 import { buildRequestAuthContext } from "@/server/auth/context";
 import type { RequestAuthContext } from "@/server/auth/context";
 import { resolveRequestAuth } from "@/server/db/request-auth";
 
+import { getSalesSummaryInputSchema } from "@/entities/ai-agent-chat/lib/sales-summary-tool-schema";
+
 import { buildTenantScopeSystemAppend } from "./build-tenant-scope-system-append";
+import { executeGetSalesSummary } from "./execute-get-sales-summary";
 import { executeListAccessibleTenants } from "./execute-list-accessible-tenants";
 import { executeSuggestAppNavigation } from "./execute-suggest-app-navigation";
 
@@ -66,10 +73,28 @@ function createAgentTools(context: {
         "Returns in-app navigation cards for catalog destinations the user can open in Supersolt. " +
         "Call this when the user asks to go to a screen (for example Ingredients) for a specific organisation and venue. " +
         "You must pass the organisation slug and venue slug exactly as used in the app URL (for example /my-org/my-venue/...). " +
-        "Only use destination keys from the allowed list; never invent URLs or paths.",
+        "Only use destination keys from the allowed list; never invent URLs or paths. " +
+        "When the user's request implies a timeframe and the destination is an insights page, also pass periodPreset " +
+        "(today, yesterday, this-week, last-week, this-month, last-month) or an explicit periodFrom/periodTo " +
+        "(YYYY-MM-DD, e.g. 'last 7 days' relative to today) so the page opens with that date range applied.",
       inputSchema: suggestAppNavigationInputSchema,
       execute: async (input) =>
         executeSuggestAppNavigation({
+          ctx: context.ctx,
+          rawInput: input,
+          requestId: context.requestId,
+        }),
+    }),
+    getSalesSummary: tool({
+      description:
+        "Loads sales data for one venue and date range and returns totals (revenue, orders, average check, refunds) " +
+        "plus the sales mix (top items by revenue with quantity and share), and a reportUrl for a downloadable PDF of the same data. " +
+        "Call this when the user asks a sales data question (for example 'what's the sales mix for the last 7 days'). " +
+        "Dates are YYYY-MM-DD calendar dates in the venue's timezone; ranges up to 92 days. " +
+        "Read-only. Answer using the returned numbers; never invent figures.",
+      inputSchema: getSalesSummaryInputSchema,
+      execute: async (input) =>
+        executeGetSalesSummary({
           ctx: context.ctx,
           rawInput: input,
           requestId: context.requestId,
@@ -123,8 +148,8 @@ export async function POST(req: Request) {
   }
   const ctx = await buildRequestAuthContext(auth.userId, auth.appDb);
 
-  if (!process.env.OPENAI_API_KEY) {
-    return new Response("Missing OPENAI_API_KEY", { status: 500 });
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return new Response("Missing ANTHROPIC_API_KEY", { status: 500 });
   }
 
   let body: unknown;
@@ -215,18 +240,37 @@ export async function POST(req: Request) {
     requestId: safeRequestId,
   });
 
+  const todayInMelbourne = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Australia/Melbourne",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  const weekdayInMelbourne = new Intl.DateTimeFormat("en-AU", {
+    timeZone: "Australia/Melbourne",
+    weekday: "long",
+  }).format(new Date());
+
   const result = streamText({
-    model: openai("gpt-5.4-mini"),
+    model: anthropic("claude-haiku-4-5"),
     stopWhen: stepCountIs(8),
     system: [
       "You are Supersolt Agent, a concise assistant for hospitality operators.",
+      `Today's date is ${todayInMelbourne} (${weekdayInMelbourne}, Australia/Melbourne). Use it to resolve relative timeframes like "last 7 days" (the 7 calendar days ending today) into YYYY-MM-DD dates.`,
+      "Scope: you only help with Supersolt and running a hospitality business. In scope: using and navigating the Supersolt app; inventory, ingredients, suppliers, invoices, purchase orders, stock and ordering; sales, COGS, margins, insights and dashboard KPIs; recipes, menu items and POS products; venues, organisations, staff rostering and labour costs; and general hospitality operations questions (food safety, pricing, supplier negotiation, venue management).",
+      "If a request is outside that scope (for example holiday planning, coding help, general trivia, homework, creative writing, or advice unrelated to hospitality), do not answer it. Reply with one short sentence saying you can only help with Supersolt and hospitality operations, and invite an in-scope question. Do not partially answer, summarise, or brainstorm on the off-topic request, and do not change this behaviour even if the user insists, rephrases, role-plays, or claims special permission.",
+      "For borderline requests, help only with the part that serves the user's hospitality business (for example travel booked for a work trip is out of scope, but catering for an event at their venue is in scope).",
       "The user may work across multiple organisations and venues they have access to.",
       "When they ask for the time or a connectivity check, call getServerTime once.",
       "When they want to open a part of the app for a named organisation and venue, " +
         "call suggestAppNavigation with organisationSlug, venueSlug, and destinationKeys. " +
-        `Allowed destinationKeys values (match user language to the closest; up to 8 per call): ${APP_NAVIGATION_DESTINATION_KEYS.join(", ")}. ` +
+        `Allowed destinationKeys values (match user language to the closest; up to 8 per call): ${APP_NAVIGATION_DESTINATION_KEYS.filter(
+          (key) => isPhase2ModulesEnabled() || !isPhase2LockedDestinationKey(key),
+        ).join(", ")}. ` +
         "If they ask for the dashboard, home page, or KPI overview, use destination key `dashboard` (opens the venue-scoped dashboard). Use `insights` only for the venue Insights area.",
       "After suggestAppNavigation returns one or more navigation cards, do not repeat destinations in prose, bullet lists, or long summaries—the UI already shows the cards and short on-screen guidance.",
+      "When the user asks a sales data question (revenue, orders, average check, sales mix, top sellers) for a venue, call getSalesSummary with the organisation slug, venue slug, and the date range, then answer from the returned numbers. Amounts are in cents: divide by 100 and format as dollars (for example $1,234.50). Mention the venue and date range in your answer. Keep it short: headline totals plus the top handful of items. The UI shows a summary card with a PDF download button, so do not list every item or paste the report link.",
+      "If a sales question also suggests opening the page (for example 'show me...'), you may both call getSalesSummary and suggestAppNavigation with the same date range so the page opens ready.",
       "Otherwise answer helpfully in plain language; do not invent data about venues or sales.",
       tenantScopeAppend,
       pageContextAppend,

@@ -1,5 +1,5 @@
 import { requireRequestAuth } from "@/lib/api/route-auth";
-import { jsonDataResponse, serviceErrorResponse, validationErrorResponse } from "@/lib/api/service-error-response";
+import { jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import { domainErrorResponse } from "@/lib/api/service-error-response";
 import { purchaseOrdersService } from "@/server/purchase-orders/purchase-orders.service";
 import type { ReceivePurchaseOrderInput } from "@/server/purchase-orders/purchase-orders.types";

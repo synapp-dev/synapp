@@ -60,8 +60,7 @@ export function stripFdvFromLineItemDto(
   includeFdv: boolean,
 ): PayRunLineItemDto {
   if (includeFdv) return line;
-  const { hasFdvLeave: _h, fdvPayslipLabel: _l, ...rest } = line;
-  return { ...rest, hasFdvLeave: false, fdvPayslipLabel: null };
+  return { ...line, hasFdvLeave: false, fdvPayslipLabel: null };
 }
 
 export function isPayRunLocked(status: PayRunStatus): boolean {

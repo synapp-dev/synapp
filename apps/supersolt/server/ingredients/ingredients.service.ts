@@ -1,5 +1,4 @@
 import type { RequestAuthContext } from "@/server/auth/context";
-import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import { suppliersRepo } from "@/server/suppliers/suppliers.repo";
 import {
@@ -57,13 +56,6 @@ export class IngredientsServiceError extends Error {
   }
 }
 
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new IngredientsServiceError(error.status, error.message);
-  }
-  throw error;
-}
-
 function assertIngredientCategory(value: string): IngredientCategory {
   if (!INGREDIENT_CATEGORIES.includes(value as IngredientCategory)) {
     throw new IngredientsServiceError(400, "Invalid ingredient category");
@@ -96,10 +88,6 @@ function toSummary(row: IngredientRow): IngredientSummary {
     updatedAt: row.updatedAt,
   };
 }
-
-type SupplierIdMutation =
-  | { mode: "omit" }
-  | { mode: "set"; value: string | null };
 
 async function resolveScope(
   ctx: RequestAuthContext,

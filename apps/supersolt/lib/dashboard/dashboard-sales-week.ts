@@ -51,14 +51,38 @@ export function previousComparableWeekDatesInVenue(
   };
 }
 
-/** Inclusive ISO instants for fetching Square payments across two venue-local weeks. */
+/**
+ * Rolling hero-chart window centred on today: 3 days of history, today,
+ * 3 days of projection. Keeps the chart populated on a fresh Monday.
+ */
+export function heroChartWindowInVenue(
+  timezone: string,
+  todayIso?: string,
+): { today: string; fromDate: string; toDate: string; dates: string[] } {
+  const today = todayIso ?? todayCalendarIsoInVenue(timezone);
+  const fromDate = addDaysCalendarIso(today, -3);
+  const toDate = addDaysCalendarIso(today, 3);
+  return {
+    today,
+    fromDate,
+    toDate,
+    dates: listCalendarDatesBetween(fromDate, toDate),
+  };
+}
+
+/**
+ * Inclusive ISO instants for fetching the dashboard's Square orders: from 13
+ * days back (the trailing-7-day hero plus its comparison window — which also
+ * always covers the previous ISO week the avg-check KPI compares against)
+ * through the end of the current venue-local week.
+ */
 export function dashboardSalesFetchIsoRange(
   timezone: string,
   todayIso?: string,
 ): { startIso: string; endIso: string } {
-  const { weekMonday } = thisWeekCalendarBoundsInVenue(timezone, todayIso);
-  const prevWeekMonday = addDaysCalendarIso(weekMonday, -7);
-  const { dayStartUtc } = venueCalendarDayBoundsUtc(prevWeekMonday, timezone);
+  const today = todayIso ?? todayCalendarIsoInVenue(timezone);
+  const rangeStart = addDaysCalendarIso(today, -13);
+  const { dayStartUtc } = venueCalendarDayBoundsUtc(rangeStart, timezone);
   const { weekSunday } = thisWeekCalendarBoundsInVenue(timezone, todayIso);
   const { dayEndExclusiveUtc } = venueCalendarDayBoundsUtc(weekSunday, timezone);
   const endIso = new Date(dayEndExclusiveUtc.getTime() - 1).toISOString();

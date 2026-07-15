@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronsRight, Cpu, LogOut, Settings } from "lucide-react";
+import { ChevronsRight, Cpu, LogOut, Monitor, Moon, Settings, Sun, SunMoon } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import {
   Avatar,
@@ -13,7 +14,12 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu";
 import {
@@ -30,6 +36,7 @@ import { ResetProductsMenuItem } from "@/components/shell/reset-products-menu-it
 
 export function NavUser() {
   const { isMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
   const currentUser = useMeStore((state) => state.currentUser);
 
   const profileName = [currentUser?.firstName, currentUser?.lastName]
@@ -89,6 +96,28 @@ export function NavUser() {
                   Settings
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <SunMoon className="mr-2 size-4 text-muted-foreground" />
+                  Theme
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup value={theme} onValueChange={setTheme}>
+                    <DropdownMenuRadioItem value="light">
+                      <Sun className="size-4 text-muted-foreground" />
+                      Light
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dark">
+                      <Moon className="size-4 text-muted-foreground" />
+                      Dark
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="system">
+                      <Monitor className="size-4 text-muted-foreground" />
+                      System
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <ReplaySetupIntroMenuItem />

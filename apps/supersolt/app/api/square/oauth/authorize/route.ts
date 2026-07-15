@@ -14,6 +14,13 @@ import {
 import { getSquareOAuthEnvConfig } from "@/server/square/config";
 import { buildSquareAuthorizeUrl } from "@/server/square/square-oauth";
 import { safeRelativeNextPath } from "@/server/square/safe-next-path";
+import { squareConnectionsRepo } from "@/server/square/square-connections.repo";
+import { runBackfillSquareSync } from "@/server/square/square-sync.service";
+import {
+  connectTestMirrorSquare,
+  getTestModeSourceVenueId,
+  isTestRunOrganisation,
+} from "@/server/test-mode/test-mode";
 
 export async function GET(request: NextRequest) {
   oauthLogAuthorize("request", {
@@ -66,6 +73,58 @@ export async function GET(request: NextRequest) {
   }
 
   const nextPath = safeRelativeNextPath(nextRaw);
+
+  // Test-run organisations skip Square OAuth entirely: connecting creates a
+  // mirror of the configured source venue's connection, then returns to the
+  // app exactly like a successful OAuth callback would.
+  const testSourceVenueId = getTestModeSourceVenueId();
+  if (
+    testSourceVenueId &&
+    (await isTestRunOrganisation(ctx.appDb, context.organisationId))
+  ) {
+    const mirror = await connectTestMirrorSquare(ctx.appDb, {
+      venueId: context.venueId,
+      organisationId: context.organisationId,
+      sourceVenueId: testSourceVenueId,
+    });
+    const dest = new URL(
+      nextPath ?? `/${organisation}/${venue}/settings/integrations`,
+      request.nextUrl.origin,
+    );
+    if (!mirror.ok) {
+      oauthWarnAuthorize("test_mirror_failed", { code: mirror.code });
+      dest.searchParams.set("square_error", mirror.code);
+      return NextResponse.redirect(dest);
+    }
+
+    oauthLogAuthorize("test_mirror_connected", {
+      organisation,
+      venue,
+      venueId: context.venueId,
+      sourceVenueId: testSourceVenueId,
+    });
+
+    const connection = await squareConnectionsRepo.loadConnectionForVenue(
+      ctx.appDb,
+      context.venueId,
+      false,
+    );
+    if (connection) {
+      void runBackfillSquareSync(ctx.appDb, {
+        venueId: context.venueId,
+        organisationId: context.organisationId,
+        timezone: context.timezone ?? "Australia/Melbourne",
+        accessToken: connection.squareAccessToken,
+        environment: connection.environment,
+        locationId: connection.squareLocationId,
+      }).catch((error) => {
+        console.error("[square/oauth] test-mirror backfill failed", error);
+      });
+    }
+
+    dest.searchParams.set("square", "connected");
+    return NextResponse.redirect(dest);
+  }
 
   let squareUrl: string;
   let cookieValue: string;

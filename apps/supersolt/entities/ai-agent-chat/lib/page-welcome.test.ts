@@ -18,7 +18,9 @@ describe("buildPageWelcome", () => {
   });
 
   it("uses catalog title for scoped recipes route", () => {
-    const w = buildPageWelcome("/acme-cafe/richmond/settings/recipes");
+    const w = buildPageWelcome(
+      "/acme-cafe/richmond/settings/inventory-setup/products/recipes",
+    );
     expect(w).not.toBeNull();
     expect(w!.headline).toBe("Welcome to Items");
     expect(w!.body).toContain("Catalog items");

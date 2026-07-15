@@ -4,11 +4,12 @@ export const INSIGHTS_PERIOD_PARAM = "preset";
 export const INSIGHTS_FROM_PARAM = "from";
 export const INSIGHTS_TO_PARAM = "to";
 
-export const DEFAULT_INSIGHTS_PRESET: InsightsDatePreset = "this-week";
+export const DEFAULT_INSIGHTS_PRESET: InsightsDatePreset = "last-7-days";
 
 const VALID_PRESETS: InsightsDatePreset[] = [
   "today",
   "yesterday",
+  "last-7-days",
   "this-week",
   "last-week",
   "this-month",
@@ -109,6 +110,8 @@ export function getInsightsPresetDateRange(preset: InsightsDatePreset): Insights
       const yesterday = addDays(now, -1);
       return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
     }
+    case "last-7-days":
+      return { start: startOfDay(addDays(now, -6)), end: endOfDay(now) };
     case "this-week":
       return { start: startOfWeekMonday(now), end: endOfWeekMonday(now) };
     case "last-week": {

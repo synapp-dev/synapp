@@ -47,6 +47,24 @@ function formatCurrency(cents: number): string {
   })}`;
 }
 
+function formatScheduleDate(isoDate: string): string {
+  return new Date(`${isoDate}T12:00:00`).toLocaleDateString("en-AU", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function formatCutoff(orderByTime: string | null): string {
+  if (!orderByTime) return "";
+  const [hours, minutes] = orderByTime.split(":");
+  const hour = Number(hours);
+  if (!Number.isFinite(hour)) return "";
+  const suffix = hour >= 12 ? "pm" : "am";
+  const display = hour % 12 === 0 ? 12 : hour % 12;
+  return ` by ${display}${minutes && minutes !== "00" ? `:${minutes}` : ""}${suffix}`;
+}
+
 type SelectionKey = string;
 
 function selectionKey(s: OrderGuideSuggestion): SelectionKey {
@@ -288,9 +306,26 @@ export function OrderGuideTab({ organisation, venue, onPosCreated }: OrderGuideT
         <div key={group.supplierId} className="rounded-lg border">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-4 py-3">
             <div>
-              <p className="font-semibold">{group.supplierName}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">{group.supplierName}</p>
+                {group.schedule ? (
+                  group.schedule.nextOrderIsToday ? (
+                    <Badge className="bg-emerald-600 text-white hover:bg-emerald-600">
+                      Order today{formatCutoff(group.schedule.orderByTime)} · delivers{" "}
+                      {formatScheduleDate(group.schedule.nextDeliveryDate)}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">
+                      Next order {formatScheduleDate(group.schedule.nextOrderDate)} · delivers{" "}
+                      {formatScheduleDate(group.schedule.nextDeliveryDate)}
+                    </Badge>
+                  )
+                ) : null}
+              </div>
               <p className="text-muted-foreground text-xs">
-                Lead time {group.leadTimeDays} days
+                {group.schedule?.orderDaysLabel
+                  ? `Order days: ${group.schedule.orderDaysLabel}`
+                  : `Lead time ${group.leadTimeDays} days`}
                 {group.orderingEmail ? ` · ${group.orderingEmail}` : ""}
               </p>
             </div>

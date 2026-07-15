@@ -92,7 +92,6 @@ export const SUPPLIER_BENEFITS: readonly SupplierBenefit[] = [
  */
 export function buildWelcomeScript(firstName: string | null) {
   const trimmed = firstName?.trim();
-  const name = trimmed ? trimmed : "there";
   return {
     greeting: trimmed ? `Hey there ${trimmed}!` : "Hey there!",
     greetingBody:

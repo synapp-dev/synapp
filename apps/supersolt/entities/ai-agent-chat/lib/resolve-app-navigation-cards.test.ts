@@ -15,7 +15,7 @@ describe("resolveAppNavigationCards", () => {
       {
         title: "Ingredients",
         description: "View and manage ingredients for this venue.",
-        href: "/acme/richmond/settings/inventory",
+        href: "/acme/richmond/settings/inventory-setup/inventory/master-list",
         destinationKey: "ingredients",
         organisationName: "Acme Co",
         venueName: "Richmond",
@@ -32,6 +32,33 @@ describe("resolveAppNavigationCards", () => {
       destinationKeys: ["ingredients", "ingredients"],
     });
     expect(cards).toHaveLength(1);
+  });
+
+  it("appends the period query only to destinations that read it", () => {
+    const cards = resolveAppNavigationCards({
+      organisationSlug: "acme",
+      venueSlug: "richmond",
+      organisationName: "Acme Co",
+      venueName: "Richmond",
+      destinationKeys: ["insights_sales", "dashboard"],
+      period: { kind: "custom", from: "2026-07-06", to: "2026-07-12" },
+    });
+    expect(cards.map((c) => c.href)).toEqual([
+      "/acme/richmond/insights/sales?preset=custom&from=2026-07-06&to=2026-07-12",
+      "/acme/richmond/dashboard",
+    ]);
+  });
+
+  it("appends a preset period as-is", () => {
+    const cards = resolveAppNavigationCards({
+      organisationSlug: "acme",
+      venueSlug: "richmond",
+      organisationName: "Acme Co",
+      venueName: "Richmond",
+      destinationKeys: ["insights_sales"],
+      period: { kind: "preset", preset: "last-week" },
+    });
+    expect(cards[0]?.href).toBe("/acme/richmond/insights/sales?preset=last-week");
   });
 
   it("builds scoped dashboard href from org and venue slugs", () => {

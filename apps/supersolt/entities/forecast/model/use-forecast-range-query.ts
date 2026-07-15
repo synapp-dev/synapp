@@ -1,12 +1,13 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { forecastApi } from "@/entities/forecast/api/endpoints";
 import { forecastKeys } from "@/entities/forecast/model/keys";
 import type {
   DailySalesRow,
   ForecastRow,
   VenueForecastStateDto,
+  VenueWeatherDayDto,
 } from "@/entities/forecast/model/types";
 
 export type ForecastRangeInput = {
@@ -20,6 +21,7 @@ export type ForecastRangeInput = {
 export type ForecastRangeQueryResult = {
   forecasts: ForecastRow[];
   dailySales: DailySalesRow[];
+  weather: VenueWeatherDayDto[];
   state: VenueForecastStateDto | null;
   isPending: boolean;
   isError: boolean;
@@ -68,6 +70,8 @@ export function useForecastRangeQuery(
         toDate,
       }),
     enabled,
+    refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
   });
 
   const dailySalesQuery = useQuery({
@@ -85,6 +89,11 @@ export function useForecastRangeQuery(
         toDate,
       }),
     enabled,
+    // daily_sales facts are recomputed by the 10-minute sales sync cron; poll
+    // so the hero chart keeps pace with the transactions list.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    placeholderData: keepPreviousData,
   });
 
   const state =
@@ -93,6 +102,7 @@ export function useForecastRangeQuery(
   return {
     forecasts: forecastsQuery.data?.forecasts ?? [],
     dailySales: dailySalesQuery.data?.rows ?? [],
+    weather: dailySalesQuery.data?.weather ?? [],
     state,
     isPending: forecastsQuery.isPending || dailySalesQuery.isPending,
     isError: forecastsQuery.isError || dailySalesQuery.isError,

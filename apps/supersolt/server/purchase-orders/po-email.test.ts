@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPoEmailLine } from "./po-email.service";
-import type { PoLineRow } from "./purchase-orders.repo";
+import {
+  buildPoEmailBody,
+  formatPoEmailLine,
+  type PoEmailPayload,
+} from "./po-email.service";
+import type { PoLineRow, PoRow } from "./purchase-orders.repo";
 
 function line(partial: Partial<PoLineRow>): PoLineRow {
   return {
@@ -59,5 +63,77 @@ describe("formatPoEmailLine", () => {
     expect(formatPoEmailLine(line({}))).toBe(
       "• Fior Di Latte — 12 unit @ $16.50 per unit",
     );
+  });
+});
+
+function payload(partial: Partial<PoEmailPayload> = {}): PoEmailPayload {
+  const po = {
+    id: "po-1",
+    organisation_id: "org-1",
+    venue_id: "venue-1",
+    supplier_id: "sup-1",
+    po_number: "PO-2026-0007",
+    status: "draft",
+    expected_delivery_date: null,
+    actual_delivery_date: null,
+    subtotal_cents: 19800,
+    gst_cents: 1980,
+    total_cents: 21780,
+    gst_treatment: "exclusive",
+    notes: null,
+    partial_delivery_flag: false,
+    created_by_user_id: null,
+    created_at: "2026-07-12T00:00:00Z",
+    updated_at: "2026-07-12T00:00:00Z",
+    submitted_at: null,
+    confirmed_at: null,
+    delivered_at: null,
+    closed_at: null,
+    cancelled_at: null,
+    cancellation_reason: null,
+    approval_status: null,
+    approved_by_user_id: null,
+    approval_comment: null,
+    rejected_at: null,
+    linked_invoice_id: null,
+  } satisfies PoRow;
+  return {
+    po,
+    lines: [line({})],
+    venueName: "Supersolt Hawthorn",
+    organisationName: "Solt Group",
+    supplierName: "Fior Foods",
+    orderingEmail: "orders@fiorfoods.com.au",
+    fromAddress: "hawthorn@inbox.supersolt.com",
+    ...partial,
+  };
+}
+
+describe("buildPoEmailBody", () => {
+  it("uses the default body when no template is set", () => {
+    const body = buildPoEmailBody(payload());
+    expect(body).toContain("Hello Fior Foods,");
+    expect(body).toContain("PO-2026-0007");
+    expect(body).toContain("Total (ex GST): $198.00");
+    expect(body).toContain("Total (inc GST): $217.80");
+  });
+
+  it("renders org template placeholders", () => {
+    const body = buildPoEmailBody(
+      payload({
+        bodyTemplate:
+          "G'day {{supplier_name}},\n{{lines}}\nTotal {{total_inc_gst}} - {{venue_name}}",
+      }),
+    );
+    expect(body).toBe(
+      "G'day Fior Foods,\n• Fior Di Latte — 12 unit @ $16.50 per unit\nTotal $217.80 - Supersolt Hawthorn",
+    );
+  });
+
+  it("leaves unknown placeholders untouched and blanks empty notes", () => {
+    const body = buildPoEmailBody(
+      payload({ bodyTemplate: "{{mystery}} notes:[{{notes}}]" }),
+    );
+    expect(body).toBe("{{mystery}} notes:[]");
   });
 });

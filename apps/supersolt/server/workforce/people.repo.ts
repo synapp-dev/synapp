@@ -8,7 +8,6 @@ import {
   userOrganisations,
   userProfiles,
   userVenues,
-  venues,
 } from "@/server/db/schema";
 
 export const peopleRepo = {

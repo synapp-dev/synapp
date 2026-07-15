@@ -66,7 +66,8 @@ function dollarsToCents(value: number | undefined): number | null {
   return Math.round(value * 100);
 }
 
-export function mapXeroReviewStatus(_xeroStatus: string | undefined): XeroReviewStatus {
+export function mapXeroReviewStatus(xeroStatus: string | undefined): XeroReviewStatus {
+  void xeroStatus;
   return "pending_review";
 }
 

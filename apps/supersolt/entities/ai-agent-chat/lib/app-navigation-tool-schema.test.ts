@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   appNavigationCardSchema,
   dedupeDestinationKeys,
+  isSafeAppNavigationHref,
   MAX_APP_NAVIGATION_DESTINATION_KEYS,
+  periodFromNavigationInput,
   suggestAppNavigationInputSchema,
   suggestAppNavigationSuccessSchema,
 } from "./app-navigation-tool-schema";
@@ -74,6 +76,76 @@ describe("app-navigation-tool-schema", () => {
         venueName: "Venue",
       }).success
     ).toBe(true);
+  });
+
+  it("accepts period presets and custom ranges on input", () => {
+    expect(
+      suggestAppNavigationInputSchema.safeParse({
+        organisationSlug: "acme",
+        venueSlug: "richmond",
+        destinationKeys: ["insights_sales"],
+        periodPreset: "last-week",
+      }).success,
+    ).toBe(true);
+    expect(
+      suggestAppNavigationInputSchema.safeParse({
+        organisationSlug: "acme",
+        venueSlug: "richmond",
+        destinationKeys: ["insights_sales"],
+        periodFrom: "2026-07-06",
+        periodTo: "2026-07-12",
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects half-open or inverted custom ranges", () => {
+    expect(
+      suggestAppNavigationInputSchema.safeParse({
+        organisationSlug: "acme",
+        venueSlug: "richmond",
+        destinationKeys: ["insights_sales"],
+        periodFrom: "2026-07-06",
+      }).success,
+    ).toBe(false);
+    expect(
+      suggestAppNavigationInputSchema.safeParse({
+        organisationSlug: "acme",
+        venueSlug: "richmond",
+        destinationKeys: ["insights_sales"],
+        periodFrom: "2026-07-12",
+        periodTo: "2026-07-06",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("prefers a custom range over a preset", () => {
+    expect(
+      periodFromNavigationInput({
+        periodPreset: "today",
+        periodFrom: "2026-07-06",
+        periodTo: "2026-07-12",
+      }),
+    ).toEqual({ kind: "custom", from: "2026-07-06", to: "2026-07-12" });
+    expect(periodFromNavigationInput({ periodPreset: "today" })).toEqual({
+      kind: "preset",
+      preset: "today",
+    });
+    expect(periodFromNavigationInput({})).toBeUndefined();
+  });
+
+  it("allows only the insights period query on hrefs", () => {
+    expect(
+      isSafeAppNavigationHref(
+        "/acme/richmond/insights/sales?preset=custom&from=2026-07-06&to=2026-07-12",
+      ),
+    ).toBe(true);
+    expect(isSafeAppNavigationHref("/acme/richmond/insights/sales?preset=this-week")).toBe(
+      true,
+    );
+    expect(isSafeAppNavigationHref("/a/b?redirect=https://evil.com")).toBe(false);
+    expect(isSafeAppNavigationHref("/a/b?preset=<script>")).toBe(false);
+    expect(isSafeAppNavigationHref("/a/b?")).toBe(false);
+    expect(isSafeAppNavigationHref("/a/b?preset=custom?from=x")).toBe(false);
   });
 
   it("accepts a valid success payload", () => {

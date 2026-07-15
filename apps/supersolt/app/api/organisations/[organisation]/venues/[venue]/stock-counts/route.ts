@@ -1,7 +1,6 @@
 import { stockCountsService } from "@/server/stock-counts/stock-counts.service";
 import type {
   CreateStockCountInput,
-  PatchStockCountInput,
 } from "@/server/stock-counts/stock-counts.types";
 import { requireRequestAuth } from "@/lib/api/route-auth";
 import { domainErrorResponse, jsonDataResponse } from "@/lib/api/service-error-response";

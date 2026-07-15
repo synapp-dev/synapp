@@ -40,8 +40,6 @@ type AllInvoicesListProps = {
 };
 
 export function AllInvoicesList({
-  organisation,
-  venue,
   listQuery,
   onOpenInvoice,
 }: AllInvoicesListProps) {
@@ -127,7 +125,11 @@ export function AllInvoicesList({
                   <TableCell className="font-mono text-sm">{inv.invoiceNumber ?? "—"}</TableCell>
                   <TableCell className="text-right">{formatCurrency(inv.totalCents)}</TableCell>
                   <TableCell>
-                    <Badge variant="outline">{inv.reviewStatus.replace("_", " ")}</Badge>
+                    {inv.setupImport ? (
+                      <Badge variant="secondary">setup import</Badge>
+                    ) : (
+                      <Badge variant="outline">{inv.reviewStatus.replace("_", " ")}</Badge>
+                    )}
                   </TableCell>
                   <TableCell className="capitalize">{inv.source}</TableCell>
                 </TableRow>

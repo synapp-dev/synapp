@@ -1,6 +1,10 @@
 "use client";
 
-import { useQuery, type UseQueryResult } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useQuery,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import {
   salesInsightsApi,
   type SalesOrdersApiPayload,
@@ -28,5 +32,11 @@ export function useSalesInsightsQuery({
       });
     },
     enabled,
+    // The mirror is refreshed by a 10-minute cron; poll so new payments show
+    // up without a manual refresh (pauses while the tab is in the background).
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+    // Keep the previous range's rows on screen while a new range loads.
+    placeholderData: keepPreviousData,
   });
 }

@@ -79,6 +79,14 @@ export function NavMain({
 }) {
   const pathname = usePathname();
 
+  // Animated items start at opacity-0, so deferring them to after mount is
+  // invisible to the user while guaranteeing the SSR and hydration trees are
+  // identical (the staggered wrappers were flagged in hydration mismatches).
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   const isUrlActive = useCallback((url: string, exact?: boolean) => {
     if (!url || url === "#") {
       return false;
@@ -116,6 +124,10 @@ export function NavMain({
   useEffect(() => {
     setOpenItem(activeParentTitle);
   }, [activeParentTitle]);
+
+  if (enableStaggeredAnimation && !hasMounted) {
+    return <SidebarGroup className={cn("gap-0", className)} />;
+  }
 
   return (
     <SidebarGroup className={cn("gap-0", className)}>
@@ -262,6 +274,9 @@ export function NavMain({
               baseDelay={staggerBaseDelay}
               incrementDelay={staggerIncrementDelay}
               fadeDirection="left"
+              // The sidebar has its own splash choreography (the li-level
+              // stagger in supersolt-splash.tsx) — don't hold for the page.
+              holdForSplash={false}
             >
               {menuItem}
             </StaggeredAnimation>

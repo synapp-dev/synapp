@@ -16,6 +16,7 @@ import { AllInvoicesList } from "./all-invoices-list";
 import { InvoiceUploadDialog } from "./invoice-upload-dialog";
 import { InvoiceDetailPanel } from "./invoice-detail-panel";
 import { useInvoiceSheetUrl } from "@/entities/invoices/lib/use-invoice-sheet-url";
+import { SuperbotFocusBanner } from "@/entities/ai-agent-chat/components/superbot-focus";
 
 type InvoicesShellProps = {
   organisation: string;
@@ -75,6 +76,7 @@ export function InvoicesShell({ organisation, venue }: InvoicesShellProps) {
 
   return (
     <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
+      <SuperbotFocusBanner destination="inventory_invoices" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
           <FileText className="h-5 w-5 text-muted-foreground" />

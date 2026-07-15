@@ -316,11 +316,13 @@ export const squareCatalogImportService = {
               organisationId: scope.organisationId,
               venueId: scope.venueId,
               menuItemId: existingLink.menuItemId,
+              // showOnMenu deliberately not updated: Square's sold-out flag only
+              // seeds it on create. Re-imports must not clobber user toggles or
+              // sales-driven activation (status still refreshes as info).
               row: {
                 name: draft.name,
                 sectionName: draft.sectionName,
                 priceCents: draft.priceCents,
-                showOnMenu: draft.showOnMenu,
                 status: draft.status,
                 isActive: draft.status === "active",
                 groupId,

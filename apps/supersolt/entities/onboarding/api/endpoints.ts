@@ -18,6 +18,8 @@ export const onboardingApi = {
     isGstRegistered?: boolean;
     /** Existing onboarding org to update; omit on first save. */
     organisationId?: string | null;
+    /** Test-run org: connect steps mirror a shared connection instead of real OAuth. */
+    isTestRun?: boolean;
   }): Promise<ApiResult<{ organisation: OnboardingOrganisationDto }>> {
     return apiFetch<{ organisation: OnboardingOrganisationDto }>(
       "/onboarding/organisation",

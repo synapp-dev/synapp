@@ -29,7 +29,10 @@ export function AgentSidebarCollapsedRail({
         onClick={() => setOpen(true)}
         className={cn(
           "group/bot pointer-events-auto fixed top-16 z-30 inline-flex flex-col items-center border-0 bg-transparent p-0 shadow-none outline-none",
-          "right-[max(1.75rem,env(safe-area-inset-right,0px))] -translate-x-[35%]",
+          // Sit exactly on the lane the collapsed rail reserves in the layout
+          // (gap width = icon width + 1rem spacing) so content can never
+          // underlap the bot at any viewport width.
+          "right-[env(safe-area-inset-right,0px)] w-[calc(var(--right-sidebar-width-icon)+1rem)]",
           "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         )}
       >
@@ -37,14 +40,14 @@ export function AgentSidebarCollapsedRail({
           key={themeKey}
           aria-hidden
           className={cn(
-            "h-24 w-auto max-w-[min(6.5rem,24vw)] origin-center transform-gpu",
+            "h-24 w-auto max-w-full origin-center transform-gpu",
             "animate-slide-down-fade-in-slow transition-transform duration-300 ease-out will-change-transform",
             "group-hover/bot:scale-[1.12]",
           )}
         />
         <span
           className={cn(
-            "text-foreground mt-1 max-w-[14rem] px-1 text-center text-base font-semibold leading-snug tracking-tight whitespace-nowrap",
+            "text-foreground mt-1 max-w-full px-1 text-center text-sm font-semibold leading-snug tracking-tight",
             "translate-y-14 opacity-0 transition-[opacity,transform] duration-300 ease-out motion-reduce:translate-y-0 motion-reduce:opacity-100",
             "group-hover/bot:translate-y-0 group-hover/bot:opacity-100",
           )}

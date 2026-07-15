@@ -3,7 +3,6 @@ import { requireRequestAuth } from "@/lib/api/route-auth";
 import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import {
   organisationMembersService,
-  OrganisationMembersServiceError,
 } from "@/server/organisations/organisation-members.service";
 
 type RouteParams = {

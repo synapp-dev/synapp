@@ -1,16 +1,70 @@
-import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
+import type { AppDb } from "@/server/db/create-app-db";
 import type { RlsTx } from "@/server/db/drizzle";
 import {
   dailySales,
   forecasts,
   ingredientConsumptionDaily,
   purchaseOrders,
+  venueDigestCache,
   venueInvoices,
   venueSquareConnections,
 } from "@/server/db/schema";
 
+export type VenueDigestKind = "dashboard" | "inventory";
+
 export const dashboardDigestRepo = {
+  /** Access is already venue-scope checked by the service, so reads go via admin. */
+  async getCachedDigest(
+    appDb: AppDb,
+    args: { venueId: string; kind: VenueDigestKind },
+  ): Promise<{ digest: string; groundingHash: string; generatedAt: string } | null> {
+    const rows = await appDb.admin
+      .select({
+        digest: venueDigestCache.digest,
+        groundingHash: venueDigestCache.groundingHash,
+        generatedAt: venueDigestCache.generatedAt,
+      })
+      .from(venueDigestCache)
+      .where(
+        and(
+          eq(venueDigestCache.venueId, args.venueId),
+          eq(venueDigestCache.kind, args.kind),
+        ),
+      )
+      .limit(1);
+    return rows[0] ?? null;
+  },
+
+  async upsertCachedDigest(
+    appDb: AppDb,
+    args: {
+      venueId: string;
+      kind: VenueDigestKind;
+      digest: string;
+      groundingHash: string;
+    },
+  ): Promise<void> {
+    await appDb.admin
+      .insert(venueDigestCache)
+      .values({
+        venueId: args.venueId,
+        kind: args.kind,
+        digest: args.digest,
+        groundingHash: args.groundingHash,
+        generatedAt: sql`now()`,
+      })
+      .onConflictDoUpdate({
+        target: [venueDigestCache.venueId, venueDigestCache.kind],
+        set: {
+          digest: sql`excluded.digest`,
+          groundingHash: sql`excluded.grounding_hash`,
+          generatedAt: sql`excluded.generated_at`,
+        },
+      });
+  },
+
   async listDailySales(
     tx: RlsTx,
     args: { venueId: string; fromDate: string; toDate: string },
@@ -89,6 +143,9 @@ export const dashboardDigestRepo = {
         and(
           eq(venueInvoices.venueId, venueId),
           inArray(venueInvoices.reviewStatus, ["pending_review", "pending_approval"]),
+          // Catalog-seeding imports are not operational work; mirror the
+          // invoices module, which keeps them out of the review queue.
+          eq(venueInvoices.setupImport, false),
         ),
       );
     return {

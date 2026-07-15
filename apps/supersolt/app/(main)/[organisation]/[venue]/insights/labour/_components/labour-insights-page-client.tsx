@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
 import { cn } from "@workspace/ui/lib/utils";
 import { useInsightsPeriod } from "@/entities/insights/model/insights-period-provider";
@@ -17,7 +16,6 @@ type LabourInsightsPageClientProps = {
 };
 
 type ReportType = "labour-cost" | "labour-percent" | "rostered-vs-actual" | "overtime";
-type DatePreset = "today" | "yesterday" | "this-week" | "last-week" | "this-month" | "last-30";
 
 type LabourCostRow = {
   date: string;
@@ -135,77 +133,6 @@ function formatCurrency(cents: number): string {
   })}`;
 }
 
-function startOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
-  return next;
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function startOfWeekMonday(date: Date): Date {
-  const day = date.getDay();
-  const delta = day === 0 ? -6 : 1 - day;
-  return startOfDay(addDays(date, delta));
-}
-
-function endOfWeekMonday(date: Date): Date {
-  return endOfDay(addDays(startOfWeekMonday(date), 6));
-}
-
-function startOfMonth(date: Date): Date {
-  return startOfDay(new Date(date.getFullYear(), date.getMonth(), 1));
-}
-
-function endOfMonth(date: Date): Date {
-  return endOfDay(new Date(date.getFullYear(), date.getMonth() + 1, 0));
-}
-
-function getDateRange(preset: DatePreset): { start: Date; end: Date } {
-  const now = new Date();
-  switch (preset) {
-    case "today":
-      return { start: startOfDay(now), end: endOfDay(now) };
-    case "yesterday": {
-      const yesterday = addDays(now, -1);
-      return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-    }
-    case "this-week":
-      return { start: startOfWeekMonday(now), end: endOfWeekMonday(now) };
-    case "last-week": {
-      const lastWeek = addDays(now, -7);
-      return { start: startOfWeekMonday(lastWeek), end: endOfWeekMonday(lastWeek) };
-    }
-    case "this-month":
-      return { start: startOfMonth(now), end: endOfMonth(now) };
-    case "last-30":
-      return { start: startOfDay(addDays(now, -30)), end: endOfDay(now) };
-    default: {
-      const neverPreset: never = preset;
-      return neverPreset;
-    }
-  }
-}
-
-function formatDateRange(start: Date, end: Date): string {
-  const fmt = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  return `${fmt.format(start)} - ${fmt.format(end)}`;
-}
-
 function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number>>) {
   const escapedHeader = header.join(",");
   const escapedRows = rows.map((row) =>
@@ -230,9 +157,9 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
   URL.revokeObjectURL(url);
 }
 
-export function LabourInsightsPageClient({ organisation, venue }: LabourInsightsPageClientProps) {
+export function LabourInsightsPageClient({ venue }: LabourInsightsPageClientProps) {
   const [selectedReport, setSelectedReport] = useState<ReportType>("labour-cost");
-  const { dateRange, preset: datePreset } = useInsightsPeriod();
+  const { preset: datePreset } = useInsightsPeriod();
 
   const costSummary = useMemo(() => {
     const totalHours = LABOUR_COST_ROWS.reduce((sum, row) => sum + row.totalHours, 0);

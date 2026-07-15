@@ -25,7 +25,7 @@ function formatCalendarDateLocal(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
-export function calendarDayIsoFromRange(start: Date, end: Date): string {
+export function calendarDayIsoFromRange(start: Date): string {
   return formatCalendarDateLocal(start);
 }
 

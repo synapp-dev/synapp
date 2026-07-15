@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { ClipboardList, ShoppingBag } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
+import { SuperbotFocusBanner } from "@/entities/ai-agent-chat/components/superbot-focus";
 import { OrderGuideTab } from "./order-guide-tab";
 import { PurchaseOrdersTab } from "./purchase-orders-tab";
 
@@ -45,6 +46,7 @@ function OrdersPageClientInner({
 
   return (
     <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
+      <SuperbotFocusBanner destination="inventory_order_guide" />
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight">Orders</h1>
         <p className="text-muted-foreground text-sm">

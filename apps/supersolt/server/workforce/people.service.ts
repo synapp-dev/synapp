@@ -1,5 +1,4 @@
 import type { RequestAuthContext } from "@/server/auth/context";
-import { AuthError } from "@/server/auth/errors";
 import { isOrganisationAdminForOrg } from "@/server/auth/capabilities";
 import { resolveOrganisationIdBySlug } from "@/server/auth/rbac";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
@@ -70,13 +69,6 @@ export type PeopleDetailDto = PeopleListItem & {
   venueIds: string[];
   sensitive?: Record<string, unknown> | null;
 };
-
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new PeopleServiceError(error.status, error.message, "forbidden");
-  }
-  throw error;
-}
 
 function roleTierFromSlug(slug: string): PeopleRoleTier {
   if (slug === "supervisor") return "supervisor";

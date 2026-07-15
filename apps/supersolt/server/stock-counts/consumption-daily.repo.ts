@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 
 import type { AppDb } from "@/server/db/create-app-db";
 import type { RlsTx } from "@/server/db/drizzle";
@@ -10,7 +10,6 @@ import {
   venueSquareOrderLines,
   venues,
 } from "@/server/db/schema";
-import { formatShiftDateInVenue } from "@/lib/roster/venue-time";
 
 export type BomLine = {
   menuItemId: string;

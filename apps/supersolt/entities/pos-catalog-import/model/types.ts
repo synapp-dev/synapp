@@ -14,8 +14,13 @@ export type PosCatalogImportRow = {
   costPerServeCents: number | null;
   gpPercent: number | null;
   recipeCostIncomplete: boolean;
+  /** Ingredient line count of the mapped recipe; null when unmapped. */
+  recipeIngredientCount: number | null;
   modifierListCount: number;
   missingFromSquare: boolean;
+  lastSoldAt: string | null;
+  /** In use but no sale in the stale window: flag for review, never auto-off. */
+  staleInUse: boolean;
 };
 
 export type PosCatalogImportListResponse = {

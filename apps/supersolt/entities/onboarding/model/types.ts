@@ -2,6 +2,8 @@ export type OrganisationSetupProgress = {
   xeroSkipped?: boolean;
   teamSkipped?: boolean;
   squareConnectedAt?: string;
+  /** Test-run org: connect steps mirror the configured source venue instead of real OAuth. */
+  isTestRun?: boolean;
 };
 
 export type OnboardingOrganisationDto = {
@@ -34,4 +36,6 @@ export type OnboardingStateResult =
       unlockedRouteSuffixes: string[];
       organisationSlug: string | null;
       primaryVenueSlug: string | null;
+      /** True when this environment supports test-run onboarding (mirrored connections). */
+      testModeAvailable: boolean;
     };

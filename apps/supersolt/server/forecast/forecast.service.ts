@@ -21,6 +21,24 @@ import {
   countDistinctHistoryDays,
   isForecastReady,
 } from "@/server/forecast/forecast-confidence";
+import { isWeatherForecastEnabled } from "@/server/weather/weather-flag";
+import type { ForecastWeatherContext } from "@/server/weather/weather-multipliers";
+import { resolveCalendarRegion } from "@/server/calendar/au-calendar";
+import {
+  fitCalendarMultipliers,
+  type ForecastCalendarContext,
+} from "@/server/calendar/calendar-multipliers";
+import type {
+  ForecastEvent,
+  ForecastEventContext,
+  ForecastEventKind,
+} from "@/server/forecast/forecast-events";
+import type { VenueCalendarEventRow } from "@/server/forecast/forecast.repo";
+import {
+  getForecastWeatherContext,
+  listVenueWeatherRange,
+  type VenueWeatherDayDto,
+} from "@/server/weather/weather.service";
 import type {
   DailySalesAggregate,
   DailySalesRow,
@@ -182,6 +200,75 @@ async function loadDailySalesHistory(
   });
 }
 
+/**
+ * Calendar context (public-holiday multipliers + region) when the venue maps to a supported region.
+ * Deterministic and offline, so it is always built; forecast computation never fails on calendar.
+ */
+async function loadCalendarContext(
+  appDb: AppDb,
+  venueId: string,
+  history: DailySalesAggregate[],
+): Promise<ForecastCalendarContext | undefined> {
+  try {
+    const info = await forecastRepo.getVenueRegionInfo(appDb, venueId);
+    const region = resolveCalendarRegion(info?.state, info?.country);
+    if (!region) {
+      return undefined;
+    }
+    return { region, multipliers: fitCalendarMultipliers({ history, region }) };
+  } catch (error) {
+    console.error("[forecast] calendar context load failed", error);
+    return undefined;
+  }
+}
+
+function toForecastEvent(row: VenueCalendarEventRow): ForecastEvent {
+  return {
+    kind: row.kind as ForecastEventKind,
+    startDate: row.startDate,
+    endDate: row.endDate,
+    title: row.title,
+    expectedMultiplier:
+      row.expectedMultiplier === null ? null : Number(row.expectedMultiplier),
+  };
+}
+
+/** Operator calendar events (closures, promos, price changes); never fails the forecast. */
+async function loadEventContext(
+  appDb: AppDb,
+  venueId: string,
+): Promise<ForecastEventContext | undefined> {
+  try {
+    const rows = await forecastRepo.listCalendarEventsForVenue(appDb, venueId);
+    if (rows.length === 0) {
+      return undefined;
+    }
+    return { events: rows.map(toForecastEvent) };
+  } catch (error) {
+    console.error("[forecast] event context load failed", error);
+    return undefined;
+  }
+}
+
+/** Weather context when the flag is on; forecast computation never fails on weather. */
+async function loadWeatherContext(
+  appDb: AppDb,
+  venueId: string,
+  history: DailySalesAggregate[],
+): Promise<ForecastWeatherContext | undefined> {
+  if (!isWeatherForecastEnabled()) {
+    return undefined;
+  }
+  try {
+    return (
+      (await getForecastWeatherContext(appDb, { venueId, history })) ?? undefined
+    );
+  } catch (error) {
+    console.error("[forecast] weather context load failed", error);
+    return undefined;
+  }
+}
+
 export async function recomputeForecastsForVenue(
   appDb: AppDb,
   args: {
@@ -193,10 +280,16 @@ export async function recomputeForecastsForVenue(
   const history = await loadDailySalesHistory(appDb, args.venueId);
   const availableHistoryDays = countDistinctHistoryDays(history.map((h) => h.date));
   const todayIso = todayCalendarIsoInVenue(args.timezone);
+  const weather = await loadWeatherContext(appDb, args.venueId, history);
+  const calendar = await loadCalendarContext(appDb, args.venueId, history);
+  const events = await loadEventContext(appDb, args.venueId);
   const computed = computeForecasts({
     history,
     todayIso,
     dataStartsFrom: args.dataStartsFrom ?? null,
+    weather,
+    calendar,
+    events,
   });
 
   if (computed.length > 0) {
@@ -323,7 +416,11 @@ export async function getDailySalesForVenue(
     fromDate: string;
     toDate: string;
   },
-): Promise<{ rows: DailySalesRow[]; state: VenueForecastStateDto | null }> {
+): Promise<{
+  rows: DailySalesRow[];
+  state: VenueForecastStateDto | null;
+  weather: VenueWeatherDayDto[];
+}> {
   const context = await resolveVenueContext(
     ctx,
     args.organisationSlug,
@@ -340,9 +437,23 @@ export async function getDailySalesForVenue(
     return [rows, state] as const;
   });
 
+  let weather: VenueWeatherDayDto[] = [];
+  if (isWeatherForecastEnabled()) {
+    try {
+      weather = await listVenueWeatherRange(ctx.appDb, {
+        venueId: context.venueId,
+        fromDate: args.fromDate,
+        toDate: args.toDate,
+      });
+    } catch (error) {
+      console.error("[forecast] daily-sales weather load failed", error);
+    }
+  }
+
   return {
     rows: data.map(mapDailySalesRow),
     state: stateRow ? mapVenueForecastState(stateRow) : null,
+    weather,
   };
 }
 
@@ -386,11 +497,21 @@ export async function getForecastsForVenue(
   );
 
   const todayIso = todayCalendarIsoInVenue(context.timezone);
+  const weather = await loadWeatherContext(ctx.appDb, context.venueId, history);
+  const calendar = await loadCalendarContext(
+    ctx.appDb,
+    context.venueId,
+    history,
+  );
+  const events = await loadEventContext(ctx.appDb, context.venueId);
   const computed = computeForecastsForDateRange({
     history,
     fromDate: args.fromDate,
     toDate: args.toDate,
     dataStartsFrom: state.dataStartsFrom,
+    weather,
+    calendar,
+    events,
   });
 
   const forecasts = mergeComputedAndStoredForecasts(

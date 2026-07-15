@@ -42,6 +42,12 @@ export type StockCountEntryDto = {
   countedAt: string | null;
 };
 
+export type StorageLocationDto = {
+  id: string;
+  name: string;
+  displayOrder: number;
+};
+
 export type StockCountDetailDto = StockCountSummaryDto & {
   scopeFilter: Record<string, unknown>;
   isBaseline: boolean;
@@ -50,6 +56,7 @@ export type StockCountDetailDto = StockCountSummaryDto & {
   rejectionReason: string | null;
   startedAt: string | null;
   entries: StockCountEntryDto[];
+  locations: StorageLocationDto[];
 };
 
 export type StockCountListResponse = {
@@ -69,6 +76,7 @@ export type CreateStockCountInput = {
 
 export type UpsertStockCountEntryInput = {
   ingredientId: string;
+  locationId?: string | null;
   countedQty?: number | null;
   unitUsed?: string | null;
   mixedUnitBreakdown?: unknown;

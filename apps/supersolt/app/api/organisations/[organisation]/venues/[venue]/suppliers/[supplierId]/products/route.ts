@@ -1,7 +1,6 @@
 
 import {
   supplierProductsService,
-  SupplierProductsServiceError,
   type UpsertSupplierProductInput,
 } from "@/server/supplier-products/supplier-products.service";
 import { requireRequestAuth } from "@/lib/api/route-auth";

@@ -6,6 +6,7 @@ export type ScopedSettingsAccess = {
   canSeeOrganisation: boolean;
   canSeeVenue: boolean;
   canSeeAwardRates: boolean;
+  canSeeCalendar: boolean;
   /** First tab segment in display order: permissions → organisation → venue. */
   firstAllowedSegment: "permissions" | "organisation" | "venue" | null;
 };
@@ -16,6 +17,7 @@ const EMPTY: ScopedSettingsAccess = {
   canSeeOrganisation: false,
   canSeeVenue: false,
   canSeeAwardRates: false,
+  canSeeCalendar: false,
   firstAllowedSegment: null,
 };
 
@@ -54,6 +56,8 @@ export function getScopedSettingsAccess(
   const canSeeOrganisation = org.roleSlug === "owner";
   const canSeeAwardRates = org.grantsOrgAdmin;
   const canSeeVenue = org.grantsOrgAdmin || venue.roleSlug === "manager";
+  // Operational config a venue manager owns (closures, promos, price changes).
+  const canSeeCalendar = org.grantsOrgAdmin || venue.roleSlug === "manager";
   const canSeeSettingsNav =
     org.grantsOrgAdmin || org.roleSlug === "owner" || venue.roleSlug === "manager";
 
@@ -78,6 +82,7 @@ export function getScopedSettingsAccess(
     canSeeOrganisation,
     canSeeVenue,
     canSeeAwardRates,
+    canSeeCalendar,
     firstAllowedSegment,
   };
 }

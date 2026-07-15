@@ -1,8 +1,6 @@
 import type { AgentChatAccessContext } from "@/entities/ai-agent-chat/lib/agent-chat-access-context-schema";
 import {
   focusPairExistsInAccessContext,
-  parseFocusSlugs,
-  parseOptionalAgentChatAccessContext,
 } from "@/entities/ai-agent-chat/lib/agent-chat-access-context-schema";
 
 export function buildTenantScopeSystemAppend(args: {

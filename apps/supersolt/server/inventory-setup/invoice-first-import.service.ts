@@ -236,6 +236,7 @@ export async function runInvoiceFirstImport(
       venueSlug: args.venueSlug,
       daysBack: args.daysBack ?? 365,
       skipApiLineItems: true,
+      setupImport: true,
       onProgress: async (p) => {
         if (p.event) pushStepEvent(p.detail);
         lastHeartbeat = {

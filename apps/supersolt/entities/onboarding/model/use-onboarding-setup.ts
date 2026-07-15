@@ -45,6 +45,7 @@ export function useSaveOnboardingOrganisationMutation() {
       abn?: string | null;
       isGstRegistered?: boolean;
       organisationId?: string | null;
+      isTestRun?: boolean;
     }) => {
       const res = await onboardingApi.postOrganisation(body);
       if (res.error) {

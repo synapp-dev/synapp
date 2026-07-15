@@ -14,6 +14,7 @@ type Body = {
   abn?: string | null;
   isGstRegistered?: boolean;
   organisationId?: string | null;
+  isTestRun?: boolean;
 };
 
 export async function POST(request: Request) {
@@ -35,6 +36,7 @@ export async function POST(request: Request) {
       abn: body.abn,
       isGstRegistered: body.isGstRegistered,
       organisationId: body.organisationId,
+      isTestRun: body.isTestRun,
     });
     return jsonDataResponse({ organisation });
   } catch (error) {

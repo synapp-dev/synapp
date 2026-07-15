@@ -9,6 +9,7 @@ import {
   tokenExpiresAtIso,
 } from "@/server/square/square-oauth";
 import { shouldRefreshSquareToken } from "@/server/square/token-freshness";
+import { isTestModeConfigured } from "@/server/test-mode/test-mode";
 
 export type SquareConnectionRow = typeof venueSquareConnections.$inferSelect;
 
@@ -79,6 +80,15 @@ export const squareConnectionsRepo = {
     venueId: string,
     rlsFirst: boolean,
   ): Promise<SquareConnectionCredentials | null> {
+    // Test-mode mirror rows hold no tokens; delegate to the source venue's
+    // row before the empty-token check. Gated on the env flag so the
+    // mirror_source_venue_id column is never queried where the migration has
+    // not been applied.
+    if (isTestModeConfigured()) {
+      const mirrored = await loadMirroredConnectionForVenue(appDb, venueId);
+      if (mirrored) return mirrored;
+    }
+
     let credentials: SquareConnectionCredentials | null = null;
     if (rlsFirst) {
       credentials = await appDb.rls((tx) =>
@@ -93,6 +103,43 @@ export const squareConnectionsRepo = {
     return ensureFreshAccessToken(appDb, venueId, credentials);
   },
 };
+
+/**
+ * Resolves a test-mode mirror row to its source venue's credentials: token and
+ * environment come from the source row (refresh stays keyed to the source
+ * venue, preserving a single refresh chain), while the location id prefers the
+ * mirror row's own value so a test venue can be re-pointed independently.
+ * Returns null when the venue's row is not a mirror.
+ */
+async function loadMirroredConnectionForVenue(
+  appDb: AppDb,
+  venueId: string,
+): Promise<SquareConnectionCredentials | null> {
+  const rows = await appDb.admin
+    .select({
+      squareLocationId: venueSquareConnections.squareLocationId,
+      mirrorSourceVenueId: venueSquareConnections.mirrorSourceVenueId,
+    })
+    .from(venueSquareConnections)
+    .where(eq(venueSquareConnections.venueId, venueId))
+    .limit(1);
+
+  const sourceVenueId = rows[0]?.mirrorSourceVenueId;
+  if (!sourceVenueId) return null;
+
+  const source = await squareConnectionsRepo.getConnectionForVenueAdmin(
+    appDb,
+    sourceVenueId,
+  );
+  if (!source) return null;
+
+  const fresh = await ensureFreshAccessToken(appDb, sourceVenueId, source);
+  return {
+    squareAccessToken: fresh.squareAccessToken,
+    environment: fresh.environment,
+    squareLocationId: rows[0]?.squareLocationId ?? fresh.squareLocationId,
+  };
+}
 
 /**
  * Rotates the access token via the stored refresh token when it is expired or

@@ -1,5 +1,4 @@
 import type { RequestAuthContext } from "@/server/auth/context";
-import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import {
   menuItemsRepo,
@@ -67,13 +66,6 @@ export class MenuItemsServiceError extends Error {
     super(message);
     this.status = status;
   }
-}
-
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new MenuItemsServiceError(error.status, error.message);
-  }
-  throw error;
 }
 
 function assertPriceMode(value: string): PriceMode {

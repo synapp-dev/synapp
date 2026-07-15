@@ -95,6 +95,34 @@ export const purchaseOrdersApi = {
         { method: "POST", body: JSON.stringify({ poIds }) }
       );
     },
+    bulkSend(
+      organisationSlug: string,
+      venueSlug: string,
+      poIds: string[]
+    ): Promise<
+      ApiResult<{
+        sent: string[];
+        pendingApproval: string[];
+        failed: Array<{ poId: string; message: string }>;
+      }>
+    > {
+      return apiFetch(
+        `/organisations/${organisationSlug}/venues/${venueSlug}/purchase-orders/bulk-send`,
+        { method: "POST", body: JSON.stringify({ poIds }) }
+      );
+    },
+    bulkClose(
+      organisationSlug: string,
+      venueSlug: string,
+      poIds: string[]
+    ): Promise<
+      ApiResult<{ closed: string[]; failed: Array<{ poId: string; message: string }> }>
+    > {
+      return apiFetch(
+        `/organisations/${organisationSlug}/venues/${venueSlug}/purchase-orders/bulk-close`,
+        { method: "POST", body: JSON.stringify({ poIds }) }
+      );
+    },
     orderGuideRefresh(
       organisationSlug: string,
       venueSlug: string,

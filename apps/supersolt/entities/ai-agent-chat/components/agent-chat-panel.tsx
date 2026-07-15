@@ -48,13 +48,21 @@ import { StaggeredAnimation } from "@/lib/ui/staggered-animation";
 import { AgentBotAvatarVideo } from "@/entities/ai-agent-chat/components/agent-bot-avatar-video";
 import { AgentChatAssistantText } from "@/entities/ai-agent-chat/components/agent-chat-assistant-text";
 import { useAgentChat } from "@/entities/ai-agent-chat/components/agent-chat-provider";
-import { AgentNavDestinationCards } from "@/entities/ai-agent-chat/components/agent-nav-destination-cards";
+import {
+  AgentNavDestinationCards,
+  type AgentNavCardsActionState,
+} from "@/entities/ai-agent-chat/components/agent-nav-destination-cards";
 import { AgentTenantScopeDropdowns } from "@/entities/ai-agent-chat/components/agent-tenant-scope-dropdowns";
+import { AgentSalesSummaryCard } from "@/entities/ai-agent-chat/components/agent-sales-summary-card";
 import { getSuccessfulAppNavigationCardsFromParts } from "@/entities/ai-agent-chat/lib/assistant-message-app-navigation";
 import {
   isSuggestAppNavigationError,
   isSuggestAppNavigationSuccessPayload,
 } from "@/entities/ai-agent-chat/lib/app-navigation-tool-schema";
+import {
+  isGetSalesSummaryError,
+  isGetSalesSummarySuccess,
+} from "@/entities/ai-agent-chat/lib/sales-summary-tool-schema";
 import type { NavLogEntry } from "@/entities/ai-agent-chat/lib/nav-log-entry";
 import type { PageWelcome } from "@/entities/ai-agent-chat/lib/page-welcome";
 
@@ -421,6 +429,27 @@ export function AgentChatPanel({
     return cards ? last.message.id : null;
   }, [timeline]);
 
+  /**
+   * Per-message action state reported by that message's nav card, so the
+   * follow-up chat line can mirror what the card is doing (countdown vs
+   * cancelled vs already navigated).
+   */
+  const [navCardActionStates, setNavCardActionStates] = useState<
+    Record<string, AgentNavCardsActionState>
+  >({});
+  const handleNavCardActionState = useCallback(
+    (messageId: string, state: AgentNavCardsActionState) => {
+      setNavCardActionStates((prev) => {
+        if (prev[messageId] === state) return prev;
+        // "redirected" is terminal: once the card has navigated, the stale
+        // card demoting itself to manual must not resurrect "tap to open" copy.
+        if (prev[messageId] === "redirected") return prev;
+        return { ...prev, [messageId]: state };
+      });
+    },
+    [],
+  );
+
   const renderMessage = (message: UIMessage) => {
     const isUser = message.role === "user";
 
@@ -428,6 +457,23 @@ export function AgentChatPanel({
       ? getSuccessfulAppNavigationCardsFromParts(message.parts)
       : null;
     const autoRedirectAllowed = message.id === eligibleAutoRedirectMessageId;
+
+    const navToolPartIndex = assistantNavCards
+      ? message.parts.findIndex((p) => p.type === "tool-suggestAppNavigation")
+      : -1;
+    /** The line that follows the nav card; it mirrors the card's live state. */
+    const navFollowUpTextIndex =
+      navToolPartIndex >= 0
+        ? message.parts.findIndex(
+            (p, i) => i > navToolPartIndex && p.type === "text",
+          )
+        : -1;
+    const navActionState: AgentNavCardsActionState | null = assistantNavCards
+      ? (navCardActionStates[message.id] ??
+        (autoRedirectAllowed && assistantNavCards.length === 1
+          ? "countdown"
+          : "manual"))
+      : null;
 
     return (
       <div
@@ -472,6 +518,35 @@ export function AgentChatPanel({
                     className={cn("whitespace-pre-wrap text-right")}
                   >
                     {part.text}
+                  </div>
+                );
+              }
+              if (
+                index === navFollowUpTextIndex &&
+                assistantNavCards &&
+                navActionState !== null &&
+                navActionState !== "manual"
+              ) {
+                const target = assistantNavCards[0]!;
+                return (
+                  <div key={index} aria-live="polite">
+                    {navActionState === "countdown" ? (
+                      <>
+                        Navigating to{" "}
+                        <strong className="font-semibold">
+                          {target.title}
+                        </strong>
+                        …
+                      </>
+                    ) : (
+                      <>
+                        Opened{" "}
+                        <strong className="font-semibold">
+                          {target.title}
+                        </strong>
+                        .
+                      </>
+                    )}
                   </div>
                 );
               }
@@ -566,6 +641,40 @@ export function AgentChatPanel({
                   return null;
               }
             }
+            if (part.type === "tool-getSalesSummary") {
+              switch (part.state) {
+                case "input-available":
+                  return (
+                    <div key={index} className="text-muted-foreground text-xs">
+                      Loading sales data…
+                    </div>
+                  );
+                case "output-available": {
+                  const output = part.output;
+                  if (isGetSalesSummaryError(output)) {
+                    return (
+                      <div key={index} className="text-destructive text-xs">
+                        {output.error.message}
+                      </div>
+                    );
+                  }
+                  if (isGetSalesSummarySuccess(output)) {
+                    return (
+                      <AgentSalesSummaryCard key={index} payload={output} />
+                    );
+                  }
+                  return null;
+                }
+                case "output-error":
+                  return (
+                    <div key={index} className="text-destructive text-xs">
+                      {part.errorText ?? "Could not load sales data."}
+                    </div>
+                  );
+                default:
+                  return null;
+              }
+            }
             if (part.type === "tool-suggestAppNavigation") {
               switch (part.state) {
                 case "input-available":
@@ -599,6 +708,9 @@ export function AgentChatPanel({
                         key={index}
                         cards={output.cards}
                         autoRedirectAllowed={autoRedirectAllowed}
+                        onActionStateChange={(state) =>
+                          handleNavCardActionState(message.id, state)
+                        }
                       />
                     );
                   }

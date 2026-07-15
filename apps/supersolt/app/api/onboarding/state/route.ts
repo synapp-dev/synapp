@@ -2,7 +2,6 @@ import { requireRequestAuth } from "@/lib/api/route-auth";
 import {
   jsonDataResponse,
   serviceErrorResponse,
-  validationErrorResponse,
 } from "@/lib/api/service-error-response";
 import {
   errorDetailsFromUnknown,

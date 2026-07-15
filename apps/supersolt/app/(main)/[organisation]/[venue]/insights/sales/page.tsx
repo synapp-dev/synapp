@@ -1,4 +1,4 @@
-import { SalesInsightsPageClient } from "@/entities/sales-insights/components/sales-insights-page";
+import { SalesOverviewPageClient } from "@/entities/sales-insights/components/sales-overview-page";
 
 export default async function SalesInsightsPage({
   params,
@@ -7,5 +7,5 @@ export default async function SalesInsightsPage({
 }) {
   const { organisation, venue } = await params;
 
-  return <SalesInsightsPageClient organisation={organisation} venue={venue} />;
+  return <SalesOverviewPageClient organisation={organisation} venue={venue} />;
 }

@@ -10,6 +10,11 @@ import {
   createXeroOAuthCookiePair,
 } from "@/server/xero/oauth-cookie";
 import { buildXeroAuthorizeUrl } from "@/server/xero/xero-oauth";
+import {
+  connectTestMirrorXero,
+  getTestModeSourceVenueId,
+  isTestRunOrganisation,
+} from "@/server/test-mode/test-mode";
 
 function redirectWithXeroError(request: NextRequest, nextPath: string, code: string) {
   const dest = new URL(nextPath, request.nextUrl.origin);
@@ -50,6 +55,27 @@ export async function GET(request: NextRequest) {
 
   if (!isOrganisationAdmin(ctx.tenantRoles, context.organisationId)) {
     return redirectWithXeroError(request, nextPath, "forbidden");
+  }
+
+  // Test-run organisations skip Xero OAuth entirely: connecting creates a
+  // mirror of the configured source venue's connection, then returns to the
+  // app exactly like a successful OAuth callback would.
+  const testSourceVenueId = getTestModeSourceVenueId();
+  if (
+    testSourceVenueId &&
+    (await isTestRunOrganisation(ctx.appDb, context.organisationId))
+  ) {
+    const mirror = await connectTestMirrorXero(ctx.appDb, {
+      venueId: context.venueId,
+      organisationId: context.organisationId,
+      sourceVenueId: testSourceVenueId,
+    });
+    if (!mirror.ok) {
+      return redirectWithXeroError(request, nextPath, mirror.code);
+    }
+    const dest = new URL(nextPath, request.nextUrl.origin);
+    dest.searchParams.set("xero", "connected");
+    return NextResponse.redirect(dest);
   }
 
   let xeroUrl: string;

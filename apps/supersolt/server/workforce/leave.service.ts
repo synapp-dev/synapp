@@ -1,9 +1,8 @@
 import type { RequestAuthContext } from "@/server/auth/context";
-import { AuthError } from "@/server/auth/errors";
 import { isOrganisationAdminForOrg } from "@/server/auth/capabilities";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import { scopeRepo } from "@/server/db/scope.repo";
-import { peopleService, PeopleServiceError } from "@/server/workforce/people.service";
+import { peopleService } from "@/server/workforce/people.service";
 import {
   canApproveLeaveRequest,
   assertLeaveOperator,
@@ -67,16 +66,6 @@ export type LeavePagePayload = {
   balances: LeaveBalanceDto[];
   requests: LeaveRequestDto[];
 };
-
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new LeaveServiceError(error.status, error.message, "forbidden");
-  }
-  if (error instanceof PeopleServiceError) {
-    throw new LeaveServiceError(error.status, error.message, "forbidden");
-  }
-  throw error;
-}
 
 function num(value: string | number | null | undefined): number {
   if (value == null) return 0;

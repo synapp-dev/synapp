@@ -1,8 +1,10 @@
 export type VenueXeroInvoiceReviewStatus =
   | "pending_review"
+  | "pending_approval"
   | "confirmed"
   | "disputed"
-  | "duplicate";
+  | "duplicate"
+  | "archived";
 
 export type VenueXeroInvoiceDocumentType = "invoice" | "credit_note";
 
@@ -22,6 +24,8 @@ export type VenueXeroInvoiceRow = {
   currencyCode: string;
   xeroStatus: string;
   reviewStatus: VenueXeroInvoiceReviewStatus;
+  /** Ingested during inventory setup to seed the supplier catalog — never part of the review queue. */
+  setupImport: boolean;
   source: VenueXeroInvoiceSource;
   reference: string | null;
   xeroUpdatedAt: string | null;

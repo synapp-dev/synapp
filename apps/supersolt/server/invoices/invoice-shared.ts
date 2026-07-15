@@ -23,6 +23,7 @@ export function mapRowToDto(row: VenueInvoiceDbRow): InvoiceRow {
     currencyCode: row.currencyCode,
     xeroStatus: row.xeroStatus,
     reviewStatus: row.reviewStatus as InvoiceRow["reviewStatus"],
+    setupImport: row.setupImport,
     source: row.source as InvoiceRow["source"],
     reference: row.reference,
     parseConfidence: row.parseConfidence as InvoiceRow["parseConfidence"],

@@ -1,5 +1,4 @@
 import type { RequestAuthContext } from "@/server/auth/context";
-import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import { peopleService, PeopleServiceError } from "@/server/workforce/people.service";
 import { workforceRepo } from "@/server/workforce/workforce.repo";
@@ -30,13 +29,6 @@ export type VenueWeekInstanceAvailabilityRowDto = {
   availableStartTime: string | null;
   availableEndTime: string | null;
 };
-
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new PeopleServiceError(error.status, error.message);
-  }
-  throw error;
-}
 
 function dbErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;

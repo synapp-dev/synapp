@@ -133,7 +133,8 @@ export function canEditTimesheet(status: TimesheetStatus, isOperator: boolean): 
   return false;
 }
 
-export function toIsoDateInTz(date: Date, _timezone: string): string {
+export function toIsoDateInTz(date: Date, timezone: string): string {
+  void timezone;
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");

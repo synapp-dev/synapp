@@ -85,6 +85,21 @@ export const posCatalogImportApi = {
     },
   },
   patch: {
+    modifierListEnabled(
+      input: ScopedInput & {
+        menuItemId: string;
+        modifierListId: string;
+        enabled: boolean;
+      },
+    ): Promise<ApiResult<{ ok: true }>> {
+      return apiFetch<{ ok: true }>(
+        `/organisations/${input.organisationSlug}/venues/${input.venueSlug}/inventory-setup/pos-items/${input.menuItemId}/modifiers/${input.modifierListId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ enabled: input.enabled }),
+        },
+      );
+    },
     showOnMenu(
       input: ScopedInput & { menuItemId: string; showOnMenu: boolean },
     ): Promise<ApiResult<unknown>> {

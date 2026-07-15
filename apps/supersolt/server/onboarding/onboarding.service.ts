@@ -16,6 +16,7 @@ import {
   ensureUniqueVenueSlug,
 } from "@/server/onboarding/unique-slugs";
 import { squareConnectionsRepo } from "@/server/square/square-connections.repo";
+import { isTestModeConfigured } from "@/server/test-mode/test-mode";
 import { seedDefaultLeaveTypes } from "@/server/workforce/leave-seed";
 import { earlyOnboardingUnlockedSuffixes } from "@/server/onboarding/module-gates";
 
@@ -80,6 +81,7 @@ export async function getOnboardingState(
       unlockedRouteSuffixes: [],
       organisationSlug: null,
       primaryVenueSlug: null,
+      testModeAvailable: isTestModeConfigured(),
     };
   }
 
@@ -99,6 +101,7 @@ export async function getOnboardingState(
       unlockedRouteSuffixes: [],
       organisationSlug: null,
       primaryVenueSlug: null,
+      testModeAvailable: isTestModeConfigured(),
     };
   }
 
@@ -139,6 +142,7 @@ export async function getOnboardingState(
     unlockedRouteSuffixes,
     organisationSlug: org.slug,
     primaryVenueSlug: primaryVenue?.slug ?? null,
+    testModeAvailable: isTestModeConfigured(),
   };
 }
 
@@ -149,6 +153,7 @@ export async function upsertOnboardingOrganisation(
     abn?: string | null;
     isGstRegistered?: boolean;
     organisationId?: string | null;
+    isTestRun?: boolean;
   },
 ): Promise<OnboardingOrganisationDto> {
   const state = await getOnboardingState(ctx);
@@ -163,6 +168,11 @@ export async function upsertOnboardingOrganisation(
 
   const abn = normalizeAbn(input.abn ?? undefined);
   const isGstRegistered = Boolean(input.isGstRegistered);
+  // Only honour the flag where the environment supports test-mode mirroring.
+  const isTestRun =
+    typeof input.isTestRun === "boolean" && isTestModeConfigured()
+      ? input.isTestRun
+      : undefined;
 
   const requestedOrgId = input.organisationId?.trim() || null;
   let updateOrganisationId: string | null = null;
@@ -192,12 +202,26 @@ export async function upsertOnboardingOrganisation(
       throw new Error("Failed to update organisation");
     }
 
+    let setupProgress = parseSetupProgress(updated.setupProgress);
+    if (isTestRun !== undefined && setupProgress.isTestRun !== isTestRun) {
+      const merged = await ctx.appDb.rls((tx) =>
+        onboardingRepo.mergeSetupProgress(
+          tx,
+          updated.id,
+          { isTestRun },
+          new Date().toISOString(),
+        ),
+      );
+      setupProgress = parseSetupProgress(merged);
+    }
+
     return {
       id: updated.id,
       name: updated.name,
       slug: updated.slug,
       abn: updated.abn,
       isGstRegistered: updated.isGstRegistered,
+      setupProgress,
     };
   }
 
@@ -207,6 +231,7 @@ export async function upsertOnboardingOrganisation(
     slug,
     abn,
     isGstRegistered,
+    ...(isTestRun !== undefined ? { setupProgress: { isTestRun } } : {}),
   });
 
   if (!org) {
@@ -228,6 +253,7 @@ export async function upsertOnboardingOrganisation(
     slug: org.slug,
     abn: org.abn,
     isGstRegistered: org.isGstRegistered,
+    setupProgress: parseSetupProgress(org.setupProgress),
   };
 }
 

@@ -4,8 +4,12 @@ import { formatShiftDateInVenue } from "@/lib/roster/venue-time";
 import { consumptionRepo } from "@/server/consumption/consumption.repo";
 import {
   orderGuideRepo,
-  type SupplierProductWithSupplier,
 } from "./order-guide.repo";
+import {
+  computeSupplierScheduleInfo,
+  type DeliveryScheduleEntry,
+  type SupplierScheduleInfo,
+} from "./order-guide.schedule";
 import {
   computeSuggestion,
   sumForecastRevenueCents,
@@ -33,6 +37,8 @@ export type OrderGuideResponse = {
     subtotalCents: number;
     belowMinimum: boolean;
     minimumShortfallCents: number;
+    /** Optional: absent on cache rows computed before schedules shipped. */
+    schedule?: SupplierScheduleInfo;
     lines: OrderGuideSuggestion[];
   }>;
   meta: {
@@ -371,12 +377,26 @@ export const orderGuideService = {
             suggestion.suggestedSubtotalCents <
               (supplier.minimumOrderCents ?? 0),
           minimumShortfallCents: 0,
+          schedule: computeSupplierScheduleInfo({
+            schedule: supplier.deliverySchedule as
+              | DeliveryScheduleEntry[]
+              | null,
+            leadTimeDays: supplier.leadTimeDays ?? 3,
+            venueToday,
+          }),
           lines: [suggestion],
         });
       }
     }
 
-    const suggestionsBySupplier = [...bySupplier.values()];
+    // Most urgent order day first; ties broken by order value so the big
+    // orders surface at the top of each day's batch.
+    const suggestionsBySupplier = [...bySupplier.values()].sort((a, b) => {
+      const aDate = a.schedule?.nextOrderDate ?? "9999-12-31";
+      const bDate = b.schedule?.nextOrderDate ?? "9999-12-31";
+      if (aDate !== bDate) return aDate < bDate ? -1 : 1;
+      return b.subtotalCents - a.subtotalCents;
+    });
     const stockCountMissing =
       ingredientRows.length > 0 &&
       ingredientRows.every((i) => Number(i.currentStockLevel) === 0);
@@ -439,13 +459,47 @@ export const orderGuideService = {
     const { purchaseOrdersService } = await import("./purchase-orders.service");
     const poIds: string[] = [];
 
+    // Default each draft's expected delivery date to the supplier's next
+    // scheduled delivery for an order placed today.
+    const context = await resolveVenueScopeForService(
+      ctx,
+      args.organisationSlug,
+      args.venueSlug,
+      {
+        notFound: () => new PurchaseOrdersServiceError(404, "Venue not found"),
+        forbidden: () => new PurchaseOrdersServiceError(403, "Forbidden"),
+      },
+    );
+    const venueToday = formatShiftDateInVenue(
+      new Date().toISOString(),
+      context.timezone ?? "Australia/Melbourne",
+    );
+    const schedules = await ctx.appDb.rls((tx) =>
+      orderGuideRepo.listSupplierSchedules(
+        tx,
+        args.selections.map((group) => group.supplierId),
+      ),
+    );
+
     for (const group of args.selections) {
       if (group.lines.length === 0) continue;
+      const supplierSchedule = schedules.get(group.supplierId);
+      const scheduleInfo = supplierSchedule
+        ? computeSupplierScheduleInfo({
+            schedule: supplierSchedule.deliverySchedule as
+              | DeliveryScheduleEntry[]
+              | null,
+            leadTimeDays: supplierSchedule.leadTimeDays,
+            venueToday,
+          })
+        : null;
+
       const detail = await purchaseOrdersService.create(ctx, {
         organisationSlug: args.organisationSlug,
         venueSlug: args.venueSlug,
         input: {
           supplierId: group.supplierId,
+          expectedDeliveryDate: scheduleInfo?.nextDeliveryDate ?? null,
           lines: group.lines.map((line) => ({
             supplierProductId: line.supplierProductId,
             ingredientId: line.ingredientId,

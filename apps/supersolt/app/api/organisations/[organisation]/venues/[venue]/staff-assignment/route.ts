@@ -1,11 +1,9 @@
 
 import { requireRequestAuth } from "@/lib/api/route-auth";
 import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
-import { createSupabaseAdmin } from "@/utils/supabase/admin";
 
 import {
   venueStaffAssignmentService,
-  VenueStaffAssignmentError,
 } from "@/server/venues/venue-staff-assignment.service";
 
 type RouteParams = {

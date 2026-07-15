@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
-import { createAppDb, createServiceAppDb } from "@/server/db/create-app-db";
+import { createServiceAppDb } from "@/server/db/create-app-db";
 import {
   organisations,
   venueSquareConnections,

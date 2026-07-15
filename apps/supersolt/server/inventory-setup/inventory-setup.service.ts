@@ -536,6 +536,7 @@ export const inventorySetupService = {
         // learning a supplier's items, and it keeps PDF parsing cheap.
         daysBack: args.daysBack ?? 56,
         skipApiLineItems: true,
+        setupImport: true,
       });
 
       const attachmentParse = await parseInvoiceAttachmentsForInventorySetup(ctx, {
@@ -668,6 +669,7 @@ export const inventorySetupService = {
         // exactly this synced set, already parsed, with no live re-fetch.
         daysBack: args.daysBack ?? 90,
         skipApiLineItems: true,
+        setupImport: true,
       });
       await tracker.completeStep("invoices", `${invoiceSync.synced} invoices synced`);
 
@@ -813,6 +815,7 @@ export const inventorySetupService = {
       venueSlug: args.venueSlug,
       daysBack: args.daysBack ?? 365,
       skipApiLineItems: true,
+      setupImport: true,
     });
 
     try {

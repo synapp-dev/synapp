@@ -4,7 +4,6 @@ import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from 
 
 import {
   ingredientsService,
-  IngredientsServiceError,
   type UpsertIngredientInput,
 } from "@/server/ingredients/ingredients.service";
 

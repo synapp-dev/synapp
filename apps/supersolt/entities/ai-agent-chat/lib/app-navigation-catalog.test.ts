@@ -16,9 +16,9 @@ describe("app-navigation-catalog", () => {
     );
   });
 
-  it("maps ingredients to the same path as the sidebar Settings inventory item", () => {
+  it("maps ingredients to the inventory-setup master list", () => {
     expect(APP_NAVIGATION_CATALOG.ingredients.pathSuffix).toBe(
-      "/settings/inventory",
+      "/settings/inventory-setup/inventory/master-list",
     );
     expect(APP_NAVIGATION_CATALOG.ingredients.title.length).toBeGreaterThan(0);
   });

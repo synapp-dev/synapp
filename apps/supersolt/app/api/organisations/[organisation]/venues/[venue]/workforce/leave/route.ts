@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { requireRequestAuth } from "@/lib/api/route-auth";
 import { jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import { domainErrorResponse } from "@/lib/api/service-error-response";

@@ -1,7 +1,6 @@
 import {
   supplierRawItemsService,
   SupplierRawItemsServiceError,
-  type SupplierRawItemSummary,
 } from "@/server/supplier-raw-items/supplier-raw-items.service";
 import type { CreateRawItemInput } from "@/server/supplier-raw-items/supplier-raw-items.schemas";
 import { requireRequestAuth } from "@/lib/api/route-auth";

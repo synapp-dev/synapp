@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SuperbotFocusBanner } from "@/entities/ai-agent-chat/components/superbot-focus";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChefHat, CookingPot, Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { Badge } from "@workspace/ui/components/badge";
@@ -288,6 +289,7 @@ export function RecipesPageClient({
   return (
     <>
       <section className="flex min-h-[calc(100vh-10rem)] flex-col gap-5">
+        <SuperbotFocusBanner destination="catalog_items" />
         {hidePageHeader ? null : (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">

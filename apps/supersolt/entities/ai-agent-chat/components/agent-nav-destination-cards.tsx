@@ -43,6 +43,14 @@ function cleanVenueName(venueName: string, orgName: string): string {
 
 const AUTO_REDIRECT_MS = 5000;
 
+/**
+ * What the card is currently doing, so surrounding chat text can mirror it:
+ * - "countdown": auto-redirect pending, the card will navigate shortly.
+ * - "redirected": the auto-redirect fired (or just did on this href).
+ * - "manual": no auto action — cancelled, stale, already there, or multi-card.
+ */
+export type AgentNavCardsActionState = "countdown" | "redirected" | "manual";
+
 type AgentNavDestinationCardsProps = {
   cards: AppNavigationCard[];
   /**
@@ -52,12 +60,15 @@ type AgentNavDestinationCardsProps = {
    * true for backwards compatibility.
    */
   autoRedirectAllowed?: boolean;
+  /** Reports the current action state so chat copy can track the card. */
+  onActionStateChange?: (state: AgentNavCardsActionState) => void;
 };
 
 function AgentNavDestinationCardItem({
   card,
   isMostRecent,
   enableAutoRedirect,
+  onActionStateChange,
 }: {
   card: AppNavigationCard;
   /** Cards that aren't the latest agent activity hide the Go CTA and make the
@@ -66,6 +77,7 @@ function AgentNavDestinationCardItem({
   /** Independent of `isMostRecent`: only true when there's exactly one card on
    * the latest agent message, so the countdown is unambiguous. */
   enableAutoRedirect: boolean;
+  onActionStateChange?: (state: AgentNavCardsActionState) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname() ?? "";
@@ -77,10 +89,30 @@ function AgentNavDestinationCardItem({
   const startRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const navigatedRef = useRef(false);
+  /** Seed from the recent-redirect marker so a remount after the auto
+   * navigation (e.g. sidebar re-render on the destination page) still reads
+   * as "redirected" rather than falling back to manual copy. */
+  const [redirected, setRedirected] = useState(() =>
+    readRecentAgentNavAutoRedirect(card.href),
+  );
 
   const skipAutoRedirect =
     appNavPathsMatch(pathname, card.href) || readRecentAgentNavAutoRedirect(card.href);
   const showCountdown = enableAutoRedirect && !cancelled && !skipAutoRedirect;
+
+  /** `redirected` wins even for stale cards: it is seeded from the recent
+   * auto-redirect marker, so a fresh panel instance on the destination page
+   * (e.g. the right sidebar) still reports the navigation that just happened. */
+  const actionState: AgentNavCardsActionState = redirected
+    ? "redirected"
+    : !enableAutoRedirect
+      ? "manual"
+      : showCountdown
+        ? "countdown"
+        : "manual";
+  useEffect(() => {
+    onActionStateChange?.(actionState);
+  }, [actionState, onActionStateChange]);
 
   const Icon = getAppNavigationDestinationIcon(card.destinationKey);
 
@@ -123,6 +155,7 @@ function AgentNavDestinationCardItem({
         if (!navigatedRef.current) {
           navigatedRef.current = true;
           markAgentNavAutoRedirect(card.href);
+          setRedirected(true);
           routerRef.current.push(card.href);
         }
         return;
@@ -252,13 +285,24 @@ function AgentNavDestinationCardItem({
 export function AgentNavDestinationCards({
   cards,
   autoRedirectAllowed = true,
+  onActionStateChange,
 }: AgentNavDestinationCardsProps) {
+  const isMostRecent = autoRedirectAllowed;
+  const enableAutoRedirect = isMostRecent && cards.length === 1;
+
+  const singleCard = cards.length === 1;
+
+  /** Multi-card sets never auto-navigate; a single card item reports its own
+   * richer state (including a just-happened redirect) even when stale. */
+  useEffect(() => {
+    if (!singleCard) {
+      onActionStateChange?.("manual");
+    }
+  }, [singleCard, onActionStateChange]);
+
   if (cards.length === 0) {
     return null;
   }
-
-  const isMostRecent = autoRedirectAllowed;
-  const enableAutoRedirect = isMostRecent && cards.length === 1;
 
   return (
     <div className="flex w-full flex-col gap-2">
@@ -268,6 +312,7 @@ export function AgentNavDestinationCards({
           card={card}
           isMostRecent={isMostRecent}
           enableAutoRedirect={enableAutoRedirect}
+          onActionStateChange={singleCard ? onActionStateChange : undefined}
         />
       ))}
     </div>

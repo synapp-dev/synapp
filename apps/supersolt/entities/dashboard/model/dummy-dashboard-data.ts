@@ -6,12 +6,26 @@ export type DashboardHeroData = {
   /** Numeric amount for CountUp (e.g. dollars). */
   countUpEnd: number;
   countUpDecimals: number;
-  deltaPercent: number;
+  /** null hides the delta badge (e.g. "All time" has nothing to compare). */
+  deltaPercent: number | null;
   deltaDirection: "up" | "down";
   comparisonLabel: string;
 };
 
 export type DashboardKpiStatus = "good" | "watch" | "bad" | "neutral";
+
+export type DashboardKpiSparkPoint = {
+  label: string;
+  value: number;
+};
+
+export type DashboardKpiSparkline = {
+  kind: "area" | "bar";
+  /** Tooltip series name, e.g. "Daily cost". */
+  label: string;
+  format: "currency" | "percent" | "number" | "days";
+  points: DashboardKpiSparkPoint[];
+};
 
 export type DashboardKpiData = {
   id: string;
@@ -36,6 +50,8 @@ export type DashboardKpiData = {
   comparisonLabel: string;
   /** Prior-week headline value shown in the delta tooltip (dummy UX). */
   previousWeekDisplay: string;
+  /** Optional mini trend chart rendered along the card's bottom edge. */
+  sparkline?: DashboardKpiSparkline;
 };
 
 export type DashboardTrendPoint = {
@@ -45,8 +61,10 @@ export type DashboardTrendPoint = {
 
 export type DashboardNetRevenuePoint = {
   label: string;
-  revenue: number;
-  expenses: number;
+  /** Actual revenue for the day; null for future days so the line stops at today. */
+  revenue: number | null;
+  /** Projected revenue for the day (forecast engine); null when no forecast exists. */
+  forecast: number | null;
 };
 
 export type DashboardChannelMix = {
@@ -89,6 +107,66 @@ export type DummyDashboardData = {
   morningDigest: DashboardMorningDigestData;
 };
 
+/**
+ * Demo breakdown for the wide Avg Check card when no live venue is in scope
+ * (mirrors the shape of `DashboardAvgCheckBreakdown` without importing the
+ * server module into dummy data).
+ */
+export const dummyAvgCheckBreakdown = {
+  from: "2026-01-05",
+  to: "2026-01-11",
+  dataSource: "demo" as const,
+  totalOrders: 1431,
+  avgCheckCents: 3420,
+  categories: [
+    {
+      key: "coffee",
+      label: "Coffee",
+      revenueCents: 1_622_400,
+      quantity: 2950,
+      sharePct: 34.2,
+      avgPerCheckCents: 1134,
+      attachRatePct: 78,
+    },
+    {
+      key: "panini",
+      label: "Panini",
+      revenueCents: 1_244_300,
+      quantity: 890,
+      sharePct: 26.2,
+      avgPerCheckCents: 870,
+      attachRatePct: 46,
+    },
+    {
+      key: "drinks",
+      label: "Drinks",
+      revenueCents: 826_800,
+      quantity: 1270,
+      sharePct: 17.4,
+      avgPerCheckCents: 578,
+      attachRatePct: 39,
+    },
+    {
+      key: "sweets",
+      label: "Sweets",
+      revenueCents: 592_100,
+      quantity: 980,
+      sharePct: 12.5,
+      avgPerCheckCents: 414,
+      attachRatePct: 31,
+    },
+    {
+      key: "other",
+      label: "Other",
+      revenueCents: 460_200,
+      quantity: 410,
+      sharePct: 9.7,
+      avgPerCheckCents: 322,
+      attachRatePct: 18,
+    },
+  ],
+};
+
 export const dummyDashboardData: DummyDashboardData = {
   hero: {
     periodLabel: "This Week",
@@ -101,13 +179,13 @@ export const dummyDashboardData: DummyDashboardData = {
     comparisonLabel: "vs previous week",
   },
   netRevenueSeries: [
-    { label: "Mon", revenue: 6100, expenses: 4280 },
-    { label: "Tue", revenue: 6420, expenses: 4510 },
-    { label: "Wed", revenue: 7010, expenses: 5120 },
-    { label: "Thu", revenue: 6880, expenses: 4950 },
-    { label: "Fri", revenue: 7640, expenses: 5280 },
-    { label: "Sat", revenue: 9220, expenses: 6850 },
-    { label: "Sun", revenue: 7650, expenses: 5420 },
+    { label: "Mon", revenue: 6100, forecast: 6280 },
+    { label: "Tue", revenue: 6420, forecast: 6350 },
+    { label: "Wed", revenue: 7010, forecast: 6620 },
+    { label: "Thu", revenue: 6880, forecast: 6940 },
+    { label: "Fri", revenue: 7640, forecast: 7320 },
+    { label: "Sat", revenue: 9220, forecast: 8710 },
+    { label: "Sun", revenue: 7650, forecast: 7980 },
   ],
   kpis: [
     {
@@ -124,21 +202,20 @@ export const dummyDashboardData: DummyDashboardData = {
       deltaDirection: "down",
       comparisonLabel: "vs previous week",
       previousWeekDisplay: "30.4%",
-    },
-    {
-      id: "labour",
-      title: "Labour %",
-      value: "30.9%",
-      countUpEnd: 30.9,
-      countUpDecimals: 1,
-      countUpSuffix: "%",
-      targetDisplay: "28%",
-      targetMissed: true,
-      status: "watch",
-      deltaPercent: 1.2,
-      deltaDirection: "up",
-      comparisonLabel: "vs previous week",
-      previousWeekDisplay: "30.5%",
+      sparkline: {
+        kind: "area",
+        label: "COGS %",
+        format: "percent",
+        points: [
+          { label: "Mon", value: 30.6 },
+          { label: "Tue", value: 30.1 },
+          { label: "Wed", value: 31.2 },
+          { label: "Thu", value: 29.9 },
+          { label: "Fri", value: 30.3 },
+          { label: "Sat", value: 29.4 },
+          { label: "Sun", value: 29.8 },
+        ],
+      },
     },
     {
       id: "avg-check",
@@ -152,6 +229,20 @@ export const dummyDashboardData: DummyDashboardData = {
       deltaDirection: "up",
       comparisonLabel: "vs previous week",
       previousWeekDisplay: "$33.40",
+      sparkline: {
+        kind: "area",
+        label: "Avg check",
+        format: "currency",
+        points: [
+          { label: "Mon", value: 32.4 },
+          { label: "Tue", value: 33.1 },
+          { label: "Wed", value: 33.8 },
+          { label: "Thu", value: 32.9 },
+          { label: "Fri", value: 34.6 },
+          { label: "Sat", value: 35.8 },
+          { label: "Sun", value: 34.2 },
+        ],
+      },
     },
     {
       id: "gp",
@@ -167,6 +258,20 @@ export const dummyDashboardData: DummyDashboardData = {
       deltaDirection: "down",
       comparisonLabel: "vs previous week",
       previousWeekDisplay: "61.8%",
+      sparkline: {
+        kind: "area",
+        label: "Gross profit %",
+        format: "percent",
+        points: [
+          { label: "Mon", value: 60.4 },
+          { label: "Tue", value: 61.8 },
+          { label: "Wed", value: 60.9 },
+          { label: "Thu", value: 62.1 },
+          { label: "Fri", value: 61.5 },
+          { label: "Sat", value: 62.6 },
+          { label: "Sun", value: 61.2 },
+        ],
+      },
     },
   ],
   trend: [

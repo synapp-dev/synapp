@@ -14,6 +14,20 @@ export const salesInsightsKeys = {
       startIso,
       endIso,
     ] as const,
+  intelligence: (
+    organisationSlug: string,
+    venueSlug: string,
+    startIso: string,
+    endIso: string,
+    scope: string
+  ) =>
+    [
+      ...salesInsightsKeys.scoped(organisationSlug, venueSlug),
+      "intelligence",
+      scope,
+      startIso,
+      endIso,
+    ] as const,
   squareInvoices: (
     organisationSlug: string,
     venueSlug: string,

@@ -3,6 +3,14 @@ import { getSquareBaseUrl, type SquareEnvironment } from "@/server/square/config
 const SQUARE_API_VERSION = "2025-12-17";
 const BATCH_MAX = 100;
 
+/** Normalized modifier on a Square order line (e.g. "Extra cheese"). */
+export type SquareOrderLineModifierDto = {
+  name: string;
+  quantity: number;
+  amountCents: number;
+  catalogObjectId: string | null;
+};
+
 /** Normalized Square order line for mapping and persistence. */
 export type SquareOrderLineDto = {
   squareOrderId: string;
@@ -13,9 +21,19 @@ export type SquareOrderLineDto = {
   variationName: string | null;
   grossAmountCents: number;
   currency: string;
+  modifiers: SquareOrderLineModifierDto[];
 };
 
 type SquareMoney = { amount?: number; currency?: string };
+
+type SquareOrderLineModifierRaw = {
+  uid?: string;
+  name?: string;
+  quantity?: string;
+  catalog_object_id?: string;
+  base_price_money?: SquareMoney;
+  total_price_money?: SquareMoney;
+};
 
 type SquareOrderLineRaw = {
   uid?: string;
@@ -25,6 +43,7 @@ type SquareOrderLineRaw = {
   variation_name?: string;
   gross_sales_money?: SquareMoney;
   total_money?: SquareMoney;
+  modifiers?: SquareOrderLineModifierRaw[];
 };
 
 type SquareOrderRaw = {
@@ -58,6 +77,25 @@ function parseQuantity(q: string | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+function normalizeModifiers(
+  raw: SquareOrderLineModifierRaw[] | undefined,
+): SquareOrderLineModifierDto[] {
+  const out: SquareOrderLineModifierDto[] = [];
+  for (const mod of raw ?? []) {
+    const name = mod.name?.trim();
+    if (!name) continue;
+    out.push({
+      name,
+      quantity: parseQuantity(mod.quantity) || 1,
+      amountCents:
+        moneyAmountCents(mod.total_price_money) ||
+        moneyAmountCents(mod.base_price_money),
+      catalogObjectId: mod.catalog_object_id?.trim() || null,
+    });
+  }
+  return out;
+}
+
 function normalizeOrder(order: SquareOrderRaw): SquareOrderLineDto[] {
   const orderId = order.id;
   if (!orderId) return [];
@@ -81,6 +119,7 @@ function normalizeOrder(order: SquareOrderRaw): SquareOrderLineDto[] {
       variationName: li.variation_name?.trim() || null,
       grossAmountCents: gross,
       currency,
+      modifiers: normalizeModifiers(li.modifiers),
     });
   }
 

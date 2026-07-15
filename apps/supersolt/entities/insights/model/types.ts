@@ -1,6 +1,7 @@
 export type InsightsDatePreset =
   | "today"
   | "yesterday"
+  | "last-7-days"
   | "this-week"
   | "last-week"
   | "this-month"

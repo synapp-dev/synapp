@@ -37,8 +37,11 @@ describe("buildRecipePrefillFromPosLine", () => {
       costPerServeCents: null,
       gpPercent: null,
       recipeCostIncomplete: false,
+      recipeIngredientCount: null,
       modifierListCount: 0,
       missingFromSquare: false,
+      lastSoldAt: null,
+      staleInUse: false,
     };
 
     expect(buildRecipePrefillFromPosLine(row)).toEqual({

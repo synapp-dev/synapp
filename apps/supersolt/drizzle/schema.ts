@@ -1,4 +1,4 @@
-import { customType, pgTable, pgSchema, index, foreignKey, check, uuid, text, timestamp, jsonb, varchar, bigserial, boolean, inet, bigint, uniqueIndex, smallint, json, pgPolicy, integer, date, unique, numeric, time, type AnyPgColumn, primaryKey, char, pgEnum } from "drizzle-orm/pg-core"
+import { customType, pgTable, pgSchema, index, foreignKey, check, uuid, text, timestamp, jsonb, varchar, bigserial, boolean, inet, bigint, uniqueIndex, smallint, json, pgPolicy, integer, date, unique, numeric, time, primaryKey, char, pgEnum } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 const bytea = customType<{ data: Buffer; notNull: true; default: false }>({
@@ -644,6 +644,7 @@ export const venueSquareConnections = pgTable("venue_square_connections", {
 	tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true, mode: 'string' }),
 	environment: text().notNull(),
 	squareLocationId: text("square_location_id"),
+	mirrorSourceVenueId: uuid("mirror_source_venue_id"),
 	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 }, (table) => [
@@ -657,6 +658,11 @@ export const venueSquareConnections = pgTable("venue_square_connections", {
 			columns: [table.venueId],
 			foreignColumns: [venues.id],
 			name: "venue_square_connections_venue_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.mirrorSourceVenueId],
+			foreignColumns: [venues.id],
+			name: "venue_square_connections_mirror_source_venue_id_fkey"
 		}).onDelete("cascade"),
 	unique("venue_square_connections_venue_uq").on(table.venueId),
 	pgPolicy("venue_square_connections_delete", { as: "permissive", for: "delete", to: ["authenticated"], using: sql`is_org_admin(organisation_id)` }),
@@ -895,6 +901,8 @@ export const venueSquareOrderLines = pgTable("venue_square_order_lines", {
 	squareLineUid: text("square_line_uid").notNull(),
 	quantity: numeric().notNull(),
 	lineName: text("line_name"),
+	variationName: text("variation_name"),
+	modifiers: jsonb(),
 	squareCatalogObjectId: text("square_catalog_object_id"),
 	// You can use { mode: "bigint" } if numbers are exceeding js number limitations
 	grossAmountCents: bigint("gross_amount_cents", { mode: "number" }).default(0).notNull(),
@@ -1276,6 +1284,7 @@ export const venueXeroConnections = pgTable("venue_xero_connections", {
 	lastInvoiceSyncError: text("last_invoice_sync_error"),
 	lastSupplierSyncAt: timestamp("last_supplier_sync_at", { withTimezone: true, mode: 'string' }),
 	lastSupplierSyncError: text("last_supplier_sync_error"),
+	mirrorSourceVenueId: uuid("mirror_source_venue_id"),
 }, (table) => [
 	index("venue_xero_connections_org_idx").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")),
 	foreignKey({
@@ -1287,6 +1296,11 @@ export const venueXeroConnections = pgTable("venue_xero_connections", {
 			columns: [table.venueId],
 			foreignColumns: [venues.id],
 			name: "venue_xero_connections_venue_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.mirrorSourceVenueId],
+			foreignColumns: [venues.id],
+			name: "venue_xero_connections_mirror_source_venue_id_fkey"
 		}).onDelete("cascade"),
 	unique("venue_xero_connections_venue_uq").on(table.venueId),
 	pgPolicy("venue_xero_connections_delete", { as: "permissive", for: "delete", to: ["authenticated"], using: sql`is_org_admin(organisation_id)` }),
@@ -1699,6 +1713,7 @@ export const venueInvoices = pgTable("venue_invoices", {
 	attachmentParseFingerprint: text("attachment_parse_fingerprint"),
 	attachmentParseError: text("attachment_parse_error"),
 	hasAttachments: boolean("has_attachments"),
+	setupImport: boolean("setup_import").default(false).notNull(),
 }, (table) => [
 	index("venue_invoices_org_idx").using("btree", table.organisationId.asc().nullsLast().op("uuid_ops")),
 	index("venue_invoices_po_idx").using("btree", table.purchaseOrderId.asc().nullsLast().op("uuid_ops")).where(sql`(purchase_order_id IS NOT NULL)`),
@@ -4478,6 +4493,67 @@ export const dailySales = pgTable("daily_sales", {
   WHERE ((v.id = daily_sales.venue_id) AND (uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
 ]);
 
+export const venueWeatherDaily = pgTable("venue_weather_daily", {
+	venueId: uuid("venue_id").notNull(),
+	date: date().notNull(),
+	rainMm: numeric("rain_mm", { precision: 6, scale:  2 }).default('0').notNull(),
+	tempMaxC: numeric("temp_max_c", { precision: 5, scale:  2 }),
+	tempMinC: numeric("temp_min_c", { precision: 5, scale:  2 }),
+	conditionBucket: text("condition_bucket").notNull(),
+	isForecast: boolean("is_forecast").default(false).notNull(),
+	source: text().default('open-meteo').notNull(),
+	fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	weatherCode: smallint("weather_code"),
+}, (table) => [
+	index("venue_weather_daily_venue_date_idx").using("btree", table.venueId.asc().nullsLast().op("uuid_ops"), table.date.desc().nullsFirst().op("date_ops")),
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "venue_weather_daily_venue_id_fkey"
+		}).onDelete("cascade"),
+	primaryKey({ columns: [table.venueId, table.date], name: "venue_weather_daily_pkey"}),
+	pgPolicy("venue_weather_daily_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM (venues v
+     JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
+  WHERE ((v.id = venue_weather_daily.venue_id) AND (uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
+]);
+
+export const venueCalendarEvents = pgTable("venue_calendar_events", {
+	id: uuid().defaultRandom().primaryKey().notNull(),
+	organisationId: uuid("organisation_id").notNull(),
+	venueId: uuid("venue_id").notNull(),
+	kind: text().notNull(),
+	startDate: date("start_date").notNull(),
+	endDate: date("end_date").notNull(),
+	title: text().notNull(),
+	note: text(),
+	expectedMultiplier: numeric("expected_multiplier", { precision: 5, scale: 3 }),
+	createdBy: uuid("created_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	index("venue_calendar_events_venue_dates_idx").using("btree", table.venueId.asc().nullsLast().op("uuid_ops"), table.startDate.asc().nullsLast().op("date_ops"), table.endDate.asc().nullsLast().op("date_ops")),
+	foreignKey({
+			columns: [table.organisationId],
+			foreignColumns: [organisations.id],
+			name: "venue_calendar_events_organisation_id_fkey"
+		}).onDelete("cascade"),
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "venue_calendar_events_venue_id_fkey"
+		}).onDelete("cascade"),
+	pgPolicy("venue_calendar_events_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM user_organisations uo
+  WHERE ((uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.organisation_id = venue_calendar_events.organisation_id) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
+	pgPolicy("venue_calendar_events_insert", { as: "permissive", for: "insert", to: ["authenticated"] }),
+	pgPolicy("venue_calendar_events_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+	pgPolicy("venue_calendar_events_delete", { as: "permissive", for: "delete", to: ["authenticated"] }),
+	check("venue_calendar_events_kind_chk", sql`kind = ANY (ARRAY['closure'::text, 'promotion'::text, 'event'::text, 'price_change'::text, 'menu_change'::text])`),
+	check("venue_calendar_events_dates_chk", sql`end_date >= start_date`),
+	check("venue_calendar_events_multiplier_chk", sql`(expected_multiplier IS NULL) OR ((expected_multiplier > (0)::numeric) AND (expected_multiplier <= (5)::numeric))`),
+]);
+
 export const employeePayrollProfiles = pgTable("employee_payroll_profiles", {
 	organisationId: uuid("organisation_id").notNull(),
 	userProfileId: uuid("user_profile_id").notNull(),
@@ -4534,5 +4610,24 @@ export const employeePayrollProfiles = pgTable("employee_payroll_profiles", {
 	pgPolicy("employee_payroll_profiles_insert", { as: "permissive", for: "insert", to: ["authenticated"], withCheck: sql`can_read_employee_sensitive(organisation_id, user_profile_id)`  }),
 	pgPolicy("employee_payroll_profiles_select", { as: "permissive", for: "select", to: ["authenticated"] }),
 	pgPolicy("employee_payroll_profiles_update", { as: "permissive", for: "update", to: ["authenticated"] }),
+]);
+
+export const venueDigestCache = pgTable("venue_digest_cache", {
+	venueId: uuid("venue_id").notNull(),
+	kind: text().default('dashboard').notNull(),
+	digest: text().notNull(),
+	groundingHash: text("grounding_hash").notNull(),
+	generatedAt: timestamp("generated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table) => [
+	foreignKey({
+			columns: [table.venueId],
+			foreignColumns: [venues.id],
+			name: "venue_digest_cache_venue_id_fkey"
+		}).onDelete("cascade"),
+	primaryKey({ columns: [table.venueId, table.kind], name: "venue_digest_cache_pkey"}),
+	pgPolicy("venue_digest_cache_select", { as: "permissive", for: "select", to: ["authenticated"], using: sql`(EXISTS ( SELECT 1
+   FROM (venues v
+     JOIN user_organisations uo ON ((uo.organisation_id = v.organisation_id)))
+  WHERE ((v.id = venue_digest_cache.venue_id) AND (uo.user_profile_id = ( SELECT auth.uid() AS uid)) AND (uo.is_active = true) AND (uo.archived_at IS NULL))))` }),
 ]);
 

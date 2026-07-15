@@ -21,6 +21,16 @@ export type SalesOrderSource = "square" | "demo" | "manual";
 
 export type SalesLineMatchSource = "catalog_link" | "name_exact" | "unmapped";
 
+/** One modifier applied to a Square order line (e.g. "Extra cheese"). */
+export type SalesLineModifier = {
+  name: string;
+  /** Modifier quantity as reported by Square (usually 1 per line unit). */
+  quantity: number;
+  /** Total charged for this modifier on the line, in cents (0 for free mods). */
+  amountCents: number;
+  catalogObjectId?: string | null;
+};
+
 /** One order line from Square (after catalog / name mapping). */
 export type SalesLineItemRow = {
   lineUid: string;
@@ -34,6 +44,8 @@ export type SalesLineItemRow = {
   menuItemId?: string | null;
   menuItemName?: string | null;
   matchSource: SalesLineMatchSource;
+  /** Modifiers applied to this line (null/absent when the mirror predates capture). */
+  modifiers?: SalesLineModifier[] | null;
 };
 
 /** Aggregated quantities / revenue for Sales mix (mapped menu lines + unmapped labels). */

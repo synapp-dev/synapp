@@ -3,12 +3,16 @@ import type {
   ForecastRow,
   VenueForecastStateDto,
 } from "@/server/forecast/types";
+import type { VenueWeatherDayDto } from "@/server/weather/weather.service";
 
-export type { DailySalesRow, ForecastMetric, ForecastRow, VenueForecastStateDto } from "@/server/forecast/types";
+export type { DailySalesRow, ForecastInputs, ForecastMetric, ForecastRow, VenueForecastStateDto } from "@/server/forecast/types";
+export type { VenueWeatherDayDto } from "@/server/weather/weather.service";
 
 export type DailySalesApiPayload = {
   rows: DailySalesRow[];
   state: VenueForecastStateDto | null;
+  /** Present (possibly empty) when WEATHER_FORECAST_ENABLED; absent from older payloads. */
+  weather?: VenueWeatherDayDto[];
 };
 
 export type ForecastsApiPayload = {

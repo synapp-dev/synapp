@@ -9,15 +9,6 @@ import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@workspace/ui/components/dialog";
-import {
   Table,
   TableBody,
   TableCell,
@@ -29,8 +20,12 @@ import {
   useCreateStockCountMutation,
   useStockCountsQuery,
 } from "@/entities/stock-counts/model/use-stock-counts-query";
-import type { CreateStockCountInput } from "@/server/stock-counts/stock-counts.types";
-import { useState } from "react";
+import {
+  SuperbotFocusBanner,
+  SUPERBOT_FOCUS_PULSE,
+  useSuperbotFocusTarget,
+} from "@/entities/ai-agent-chat/components/superbot-focus";
+import { cn } from "@workspace/ui/lib/utils";
 
 type StockCountsListPageProps = {
   organisation: string;
@@ -60,15 +55,16 @@ export function StockCountsListPage({
   const router = useRouter();
   const { data, isLoading, error } = useStockCountsQuery({ organisation, venue });
   const createMutation = useCreateStockCountMutation({ organisation, venue });
-  const [createOpen, setCreateOpen] = useState(false);
   const canStartCount = (data?.activeIngredientCount ?? 0) > 0;
+  const startCountFocus = useSuperbotFocusTarget<HTMLButtonElement>(
+    "superbot-start-count",
+  );
   const ingredientsPath = buildScopedPath(organisation, venue, "menu/ingredients");
 
-  async function handleNewCount(input?: CreateStockCountInput) {
+  async function handleNewCount() {
     try {
-      const created = await createMutation.mutateAsync(input);
+      const created = await createMutation.mutateAsync({ scopeType: "full" });
       toast.success("Stock count started");
-      setCreateOpen(false);
       router.push(
         buildScopedPath(
           organisation,
@@ -83,6 +79,7 @@ export function StockCountsListPage({
 
   return (
     <section className="flex flex-col gap-5">
+      <SuperbotFocusBanner destination="inventory_stock_counts" />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Stock Counts</h1>
@@ -90,44 +87,15 @@ export function StockCountsListPage({
             Capture on-hand inventory and review variance against expected stock.
           </p>
         </div>
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogTrigger asChild>
-            <Button disabled={createMutation.isPending || !canStartCount}>
-              <Plus className="mr-2 size-4" />
-              New count
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Start stock count</DialogTitle>
-              <DialogDescription>
-                Choose what to count. Cycle counts sample ~25% of ingredients.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="flex-col gap-2 sm:flex-col">
-              <Button
-                className="w-full"
-                onClick={() => void handleNewCount({ scopeType: "full" })}
-                disabled={createMutation.isPending}
-              >
-                Full count
-              </Button>
-              <Button
-                className="w-full"
-                variant="outline"
-                onClick={() =>
-                  void handleNewCount({
-                    scopeType: "cycle",
-                    scopeFilter: { cycleFraction: 0.25 },
-                  })
-                }
-                disabled={createMutation.isPending}
-              >
-                Cycle count (25%)
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <Button
+          ref={startCountFocus.ref}
+          disabled={createMutation.isPending || !canStartCount}
+          onClick={() => void handleNewCount()}
+          className={cn(startCountFocus.active && SUPERBOT_FOCUS_PULSE)}
+        >
+          <Plus className="mr-2 size-4" />
+          New count
+        </Button>
       </div>
 
       {!isLoading && data && !canStartCount ? (
@@ -184,7 +152,12 @@ export function StockCountsListPage({
             <div className="flex flex-col items-start gap-3 px-6 py-8">
               <p className="text-muted-foreground text-sm">No stock counts yet.</p>
               {canStartCount ? (
-                <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={createMutation.isPending}
+                  onClick={() => void handleNewCount()}
+                >
                   Start first count
                 </Button>
               ) : (

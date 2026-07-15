@@ -51,11 +51,15 @@ describe("getSalesInsightsOrders", () => {
       null,
     );
 
+    // Mock orders only exist within the last 48 days of "now", so the range
+    // must be relative — a pinned range rots as time passes.
+    const end = new Date();
+    const start = new Date(end.getTime() - 7 * 86_400_000);
     const result = await getSalesInsightsOrders(mockCtx, {
       organisationSlug: "acme",
       venueSlug: "main",
-      startIso: "2026-05-01T00:00:00.000Z",
-      endIso: "2026-05-07T23:59:59.999Z",
+      startIso: start.toISOString(),
+      endIso: end.toISOString(),
     });
 
     expect(result.meta.dataSource).toBe("demo");

@@ -1,5 +1,6 @@
 import type {
   SalesLineItemRow,
+  SalesLineModifier,
   SalesOrderRow,
 } from "@/entities/sales-insights/model/types";
 import type {
@@ -38,6 +39,27 @@ export function mirrorPaymentRowToSalesOrder(
   };
 }
 
+/** Defensively parse the mirror's jsonb modifiers into typed rows. */
+function parseMirrorModifiers(value: unknown): SalesLineModifier[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+  const out: SalesLineModifier[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const mod = entry as Record<string, unknown>;
+    if (typeof mod.name !== "string" || !mod.name.trim()) continue;
+    out.push({
+      name: mod.name,
+      quantity: typeof mod.quantity === "number" ? mod.quantity : 1,
+      amountCents: typeof mod.amountCents === "number" ? mod.amountCents : 0,
+      catalogObjectId:
+        typeof mod.catalogObjectId === "string" ? mod.catalogObjectId : null,
+    });
+  }
+  return out.length > 0 ? out : null;
+}
+
 export function mirrorOrderLineRowToSalesLineItem(
   row: VenueSquareOrderLineRow,
 ): SalesLineItemRow {
@@ -48,9 +70,11 @@ export function mirrorOrderLineRowToSalesLineItem(
     grossAmountCents: Number(row.grossAmountCents),
     currency: row.currency,
     squareCatalogObjectId: row.squareCatalogObjectId,
+    squareVariationName: row.variationName,
     menuItemId: row.menuItemId,
     menuItemName: null,
     matchSource: row.matchSource as SalesLineItemRow["matchSource"],
+    modifiers: parseMirrorModifiers(row.modifiers),
   };
 }
 

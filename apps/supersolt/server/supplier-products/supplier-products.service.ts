@@ -2,7 +2,6 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import type { CostChangePreview } from "@/entities/invoices/model/types";
 import type { RequestAuthContext } from "@/server/auth/context";
-import { AuthError } from "@/server/auth/errors";
 import { resolveVenueScopeForService } from "@/server/access/require-venue-scope";
 import {
   ingredients,
@@ -64,13 +63,6 @@ export class SupplierProductsServiceError extends Error {
     super(message);
     this.status = status;
   }
-}
-
-function mapAuthError(error: unknown): never {
-  if (error instanceof AuthError) {
-    throw new SupplierProductsServiceError(error.status, error.message);
-  }
-  throw error;
 }
 
 function assertPackUnit(value: string): PackUnit {

@@ -4,7 +4,6 @@ import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from 
 
 import {
   suppliersService,
-  SuppliersServiceError,
   type UpsertSupplierInput,
 } from "@/server/suppliers/suppliers.service";
 

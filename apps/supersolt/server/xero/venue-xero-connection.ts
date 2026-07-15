@@ -1,6 +1,5 @@
 import type { RequestAuthContext } from "@/server/auth/context";
 import { assertVenueMember } from "@/server/auth/rbac";
-import { AuthError } from "@/server/auth/errors";
 import { scopeRepo } from "@/server/db/scope.repo";
 import { xeroInvoicesRepo } from "@/server/xero/xero-invoices.repo";
 

@@ -38,6 +38,8 @@ export type SquareSyncResult = {
 const SQUARE_BACKFILL_CHUNK_DAYS = 14;
 const DEFAULT_BACKFILL_DAYS = 90;
 const MANUAL_SYNC_COOLDOWN_MS = 60_000;
+/** A sale inside this window auto-activates the menu item's in-use flag. */
+const AUTO_IN_USE_WINDOW_DAYS = 30;
 
 export { DEFAULT_BACKFILL_DAYS, MANUAL_SYNC_COOLDOWN_MS };
 
@@ -313,6 +315,8 @@ export async function syncSquareSalesForVenue(
           squareLineUid: line.lineUid,
           quantity: String(line.quantity),
           lineName: line.lineName,
+          variationName: line.variationName,
+          modifiers: line.modifiers.length > 0 ? line.modifiers : null,
           squareCatalogObjectId: line.squareCatalogObjectId,
           grossAmountCents: line.grossAmountCents,
           currency: line.currency,
@@ -328,6 +332,23 @@ export async function syncSquareSalesForVenue(
       await salesInsightsRepo.upsertSquareOrderLines(appDb, lineInserts);
       lineCount = lineInserts.length;
     }
+  }
+
+  const activated = await squareSyncRepo.activateMenuItemsWithRecentSales(appDb, {
+    venueId: args.venueId,
+    sinceIso: new Date(
+      Date.now() - AUTO_IN_USE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString(),
+  });
+  if (activated.length > 0) {
+    console.info(
+      "[square_sync.auto_in_use]",
+      JSON.stringify({
+        venueId: args.venueId,
+        activatedCount: activated.length,
+        menuItemIds: activated,
+      }),
+    );
   }
 
   const affectedDates = calendarDatesForOrders(

@@ -14,6 +14,7 @@ import {
   type StockCountStatus,
 } from "@/server/stock-counts/stock-counts-policy";
 import { stockCountsRepo } from "@/server/stock-counts/stock-counts.repo";
+import { storageLocationsRepo } from "@/server/stock-counts/storage-locations.repo";
 import { trackStockCountsEvent } from "@/server/stock-counts/stock-counts-telemetry";
 import type {
   CreateStockCountInput,
@@ -174,9 +175,11 @@ async function loadDetail(
     throw new StockCountsServiceError("stock_counts.not_found", "Count not found");
   }
 
-  const entries = await ctx.appDb.rls((tx) =>
-    stockCountsRepo.listEntriesForCount(tx, countId),
-  );
+  const [entries, locations] = await ctx.appDb.rls(async (tx) => {
+    const entryRows = await stockCountsRepo.listEntriesForCount(tx, countId);
+    const locationRows = await storageLocationsRepo.listForVenue(tx, scope.venueId);
+    return [entryRows, locationRows] as const;
+  });
   const completedItemCount = entries.filter(
     (e) => e.isRowComplete || e.isSkipped || e.countedQty !== null,
   ).length;
@@ -203,6 +206,11 @@ async function loadDetail(
     rejectionReason: row.rejectionReason,
     startedAt: row.startedAt,
     entries: entries.map(toEntryDto),
+    locations: locations.map((l) => ({
+      id: l.id,
+      name: l.name,
+      displayOrder: l.displayOrder,
+    })),
   };
 }
 
@@ -348,6 +356,12 @@ export const stockCountsService = {
         prevEntries.map((e) => [e.ingredientId, Number(e.countedQty ?? 0)]),
       );
 
+      const locationByIngredient =
+        await storageLocationsRepo.listPrimaryForIngredients(
+          tx,
+          ingredientRows.map((ing) => ing.id),
+        );
+
       const count = await stockCountsRepo.insertCount(tx, {
         organisationId: scope.organisationId,
         venueId: scope.venueId,
@@ -368,6 +382,7 @@ export const stockCountsService = {
         ingredientRows.map((ing) => ({
           countId: count.id,
           ingredientId: ing.id,
+          locationId: locationByIngredient.get(ing.id) ?? null,
           previousCountQty:
             prevByIngredient.get(ing.id) !== undefined
               ? String(prevByIngredient.get(ing.id))
@@ -449,24 +464,36 @@ export const stockCountsService = {
           );
         }
 
+        const hasCountedQty = countedQty !== undefined && countedQty !== null;
+
         await stockCountsRepo.upsertEntry(tx, {
           countId: args.countId,
           ingredientId: entry.ingredientId,
           patch: {
-            countedQty:
-              countedQty !== undefined && countedQty !== null
-                ? String(countedQty)
-                : undefined,
+            countedQty: hasCountedQty ? String(countedQty) : undefined,
+            locationId: entry.locationId,
             unitUsed: entry.unitUsed,
             mixedUnitBreakdown: resolved.mixedUnitBreakdown,
             notes: entry.notes,
             needsVerification: entry.needsVerification,
-            isRowComplete: entry.isRowComplete ?? true,
-            isSkipped: entry.isSkipped ?? false,
-            countedByUserId: ctx.userId,
-            countedAt: new Date().toISOString(),
+            isRowComplete:
+              entry.isRowComplete ?? (hasCountedQty ? true : undefined),
+            isSkipped: entry.isSkipped ?? (hasCountedQty ? false : undefined),
+            ...(hasCountedQty || entry.isRowComplete || entry.isSkipped
+              ? {
+                  countedByUserId: ctx.userId,
+                  countedAt: new Date().toISOString(),
+                }
+              : {}),
           },
         });
+
+        if (entry.locationId) {
+          await storageLocationsRepo.ensureIngredientLocation(tx, {
+            ingredientId: entry.ingredientId,
+            locationId: entry.locationId,
+          });
+        }
 
         trackStockCountsEvent("stock_counts.entry_saved", {
           venueId: scope.venueId,
@@ -852,6 +879,7 @@ export const stockCountsService = {
     },
   ): Promise<string> {
     const detail = await this.get(ctx, args);
+    const locationNameById = new Map(detail.locations.map((l) => [l.id, l.name]));
     const header =
       "ingredient,location,previous_qty,counted_qty,expected_qty,variance_qty,variance_dollars,notes";
     const lines = detail.entries.map((e) => {
@@ -861,7 +889,7 @@ export const stockCountsService = {
       };
       return [
         esc(e.ingredientName),
-        esc(""),
+        esc(e.locationId ? (locationNameById.get(e.locationId) ?? "") : ""),
         esc(e.previousCountQty),
         esc(e.countedQty),
         esc(e.expectedQty),

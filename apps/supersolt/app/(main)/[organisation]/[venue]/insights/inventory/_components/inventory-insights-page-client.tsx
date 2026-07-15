@@ -1,190 +1,68 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
-  AlertTriangle,
-  BarChart3,
-  Clock,
-  DollarSign,
+  ArrowRight,
+  Boxes,
+  ClipboardList,
   Download,
-  Info,
-  Package,
+  Flame,
   ShoppingCart,
   Trash2,
-  TrendingDown,
+  TriangleAlert,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@workspace/ui/components/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@workspace/ui/components/table";
+import { Card, CardContent } from "@workspace/ui/components/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip";
 import { cn } from "@workspace/ui/lib/utils";
+import { InsightsPeriodControls } from "@/entities/insights/components/insights-period-controls";
+import { useInsightsAlertsQuery } from "@/entities/insights/model/use-insights-alerts-query";
 import { useInsightsPeriod } from "@/entities/insights/model/insights-period-provider";
-import { useVenueXeroConnectionQuery } from "@/entities/xero/model/use-venue-xero-connection";
-import { useVenueXeroInvoicesQuery } from "@/entities/xero/model/use-venue-xero-invoices-query";
+import { toDateInputValue } from "@/entities/insights/lib/period";
+import { calendarDatesInRange } from "@/entities/sales-insights/lib/sales-forecast-ui";
+import { dateRangeToCalendarIso } from "@/entities/forecast/model/use-forecast-range-query";
+import { useDashboardInsightTiles } from "@/entities/dashboard/model/use-dashboard-insight-tiles";
+import { useInventoryCogsRange } from "@/entities/dashboard/model/use-inventory-cogs-range";
+import { InventoryDaysCoverCard } from "./inventory-days-cover-card";
+import { InventoryHeroCard, type InventoryHeroPoint } from "./inventory-hero-card";
+import { InventoryKpiCard } from "./inventory-kpi-card";
+import { InventoryStockRiskCard } from "./inventory-stock-risk-card";
+import { InventorySuperbotCard } from "./inventory-superbot-card";
+import { useInventoryDigest } from "./use-inventory-digest";
 
 type InventoryInsightsPageClientProps = {
   organisation: string;
   venue: string;
 };
 
-type AlertType = "below-par" | "overdue-po" | "high-variance" | "no-recent-purchase";
+/** Entrance stagger, in ms, between the page's major sections. */
+const SECTION_STAGGER_MS = 90;
 
-type AlertItem = {
-  id: string;
-  type: AlertType;
-  name: string;
-  detail: string;
-  actionLabel?: string;
-};
+/**
+ * Ghost icon-button styling for the dark inventory hero card, mirroring the
+ * sales hero. Dual-theme: light chrome on the dark-indigo surface (app light
+ * mode), dark chrome on the inverted light surface (app dark mode).
+ */
+const HERO_ICON_ACTION_CLASS =
+  "size-8 text-indigo-100/85 hover:bg-white/15 hover:text-white dark:text-slate-700 dark:hover:bg-slate-900/10 dark:hover:text-slate-900";
 
-type DatePreset = "today" | "yesterday" | "this-week" | "last-week" | "this-month" | "last-30";
+const dayLabelFormat = new Intl.DateTimeFormat("en-AU", {
+  weekday: "short",
+  day: "numeric",
+});
 
-const CATEGORY_STOCK_VALUE = [
-  { category: "Proteins", value: 12840 },
-  { category: "Produce", value: 6840 },
-  { category: "Dry Goods", value: 4930 },
-  { category: "Dairy", value: 3220 },
-  { category: "Beverage", value: 7580 },
-];
-
-const FOOD_COST_TREND = [
-  { week: "Wk 01", pct: 28.4 },
-  { week: "Wk 02", pct: 29.1 },
-  { week: "Wk 03", pct: 31.2 },
-  { week: "Wk 04", pct: 30.6 },
-  { week: "Wk 05", pct: 29.5 },
-  { week: "Wk 06", pct: 28.9 },
-];
-
-const ALERTS: AlertItem[] = [
-  {
-    id: "a1",
-    type: "below-par",
-    name: "Chicken Thigh",
-    detail: "Current 3.1kg vs par 8kg",
-    actionLabel: "Order",
-  },
-  {
-    id: "a2",
-    type: "below-par",
-    name: "Milk (2L)",
-    detail: "Current 6 units vs par 18",
-    actionLabel: "Order",
-  },
-  {
-    id: "a3",
-    type: "high-variance",
-    name: "Olive Oil",
-    detail: "Variance +17.8% this week",
-  },
-  {
-    id: "a4",
-    type: "high-variance",
-    name: "Lemon Juice",
-    detail: "Variance -14.2% this week",
-  },
-  {
-    id: "a5",
-    type: "overdue-po",
-    name: "PO-1249",
-    detail: "2 days overdue (FreshCo)",
-    actionLabel: "Follow up",
-  },
-  {
-    id: "a6",
-    type: "no-recent-purchase",
-    name: "Caperberries",
-    detail: "No purchase in 37 days",
-  },
-];
-
-function fmtCurrency(value: number): string {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function startOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
-}
-
-function endOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(23, 59, 59, 999);
-  return next;
-}
-
-function addDays(date: Date, days: number): Date {
-  const next = new Date(date);
-  next.setDate(next.getDate() + days);
-  return next;
-}
-
-function startOfWeekMonday(date: Date): Date {
-  const day = date.getDay();
-  const delta = day === 0 ? -6 : 1 - day;
-  return startOfDay(addDays(date, delta));
-}
-
-function endOfWeekMonday(date: Date): Date {
-  return endOfDay(addDays(startOfWeekMonday(date), 6));
-}
-
-function startOfMonth(date: Date): Date {
-  return startOfDay(new Date(date.getFullYear(), date.getMonth(), 1));
-}
-
-function endOfMonth(date: Date): Date {
-  return endOfDay(new Date(date.getFullYear(), date.getMonth() + 1, 0));
-}
-
-function getDateRange(preset: DatePreset): { start: Date; end: Date } {
-  const now = new Date();
-  switch (preset) {
-    case "today":
-      return { start: startOfDay(now), end: endOfDay(now) };
-    case "yesterday": {
-      const yesterday = addDays(now, -1);
-      return { start: startOfDay(yesterday), end: endOfDay(yesterday) };
-    }
-    case "this-week":
-      return { start: startOfWeekMonday(now), end: endOfWeekMonday(now) };
-    case "last-week": {
-      const previousWeek = addDays(now, -7);
-      return {
-        start: startOfWeekMonday(previousWeek),
-        end: endOfWeekMonday(previousWeek),
-      };
-    }
-    case "this-month":
-      return { start: startOfMonth(now), end: endOfMonth(now) };
-    case "last-30":
-      return { start: startOfDay(addDays(now, -30)), end: endOfDay(now) };
-    default: {
-      const neverPreset: never = preset;
-      return neverPreset;
-    }
-  }
-}
-
-function formatDateRange(start: Date, end: Date): string {
-  const fmt = new Intl.DateTimeFormat("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  return `${fmt.format(start)} - ${fmt.format(end)}`;
-}
-
-function downloadCsv(filename: string, header: string[], rows: Array<Array<string | number>>) {
+function downloadCsv(
+  filename: string,
+  header: string[],
+  rows: Array<Array<string | number>>,
+) {
   const escapedRows = rows.map((row) =>
     row
       .map((value) => {
@@ -194,7 +72,7 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
         }
         return text;
       })
-      .join(",")
+      .join(","),
   );
 
   const csv = [header.join(","), ...escapedRows].join("\n");
@@ -207,289 +85,363 @@ function downloadCsv(filename: string, header: string[], rows: Array<Array<strin
   URL.revokeObjectURL(url);
 }
 
-export function InventoryInsightsPageClient({ organisation, venue }: InventoryInsightsPageClientProps) {
-  const xeroConnection = useVenueXeroConnectionQuery(organisation, venue);
-  const xeroInvoices = useVenueXeroInvoicesQuery({
+function Section({
+  index,
+  className,
+  children,
+}: {
+  index: number;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn("opacity-0 animate-slide-up-fade-in-slow", className)}
+      style={{ animationDelay: `${index * SECTION_STAGGER_MS}ms` }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function InventoryInsightsPageClient({
+  organisation,
+  venue,
+}: InventoryInsightsPageClientProps) {
+  const { dateRange } = useInsightsPeriod();
+  const calendarRange = useMemo(
+    () => dateRangeToCalendarIso(dateRange),
+    [dateRange],
+  );
+
+  const tilesQuery = useDashboardInsightTiles({
     organisationSlug: organisation,
     venueSlug: venue,
-    enabled: xeroConnection.data?.connected === true,
   });
-  const xeroBillCount = xeroInvoices.data?.invoices.length ?? 0;
-  const invoicesHref = `/${organisation}/${venue}/purchasing/invoices`;
+  const tiles = tilesQuery.data ?? null;
+  const tilesLoading = tilesQuery.isPending;
 
-  const { preset: datePreset } = useInsightsPeriod();
+  const cogsQuery = useInventoryCogsRange({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    fromDate: calendarRange.fromDate,
+    toDate: calendarRange.toDate,
+  });
+  const cogs = cogsQuery.data ?? null;
+  const heroLoading = cogsQuery.isPending;
 
-  const totalStockValue = useMemo(
-    () => CATEGORY_STOCK_VALUE.reduce((sum, category) => sum + category.value, 0),
-    []
+  const digest = useInventoryDigest({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    enabled: true,
+  });
+
+  const digestVisible =
+    digest.status !== "idle" && digest.status !== "unavailable";
+
+  const alertsQuery = useInsightsAlertsQuery({
+    organisationSlug: organisation,
+    venueSlug: venue,
+    module: "inventory",
+  });
+  const alerts = alertsQuery.data ?? [];
+
+  const rangeDates = useMemo(
+    () => calendarDatesInRange(dateRange.start, dateRange.end),
+    [dateRange],
   );
 
-  const itemsBelowPar = useMemo(
-    () => ALERTS.filter((alert) => alert.type === "below-par").length,
-    []
-  );
+  // Fill the whole selected period so quiet days still hold their place on
+  // the x-axis, matching the sales hero's calendar coverage.
+  const heroPoints = useMemo((): InventoryHeroPoint[] => {
+    const costByDate = new Map(
+      (cogs?.costByDay ?? []).map((entry) => [entry.date, entry.costCents]),
+    );
+    return rangeDates.map((date) => ({
+      label: dayLabelFormat.format(new Date(`${date}T12:00:00`)),
+      cost: (costByDate.get(date) ?? 0) / 100,
+    }));
+  }, [cogs?.costByDay, rangeDates]);
 
-  const pendingPOs = useMemo(
-    () => ALERTS.filter((alert) => alert.type === "overdue-po").length,
-    []
-  );
+  const deltaPp = useMemo(() => {
+    if (!cogs || cogs.percent === null || cogs.prevPercent === null) {
+      return null;
+    }
+    return cogs.percent - cogs.prevPercent;
+  }, [cogs]);
 
-  const highVarianceItems = useMemo(
-    () => ALERTS.filter((alert) => alert.type === "high-variance"),
-    []
-  );
+  const anchored = tiles !== null && tiles.stockRisk.trackedIngredients !== null;
+  const atRisk = tiles?.stockRisk.atRisk ?? [];
 
-  const parLevelAlerts = useMemo(
-    () => ALERTS.filter((alert) => alert.type === "below-par"),
-    []
-  );
+  const ordersHref = `/${organisation}/${venue}/purchasing/orders`;
+  const stockCountsHref = `/${organisation}/${venue}/stock-management/stock-counts`;
+  const wasteHref = `/${organisation}/${venue}/stock-management/waste`;
 
-  function handleExportKpis() {
+  function handleExportCsv() {
+    if (!tiles && !cogs) {
+      toast.error("Nothing to export yet");
+      return;
+    }
+    const fromLabel = toDateInputValue(dateRange.start);
+    const toLabel = toDateInputValue(dateRange.end);
     downloadCsv(
-      `inventory-insights-${venue}-${datePreset}.csv`,
+      `inventory-insights-${fromLabel}-to-${toLabel}.csv`,
       ["Metric", "Value"],
       [
-        ["Total Stock Value", totalStockValue],
-        ["Items Below Par", itemsBelowPar],
-        ["Waste This Week", 2380],
-        ["Pending POs", pendingPOs],
-      ]
+        ["Period", `${fromLabel} to ${toLabel}`],
+        ["Theoretical COGS %", cogs?.percent?.toFixed(1) ?? "n/a"],
+        ["Consumption cost", ((cogs?.costCents ?? 0) / 100).toFixed(2)],
+        ["Revenue", ((cogs?.revenueCents ?? 0) / 100).toFixed(2)],
+        ...(cogs?.costByDay ?? []).map((entry) => [
+          `Consumption cost: ${entry.date}`,
+          (entry.costCents / 100).toFixed(2),
+        ]),
+        ["Ingredients at risk (<3d cover)", atRisk.length],
+        ["Tracked ingredients", tiles?.stockRisk.trackedIngredients ?? 0],
+        [
+          "Untracked sales (7d)",
+          ((tiles?.unmappedSales.valueCents7d ?? 0) / 100).toFixed(2),
+        ],
+        ...atRisk.map((item) => [
+          `At risk: ${item.name}`,
+          `${item.daysOfCover.toFixed(1)} days cover`,
+        ]),
+      ],
     );
     toast.success("Inventory summary exported");
   }
 
   return (
     <section className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <Section index={0} className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-lg font-semibold tracking-tight">Inventory</h2>
-          <Badge variant="outline" className="text-muted-foreground text-xs font-normal">
-            Demo data
-          </Badge>
+          {tilesLoading ? null : tiles ? (
+            <Badge
+              variant="secondary"
+              className="gap-1.5 px-2 py-0.5 text-xs font-normal"
+            >
+              <span className="relative flex size-1.5" aria-hidden>
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
+              </span>
+              Live · consumption engine
+            </Badge>
+          ) : (
+            <Badge
+              variant="outline"
+              className="text-muted-foreground text-xs font-normal"
+            >
+              Engine warming up
+            </Badge>
+          )}
         </div>
-        <Button onClick={handleExportKpis} className="gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
-      </div>
+      </Section>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Stock Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{fmtCurrency(totalStockValue)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Items Below Par</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="flex items-center gap-2">
-            <p className="text-2xl font-bold">{itemsBelowPar}</p>
-            {itemsBelowPar > 0 ? <Badge variant="destructive">{itemsBelowPar}</Badge> : null}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Waste This Week</CardTitle>
-            <Trash2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{fmtCurrency(2380)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending POs</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{pendingPOs}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingDown className="h-4 w-4" />
-              Food Cost % Trend
-            </CardTitle>
-            <CardDescription>Weekly food cost % against 30% target</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {FOOD_COST_TREND.map((row) => (
-              <div key={row.week} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span>{row.week}</span>
-                  <span className={cn("font-medium", row.pct > 30 ? "text-red-600" : "text-emerald-600")}>
-                    {row.pct.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn("h-full rounded-full", row.pct > 30 ? "bg-red-500" : "bg-emerald-500")}
-                    style={{ width: `${Math.min(100, row.pct * 2.2)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-            <p className="pt-1 text-xs text-muted-foreground">Target: 30%</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <BarChart3 className="h-4 w-4" />
-              Stock Value by Category
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {CATEGORY_STOCK_VALUE.map((category) => {
-              const percentage = totalStockValue === 0 ? 0 : (category.value / totalStockValue) * 100;
-              return (
-                <div key={category.category} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{category.category}</span>
-                    <span className="text-muted-foreground">
-                      {fmtCurrency(category.value)} ({percentage.toFixed(0)}%)
-                    </span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Package className="h-4 w-4" />
-              Par Level Alerts
-              {parLevelAlerts.length > 0 ? <Badge variant="destructive">{parLevelAlerts.length}</Badge> : null}
-            </CardTitle>
-            <CardDescription>Items currently below their par level</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            {parLevelAlerts.map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center justify-between rounded-md bg-red-50 px-2 py-1.5 text-sm dark:bg-red-950/20"
-              >
-                <div>
-                  <p className="font-medium">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.detail}</p>
-                </div>
-                {item.actionLabel ? (
-                  <Button variant="ghost" size="sm" className="h-7 text-xs text-red-600">
-                    {item.actionLabel}
-                  </Button>
+      {alerts.length > 0 ? (
+        <Section index={1} className="space-y-2">
+          {alerts.map((alert) => (
+            <Card key={alert.id} className="border-primary/20 bg-muted/30">
+              <CardContent className="py-3 text-sm">
+                <p className="font-medium">{alert.headline}</p>
+                {alert.supportingMetric ? (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {alert.supportingMetric}
+                  </p>
                 ) : null}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          ))}
+        </Section>
+      ) : null}
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingDown className="h-4 w-4" />
-              High-Variance Items
-              {highVarianceItems.length > 0 ? (
-                <Badge variant="outline" className="border-amber-300 text-amber-600">
-                  {highVarianceItems.length}
-                </Badge>
-              ) : null}
-            </CardTitle>
-            <CardDescription>Items with large variance this period</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 pt-0">
-            {highVarianceItems.map((item) => (
-              <div
-                key={item.id}
-                className="rounded-md bg-amber-50 px-2 py-1.5 text-sm dark:bg-amber-950/20"
-              >
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-muted-foreground">{item.detail}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      <Section index={1}>
+        <InventoryHeroCard
+          cogsPercent={cogs?.percent ?? null}
+          deltaPp={deltaPp}
+          costCents={cogs?.costCents ?? 0}
+          revenueCents={cogs?.revenueCents ?? 0}
+          periodDays={rangeDates.length}
+          points={heroPoints}
+          isLoading={heroLoading}
+          periodControls={
+            <InsightsPeriodControls tone="onHero" heroAccent="indigo" />
+          }
+          actions={
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={HERO_ICON_ACTION_CLASS}
+                  aria-label="Export CSV"
+                  onClick={handleExportCsv}
+                >
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">Export CSV</TooltipContent>
+            </Tooltip>
+          }
+        />
+      </Section>
+
+      {/* Superbot read at half width beside the KPI tiles, dashboard-digest style.
+          The digest card renders null when idle/unavailable, so the KPIs take
+          the full row in that case. */}
+      <div
+        className={cn(
+          "grid gap-4",
+          digestVisible ? "items-stretch lg:grid-cols-2" : "",
+        )}
+      >
+        {digestVisible ? (
+          <Section index={2} className="h-full">
+            <InventorySuperbotCard
+              organisation={organisation}
+              venue={venue}
+              text={digest.text}
+              status={digest.status}
+              onRegenerate={() => void digest.regenerate()}
+              className="h-full"
+            />
+          </Section>
+        ) : null}
+        <div
+          className={cn(
+            "grid gap-3",
+            // Two equal rows so the tiles split the digest's height evenly
+            // instead of leaving stretch gaps beneath natural-height cards.
+            digestVisible
+              ? "sm:grid-cols-2 sm:grid-rows-2"
+              : "grid-cols-2 xl:grid-cols-4",
+          )}
+        >
+          <Section index={3} className="h-full">
+            <InventoryKpiCard
+              label="Consumed (7d)"
+              icon={Flame}
+              tone="neutral"
+              countUpEnd={(tiles?.cogs.costCents7d ?? 0) / 100}
+              countUpPrefix="$"
+              footnote="Theoretical ingredient cost"
+              countUpDelaySeconds={(3 * SECTION_STAGGER_MS) / 1000}
+              isLoading={tilesLoading}
+            />
+          </Section>
+          <Section index={4} className="h-full">
+            <InventoryKpiCard
+              label="Stock at risk"
+              icon={TriangleAlert}
+              tone={!anchored ? "neutral" : atRisk.length > 0 ? "bad" : "good"}
+              countUpEnd={atRisk.length}
+              footnote={
+                anchored ? "Under 3 days of cover" : "Needs a baseline stock count"
+              }
+              countUpDelaySeconds={(4 * SECTION_STAGGER_MS) / 1000}
+              isLoading={tilesLoading}
+            />
+          </Section>
+          <Section index={5} className="h-full">
+            <InventoryKpiCard
+              label="Untracked sales (7d)"
+              icon={ShoppingCart}
+              tone={(tiles?.unmappedSales.valueCents7d ?? 0) > 0 ? "watch" : "good"}
+              countUpEnd={(tiles?.unmappedSales.valueCents7d ?? 0) / 100}
+              countUpPrefix="$"
+              footnote={`${Math.round(tiles?.unmappedSales.count7d ?? 0).toLocaleString(
+                "en-AU",
+              )} line items not mapped to recipes`}
+              countUpDelaySeconds={(5 * SECTION_STAGGER_MS) / 1000}
+              isLoading={tilesLoading}
+            />
+          </Section>
+          <Section index={6} className="h-full">
+            <InventoryKpiCard
+              label="Tracked ingredients"
+              icon={Boxes}
+              tone={anchored ? "good" : "neutral"}
+              countUpEnd={tiles?.stockRisk.trackedIngredients ?? 0}
+              footnote={
+                anchored ? "Anchored by approved stock count" : "No anchor yet"
+              }
+              countUpDelaySeconds={(6 * SECTION_STAGGER_MS) / 1000}
+              isLoading={tilesLoading}
+            />
+          </Section>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <AlertTriangle className="h-4 w-4" />
-            Alerts & Warnings
-            <Badge variant="destructive">{ALERTS.length}</Badge>
-          </CardTitle>
-          <CardDescription>Grouped actionable alerts for inventory health</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Type</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead>Detail</TableHead>
-                <TableHead className="text-right">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ALERTS.map((alert) => (
-                <TableRow key={alert.id}>
-                  <TableCell>
-                    <Badge variant="outline">{alert.type}</Badge>
-                  </TableCell>
-                  <TableCell className="font-medium">{alert.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{alert.detail}</TableCell>
-                  <TableCell className="text-right">
-                    {alert.actionLabel ? (
-                      <Button variant="ghost" size="sm" className="h-7 text-xs">
-                        {alert.actionLabel}
-                      </Button>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <Section index={7} className="lg:col-span-2">
+          <InventoryDaysCoverCard
+            atRisk={atRisk}
+            trackedIngredients={tiles?.stockRisk.trackedIngredients ?? null}
+            stockCountsHref={stockCountsHref}
+            isLoading={tilesLoading}
+          />
+        </Section>
+        <Section index={8} className="lg:col-span-3">
+          <InventoryStockRiskCard
+            atRisk={atRisk}
+            trackedIngredients={tiles?.stockRisk.trackedIngredients ?? null}
+            orderGuideHref={ordersHref}
+            isLoading={tilesLoading}
+          />
+        </Section>
+      </div>
 
-      <Card className="border-dashed">
-        <CardContent className="flex items-start gap-2 py-4 text-sm text-muted-foreground">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            Charts here still use seeded demo data.{" "}
-            {xeroConnection.data?.connected ? (
-              <>
-                Supplier bills from Xero are available in{" "}
-                <Link href={invoicesHref} className="font-medium text-foreground underline">
-                  Inventory → Invoices
-                </Link>
-                {xeroBillCount > 0 ? ` (${xeroBillCount} synced).` : " — sync bills to populate COGS inputs."}
-              </>
-            ) : (
-              "Connect Xero under Settings → Integrations to sync supplier bills."
-            )}
-          </span>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {[
+          {
+            href: ordersHref,
+            icon: ShoppingCart,
+            title: "Order guide",
+            blurb: "Consumption-rate demand, ready to send",
+          },
+          {
+            href: stockCountsHref,
+            icon: ClipboardList,
+            title: "Stock counts",
+            blurb: "Anchor stock-on-hand with a count",
+          },
+          {
+            href: wasteHref,
+            icon: Trash2,
+            title: "Waste log",
+            blurb: "Record waste so cover stays honest",
+          },
+        ].map((link, index) => (
+          <Section key={link.href} index={9 + index}>
+            <Link href={link.href} className="group block h-full">
+              <Card
+                className={cn(
+                  "h-full gap-0 py-0 shadow-sm transition-all duration-300",
+                  "group-hover:-translate-y-0.5 group-hover:border-primary/50 group-hover:shadow-lg",
+                )}
+              >
+                <CardContent className="flex items-center gap-3 px-5 py-4">
+                  <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg transition-transform duration-300 group-hover:scale-110">
+                    <link.icon className="size-4" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      {link.title}
+                    </span>
+                    <span className="text-muted-foreground block truncate text-xs">
+                      {link.blurb}
+                    </span>
+                  </span>
+                  <ArrowRight
+                    className="text-muted-foreground size-4 shrink-0 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-primary"
+                    aria-hidden
+                  />
+                </CardContent>
+              </Card>
+            </Link>
+          </Section>
+        ))}
+      </div>
     </section>
   );
 }

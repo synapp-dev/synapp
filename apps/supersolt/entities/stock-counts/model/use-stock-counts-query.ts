@@ -83,6 +83,9 @@ export function useStockCountEntryMutation(args: {
       countedQty?: number;
       mixedUnitBreakdown?: Record<string, unknown>;
       notes?: string;
+      locationId?: string | null;
+      isRowComplete?: boolean;
+      isSkipped?: boolean;
     }) => {
       const result = await stockCountsApi.patch.detail({
         organisationSlug: args.organisation,
@@ -95,7 +98,14 @@ export function useStockCountEntryMutation(args: {
               countedQty: entry.countedQty,
               mixedUnitBreakdown: entry.mixedUnitBreakdown,
               notes: entry.notes,
-              isRowComplete: true,
+              locationId: entry.locationId,
+              isRowComplete:
+                entry.isRowComplete ??
+                (entry.countedQty !== undefined ||
+                entry.mixedUnitBreakdown !== undefined
+                  ? true
+                  : undefined),
+              isSkipped: entry.isSkipped,
             },
           ],
         },

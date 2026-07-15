@@ -1,3 +1,5 @@
-export function trackAwardRatesEvent(_event: string, _payload: Record<string, unknown>): void {
+export function trackAwardRatesEvent(event: string, payload: Record<string, unknown>): void {
   // No-op until analytics pipeline lands.
+  void event;
+  void payload;
 }

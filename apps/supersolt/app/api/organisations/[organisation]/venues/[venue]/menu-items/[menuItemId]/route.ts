@@ -2,7 +2,6 @@ import { requireRequestAuth } from "@/lib/api/route-auth";
 import { serviceErrorResponse, jsonDataResponse, validationErrorResponse } from "@/lib/api/service-error-response";
 import {
   menuItemsService,
-  MenuItemsServiceError,
   type UpsertMenuItemInput,
 } from "@/server/menu-items/menu-items.service";
 
