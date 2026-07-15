@@ -266,6 +266,7 @@
   --animate-pulse-subtle: pulse-subtle 2s ease-in-out infinite;
   --animate-superbot-timesheet-row-pulse: superbot-timesheet-row-pulse 2.4s
     ease-in-out infinite;
+  --animate-superbot-focus-pulse: superbot-focus-pulse 1.8s ease-in-out infinite;
   --animate-utility-radar-beacon-ring: utility-radar-beacon-ring 2.1s ease-out
     infinite;
   --animate-opacity-breathe-subtle: opacity-breathe-subtle 3.5s ease-in-out
@@ -274,6 +275,9 @@
   --animate-bounce-slow: bounce-slow 2s ease-in-out infinite;
   --animate-bounce-gentle: bounce-gentle 1.5s ease-in-out infinite;
   --animate-rotate-gradient: rotate-gradient 8s linear infinite;
+  /* Linear left→right fill (scaleX 0→1); pair with origin-left. Override
+     duration/play-state inline for countdown-style progress bars. */
+  --animate-fill-x: fill-x 8s linear forwards;
   /* Layer translate pans (pair with oversized `bg-cover` + clip). Use `animate-bg-*` or transition `translate` in JSX. */
   --animate-bg-left: bg-animate-left 0.7s ease-in-out forwards;
   --animate-bg-top: bg-animate-top 0.7s ease-in-out forwards;
@@ -914,6 +918,21 @@
       background-color: color-mix(in oklab, rgb(34 197 94) 28%, var(--card));
     }
   }
+  /* Superbot action priming: breathing glow ring on the control a digest
+     action deep-linked the operator to. Follows the element's own radius. */
+  @keyframes superbot-focus-pulse {
+    0%,
+    100% {
+      box-shadow:
+        0 0 0 3px color-mix(in oklab, rgb(34 197 94) 45%, transparent),
+        0 0 16px 2px color-mix(in oklab, rgb(34 197 94) 26%, transparent);
+    }
+    50% {
+      box-shadow:
+        0 0 0 3px color-mix(in oklab, rgb(34 197 94) 80%, transparent),
+        0 0 28px 8px color-mix(in oklab, rgb(34 197 94) 50%, transparent);
+    }
+  }
   @keyframes utility-radar-beacon-ring {
     0% {
       transform: scale(1);
@@ -1053,6 +1072,17 @@
   }
 }
 
+/* Linear left→right fill for countdown-style progress bars (see
+   --animate-fill-x). Lives outside @theme so it always ships. */
+@keyframes fill-x {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
 /*
  * Net revenue hero — soft blobs (radial stack + background-position pan).
  * One shot: spread → 65% along the path toward full rest (halfway + 15pp), then hold.
@@ -1170,6 +1200,70 @@
 
 @media (prefers-reduced-motion: reduce) {
   .superbot-suggestions-shifting-blobs {
+    animation: none;
+    background-position:
+      38.6% 46.3%,
+      62.6% 43.4%,
+      52.9% 61.4%;
+  }
+}
+
+/*
+ * Module hero blobs — one tint per functional area (see
+ * apps/supersolt/lib/module-theme.ts for the hue map). Same pan keyframes
+ * as the net revenue hero; only the middle radial's tint changes.
+ */
+.purchasing-hero-shifting-blobs,
+.inventory-hero-shifting-blobs,
+.stock-hero-shifting-blobs,
+.workforce-hero-shifting-blobs,
+.pnl-hero-shifting-blobs {
+  background-size: 320% 320%;
+  background-repeat: no-repeat;
+  animation: net-revenue-hero-shift-blobs 6.5s ease forwards;
+}
+
+.purchasing-hero-shifting-blobs {
+  background-image:
+    radial-gradient(ellipse 45% 42% at 50% 50%, rgb(255 255 255 / 0.09) 0%, transparent 58%),
+    radial-gradient(ellipse 38% 48% at 50% 50%, rgb(253 230 138 / 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 44% 40% at 50% 50%, rgb(0 0 0 / 0.2) 0%, transparent 52%);
+}
+
+.inventory-hero-shifting-blobs {
+  background-image:
+    radial-gradient(ellipse 45% 42% at 50% 50%, rgb(255 255 255 / 0.09) 0%, transparent 58%),
+    radial-gradient(ellipse 38% 48% at 50% 50%, rgb(165 180 252 / 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 44% 40% at 50% 50%, rgb(0 0 0 / 0.2) 0%, transparent 52%);
+}
+
+.stock-hero-shifting-blobs {
+  background-image:
+    radial-gradient(ellipse 45% 42% at 50% 50%, rgb(255 255 255 / 0.09) 0%, transparent 58%),
+    radial-gradient(ellipse 38% 48% at 50% 50%, rgb(186 230 253 / 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 44% 40% at 50% 50%, rgb(0 0 0 / 0.2) 0%, transparent 52%);
+}
+
+.workforce-hero-shifting-blobs {
+  background-image:
+    radial-gradient(ellipse 45% 42% at 50% 50%, rgb(255 255 255 / 0.09) 0%, transparent 58%),
+    radial-gradient(ellipse 38% 48% at 50% 50%, rgb(254 205 211 / 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 44% 40% at 50% 50%, rgb(0 0 0 / 0.2) 0%, transparent 52%);
+}
+
+.pnl-hero-shifting-blobs {
+  background-image:
+    radial-gradient(ellipse 45% 42% at 50% 50%, rgb(255 255 255 / 0.09) 0%, transparent 58%),
+    radial-gradient(ellipse 38% 48% at 50% 50%, rgb(221 214 254 / 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 44% 40% at 50% 50%, rgb(0 0 0 / 0.2) 0%, transparent 52%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .purchasing-hero-shifting-blobs,
+  .inventory-hero-shifting-blobs,
+  .stock-hero-shifting-blobs,
+  .workforce-hero-shifting-blobs,
+  .pnl-hero-shifting-blobs {
     animation: none;
     background-position:
       38.6% 46.3%,
@@ -1313,5 +1407,187 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
+  }
+}
+
+/*
+ * Animated weather glyphs (sales hero chart + anywhere WeatherGlyph renders).
+ * Classes target SVG sub-elements; transform-box keeps rotation centred on the shape.
+ */
+@keyframes weather-sun-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes weather-drop-fall {
+  0% {
+    transform: translateY(-1px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+}
+@keyframes weather-cloud-drift {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(1.3px);
+  }
+}
+@keyframes weather-bolt-flash {
+  0%,
+  84%,
+  100% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 0.15;
+  }
+  92% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.4;
+  }
+}
+@keyframes weather-flake-sway {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  33% {
+    transform: translate(0.8px, 1.2px);
+  }
+  66% {
+    transform: translate(-0.8px, 2.4px);
+  }
+}
+.weather-glyph-sun {
+  animation: weather-sun-spin 26s linear infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.weather-glyph-cloud {
+  animation: weather-cloud-drift 5.5s ease-in-out infinite;
+}
+.weather-glyph-drop {
+  animation: weather-drop-fall 1.7s ease-in infinite;
+}
+.weather-glyph-drop-b {
+  animation-delay: 0.55s;
+}
+.weather-glyph-drop-c {
+  animation-delay: 1.1s;
+}
+.weather-glyph-bolt {
+  animation: weather-bolt-flash 3.2s linear infinite;
+}
+.weather-glyph-fog-line {
+  animation: weather-cloud-drift 4s ease-in-out infinite;
+}
+.weather-glyph-fog-line-b {
+  animation-delay: 1.3s;
+}
+.weather-glyph-flake {
+  animation: weather-flake-sway 2.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-glyph-sun,
+  .weather-glyph-cloud,
+  .weather-glyph-drop,
+  .weather-glyph-bolt,
+  .weather-glyph-fog-line,
+  .weather-glyph-flake {
+    animation: none;
+  }
+  .weather-glyph-drop {
+    opacity: 1;
+  }
+}
+
+/*
+ * Weather column entrance (sales hero chart): each icon + temperature block
+ * slides in from above and fades in, staggered left-to-right via inline
+ * animation-delay while the bars rise from the bottom.
+ */
+@keyframes weather-column-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.weather-column-enter {
+  animation: weather-column-enter 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-column-enter {
+    animation: none;
+  }
+}
+
+/*
+ * Sequenced bar rise (sales hero chart with weather): bars scale up from their
+ * own baseline; per-day delays are set inline so each day's forecast, actual,
+ * and weather block enter left-to-right as a little cascade.
+ */
+@keyframes weather-bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.weather-seq-bar {
+  animation: weather-bar-rise 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .weather-seq-bar {
+    animation: none;
+  }
+}
+
+/*
+ * Forecast bar treatment (sales hero chart): dotted outline with a slow
+ * marching-ants crawl, plus a slowly rotating brand mark centred in the bar.
+ * The dash pattern is 3 + 4 = 7px, so the offset must stay a multiple of 7
+ * for a seamless loop.
+ */
+@keyframes sales-forecast-ants-march {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+.sales-forecast-ants {
+  animation: sales-forecast-ants-march 1.6s linear infinite;
+}
+@keyframes sales-forecast-mark-spin {
+  to {
+    transform: rotateY(360deg);
+  }
+}
+.sales-forecast-mark-spin {
+  animation: sales-forecast-mark-spin 12s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sales-forecast-ants,
+  .sales-forecast-mark-spin {
+    animation: none;
   }
 }

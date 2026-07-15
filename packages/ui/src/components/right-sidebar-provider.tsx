@@ -4,10 +4,24 @@ import * as React from "react";
 import { cn } from "@workspace/ui/lib/utils";
 
 import { TooltipProvider } from "@workspace/ui/components/tooltip";
-import { useIsMobile } from "@workspace/ui/hooks/use-mobile";
 
 const SIDEBAR_WIDTH = "16rem";
 const SIDEBAR_WIDTH_ICON = "3rem";
+const DEFAULT_MOBILE_BREAKPOINT = 768;
+
+function useIsBelowBreakpoint(breakpoint: number) {
+  const [isBelow, setIsBelow] = React.useState(false);
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const onChange = () => setIsBelow(mql.matches);
+    mql.addEventListener("change", onChange);
+    setIsBelow(mql.matches);
+    return () => mql.removeEventListener("change", onChange);
+  }, [breakpoint]);
+
+  return isBelow;
+}
 
 type RightSidebarContextProps = {
   state: "expanded" | "collapsed";
@@ -36,6 +50,7 @@ export function RightSidebarProvider({
   defaultOpen = false,
   open: openProp,
   onOpenChange: setOpenProp,
+  mobileBreakpoint = DEFAULT_MOBILE_BREAKPOINT,
   className,
   style,
   children,
@@ -44,8 +59,10 @@ export function RightSidebarProvider({
   defaultOpen?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Below this viewport width the sidebar renders as an overlay Sheet. */
+  mobileBreakpoint?: number;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = useIsBelowBreakpoint(mobileBreakpoint);
   const [openMobile, setOpenMobile] = React.useState(false);
 
   const [_open, _setOpen] = React.useState(defaultOpen);

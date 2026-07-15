@@ -12,7 +12,7 @@ import {
 } from "@workspace/ui/components/sheet";
 import { useRightSidebar } from "./right-sidebar-provider";
 
-const SIDEBAR_WIDTH_MOBILE = "18rem";
+const SIDEBAR_WIDTH_MOBILE = "min(21rem, 85vw)";
 
 export function RightSidebar({
   variant = "sidebar",
