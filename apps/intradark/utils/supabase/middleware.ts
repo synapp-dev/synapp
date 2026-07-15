@@ -1,22 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { User } from "@supabase/supabase-js";
-import { createServerClient } from "@supabase/ssr";
+import { createSupabaseMiddlewareClient } from "@workspace/supabase/middleware";
 
-// TODO: Add your database types once you have them set up
-// You can generate types from Supabase using: npx supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
+// TODO: Bind generated database types once they are set up:
+// npx supabase gen types typescript --project-id YOUR_PROJECT_ID > types/supabase.ts
 // types/supabase.ts is only a partial hand-written schema; adopting it here would
 // break queries against tables it does not list.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Database = any; // Replace with your actual database types
 
 export async function updateSession(request: NextRequest): Promise<{
   response: NextResponse;
   user: User | null;
 }> {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
 
@@ -26,33 +20,12 @@ export async function updateSession(request: NextRequest): Promise<{
         "[intradark] Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY to refresh auth in middleware."
       );
     }
-    return { response: supabaseResponse, user: null };
+    return { response: NextResponse.next({ request }), user: null };
   }
 
-  const supabase = createServerClient<Database>(
-    supabaseUrl,
-    supabaseKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  const { supabase, getResponse } = createSupabaseMiddlewareClient(request);
 
-  // Do not run code between createServerClient and
+  // Do not run code between createSupabaseMiddlewareClient and
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
   // IMPORTANT: DO NOT REMOVE auth.getUser()
@@ -64,11 +37,13 @@ export async function updateSession(request: NextRequest): Promise<{
     user = nextUser ?? null;
   } catch (error) {
     // e.g. AuthRetryableFetchError when Supabase is unreachable, URL is wrong,
-    // or local `supabase start` is not running — still allow the app to load.
+    // or local `supabase start` is not running; still allow the app to load.
     if (process.env.NODE_ENV === "development") {
       console.warn("[intradark] Supabase auth in middleware failed:", error);
     }
   }
+
+  const supabaseResponse = getResponse();
 
   // IMPORTANT: You *must* return the supabaseResponse object as it is.
   // If you're creating a new response object with NextResponse.next() make sure to:

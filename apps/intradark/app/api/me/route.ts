@@ -1,17 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { getEffectiveRoleSlugsForUser } from "@/entities/rbac/lib/get-effective-role-slugs";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 export async function GET() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const role_slugs = await getEffectiveRoleSlugsForUser(user.id);
 

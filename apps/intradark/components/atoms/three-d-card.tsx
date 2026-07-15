@@ -5,7 +5,7 @@ import React, {
   ReactNode,
   CSSProperties,
 } from "react";
-import { cn } from "../../../../packages/ui/src/lib/utils";
+import { cn } from "@workspace/ui/lib/utils";
 import brandColors from "../../lib/brandColors.json";
 
 /**

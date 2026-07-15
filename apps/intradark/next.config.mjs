@@ -10,7 +10,7 @@ const nextConfig = {
       },
     ];
   },
-  transpilePackages: ["@workspace/ui", "country-flag-icons"],
+  transpilePackages: ["@workspace/ui", "@workspace/supabase", "@workspace/env-check", "country-flag-icons"],
   // SSH stack for the plugin push-to-live (ssh2 has an OPTIONAL native dep
   // `cpu-features`); keep these out of the bundle so they're required at runtime
   // where ssh2 gracefully skips cpu-features.

@@ -1,4 +1,4 @@
-import { Upload } from "tus-js-client";
+import { DetailedError, Upload } from "tus-js-client";
 
 /**
  * TUS endpoint for **signed** resumable uploads (`createSignedUploadUrl` token in `x-signature`).
@@ -38,13 +38,41 @@ export type UtilityLineupTusUploadOptions = {
 };
 
 /**
+ * Chrome invalidates a picked `File` handle when the file on disk is modified after selection
+ * (recorder still finalizing the clip, cloud sync touching it). Every read after that fails at
+ * the network layer (`ERR_UPLOAD_FILE_CHANGED`), which tus surfaces as an opaque ProgressEvent
+ * error with no response code. Snapshotting into detached blob storage up front makes the read
+ * failure immediate and explainable, and immunizes the rest of the upload.
+ */
+async function snapshotFileForUpload(file: File): Promise<Blob> {
+  try {
+    return await new Response(file).blob();
+  } catch {
+    throw new Error(
+      "Couldn't read the video from disk — it changed after you selected it (still saving from your recorder, or being synced?). Wait for it to finish saving, re-select it, and try again.",
+    );
+  }
+}
+
+function friendlyTusError(err: unknown): Error {
+  if (err instanceof DetailedError && !err.originalResponse) {
+    return new Error(
+      "The upload kept getting interrupted before reaching the server. Check your connection (and any VPN/antivirus web protection), then try again.",
+      { cause: err },
+    );
+  }
+  return err instanceof Error ? err : new Error(String(err));
+}
+
+/**
  * Chunked resumable upload so large videos are not capped by the Storage **standard** upload limit
  * (`FILE_SIZE_LIMIT_STANDARD_UPLOAD` / multipart path used by `uploadToSignedUrl`).
  */
-export function uploadUtilityLineupVideoTusSigned(
+export async function uploadUtilityLineupVideoTusSigned(
   opts: UtilityLineupTusUploadOptions,
 ): Promise<void> {
   const endpoint = supabaseSignedTusResumableEndpoint(opts.supabaseUrl);
+  const source = await snapshotFileForUpload(opts.file);
 
   return new Promise((resolve, reject) => {
     const cleanupAbort = () => {
@@ -57,7 +85,7 @@ export function uploadUtilityLineupVideoTusSigned(
       reject(new DOMException("The upload was aborted", "AbortError"));
     };
 
-    const upload = new Upload(opts.file, {
+    const upload = new Upload(source, {
       endpoint,
       retryDelays: [0, 3000, 5000, 10000, 20000],
       headers: {
@@ -67,6 +95,12 @@ export function uploadUtilityLineupVideoTusSigned(
       },
       uploadDataDuringCreation: true,
       removeFingerprintOnSuccess: true,
+      // The snapshot Blob has no name, so the default name/size fingerprint could collide
+      // across different clips; the signed object path is unique per upload job.
+      fingerprint: () =>
+        Promise.resolve(
+          ["intradark-tus", opts.bucket, opts.objectPath].join("-"),
+        ),
       chunkSize: 6 * 1024 * 1024,
       metadata: {
         bucketName: opts.bucket,
@@ -82,7 +116,7 @@ export function uploadUtilityLineupVideoTusSigned(
       },
       onError(err) {
         cleanupAbort();
-        reject(err instanceof Error ? err : new Error(String(err)));
+        reject(friendlyTusError(err));
       },
       onSuccess() {
         cleanupAbort();

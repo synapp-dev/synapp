@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { parseAnthem } from "@/entities/players/lib/anthem";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 const bodySchema = z.object({
   url: z.string().trim().nullable(),
@@ -16,14 +16,8 @@ const bodySchema = z.object({
  * caller's own row.
  */
 export async function PATCH(request: Request) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   let json: unknown;
   try {
