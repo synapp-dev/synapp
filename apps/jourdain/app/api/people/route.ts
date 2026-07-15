@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { createPerson, listPeople } from "@/lib/people/service";
 import {
   PERSON_CIRCLES,
@@ -22,20 +22,9 @@ const createPersonSchema = z.object({
   bio: z.string().trim().max(5000).nullish(),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const circleParam = request.nextUrl.searchParams.get("circle");
   const circle = PERSON_CIRCLES.includes(circleParam as PersonCircle)
@@ -57,12 +46,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = createPersonSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

@@ -4,7 +4,7 @@ import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import * as chrono from "chrono-node";
 import { differenceInDays, format, parseISO } from "date-fns";
 import { z } from "zod/v4";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { createTask, listTasks, updateTask } from "@/lib/tasks/service";
 import {
   appendPersonFacts,
@@ -208,18 +208,8 @@ Style:
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
-  }
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(

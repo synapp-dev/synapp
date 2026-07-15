@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { respondToTask } from "@/lib/tasks/service";
 
 const respondSchema = z.object({
@@ -11,17 +11,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
-  }
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { taskId } = await params;
   const parsed = respondSchema.safeParse(

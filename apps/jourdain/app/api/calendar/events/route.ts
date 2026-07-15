@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addDays, addHours, format, parseISO } from "date-fns";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { getCalendarContext } from "@/lib/google/client";
 import { mapEvent } from "@/lib/google/events";
 import type { calendar_v3 } from "googleapis";
@@ -15,13 +15,6 @@ const createEventSchema = z.object({
   timeZone: z.string().max(100).optional(),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 function notConnected() {
   return NextResponse.json(
     { data: null, error: { message: "Google Calendar is not connected" } },
@@ -30,11 +23,8 @@ function notConnected() {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return unauthorized();
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const context = await getCalendarContext(user.id);
   if (!context) return notConnected();
@@ -77,11 +67,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return unauthorized();
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const context = await getCalendarContext(user.id);
   if (!context) return notConnected();

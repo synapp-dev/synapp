@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { getCalendarContext } from "@/lib/google/client";
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
-  }
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const context = await getCalendarContext(user.id);
   if (!context) {

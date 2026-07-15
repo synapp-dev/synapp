@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { createTask, listTasks } from "@/lib/tasks/service";
 import { syncTaskCalendarEvent } from "@/lib/google/task-sync";
 import { TASK_DOMAINS, type TaskStatus } from "@/entities/tasks/model/types";
@@ -18,20 +18,9 @@ const createTaskSchema = z.object({
   domains: z.array(z.enum(TASK_DOMAINS)).max(TASK_DOMAINS.length).optional(),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const statusParam = request.nextUrl.searchParams.get("status");
   const status =
@@ -54,12 +43,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = createTaskSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

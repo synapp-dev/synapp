@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { createProject, listProjects } from "@/lib/projects/service";
 import { PROJECT_STATUSES } from "@/entities/projects/model/types";
 
@@ -15,20 +15,9 @@ const createProjectSchema = z.object({
   orderIndex: z.number().int().optional(),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   try {
     const projects = await listProjects(supabase);
@@ -48,12 +37,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = createProjectSchema.safeParse(
     await request.json().catch(() => null)

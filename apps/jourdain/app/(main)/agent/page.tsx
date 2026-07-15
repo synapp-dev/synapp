@@ -19,7 +19,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@workspace/ui/components/button";
 import { cn } from "@workspace/ui/lib/utils";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { JourdainOrb } from "@/components/atoms/jourdain-orb";
 import { AgentCardView } from "@/components/organisms/agent-cards";
 import { apiFetch } from "@/lib/api/fetcher.client";

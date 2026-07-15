@@ -22,7 +22,7 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
 import { cn } from "@workspace/ui/lib/utils";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 export type NavMainSubItem = {
   title: string;

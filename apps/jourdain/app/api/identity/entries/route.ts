@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import {
   IDENTITY_SECTIONS,
   type IdentitySection,
@@ -33,20 +33,9 @@ const reorderSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(500),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const sectionParam = request.nextUrl.searchParams.get("section");
   const section = IDENTITY_SECTIONS.includes(sectionParam as IdentitySection)
@@ -70,12 +59,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = createEntrySchema.safeParse(
     await request.json().catch(() => null)
@@ -107,12 +92,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = reorderSchema.safeParse(
     await request.json().catch(() => null)

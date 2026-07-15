@@ -35,7 +35,7 @@ import {
   useToggleFavourite,
 } from "@/hooks/gym/use-gym";
 import { ExerciseDrawer } from "@/components/gym/exercise-drawer";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { useStreamingText } from "@/hooks/use-streaming-text";
 import {
   GROUP_SUBGROUPS,

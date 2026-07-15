@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { getPerson } from "@/lib/people/service";
 import { getGmailContext } from "@/lib/google/client";
 import { listPersonEmailThreads } from "@/lib/google/gmail";
 import type { PersonEmailResult } from "@/entities/people/model/types";
 
 export const maxDuration = 30;
-
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
 
 function ok(result: PersonEmailResult) {
   return NextResponse.json({ data: result, error: null });
@@ -32,12 +25,8 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ personId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { personId } = await params;
 

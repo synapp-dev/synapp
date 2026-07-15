@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import {
   ROUTINE_DOMAINS,
   ROUTINE_FREQS,
@@ -36,24 +36,13 @@ const updateRoutineSchema = z.object({
   trackTime: z.boolean().optional(),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ routineId: string }> }
 ) {
   const { routineId } = await params;
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   try {
     const routine = await getRoutine(supabase, routineId);
@@ -82,12 +71,8 @@ export async function PATCH(
   { params }: { params: Promise<{ routineId: string }> }
 ) {
   const { routineId } = await params;
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = updateRoutineSchema.safeParse(
     await request.json().catch(() => null)
@@ -124,12 +109,8 @@ export async function DELETE(
   { params }: { params: Promise<{ routineId: string }> }
 ) {
   const { routineId } = await params;
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   try {
     await deleteRoutine(supabase, routineId);

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { cn } from "@workspace/ui/lib/utils";
-import { ThemeToggle } from "@/components/atoms/theme-toggle";
+import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
 import { CommandMenu } from "@/components/molecules/command-menu";
 import { Breadcrumb } from "@/components/molecules/breadcrumb";
 import { MobileSectionNav } from "@/components/organisms/mobile-section-nav";
@@ -31,7 +31,7 @@ export function AppHeader() {
       <div className="flex items-center gap-2 px-4">
         <CommandMenu />
         <div className="w-0.5 h-0.5 bg-muted-foreground rounded-full mx-2" />
-        <ThemeToggle />
+        <ThemeToggle className="relative" />
       </div>
     </header>
   );

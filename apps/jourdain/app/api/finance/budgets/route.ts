@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { CATEGORIES } from "@/lib/finance/categorise";
 import { getBudgets, upsertBudget } from "@/lib/finance/service";
 
@@ -9,19 +9,9 @@ const upsertSchema = z.object({
   monthlyLimit: z.number().positive().max(1_000_000),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET() {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return unauthorized();
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   try {
     const budgets = await getBudgets(user.id);
@@ -40,11 +30,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return unauthorized();
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = upsertSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { deleteTask, getTask, updateTask } from "@/lib/tasks/service";
 import {
   removeTaskCalendarEvent,
@@ -26,23 +26,12 @@ const updateTaskSchema = z
     message: "Empty update",
   });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { taskId } = await params;
   try {
@@ -69,12 +58,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { taskId } = await params;
   const parsed = updateTaskSchema.safeParse(await request.json().catch(() => null));
@@ -104,12 +89,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ taskId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { user, supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { taskId } = await params;
   try {

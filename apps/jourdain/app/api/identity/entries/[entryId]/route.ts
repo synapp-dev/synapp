@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { deleteEntry, updateEntry } from "@/lib/identity/service";
 
 const extrasSchema = z.object({
@@ -17,24 +17,13 @@ const updateEntrySchema = z.object({
   extras: extrasSchema.optional(),
 });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ entryId: string }> }
 ) {
   const { entryId } = await params;
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = updateEntrySchema.safeParse(
     await request.json().catch(() => null)
@@ -70,12 +59,8 @@ export async function DELETE(
   { params }: { params: Promise<{ entryId: string }> }
 ) {
   const { entryId } = await params;
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   try {
     await deleteEntry(supabase, entryId);

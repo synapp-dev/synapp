@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { deletePerson, updatePerson } from "@/lib/people/service";
 import { PERSON_CIRCLES } from "@/entities/people/model/types";
 
@@ -24,23 +24,12 @@ const updatePersonSchema = z
   })
   .refine((value) => Object.keys(value).length > 0, { message: "Empty update" });
 
-function unauthorized() {
-  return NextResponse.json(
-    { data: null, error: { message: "Unauthorized", status: 401 } },
-    { status: 401 }
-  );
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ personId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { personId } = await params;
   const parsed = updatePersonSchema.safeParse(await request.json().catch(() => null));
@@ -69,12 +58,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ personId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return unauthorized();
+  const { supabase, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const { personId } = await params;
   try {

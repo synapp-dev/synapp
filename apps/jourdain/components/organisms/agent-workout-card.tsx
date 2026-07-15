@@ -14,7 +14,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Spinner } from "@workspace/ui/components/spinner";
 import { cn } from "@workspace/ui/lib/utils";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { AnimatedNumber } from "@/components/gym/animated-number";
 import { useStreamingText } from "@/hooks/use-streaming-text";
 import { useStartSession } from "@/hooks/gym/use-gym";

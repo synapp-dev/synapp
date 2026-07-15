@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { CATEGORIES } from "@/lib/finance/categorise";
 import { setTransactionCategory } from "@/lib/finance/service";
 
@@ -13,16 +13,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ transactionId: string }> }
 ) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
-  }
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = updateSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

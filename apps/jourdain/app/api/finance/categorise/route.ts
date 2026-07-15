@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { recategoriseTransactions } from "@/lib/finance/service";
 
 const bodySchema = z.object({ force: z.boolean().optional() });
 
 export async function POST(request: NextRequest) {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json(
-      { data: null, error: { message: "Unauthorized", status: 401 } },
-      { status: 401 }
-    );
-  }
+  const { user, errorResponse } = await requireRequestUser();
+  if (errorResponse) return errorResponse;
 
   const parsed = bodySchema.safeParse(
     await request.json().catch(() => ({}))
