@@ -1,4 +1,4 @@
-import { SocialLoginButton } from "@/components/atoms/social-login-button";
+import { SocialLoginButton } from "@workspace/ui/components/atoms/social-login-button";
 
 export function SocialLoginGroup() {
   return (

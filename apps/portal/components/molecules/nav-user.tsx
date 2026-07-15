@@ -8,7 +8,6 @@ import {
   LogOut,
   Sparkles,
 } from "lucide-react";
-import { useEffect } from "react";
 
 import {
   Avatar,

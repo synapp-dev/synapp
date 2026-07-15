@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Organisation } from "@/providers/postgres/organisations/read";
 
 export function useDeleteOrganisationMutation() {
   const queryClient = useQueryClient();

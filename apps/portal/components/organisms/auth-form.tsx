@@ -5,11 +5,11 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { EmailInput } from "@/components/molecules/email-input";
 import { PasswordInput } from "@/components/molecules/password-input";
-import { NameInput } from "@/components/molecules/name-input";
-import { MobileInput } from "@/components/molecules/mobile-input";
+import { NameInput } from "@workspace/ui/components/molecules/name-input";
+import { MobileInput } from "@workspace/ui/components/molecules/mobile-input";
 import { SocialLoginGroup } from "@/components/molecules/social-login-group";
-import { AuthDivider } from "@/components/atoms/auth-divider";
-import { AuthFooter } from "@/components/molecules/auth-footer";
+import { AuthDivider } from "@workspace/ui/components/atoms/auth-divider";
+import { AuthFooter } from "@workspace/ui/components/molecules/auth-footer";
 import { createBrowserClient } from "@/utils/supabase/client";
 
 import { useRouter, useSearchParams } from "next/navigation";
