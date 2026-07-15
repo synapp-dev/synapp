@@ -6,7 +6,7 @@ import { Calendar } from "@workspace/ui/components/calendar";
 import { Card } from "@workspace/ui/components/card";
 import { Separator } from "@workspace/ui/components/separator";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import {
   getNotificationKindMeta,
   NotificationKindBadge,

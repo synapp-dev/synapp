@@ -10,7 +10,7 @@ import { Textarea } from "@workspace/ui/components/textarea";
 import { cn } from "@workspace/ui/lib/utils";
 import { useMeStore } from "@/entities/me/model/store";
 
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { useMessagesDemo } from "@/components/organisms/messages-demo-context";
 
 /** Single-line ~h-9; cap ~6 lines like Messenger. */

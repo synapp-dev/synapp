@@ -21,6 +21,7 @@
     "@supabase/supabase-js": "^2.51.0",
     "@tanstack/query-core": "^5.83.0",
     "@tanstack/react-query": "^5.83.0",
+    "@workspace/supabase": "workspace:*",
     "@workspace/ui": "workspace:*",
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",

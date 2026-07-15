@@ -6,12 +6,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays,
+  FolderOpen,
   LayoutDashboard,
   Mail,
   MessageSquare,
+  PanelsTopLeft,
   Phone,
   Settings,
   Shield,
+  Smartphone,
+  Sparkles,
   User,
   Users,
 } from "lucide-react";
@@ -51,6 +55,12 @@ function makeCaseNavItems(caseSlug: string): NavMainItem[] {
   const base = `/cases/${caseSlug}`;
   return [
     {
+      title: "Overview",
+      url: `${base}/overview`,
+      icon: PanelsTopLeft,
+      exact: false,
+    },
+    {
       title: "Correspondence",
       url: `${base}/correspondence`,
       icon: Mail,
@@ -78,6 +88,18 @@ function makeCaseNavItems(caseSlug: string): NavMainItem[] {
       title: "Meetings",
       url: `${base}/meetings`,
       icon: Phone,
+      exact: false,
+    },
+    {
+      title: "Documents",
+      url: `${base}/documents`,
+      icon: FolderOpen,
+      exact: false,
+    },
+    {
+      title: "Youth View",
+      url: `${base}/youth-view`,
+      icon: Smartphone,
       exact: false,
     },
   ];
@@ -178,6 +200,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         icon: MessageSquare,
         badge: unreadMessageCount > 0 ? `${unreadMessageCount} new` : undefined,
         exact: false,
+      },
+      {
+        title: "Concepts",
+        url: "/concepts",
+        icon: Sparkles,
+        exact: true,
       },
       {
         title: "Settings",

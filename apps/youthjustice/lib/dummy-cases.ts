@@ -214,7 +214,7 @@ export function buildCaseNavigationPath(pathname: string, newCaseSlug: string): 
     const tail = segments.slice(2).join("/");
     return `/cases/${newCaseSlug}/${tail}`;
   }
-  return `/cases/${newCaseSlug}/correspondence`;
+  return `/cases/${newCaseSlug}/overview`;
 }
 
 /**

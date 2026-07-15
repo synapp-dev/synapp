@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { CaseCalendarPanel } from "@/components/organisms/case-calendar-panel";
 import { getDummyCaseBySlug } from "@/lib/dummy-cases";
-import { getDummyCalendar } from "@/lib/dummy-case-content";
+import { getDummyCaseCalendarEvents } from "@/lib/dummy-case-extras";
 
 type Props = {
   params: Promise<{ caseSlug: string }>;
@@ -14,7 +14,7 @@ export default async function CalendarPage({ params }: Props) {
   if (!c) {
     notFound();
   }
-  const rows = getDummyCalendar(caseSlug);
+  const rows = getDummyCaseCalendarEvents(caseSlug);
 
   return (
     <CaseCalendarPanel

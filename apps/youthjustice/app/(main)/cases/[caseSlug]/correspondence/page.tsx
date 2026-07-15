@@ -1,22 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { getDummyCaseBySlug } from "@/lib/dummy-cases";
-import { getDummyCorrespondence } from "@/lib/dummy-case-content";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table";
+import { getDummyCaseProfile } from "@/lib/dummy-case-profile";
+import { getDummyCaseNotes } from "@/lib/dummy-case-extras";
+import { CaseNotesList } from "@/components/organisms/case-notes-list";
 
 type Props = {
   params: Promise<{ caseSlug: string }>;
@@ -25,49 +12,29 @@ type Props = {
 export default async function CorrespondencePage({ params }: Props) {
   const { caseSlug } = await params;
   const c = getDummyCaseBySlug(caseSlug);
-  if (!c) {
+  const profile = getDummyCaseProfile(caseSlug);
+  if (!c || !profile) {
     notFound();
   }
-  const rows = getDummyCorrespondence(caseSlug);
+  const notes = getDummyCaseNotes(caseSlug);
+  const firstName = c.displayName.split(" ")[0]!;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Correspondence</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Correspondence & case notes
+        </h1>
         <p className="text-muted-foreground text-sm">
-          Demo log for {c.displayName} — Victoria youth justice (not real data).
+          Contact record and notes for {c.displayName} (demo data, new entries
+          reset on reload).
         </p>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent contact</CardTitle>
-          <CardDescription>
-            Track how you have engaged with this case (placeholder rows).
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Channel</TableHead>
-                <TableHead>Summary</TableHead>
-                <TableHead>Worker</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="whitespace-nowrap">{row.date}</TableCell>
-                  <TableCell>{row.channel}</TableCell>
-                  <TableCell>{row.summary}</TableCell>
-                  <TableCell>{row.worker}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <CaseNotesList
+        firstName={firstName}
+        workerName={profile.worker.name}
+        initialNotes={notes}
+      />
     </div>
   );
 }

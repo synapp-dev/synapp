@@ -2,7 +2,7 @@
 
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
-import { ThemeToggle } from "@/components/atoms/theme-toggle";
+import { ThemeToggle } from "@workspace/ui/components/atoms/theme-toggle";
 import { CommandMenu } from "@/components/molecules/command-menu";
 import { NotificationsMenu } from "@/components/molecules/notifications-menu";
 import { Breadcrumb } from "@/components/molecules/breadcrumb";
