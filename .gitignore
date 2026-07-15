@@ -66,3 +66,4 @@ apps/intradark/public/video/welcome-smoke-loop.mov
 # CS2 plugin packaging: download cache, staging tree, and output zips (do not commit)
 apps/intradark/.cache/
 apps/intradark/dist/
+graphify-out/
