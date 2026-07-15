@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Menzies Aviation">
+  <rect width="512" height="512" rx="72" fill="#1f3668"/>
+  <path d="M104 408 L104 132 L256 300 L408 132 L408 408"
+        fill="none" stroke="#ffffff" stroke-width="70"
+        stroke-linejoin="miter" stroke-miterlimit="12" stroke-linecap="butt"/>
+</svg>

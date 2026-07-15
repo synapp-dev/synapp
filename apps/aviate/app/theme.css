@@ -1,0 +1,75 @@
+/*
+ * Aviate-only theme overrides.
+ *
+ * This file is imported solely by the Aviate app layout, so it is compiled
+ * into the Aviate CSS bundle only — the shared `@workspace/ui` globals.css is
+ * left untouched and the other apps are unaffected.
+ *
+ * Menzies branding: a navy sidebar with light text in light mode. Dark mode is
+ * left as-is (the shared sidebar token is already near-black), so everything
+ * here is scoped to `:root:not(.dark)`.
+ */
+
+:root:not(.dark) {
+  --sidebar: #1f3668;
+  --sidebar-foreground: #e8eefb;
+  --sidebar-primary: #ffffff;
+  --sidebar-primary-foreground: #1f3668;
+  --sidebar-accent: #2b4577;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #34517f;
+  --sidebar-ring: #ffffff;
+}
+
+/* Lift the muted greys and hairlines that live inside the navy sidebar
+   (section labels, sub-item icons, the profile caption, separators) so they
+   stay legible against the dark background. */
+:root:not(.dark) [data-sidebar="sidebar"] {
+  --muted-foreground: #a9b8d6;
+  --border: #34517f;
+}
+
+/* Active leaf / sub item: white pill with navy text + navy icon. */
+:root:not(.dark) [data-sidebar="menu-button"][data-active="true"],
+:root:not(.dark) [data-sidebar="menu-sub-button"][data-active="true"] {
+  background-color: var(--sidebar-primary);
+  color: var(--sidebar-primary-foreground);
+}
+
+:root:not(.dark) [data-sidebar="menu-button"][data-active="true"]:hover,
+:root:not(.dark) [data-sidebar="menu-sub-button"][data-active="true"]:hover {
+  background-color: #eef2fb;
+  color: var(--sidebar-primary-foreground);
+}
+
+/* Icons follow their label colour: light when idle, navy when active.
+   (The base sidebar styles otherwise force sub-item icons to a fixed colour,
+   which made the active icon disappear on the white pill.) */
+:root:not(.dark) [data-sidebar="menu-sub-button"] svg {
+  color: currentColor;
+  opacity: 0.7;
+}
+:root:not(.dark) [data-sidebar="menu-button"][data-active="true"] svg,
+:root:not(.dark) [data-sidebar="menu-sub-button"][data-active="true"] svg {
+  color: var(--sidebar-primary-foreground);
+  opacity: 1;
+}
+
+/* When a parent is active only because one of its children is active, outline
+   it instead of filling it solid, so the child pill is the clear highlight. */
+:root:not(.dark) [data-sidebar="menu-button"][aria-expanded][data-active="true"] {
+  background-color: transparent;
+  color: var(--sidebar-foreground);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+:root:not(.dark) [data-sidebar="menu-button"][aria-expanded][data-active="true"] svg {
+  color: var(--sidebar-foreground);
+  opacity: 1;
+}
+:root:not(.dark) [data-sidebar="menu-button"][aria-expanded][data-active="true"]:hover {
+  background-color: #2b4577;
+  color: #ffffff;
+}
+:root:not(.dark) [data-sidebar="menu-button"][aria-expanded][data-active="true"]:hover svg {
+  color: #ffffff;
+}
