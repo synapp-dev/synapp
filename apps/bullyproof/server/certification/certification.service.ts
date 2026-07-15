@@ -5,12 +5,8 @@ import {
   createStageSchema,
   updateStageSchema,
   deleteStageSchema,
-  type GetStagesParams,
-  type GetStageByIdParams,
-  type GetStageByCodeParams,
   type CreateStageParams,
   type UpdateStageParams,
-  type DeleteStageParams,
 } from "./certification.validators";
 import { certificationRepo } from "./certification.repo";
 import { assertFeature } from "@/server/features/features.service";
@@ -36,7 +32,7 @@ async function assertCanManageCertification(ctx: AuthContext) {
 
 export const certificationService = {
   async getStages(ctx: AuthContext, query: unknown) {
-    const params: GetStagesParams = getStagesSchema.parse(query);
+    getStagesSchema.parse(query);
     await assertCanViewCertification(ctx);
 
     return await certificationRepo.getStages();

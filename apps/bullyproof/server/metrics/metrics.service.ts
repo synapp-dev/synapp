@@ -108,8 +108,8 @@ export const metricsService = {
       .from(schools)
       .where(and(...previousWhereConditions));
 
-    const [currentResult] = await currentQuery;
-    const [previousResult] = await previousQuery;
+    await currentQuery;
+    await previousQuery;
 
     // Get total count (not just this month's new schools)
     let totalCurrentWhereConditions: any[] = [];

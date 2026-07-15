@@ -13,7 +13,7 @@ export default async function LessonRunLessonControlsPage({
 }: {
   params: Promise<{ school_id: string; lesson_id: string }>;
 }) {
-  const { school_id, lesson_id } = await params;
+  const { lesson_id } = await params;
 
   return <ControlMode lessonId={lesson_id} />;
 }

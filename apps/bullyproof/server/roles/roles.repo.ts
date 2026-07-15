@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { roles, userRoles, userProfile, schools, scopes } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc, isNull } from "drizzle-orm";
+import { eq, and, inArray, asc, isNull } from "drizzle-orm";
 import {
   ROLE_EXCLUSIVITY_PLATFORM_KEYS,
   SCHOOL_ROLE_KEYS,

@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "@workspace/ui/components/separator";
 import { LiveActivityFeed } from "./components/live-activity-feed";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { useEffectiveUser } from "@/hooks/use-effective-user";
 import { HeroCard } from "@/entities/dashboard/ui/shared/hero-card";
 import type { RoleBadgeItem } from "@/components/atoms/role-badges";

@@ -138,6 +138,7 @@ export function getYouTubeThumbnailUrl(
  * @param url - Vimeo video URL
  */
 export function getVimeoThumbnailUrl(url: string): string | null {
+  void url; // signature kept for the documented oEmbed implementation path
   // Vimeo doesn't provide direct thumbnail URLs like YouTube
   // Would need to use oEmbed API: https://vimeo.com/api/oembed.json?url={url}
   // For now, return null - components can handle this by using the video element's poster

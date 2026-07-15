@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { courseTopicProgress, courseTopicSlides, vQuizAttemptsEnriched } from "@/server/db/schema";
-import { eq, and, desc, max, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 
 export const courseTopicProgressRepo = {
   // Get progress for a user/topic

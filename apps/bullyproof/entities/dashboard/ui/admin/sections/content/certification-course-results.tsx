@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Loader2, Users, CheckCircle2, Clock, TrendingUp, Target } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@workspace/ui/components/card";
 import { Progress } from "@workspace/ui/components/progress";
 import { Badge } from "@workspace/ui/components/badge";
@@ -277,11 +277,6 @@ export function CertificationCourseResults({
     },
   } satisfies ChartConfig;
 
-  const totalCompletions = useMemo(
-    () => chartData.reduce((acc, curr) => acc + curr.completions, 0),
-    [chartData]
-  );
-
   const pieChartData = useMemo(() => {
     if (!results) return [];
     return [
@@ -302,19 +297,6 @@ export function CertificationCourseResults({
       },
     ].filter((item) => item.value > 0);
   }, [results]);
-
-  const formatDate = (dateString: string | null | undefined) => {
-    if (!dateString) return "N/A";
-    try {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return "N/A";
-    }
-  };
 
   const formatDuration = (startedAt: string | null, completedAt: string | null) => {
     if (!startedAt || !completedAt) {

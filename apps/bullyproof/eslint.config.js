@@ -4,7 +4,12 @@ import { nextJsConfig } from "@workspace/eslint-config/next-js";
 export default [
   ...nextJsConfig,
   {
-    ignores: ["drizzle/schema.ts", "drizzle/relations.ts", "drizzle/**/*.ts"],
+    ignores: [
+      "drizzle/schema.ts",
+      "drizzle/relations.ts",
+      "drizzle/**/*.ts",
+      "public/pdf.worker.min.mjs",
+    ],
   },
   {
     files: [

@@ -12,7 +12,6 @@ import {
   CardContent,
 } from "@workspace/ui/components/card";
 import { Button } from "@workspace/ui/components/button";
-import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import {
   AlertDialog,
   AlertDialogAction,

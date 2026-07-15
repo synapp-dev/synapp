@@ -7,8 +7,6 @@ import {
   type CreateInviteParams,
   type UpdateInviteParams,
   type ListInvitesParams,
-  type GetInviteByIdParams,
-  type AcceptInviteParams,
 } from "./invites.validators";
 import { invitesRepo } from "./invites.repo";
 import { getUserScopedRoles } from "../auth/rbac";
@@ -130,7 +128,7 @@ export const invitesService = {
         "[INVITE CREATE] Verifying user_profile exists for userId:",
         userId
       );
-      const { data: profile, error: profileError } = await adminClient
+      const { error: profileError } = await adminClient
         .from("user_profile")
         .select("id")
         .eq("id", userId)
@@ -234,7 +232,7 @@ export const invitesService = {
       );
       await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 500ms for trigger
 
-      const { data: profile, error: profileError } = await adminClient
+      const { error: profileError } = await adminClient
         .from("user_profile")
         .select("id")
         .eq("id", userId)
@@ -358,7 +356,7 @@ export const invitesService = {
 
     await assertCanManageInvites(ctx, existingInvite[0].schoolId);
 
-    const updatedInvite = await invitesRepo.update(id, data);
+    await invitesRepo.update(id, data);
     return await invitesRepo.getWithDetails(id);
   },
 
@@ -388,7 +386,7 @@ export const invitesService = {
     }
 
     // Update invite status
-    const updatedInvite = await invitesRepo.update(id, { status: "ACCEPTED" });
+    await invitesRepo.update(id, { status: "ACCEPTED" });
 
     // TODO: Here you would typically create the user role assignment
     // This would involve calling the roles service to assign the role

@@ -56,7 +56,7 @@ export function ResponsiveSidebarProvider({
   // Always start with defaultOpen on both server and client to avoid hydration mismatch
   // Then update after mount based on window width
   const [open, setOpen] = React.useState(defaultOpen);
-  const [mounted, setMounted] = React.useState(false);
+  const [, setMounted] = React.useState(false);
 
   // Update state after mount to avoid hydration mismatch
   React.useEffect(() => {

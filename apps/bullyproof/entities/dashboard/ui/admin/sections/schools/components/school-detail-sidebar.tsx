@@ -68,7 +68,7 @@ export function SchoolDetailSidebar({
               <SidebarGroup className="p-0">
                 <SidebarGroupContent className="p-0">
                   <SidebarMenu className="p-2">
-                    {navItems.map((item, index) => {
+                    {navItems.map((item) => {
                       const Icon = item.icon;
                       const isOnboarding = item.id === "onboarding";
                       // Feature Access is available read-only to school

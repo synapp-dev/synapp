@@ -7,7 +7,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { db } from "@/server/db/drizzle";
 import { certificationCourses, userProfile } from "@/server/db/schema";
 import { courseProgressRepo } from "@/server/course-progress/course-progress.repo";
@@ -18,14 +18,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { id: courseId } = await params;
 

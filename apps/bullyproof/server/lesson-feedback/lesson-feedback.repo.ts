@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
-import { lessonFeedback, lessons } from "@/server/db/schema";
-import { eq, and } from "drizzle-orm";
+import { lessonFeedback } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 export const lessonFeedbackRepo = {
   getByLessonId: (lessonId: string) =>

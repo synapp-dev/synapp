@@ -121,7 +121,7 @@ export async function POST(request: Request) {
         );
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const { data: profile, error: profileError } = await adminClient
+        const { error: profileError } = await adminClient
           .from("user_profile")
           .select("id")
           .eq("id", licenceUserId)

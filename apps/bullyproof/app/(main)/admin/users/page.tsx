@@ -32,7 +32,6 @@ import {
   AlertDescription,
   AlertTitle,
 } from "@workspace/ui/components/alert";
-import { Badge } from "@workspace/ui/components/badge";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { ScrollArea } from "@workspace/ui/components/scroll-area";
 import {

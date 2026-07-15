@@ -1,6 +1,6 @@
 import { Card, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { ReactNode } from "react";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 interface SettingsPageTemplateProps {
   title?: string;

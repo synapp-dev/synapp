@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { userSlideViews, topicSlides, courseTopics, certificationCourses } from "@/server/db/schema";
+import { userSlideViews } from "@/server/db/schema";
 import { eq, asc, sql, and, count } from "drizzle-orm";
 
 export const userSlideViewsRepo = {

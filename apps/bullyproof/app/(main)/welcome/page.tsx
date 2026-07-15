@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { isVideoUrl, getVideoEmbedUrl } from "@/utils/video";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { useCompleteTutorial } from "@/entities/me/api/completeTutorial";
 import { useMeStore } from "@/entities/me/model/store";
 import { FeatureGuard } from "@/components/molecules/feature-guard";

@@ -9,7 +9,7 @@ import { BarChart3, Loader2, Star } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { cn } from "@workspace/ui/lib/utils";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import {
   OverallRatingStars,
   OVERALL_RATING_STAR_SLOT_CLASS,

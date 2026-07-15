@@ -21,7 +21,7 @@
  */
 import { NextResponse } from "next/server";
 import { slideViewingSessionsRepo } from "@/server/slide-viewing-sessions/slide-viewing-sessions.repo";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 /**
  * Handle POST /api/slides/sessions/resume
@@ -33,14 +33,8 @@ import { createServerClient } from "@/utils/supabase/server";
  */
 export async function POST(request: Request) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const body = await request.json();
     const { sessionId } = body;

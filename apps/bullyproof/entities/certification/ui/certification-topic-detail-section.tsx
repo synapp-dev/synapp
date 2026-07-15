@@ -36,7 +36,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@workspace/ui/components/select";
 import { Input } from "@workspace/ui/components/input";
 import { Label } from "@workspace/ui/components/label";
@@ -78,7 +77,6 @@ export function CertificationTopicDetailSection({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [imageUrlValue, setImageUrlValue] = useState<string>("");
   const [videoUrlValue, setVideoUrlValue] = useState<string>("");
-  const [isDragging, setIsDragging] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeletingSlide, setIsDeletingSlide] = useState(false);
 
@@ -116,7 +114,6 @@ export function CertificationTopicDetailSection({
           const initialSlides = slidesResult.data
             .sort(compareSlidesByPosition)
             .map((slide) => {
-              const slideWithUrl = slide as typeof slide & { signedImageUrl?: string | null };
               return {
                 id: slide.id,
                 kind: slide.kind as "image" | "video" | "quiz" | "test",

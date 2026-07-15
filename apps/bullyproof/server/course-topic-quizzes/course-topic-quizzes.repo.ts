@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { courseTopicQuizzes, courseTopics } from "@/server/db/schema";
+import { courseTopicQuizzes } from "@/server/db/schema";
 import { eq, asc, sql, desc, and, ne } from "drizzle-orm";
 import { createSlug } from "@/utils/slug";
 

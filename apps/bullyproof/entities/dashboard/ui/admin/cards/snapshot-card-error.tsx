@@ -1,6 +1,5 @@
 import {
   Card,
-  CardContent,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -15,7 +14,6 @@ interface SnapshotCardErrorProps {
 
 export function SnapshotCardError({
   title,
-  icon,
   error,
 }: SnapshotCardErrorProps) {
   return (

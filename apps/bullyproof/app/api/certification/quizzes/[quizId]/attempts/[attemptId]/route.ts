@@ -20,21 +20,15 @@
  */
 import { NextResponse } from "next/server";
 import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { attemptId } = await params;
     const attempts = await quizAttemptsRepo.getById(attemptId);
@@ -63,14 +57,8 @@ export async function PUT(
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { attemptId } = await params;
     const attempts = await quizAttemptsRepo.getById(attemptId);

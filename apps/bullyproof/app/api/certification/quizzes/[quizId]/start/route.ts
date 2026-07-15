@@ -23,8 +23,7 @@
 import { NextResponse } from "next/server";
 import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
 import { courseTopicQuizzesRepo } from "@/server/course-topic-quizzes/course-topic-quizzes.repo";
-import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 /**
  * Handle POST /api/certification/quizzes/[quizId]/start
@@ -42,14 +41,8 @@ export async function POST(
   { params }: { params: Promise<{ quizId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { quizId } = await params;
     const body = await request.json();

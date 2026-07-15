@@ -11,12 +11,6 @@ import { Input } from "@workspace/ui/components/input";
 import {
   BookOpen,
   Search,
-  FileText,
-  Users,
-  Shield,
-  BarChart3,
-  Settings,
-  MessageCircle,
 } from "lucide-react";
 import { generateMetadataFromSegments } from "@/utils/metadata";
 

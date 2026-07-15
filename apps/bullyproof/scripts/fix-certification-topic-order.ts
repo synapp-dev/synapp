@@ -13,17 +13,6 @@ import { db } from '../server/db/drizzle';
 import { courseTopics, courseTopicSlides, certificationCourses } from '../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
-interface TopicWithSlides {
-  id: string;
-  courseId: string;
-  courseOrder: number | null;
-  title: string;
-  slides: Array<{
-    id: string;
-    imageUrl: string | null;
-  }>;
-}
-
 async function fixCertificationTopicOrder() {
   console.log('🔍 Starting certification topic order fix...\n');
 

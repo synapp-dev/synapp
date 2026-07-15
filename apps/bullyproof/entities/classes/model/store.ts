@@ -1,5 +1,5 @@
 import type { ClassRow } from "@/types/db";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { classesApi } from "../api/endpoints";
 import { classesKeys } from "./keys";
@@ -21,7 +21,7 @@ export function useClasses(filters?: {
     ? (() => {
         const filtered = Object.fromEntries(
           Object.entries(filters).filter(
-            ([_, value]) => value !== undefined && value !== ""
+            ([, value]) => value !== undefined && value !== ""
           )
         );
         return Object.keys(filtered).length > 0 ? filtered : undefined;

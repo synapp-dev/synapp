@@ -247,7 +247,7 @@ export function ImageSelectorDialog({
   const imageFileInputRef = useRef<HTMLInputElement>(null);
   const footerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { pdfPages, singleImages, addPdfPages, addSingleImage, getAllItems } =
+  const { pdfPages, singleImages, addPdfPages, addSingleImage } =
     useSessionLibraryStore();
 
   // Helper function to show footer message
@@ -490,13 +490,6 @@ export function ImageSelectorDialog({
       setSelectedImageData(null);
       setHoveredAfterSelection(new Set());
     }
-  };
-
-  const handleCancelSelection = () => {
-    setSelectedImageId(null);
-    setSelectedImageData(null);
-    setSelectedImageIds(new Set());
-    setHoveredAfterSelection(new Set());
   };
 
   const handleFolderClick = (pdfId: string) => {

@@ -49,7 +49,7 @@ export function useLessons(filters?: {
     ? (() => {
         const filtered = Object.fromEntries(
           Object.entries(filters).filter(
-            ([_, value]) => value !== undefined && value !== ""
+            ([, value]) => value !== undefined && value !== ""
           )
         );
         return Object.keys(filtered).length > 0 ? filtered : undefined;
@@ -70,9 +70,6 @@ export function useLessons(filters?: {
     gcTime: 5 * 60 * 1000, // 5 minutes
     refetchOnMount: true,
   });
-
-  // Get lesson IDs from the list
-  const lessonIdsFromList = listQuery.data?.map((l) => l.id) || [];
 
   // Only fetch details for lessons that don't have full details cached
   const lessonsNeedingDetails = useMemo(() => {

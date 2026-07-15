@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { QuestionDefinition } from "@/types/course-ratings";
 
 // Schema for getting certification courses
 export const getCoursesSchema = z.object({

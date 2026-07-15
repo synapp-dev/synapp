@@ -60,13 +60,6 @@ const stateNameMap: Record<string, string> = {
   'vic': 'Victoria'
 };
 
-// Sector mapping
-const sectorMap: Record<string, string> = {
-  'government': 'government',
-  'catholic': 'catholic',
-  'independent': 'independent'
-};
-
 // Level mapping
 const levelMap: Record<string, string> = {
   'primary': 'primary',

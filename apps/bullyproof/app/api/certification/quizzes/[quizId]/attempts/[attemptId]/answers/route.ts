@@ -24,7 +24,7 @@
 import { NextResponse } from "next/server";
 import { quizAttemptAnswersRepo } from "@/server/quiz-attempt-answers/quiz-attempt-answers.repo";
 import { quizAttemptsRepo } from "@/server/quiz-attempts/quiz-attempts.repo";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 /**
  * Handle GET /api/certification/quizzes/[quizId]/attempts/[attemptId]/answers
@@ -40,14 +40,8 @@ export async function GET(
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { attemptId } = await params;
 
@@ -87,14 +81,8 @@ export async function POST(
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { attemptId } = await params;
     const body = await request.json();
@@ -128,12 +116,7 @@ export async function POST(
     // Update attempt correct answers count (recalculate based on all answers)
     // Note: isCorrect in the answer record is a simplified check
     // Full correctness is calculated during quiz submission
-    await quizAttemptsRepo.updateAnswer(
-      attemptId,
-      body.questionId,
-      body.answerIds[0], // Pass first answer ID for compatibility (scoring logic will use all answers)
-      answer[0].isCorrect ?? false
-    );
+    await quizAttemptsRepo.updateAnswer(attemptId);
 
     return NextResponse.json(answer[0], { status: 200 });
   } catch (e: any) {

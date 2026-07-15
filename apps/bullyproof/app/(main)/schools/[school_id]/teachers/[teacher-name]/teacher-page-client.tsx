@@ -1,12 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card";
+
+
 import { Button } from "@workspace/ui/components/button";
 import {
   ArrowLeft,
@@ -38,7 +34,7 @@ import {
   useUserClasses,
 } from "@/entities/users/api/user-details-queries";
 import { useLessonsByTeacherAtSchool } from "@/entities/lessons/api/useLessonsByTeacherAtSchool";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 interface TeacherPageClientProps {
   teacherSlug: string;
@@ -196,20 +192,6 @@ export default function TeacherPageClient({
     return `${firstName} ${lastName}`.trim() || user.email;
   };
 
-  const getInitials = (user: UserWithRolesAndSchools) => {
-    const firstName = user.firstName || "";
-    const lastName = user.lastName || "";
-    if (firstName && lastName) {
-      return `${firstName[0]}${lastName[0]}`.toUpperCase();
-    }
-    if (firstName) {
-      return firstName[0].toUpperCase();
-    }
-    if (user.email) {
-      return user.email[0].toUpperCase();
-    }
-    return "U";
-  };
 
   const getSchoolRoles = (user: UserWithRolesAndSchools) => {
     if (!schoolId) return [];

@@ -5,14 +5,13 @@ import type {
   CourseTopicRow,
   CourseTopicSlideRow,
 } from "@/types/db";
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -27,24 +26,13 @@ import {
   CheckCircle2,
   Lock,
   PlayCircle,
-  Download,
-  Eye,
   FileQuestion,
   ChevronsRight,
-  ChevronRight,
   TrendingUp,
-  Award,
   BookOpen,
   ClipboardList,
 } from "lucide-react";
 import { Loader2 } from "lucide-react";
-import { PolarGrid, PolarRadiusAxis, RadialBar, RadialBarChart, Label } from "recharts";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@workspace/ui/components/chart";
 import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
 import { useMeStore } from "@/entities/me/model/store";
@@ -52,7 +40,6 @@ import { useMySchoolsQuery } from "@/entities/me/model/useMySchoolsQuery";
 import { createSlug } from "@/utils/slug";
 import { AnimatedThumbnail, type TopicSlide } from "@/components/organisms/animated-thumbnail";
 import { useCertificationTopicsByCourseCode } from "@/entities/certification/model/topics-store";
-import { useCertificationCourseByCode } from "@/entities/certification/model/store";
 import Image from "next/image";
 import { StarRating } from "@/components/atoms/star-rating";
 import { TopicCertificate } from "@/components/molecules/topic-certificate";
@@ -82,7 +69,7 @@ export default function CoursePage() {
   usePageTitle(["courses", courseNameSlug]);
 
   const currentUser = useMeStore((s) => s.currentUser);
-  const { data: schools = [] } = useMySchoolsQuery({ limit: 1 });
+  useMySchoolsQuery({ limit: 1 });
 
   // Fetch course by slug (still need API call for slug lookup, then use store)
   const [course, setCourse] = useState<Course | null>(null);
@@ -137,7 +124,7 @@ export default function CoursePage() {
   const [certificationProgress, setCertificationProgress] = useState(0);
   
   // Animation state for radial chart
-  const [animatedRadialChartData, setAnimatedRadialChartData] = useState<Array<{
+  const [, setAnimatedRadialChartData] = useState<Array<{
     topic: string;
     topicName: string;
     completion: number;
@@ -260,9 +247,9 @@ export default function CoursePage() {
 
   // Calculate topic statuses (needed for animation) - memoized to prevent infinite loops
   const topicStatuses: Array<"completed" | "current" | "locked" | "retry_available"> = useMemo(() => {
-    return topicsList.map((topic, index) => {
+    return topicsList.map((topic) => {
       const progress = topicProgress.get(topic.id);
-      
+
       // Check if it's the current topic FIRST (so BP man always shows on current topic)
       if (topic === currentTopic) {
         return "current";
@@ -331,13 +318,13 @@ export default function CoursePage() {
     const totalTopicsCount = topicsList.length;
 
     // Calculate target completion percentages for radial chart (actual completion based on slides + quiz)
-    const targetCompletions = topicsList.map((topic, index) => {
+    const targetCompletions = topicsList.map((topic) => {
       const progress = topicProgress.get(topic.id);
       return calculateTopicCompletion(topic, progress);
     });
 
     // Calculate target values for progress bars (binary: 0 or 100)
-    const targetValues = topicsList.map((topic, index) => {
+    const targetValues = topicsList.map((topic) => {
       const progress = topicProgress.get(topic.id);
       const isCompleted = progress && (progress.status === "completed" || progress.status === "passed");
       
@@ -505,53 +492,11 @@ export default function CoursePage() {
     );
   }
 
-  // Get user name
-  const firstName = currentUser?.firstName || "";
-  const lastName = currentUser?.lastName || "";
-  const userName =
-    currentUser?.fullName ||
-    [firstName, lastName].filter(Boolean).join(" ") ||
-    "User";
-
   // Get user role
   const userRole =
     currentUser?.schoolRoles?.[0]?.roleName ||
     currentUser?.platformRoles?.[0] ||
     "User";
-
-  // Get school name
-  const schoolName = schools[0]?.name || "No school assigned";
-
-  // Get start date (using welcome tutorial completion timestamp)
-  const welcomeTutorialCompletedAt =
-    (currentUser?.metadata as any)?.tutorials?.welcome?.completedAt;
-
-  const formatFullDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    });
-  };
-
-  const startDate = welcomeTutorialCompletedAt
-    ? formatFullDate(welcomeTutorialCompletedAt)
-    : currentUser?.createdAt
-      ? formatFullDate(currentUser.createdAt)
-      : "N/A";
-
-  // Get greeting based on time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  };
 
   const currentTopicNumber = currentTopic
     ? (currentTopic.courseOrder ?? topicsList.indexOf(currentTopic) + 1)
@@ -598,58 +543,6 @@ export default function CoursePage() {
     // No quiz attempt yet
     quizStatus = "not_attempted";
   }
-
-  // Use animated radial chart data if available, otherwise calculate static values
-  const radialChartData = animatedRadialChartData.length > 0 
-    ? animatedRadialChartData
-    : topicsList.map((topic, index) => {
-        const progress = topicProgress.get(topic.id);
-        const status = topicStatuses[index];
-        const completion = calculateTopicCompletion(topic, progress);
-        const topicNum = topic.courseOrder ?? index + 1;
-        
-        // Determine color based on status
-        let fillColor = "hsl(var(--muted))"; // locked
-        if (status === "completed") {
-          fillColor = "rgb(59 130 246)"; // blue-500
-        } else if (status === "current") {
-          fillColor = "var(--brand-bullyproof-primary)"; // Bullyproof primary
-        } else if (status === "retry_available") {
-          fillColor = "var(--brand-bullyproof-secondary)"; // Bullyproof secondary
-        }
-        
-        return {
-          topic: `T${topicNum}`,
-          topicName: topic.title,
-          completion,
-          fill: fillColor,
-        };
-      });
-
-  // Radial chart config - create a config entry for each topic
-  const radialChartConfig = {
-    completion: {
-      label: "Completion",
-    },
-    ...topicsList.reduce((config, topic, index) => {
-      const topicNum = topic.courseOrder ?? index + 1;
-      const key = `topic${topicNum}`;
-      const status = topicStatuses[index];
-      let fillColor = "hsl(var(--muted))"; // locked
-      if (status === "completed") {
-        fillColor = "rgb(59 130 246)"; // blue-500
-      } else if (status === "current") {
-        fillColor = "var(--brand-bullyproof-primary)"; // Bullyproof primary
-      } else if (status === "retry_available") {
-        fillColor = "var(--brand-bullyproof-secondary)"; // Bullyproof secondary
-      }
-      config[key] = {
-        label: `T${topicNum}`,
-        color: fillColor,
-      };
-      return config;
-    }, {} as Record<string, { label: string; color: string }>),
-  } satisfies ChartConfig;
 
   const courseSlug = course ? createSlug(course.name) : "";
 
@@ -1014,12 +907,10 @@ export default function CoursePage() {
                     <div className="flex gap-2 items-end overflow-visible">
                       {topicsList.map((topic, index) => {
                         const topicNum = topic.courseOrder ?? index + 1;
-                        const progress = topicProgress.get(topic.id);
                         const status = topicStatuses[index];
                         const isCompleted = status === "completed";
                         const isCurrent = status === "current";
                         const isRetryAvailable = status === "retry_available";
-                        const isLocked = status === "locked";
                         const currentIndex = topicsList.findIndex((t, i) => topicStatuses[i] === "current");
                         const isNextAfterCurrent = index === currentIndex + 1 && currentIndex !== -1;
                         
@@ -1166,7 +1057,6 @@ export default function CoursePage() {
                 // The enriched data should load automatically via the store's getEnrichedTopics
                 const hasQuiz = topic.hasQuiz ?? false;
                 const slideCount = topic.slideCount ?? (topic.slides?.length ?? 0);
-                const topicStarted = isTopicStarted(progress);
                 const isCompleted = status === "completed";
                 const isCurrent = status === "current";
 
@@ -1221,41 +1111,6 @@ export default function CoursePage() {
                     console.error("Failed to fetch quizzes:", err);
                     // Fallback to quiz overview page
                     router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
-                  }
-                };
-
-                const handleContinueClick = async (e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  const topicSlug = createSlug(topic.title);
-                  
-                  // If status is quiz_unlocked, navigate to quiz instead of slides
-                  if (progress?.status === "quiz_unlocked") {
-                    // Check if there's an in-progress quiz attempt
-                    try {
-                      const result = await certificationApi.topics.progress.getQuizInProgress(topic.id);
-                      if (result.data?.quizId) {
-                        // Fetch quiz to get title for slug
-                        try {
-                          const quizResult = await certificationApi.quizzes.byId(result.data.quizId);
-                          if (quizResult.data) {
-                            const quizSlug = createSlug(quizResult.data.title);
-                            router.push(`/courses/${courseSlug}/${topicSlug}/quiz/${quizSlug}`);
-                          } else {
-                            router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
-                          }
-                        } catch (err) {
-                          console.error("Failed to fetch quiz:", err);
-                          router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
-                        }
-                      } else {
-                        router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
-                      }
-                    } catch (err) {
-                      console.error("Failed to fetch in-progress quiz attempt:", err);
-                      router.push(`/courses/${courseSlug}/${topicSlug}/quiz`);
-                    }
-                  } else {
-                    router.push(`/courses/${courseSlug}/${topicSlug}/slides`);
                   }
                 };
 

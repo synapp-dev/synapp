@@ -9,7 +9,6 @@ import {
   CardContent,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@workspace/ui/components/card";
 import { LessonWizard } from "@/components/organisms/lesson-wizard";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -17,7 +16,6 @@ import { useSchoolStore } from "@/stores/school-store";
 import { lessonsKeys } from "@/entities/lessons/model/keys";
 import { lessonsApi } from "@/entities/lessons/api/endpoints";
 import { Separator } from "@workspace/ui/components/separator";
-import { format } from "date-fns";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { getDisplayStatus } from "@/utils/lesson-status";
 import {
@@ -96,7 +94,7 @@ export default function LessonsPage({
   params: Promise<{ school_id: string }>;
 }) {
   const ALL_LESSONS_PAGE_SIZE = 10;
-  const [schoolId, setSchoolId] = useState<string>("");
+  const [, setSchoolId] = useState<string>("");
 
   useEffect(() => {
     params.then(({ school_id }) => setSchoolId(school_id));
@@ -395,33 +393,6 @@ export default function LessonsPage({
     () => [...(otherCompletedLessonsRaw as Lesson[])].sort(sortLessonsByCreatedDesc),
     [otherCompletedLessonsRaw]
   );
-
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "default";
-      case "feedback":
-        return "secondary";
-      case "in_progress":
-        return "secondary";
-      case "scheduled":
-        return "outline";
-      case "draft":
-        return "secondary";
-      case "cancelled":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
-  const formatStatus = (status: string) => {
-    return status.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase());
-  };
-
-  const formatCreatedDate = (dateString: string) => {
-    return format(new Date(dateString), "MMM d");
-  };
 
   const myLessons = useMemo(
     () => (showCompletedMyLessons ? myCompletedLessons : myActiveLessons),

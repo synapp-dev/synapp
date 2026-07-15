@@ -5,21 +5,14 @@ import {
   updateTopicSchema,
   deleteTopicSchema,
   reorderTopicsSchema,
-  type GetTopicsByStageCodeParams,
-  type GetTopicsByStageIdParams,
   type CreateTopicParams,
   type UpdateTopicParams,
-  type DeleteTopicParams,
   type ReorderTopicsParams,
 } from "./certification-topics.validators";
 import { certificationTopicsRepo } from "./certification-topics.repo";
 import { certificationSlidesRepo } from "../certification-slides/certification-slides.repo";
 import { certificationSlidesService } from "../certification-slides/certification-slides.service";
 import { assertFeature } from "@/server/features/features.service";
-import { createServerClient } from "@/utils/supabase/server";
-import { db } from "@/server/db/drizzle";
-import { certificationCourses } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {

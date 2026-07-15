@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
 } from "@workspace/ui/components/card";
@@ -456,7 +455,6 @@ function SchoolsPageContent() {
           {filteredSchools.map((school) => {
             const { stateText, sectorText, levelsText } =
               extractSchoolMetadata(school);
-            const slug = (school as any)?.slug;
             const avatarUrl = (school as any)?.avatarUrl;
             const address = (school as any)?.address;
 

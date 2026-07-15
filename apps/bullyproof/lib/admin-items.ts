@@ -7,10 +7,8 @@ import {
   FileText,
   HelpCircle,
   BookOpenText,
-  Settings,
   type LucideIcon,
   Component,
-  Ticket,
   TicketCheck,
   DatabaseZap,
   FolderOpen,
@@ -238,7 +236,7 @@ export function getAdminItemsByCategory() {
 
   // Convert to array format and filter out empty categories
   return Object.entries(categoryMap)
-    .filter(([_, items]) => items.length > 0)
+    .filter(([, items]) => items.length > 0)
     .map(([name, items]) => ({
       name,
       items: items.map(({ title, url, icon, iconName, disabled }) => ({

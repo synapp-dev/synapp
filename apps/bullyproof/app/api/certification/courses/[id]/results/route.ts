@@ -19,7 +19,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUserIdFromRequest } from "@/utils/getUserIdFromRequest";
 import { checkFeatureAccess } from "@/server/features/features.service";
-import { courseProgressRepo } from "@/server/course-progress/course-progress.repo";
 import { eq } from "drizzle-orm";
 import { courseProgress } from "@/server/db/schema";
 import { db } from "@/server/db/drizzle";

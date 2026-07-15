@@ -60,7 +60,6 @@ export function ContentSection({
   title,
   description,
   basePath,
-  schoolId,
   hideHeader = false,
 }: ContentSectionProps) {
   const router = useRouter();

@@ -15,7 +15,6 @@ import {
   AccordionTrigger,
 } from "@workspace/ui/components/accordion";
 import {
-  HelpCircle,
   Search,
   MessageCircle,
   BookOpen,

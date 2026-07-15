@@ -11,7 +11,6 @@ import {
   GitCommit,
   Plus,
   Bug,
-  AlertTriangle,
   Star,
   Download,
   Filter,

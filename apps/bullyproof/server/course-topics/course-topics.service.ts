@@ -6,13 +6,9 @@ import {
   deleteTopicSchema,
   reorderTopicsSchema,
   getTopicBySlugSchema,
-  type GetTopicsByCourseCodeParams,
-  type GetTopicsByCourseIdParams,
   type CreateTopicParams,
   type UpdateTopicParams,
-  type DeleteTopicParams,
   type ReorderTopicsParams,
-  type GetTopicBySlugParams,
 } from "./course-topics.validators";
 import { courseTopicsRepo } from "./course-topics.repo";
 import { topicSlidesRepo } from "../topic-slides/topic-slides.repo";

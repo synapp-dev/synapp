@@ -17,7 +17,7 @@
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { certificationSlidesService } from "@/server/certification-slides/certification-slides.service";
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
 import { courseTopics } from "@/server/db/schema";
@@ -40,14 +40,8 @@ export async function GET(
   { params }: { params: Promise<{ topicId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { topicId } = await params;
 

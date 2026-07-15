@@ -6,20 +6,14 @@
  */
 import { NextResponse } from "next/server";
 import { and, eq } from "drizzle-orm";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { db } from "@/server/db/drizzle";
 import { certificationCourses, courseProgress } from "@/server/db/schema";
 
 export async function GET() {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const rows = await db
       .select({

@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
 import { Calendar } from "@workspace/ui/components/calendar";
-import { Loader2, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, FileText, AlertCircle, HandMetal, ChevronsRight, TriangleAlert, Download } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2, FileText, AlertCircle, HandMetal, ChevronsRight, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@workspace/ui/components/alert";
 import { toast } from "sonner";
 import { useLessonById } from "@/entities/lessons/api/useLessonById";
@@ -133,7 +133,7 @@ export default function LessonPreparePage() {
 
   const [showPreview, setShowPreview] = useState(false);
   const [showGalleryDrawer, setShowGalleryDrawer] = useState(false);
-  const [topic, setTopic] = useState<Topic | null>(null);
+  const [, setTopic] = useState<Topic | null>(null);
   const [isLoadingTopic, setIsLoadingTopic] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
 
@@ -149,7 +149,7 @@ export default function LessonPreparePage() {
   };
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>([]);
   const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
-  const [lessonPlansError, setLessonPlansError] = useState<string | null>(null);
+  const [, setLessonPlansError] = useState<string | null>(null);
   type TopicResource = {
     id: string;
     displayName: string;
@@ -408,22 +408,6 @@ export default function LessonPreparePage() {
 
     updateStatusToReady();
   }, [viewedSlides, downloadedPlan, lessonData?.status, lesson_id, queryClient]);
-
-  // Open schedule dialog with pre-populated values if lesson already has a schedule
-  const openScheduleDialog = () => {
-    if (lessonData?.scheduledFor) {
-      const existingDate = new Date(lessonData.scheduledFor);
-      setScheduleDate(existingDate);
-      // Format time as HH:mm for the time input
-      const hours = existingDate.getHours().toString().padStart(2, "0");
-      const minutes = existingDate.getMinutes().toString().padStart(2, "0");
-      setScheduleTime(`${hours}:${minutes}`);
-    } else {
-      setScheduleDate(undefined);
-      setScheduleTime("09:00");
-    }
-    setShowScheduleDialog(true);
-  };
 
   // Handle scheduling the lesson
   const handleScheduleLesson = async () => {

@@ -4,7 +4,9 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@workspace/ui/*": ["../../packages/ui/src/*"]
+      "@workspace/ui/*": ["../../packages/ui/src/*"],
+      "@workspace/supabase/*": ["../../packages/supabase/src/*"],
+      "@workspace/env-check": ["../../packages/env-check/src/index.ts"]
     },
     "plugins": [
       {

@@ -1,6 +1,6 @@
 import { db } from "@/server/db/drizzle";
 import { lessons, topics, lessonClasses, classes, userProfile, curriculumStages, classYears, schoolYears, schools } from "@/server/db/schema";
-import { eq, and, inArray, desc, asc, sql, or } from "drizzle-orm";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 
 function statusFilterClause(status?: string) {
   if (!status) return undefined;

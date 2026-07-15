@@ -1,57 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { Database } from "@/types/supabase";
-import { createServerClient } from "@supabase/ssr";
-
-/**
- * Helper function to copy cookies from source response to target response.
- * This is critical for maintaining Supabase session state during redirects.
- */
-function copyCookies(
-  sourceResponse: NextResponse,
-  targetResponse: NextResponse
-): void {
-  sourceResponse.cookies.getAll().forEach((cookie) => {
-    targetResponse.cookies.set(cookie.name, cookie.value, {
-      path: cookie.path,
-      domain: cookie.domain,
-      sameSite: cookie.sameSite as "lax" | "strict" | "none" | undefined,
-      secure: cookie.secure,
-      httpOnly: cookie.httpOnly,
-      maxAge: cookie.maxAge,
-      expires: cookie.expires,
-    });
-  });
-}
+import {
+  createSupabaseMiddlewareClient,
+  copySessionCookies as copyCookies,
+} from "@workspace/supabase/middleware";
 
 export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
-  });
+  const { supabase, getResponse } =
+    createSupabaseMiddlewareClient<Database>(request);
 
-  const supabase = createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          supabaseResponse = NextResponse.next({
-            request,
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
-
-  // Do not run code between createServerClient and
+  // Do not run code between createSupabaseMiddlewareClient and
   // supabase.auth.getUser(). A simple mistake could make it very hard to debug
   // issues with users being randomly logged out.
   // IMPORTANT: DO NOT REMOVE auth.getUser()
@@ -59,6 +17,8 @@ export async function updateSession(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const supabaseResponse = getResponse();
 
   const pathname = request.nextUrl.pathname;
 

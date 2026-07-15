@@ -1,5 +1,5 @@
 import { db } from "@/server/db/drizzle";
-import { features, featurePermissions, roles, userRoles, schools } from "@/server/db/schema";
+import { features, featurePermissions, userRoles } from "@/server/db/schema";
 import { eq, and, or, isNull, sql, inArray, desc } from "drizzle-orm";
 
 export type FeaturePermissionLevel = "global" | "role" | "school" | "school_role" | "user";

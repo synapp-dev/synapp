@@ -6,7 +6,7 @@ import { Button } from "@workspace/ui/components/button";
 import { Card, CardContent } from "@workspace/ui/components/card";
 import { EmailInput } from "@/components/molecules/email-input";
 import { PasswordInput } from "@/components/molecules/password-input";
-import { AuthFooter } from "@/components/molecules/auth-footer";
+import { AuthFooter } from "@workspace/ui/components/molecules/auth-footer";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { AnimatedBackground } from "@/components/molecules/animated-background";
 import {
@@ -78,7 +78,6 @@ function AuthFormContent({ className, ...props }: React.ComponentProps<"div">) {
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [isFirstOtpSubmission, setIsFirstOtpSubmission] = useState(true);
   const [hasOtpError, setHasOtpError] = useState(false);
-  const [devBypassOtp, setDevBypassOtp] = useState(false);
   const otpRef = React.useRef<HTMLInputElement>(null);
   const hasShownInitialAlertRef = React.useRef(false);
   const router = useRouter();

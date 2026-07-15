@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect, useCallback } from "react";
-import { Loader2, Inbox, RefreshCw } from "lucide-react";
+import { Inbox, RefreshCw } from "lucide-react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { createBrowserClient } from "@/utils/supabase/client";
 import { Button } from "@workspace/ui/components/button";

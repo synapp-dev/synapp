@@ -1,7 +1,7 @@
 "use client";
 
 import { SnapshotCard } from "@/entities/dashboard/ui/admin/cards/hero-card";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 interface PlatformMetricsCardsProps {
   platformMetrics: {

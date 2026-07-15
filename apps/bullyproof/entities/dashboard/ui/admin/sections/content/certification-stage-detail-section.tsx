@@ -26,7 +26,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { compareSlidesByPosition } from "@/lib/fractional-position";
 import { certificationApi } from "@/entities/certification/api/endpoints";
-import { useCertificationCourses } from "@/entities/certification/model/store";
 import {
   useCertificationTopicsByCourseCode,
   useInvalidateCertificationTopics,
@@ -47,8 +46,6 @@ import {
   GripHorizontal,
   MoreVertical,
   Trash2,
-  Edit,
-  FileText,
   FilePlus,
   ChevronsLeft,
   ChevronsRight,
@@ -79,7 +76,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import {
   AnimatedThumbnail,
   type TopicSlide,
@@ -728,8 +725,6 @@ export function CertificationCourseDetailSection({
   const [showDragHintIndex, setShowDragHintIndex] = useState<number | null>(
     null
   );
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hideButtonTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const leaveDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const dragHintTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -977,7 +972,7 @@ export function CertificationCourseDetailSection({
     }
   };
 
-  const handleTopicClick = (topic: TopicWithSlides, e?: React.MouseEvent) => {
+  const handleTopicClick = (topic: TopicWithSlides) => {
     if (activeId || topic.id.startsWith("temp_")) return;
     if (topic.slug) {
       router.push(`${basePath}/${slug}/${topic.slug}`);
@@ -1007,7 +1002,7 @@ export function CertificationCourseDetailSection({
     }
   };
 
-  const handleAddTopicClick = (e: React.MouseEvent, index: number) => {
+  const handleAddTopicClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     // For now, just open the add topic drawer
     // In the future, we could add logic to insert at a specific position
@@ -1287,7 +1282,7 @@ export function CertificationCourseDetailSection({
                       onChevronLeave={() => {}}
                       onDragHandleEnter={() => {}}
                       onDragHandleLeave={() => {}}
-                      onClick={(e) => handleTopicClick(topic, e)}
+                      onClick={() => handleTopicClick(topic)}
                       onAddTopicClick={() => {}}
                       onDeleteTopic={() => {}}
                       onAddSlideBefore={() => {}}
@@ -1512,9 +1507,9 @@ export function CertificationCourseDetailSection({
                                 dragHintTimeoutRef.current = null;
                               }
                             }}
-                            onClick={(e) => handleTopicClick(topic, e)}
+                            onClick={() => handleTopicClick(topic)}
                             onAddTopicClick={(e) =>
-                              handleAddTopicClick(e, index)
+                              handleAddTopicClick(e)
                             }
                             onDeleteTopic={() => handleDeleteTopic(topic)}
                             onAddSlideBefore={() => handleAddSlideBefore(topic)}

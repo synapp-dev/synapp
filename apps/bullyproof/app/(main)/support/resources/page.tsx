@@ -10,9 +10,7 @@ import { Button } from "@workspace/ui/components/button";
 import {
   Download,
   FileText,
-  Image,
   Video,
-  Archive,
   BookOpen,
   Shield,
   Users,

@@ -14,11 +14,11 @@
  * - 401 Unauthorized: `{ error: string }` when user identification fails.
  * - 500 Internal Server Error: `{ error: string }` on unexpected failures.
  */
-import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { NextResponse } from "next/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 import { db } from "@/server/db/drizzle";
 import { courseProgress, certificationCourses, courseRatings } from "@/server/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 /**
  * Handle GET /api/certification/courses/unrated
@@ -29,16 +29,10 @@ import { eq, and, sql } from "drizzle-orm";
  * @param request The incoming HTTP request.
  * @returns A JSON `NextResponse` with array of unrated courses or an error payload.
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     console.log(`[UnratedCourses] Fetching unrated courses for user: ${user.id}`);
 

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": [
+        "NEXT_PUBLIC_SUPABASE_*",
+        "SUPABASE_*",
+        "POSTGRES_*",
+        "DATABASE_URL",
+        "NEXT_PUBLIC_SITE_URL",
+        "SMTP_*",
+        "TICKET_NOTIFY_EMAIL",
+        "NOTION_BULLYPROOF_TOKEN",
+        "MAINTENANCE_BYPASS_DEV_KEY",
+        "SEED_THURSDAY_ISLAND"
+      ]
+    }
+  }
+}

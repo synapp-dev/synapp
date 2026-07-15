@@ -5,7 +5,7 @@ import { getEnabledAdminItems } from "@/lib/admin-items";
 import { AdminCard } from "./components/admin-card";
 import { FeatureGuard } from "@/components/molecules/feature-guard";
 import { useFeaturesAccess } from "@/hooks/use-features-access";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 export function AdminPageClient() {
   const adminItems = getEnabledAdminItems();

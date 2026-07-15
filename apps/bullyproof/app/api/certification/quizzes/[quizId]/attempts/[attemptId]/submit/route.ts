@@ -24,7 +24,7 @@ import { courseTopicQuizCompletionsRepo } from "@/server/course-topic-quiz-compl
 import { courseTopicProgressRepo } from "@/server/course-topic-progress/course-topic-progress.repo";
 import { courseProgressRepo } from "@/server/course-progress/course-progress.repo";
 import { shouldShowRatingModal } from "@/server/course-ratings/course-ratings.utils";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 
 /**
  * Handle POST /api/certification/quizzes/[quizId]/attempts/[attemptId]/submit
@@ -41,14 +41,8 @@ export async function POST(
   { params }: { params: Promise<{ quizId: string; attemptId: string }> }
 ) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const { attemptId } = await params;
 

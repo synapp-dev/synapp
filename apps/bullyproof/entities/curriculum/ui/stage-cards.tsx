@@ -17,7 +17,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card";
 import { cn } from "@workspace/ui/lib/utils";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 import { Skeleton } from "@workspace/ui/components/skeleton";
 import { BookOpen } from "lucide-react";
 import {
@@ -81,7 +81,6 @@ function TopicImageThumbnail({
   topic,
   onTopicClick,
   index = 0,
-  type = "curriculum",
   isCardHovered = false,
 }: TopicImageThumbnailProps) {
   // Get all image slides sorted by position
@@ -244,7 +243,6 @@ function StageCard({ stage, index, onStageClick, basePath, type = "curriculum", 
   const displayedTopics = type === "certification" 
     ? topics.slice(0, 3)
     : topics.slice(0, 3); // Show 3 topics in a single row
-  const hasMoreTopics = topics.length > displayedTopics.length;
 
   // Curriculum uses slug for pretty URLs; certification uses code
   const stageSegment = type === "curriculum"

@@ -41,7 +41,6 @@ import {
 
 interface SchoolsDataTableProps {
   onSchoolClick: (school: School) => void;
-  refreshTrigger?: number | string; // When this changes, the table will refetch data
   schools: School[];
   isLoading?: boolean;
   error?: string | null;
@@ -52,7 +51,6 @@ interface SchoolsDataTableProps {
 
 export function SchoolsDataTable({
   onSchoolClick,
-  refreshTrigger,
   schools,
   isLoading = false,
   error = null,

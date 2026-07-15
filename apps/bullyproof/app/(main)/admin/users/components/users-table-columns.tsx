@@ -3,10 +3,8 @@ import { ArrowUpDown } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import { Badge } from "@workspace/ui/components/badge";
 import {
-  meApi,
   type UserWithRolesAndSchools,
 } from "@/entities/me/api/endpoints";
-import { ShieldCheck, Users as UsersIcon } from "lucide-react";
 import { cn } from "@workspace/ui/lib/utils";
 
 export type User = UserWithRolesAndSchools;
@@ -165,8 +163,7 @@ export const columns: ColumnDef<User>[] = [
     header: () => {
       return <div className="text-left">Access Levels</div>;
     },
-    cell: ({ row }) => {
-      const user = row.original;
+    cell: () => {
       // This will be populated with role data
       return <div className="text-left">—</div>;
     },

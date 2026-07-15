@@ -71,14 +71,12 @@ import {
   XCircle,
   AlertTriangle,
   RefreshCw,
-  ChevronsUpDown,
   ChevronDown,
   Check,
   Trash2,
 } from "lucide-react";
 import type { SchoolYearRow } from "@/types/db";
 import { cn } from "@workspace/ui/lib/utils";
-import { meApi, type UserWithRolesAndSchools } from "@/entities/me/api/endpoints";
 import { apiFetch } from "@/lib/api/fetcher.client";
 import { schoolApi } from "@/entities/school/api/endpoints";
 import type { School as SchoolType } from "./schools-table-columns";
@@ -89,41 +87,6 @@ interface ImportClassesDialogProps {
   school: SchoolType | null;
   onSuccess?: () => void;
 }
-
-// Parse teacher names from various formats
-const parseTeacherNames = (teacherString: string): Array<{ firstName: string; lastName: string }> => {
-  if (!teacherString || !teacherString.trim()) {
-    return [];
-  }
-
-  const teachers: Array<{ firstName: string; lastName: string }> = [];
-  
-  // First, split by & to handle "name & name" format
-  const parts = teacherString.split("&").map(p => p.trim());
-  
-  for (const part of parts) {
-    // Split by spaces and group into pairs (firstName lastName)
-    const words = part.trim().split(/\s+/).filter(w => w.length > 0);
-    
-    // Group words into pairs (assuming firstName lastName format)
-    for (let i = 0; i < words.length; i += 2) {
-      if (i + 1 < words.length) {
-        teachers.push({
-          firstName: words[i] || "",
-          lastName: words[i + 1] || "",
-        });
-      } else if (words.length === 1) {
-        // Single word - treat as last name
-        teachers.push({
-          firstName: "",
-          lastName: words[i] || "",
-        });
-      }
-    }
-  }
-  
-  return teachers.filter(t => t.firstName || t.lastName);
-};
 
 // Check if a row is a header row
 const isHeaderRow = (
@@ -168,41 +131,6 @@ export function ImportClassesDialog({
 
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvData, setCsvData] = useState<ClassRowData[]>([]);
-  const [allUsers, setAllUsers] = useState<UserWithRolesAndSchools[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
-  // Filter teachers from the school (users with TEACHER role)
-  const apTeachersFromSchool = useMemo(() => {
-    if (!school?.id || allUsers.length === 0) return [];
-    
-    const teachers = allUsers.filter((user) => {
-      // Check if user has TEACHER role for this school
-      const schoolRoles = user.schoolRoles.filter(
-        (role) => role.schoolId === school.id
-      );
-      
-      // User must have TEACHER role for this school
-      return schoolRoles.some((role) => role.roleKey === "TEACHER");
-    }).map((user) => ({
-      userId: user.id,
-      firstName: user.firstName || "",
-      lastName: user.lastName || "",
-      email: user.email,
-    }));
-    
-    // Debug logging
-    if (teachers.length === 0 && allUsers.length > 0) {
-      console.log("[ImportClassesDialog] No teachers found:", {
-        schoolId: school.id,
-        allUsersCount: allUsers.length,
-        sampleUser: allUsers[0],
-        sampleUserSchoolRoles: allUsers[0]?.schoolRoles,
-      });
-    }
-    
-    return teachers;
-  }, [allUsers, school?.id]);
-
   // Table state for CSV data
   const [csvTableSorting, setCsvTableSorting] = useState<SortingState>([]);
   const [csvTableColumnFilters, setCsvTableColumnFilters] =
@@ -837,8 +765,6 @@ export function ImportClassesDialog({
 
   // CSV Table columns
   const headerButtonClassName = "h-auto p-0 -ml-3 hover:bg-transparent group";
-  const headerIconClassName =
-    "ml-2 h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors";
 
   const csvTableColumns = useMemo<ColumnDef<ClassRowData>[]>(
     () => [

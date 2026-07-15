@@ -29,7 +29,7 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar";
 import { Separator } from "@workspace/ui/components/separator";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 function DisabledMenuItem({
   title,

@@ -2,12 +2,8 @@ import {
   getSchoolSectorsSchema,
   getSchoolSectorByIdSchema,
   getSchoolSectorByKeySchema,
-  type GetSchoolSectorsParams,
-  type GetSchoolSectorByIdParams,
-  type GetSchoolSectorByKeyParams,
 } from "./school-sectors.validators";
 import { schoolSectorsRepo } from "./school-sectors.repo";
-import { getUserScopedRoles } from "../auth/rbac";
 
 // Placeholder auth context type; adapt to your actual session/context
 type AuthContext = {
@@ -26,7 +22,7 @@ async function assertCanViewSchoolSectors(ctx: AuthContext) {
 
 export const schoolSectorsService = {
   async getSchoolSectors(ctx: AuthContext, query: unknown) {
-    const params: GetSchoolSectorsParams = getSchoolSectorsSchema.parse(query);
+    getSchoolSectorsSchema.parse(query);
     await assertCanViewSchoolSectors(ctx);
 
     return await schoolSectorsRepo.getAll();

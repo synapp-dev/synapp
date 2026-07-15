@@ -22,7 +22,7 @@
  * @deprecated This route uses deprecated schema tables. Migrate to use quizAttemptAnswersRepo and courseTopicProgressRepo.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/utils/supabase/server";
+import { requireRequestUser } from "@/lib/api/route-auth";
 // DEPRECATED: These repos use old schema tables that no longer exist
 // TODO: Migrate this route to use:
 //   - quizAttemptAnswersRepo instead of certificationAnswersRepo
@@ -43,14 +43,8 @@ import { certificationTopicProgressRepo } from "@/server/certification-topic-pro
  */
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const { user, errorResponse } = await requireRequestUser();
+    if (errorResponse) return errorResponse;
 
     const body = await request.json();
     const {

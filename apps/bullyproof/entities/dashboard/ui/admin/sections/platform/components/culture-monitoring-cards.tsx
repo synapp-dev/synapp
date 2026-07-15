@@ -15,7 +15,7 @@ import {
 } from "@workspace/ui/components/card";
 import { Badge } from "@workspace/ui/components/badge";
 import { Progress } from "@workspace/ui/components/progress";
-import { StaggeredAnimation } from "@/components/atoms/staggered-animation";
+import { StaggeredAnimation } from "@workspace/ui/components/atoms/staggered-animation";
 
 interface CultureMonitoringCardsProps {
   cultureMonitoring: {
@@ -188,7 +188,7 @@ export function CultureMonitoringCards({
             </CardHeader>
             <CardContent className="pt-0">
               <div className="space-y-2">
-                {cultureMonitoring.scoreDistribution.map((range, index) => (
+                {cultureMonitoring.scoreDistribution.map((range) => (
                   <div
                     key={range.range}
                     className="flex items-center justify-between"

@@ -265,7 +265,7 @@ export async function PATCH(
 
     // Update user profile using Drizzle (bypasses RLS) and return updated data
     // Use .returning() to avoid an extra query
-    const [updatedUserProfile] = await db
+    await db
       .update(userProfile)
       .set(updateData)
       .where(eq(userProfile.id, targetUserId))

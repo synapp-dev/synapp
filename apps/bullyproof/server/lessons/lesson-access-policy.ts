@@ -1,6 +1,5 @@
 import {
   getUserScopedRoles,
-  type UserScopedRoles,
 } from "@/server/auth/rbac";
 import { checkFeatureAccess } from "@/server/features/features.service";
 import { ACTION_FEATURES, PAGE_FEATURES } from "@/lib/feature-keys";

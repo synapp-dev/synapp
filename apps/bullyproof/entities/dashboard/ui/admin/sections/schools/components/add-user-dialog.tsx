@@ -42,7 +42,6 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
-  getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
   type ColumnFiltersState,
@@ -52,12 +51,10 @@ import {
 import {
   UserPlus,
   Upload,
-  Shield,
   ArrowLeft,
   FileText,
   Check,
   X,
-  ArrowUpDown,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -67,8 +64,6 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
-import { usersApi } from "@/entities/users/api/endpoints";
-import { meApi } from "@/entities/me/api/endpoints";
 import { rolesApi } from "@/entities/roles/api/endpoints";
 import { useRoles } from "@/entities/users/model/store";
 import { apiFetch } from "@/lib/api/fetcher.client";
@@ -80,7 +75,6 @@ interface AddUserDialogProps {
   school: SchoolType | null;
   onSuccess?: () => void;
   skipToManual?: boolean; // Skip directly to manual form
-  initialUserType?: "admin" | "teacher"; // Pre-select user type
 }
 
 // Email validation helper
@@ -113,7 +107,6 @@ export function AddUserDialog({
   school,
   onSuccess,
   skipToManual = false,
-  initialUserType,
 }: AddUserDialogProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -801,75 +794,8 @@ export function AddUserDialog({
     });
   };
 
-  // Function to update a cell value and re-validate the row (kept for backwards compatibility, but not used)
-  const updateCellValue = (
-    rowIndex: number,
-    field: "firstName" | "lastName" | "email",
-    value: string
-  ) => {
-    setCsvData((prev) => {
-      // First, update the specific row
-      const updated = prev.map((row) => {
-        if (row.rowIndex === rowIndex) {
-          const updatedRow = { ...row };
-
-          // Update the field
-          if (field === "email") {
-            updatedRow.email = value.trim();
-          } else if (field === "firstName") {
-            updatedRow.firstName = value.trim() || undefined;
-          } else if (field === "lastName") {
-            updatedRow.lastName = value.trim() || undefined;
-          }
-
-          // Re-validate the row
-          const firstName = updatedRow.firstName || "";
-          const lastName = updatedRow.lastName || "";
-          const email = updatedRow.email || "";
-
-          // Count filled columns
-          const filledColumns = [firstName, lastName, email].filter(
-            (val) => val.length > 0
-          ).length;
-
-          // Check if incomplete (2 out of 3 filled)
-          updatedRow.isIncomplete = filledColumns === 2;
-
-          // Validate email
-          updatedRow.isValid = email ? isValidEmail(email) : false;
-
-          return updatedRow;
-        }
-        return row;
-      });
-
-      // Re-check duplicates across all rows (after the update)
-      const emailCounts = new Map<string, number>();
-      updated.forEach((row) => {
-        if (row.email) {
-          const emailLower = row.email.toLowerCase();
-          emailCounts.set(emailLower, (emailCounts.get(emailLower) || 0) + 1);
-        }
-      });
-
-      return updated.map((row) => {
-        if (row.email) {
-          const emailLower = row.email.toLowerCase();
-          const count = emailCounts.get(emailLower) || 0;
-          return {
-            ...row,
-            isDuplicate: count > 1,
-          };
-        }
-        return row;
-      });
-    });
-  };
-
   // CSV Table columns
   const headerButtonClassName = "h-auto p-0 -ml-3 hover:bg-transparent group";
-  const headerIconClassName =
-    "ml-2 h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors";
 
   const csvTableColumns = useMemo<ColumnDef<(typeof csvData)[0]>[]>(
     () => [
@@ -1558,24 +1484,6 @@ export function AddUserDialog({
                       incompleteRows.length > 0 ||
                       invalidRows.length > 0 ||
                       duplicateRows.length > 0;
-
-                    const formatRowInfo = (row: (typeof csvData)[0]) => {
-                      const presentFields: string[] = [];
-                      if (row.firstName) presentFields.push(row.firstName);
-                      if (row.lastName) presentFields.push(row.lastName);
-                      if (row.email) presentFields.push(row.email);
-
-                      const missingFields: string[] = [];
-                      if (!row.email) missingFields.push("email");
-                      if (!row.firstName) missingFields.push("firstName");
-                      if (!row.lastName) missingFields.push("lastName");
-
-                      let info = `Row ${row.rowIndex}: ${presentFields.join(", ")}`;
-                      if (missingFields.length > 0) {
-                        info += ` (missing ${missingFields.join(", ")})`;
-                      }
-                      return info;
-                    };
 
                     // Combine all error rows into a single array with their error types
                     const allErrorRows = [

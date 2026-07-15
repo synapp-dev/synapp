@@ -1,4 +1,3 @@
-import type { UserProfileExpandedRow } from "@/types/db";
 import {
   useQuery,
   queryOptions,
@@ -8,8 +7,6 @@ import { useEffect } from "react";
 import { meApi } from "@/entities/me/api/endpoints";
 import { meKeys } from "@/entities/me/model/keys";
 import { useMeStore, type UserProfileWithFeatures } from "@/entities/me/model/store";
-
-type UserProfile = UserProfileExpandedRow;
 
 export const getCurrentUserOptions = () =>
   queryOptions<UserProfileWithFeatures | null>({

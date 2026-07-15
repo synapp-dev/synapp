@@ -11,12 +11,10 @@ import { toStorageUrl } from "@/utils/supabase/storage-url";
  * 
  * @param slides - Array of all slides
  * @param enabled - Whether to enable preloading (defaults to true)
- * @param isCertification - Whether these are certification slides (unused, kept for compat)
  */
 export function usePreloadAllSlideImages(
   slides: SlideData[],
-  enabled: boolean = true,
-  isCertification: boolean = false
+  enabled: boolean = true
 ) {
   const preloadedRef = useRef<Set<string>>(new Set());
 

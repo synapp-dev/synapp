@@ -8,16 +8,13 @@ import { Avatar, AvatarFallback } from "@workspace/ui/components/avatar";
 import { Badge } from "@workspace/ui/components/badge";
 import {
   Clock,
-  User,
   Plus,
   Edit,
   Play,
   Square,
   Download,
   Calendar,
-  MessageSquare,
   CheckCircle2,
-  XCircle,
 } from "lucide-react";
 import { generateMetadataFromSegments } from "@/utils/metadata";
 
@@ -32,7 +29,7 @@ export default async function LessonHistoryPage({
 }: {
   params: Promise<{ school_id: string; lesson_id: string }>;
 }) {
-  const { school_id, lesson_id } = await params;
+  await params;
 
   // Dummy audit log data - most recent at the top
   const auditLog = [
@@ -236,7 +233,7 @@ export default async function LessonHistoryPage({
 
             {/* Timeline Items */}
             <div className="space-y-6">
-              {auditLog.map((item, index) => (
+              {auditLog.map((item) => (
                 <div key={item.id} className="relative flex gap-4">
                   {/* Timeline Dot */}
                   <div className="relative z-10">
