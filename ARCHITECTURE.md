@@ -29,7 +29,7 @@ This document is the **source of truth** for how code is placed, shared, and evo
 | `apps/*` | `packages/*`, local app code |
 | `packages/*` | Other `packages/*` only where explicitly allowed below |
 | `@workspace/ui` | **Presentation only.** No `@supabase/*`, no `@workspace/supabase`, no product/domain types. |
-| `@workspace/supabase` | Supabase/auth/session utilities; **may** depend on `@workspace/ui` for **optional** prebuilt UI. **`@workspace/ui` must not** depend on `@workspace/supabase`. |
+| `@workspace/supabase` | Supabase/auth/session utilities (`packages/supabase/`): browser/server/admin client factories and middleware cookie plumbing, generic over each app's `Database` type. Apps keep thin shims in `utils/supabase/` that bind their types and product policy. **May** depend on `@workspace/ui` for **optional** prebuilt UI. **`@workspace/ui` must not** depend on `@workspace/supabase`. |
 
 Cycles between packages are forbidden; new edges require an update to this doc.
 
@@ -70,7 +70,11 @@ Wire **`pnpm lint:architecture`** into CI alongside existing **`turbo lint`**.
 - Mature features may be promoted to **`packages/<module>`** as **data-agnostic shells** (implementation + docs + neutral defaults), wired per product via **explicit context/adapters**.
 - This does **not** imply a **shared hosted database** across products; each deployable keeps **sovereign data**.
 
-### 5.4 Documentation-only workspace packages
+### 5.4 Runtime utility packages
+
+- **`@workspace/env-check`** (`packages/env-check/`): dependency-free `checkEnv` helper called from each app's `instrumentation.ts` at server boot. Apps declare their own required/recommended env vars; the package only provides the presence check and logging. Missing **required** vars abort startup with a clear error; missing **recommended** vars produce one grouped warning.
+
+### 5.5 Documentation-only workspace packages
 
 - **`@workspace/rbac-contract`** (`packages/rbac-contract/`) holds **RBAC migration contract** notes and cross-app conventions (catalog + assignment tables, RLS expectations, Phase 2 prefix scopes). **MVP has no required runtime imports** from apps; each product still owns DDL under **`apps/<product>/`** per §8.1.
 - Rationale: [`apps/intradark/docs/features/admin-panel/plan.md`](apps/intradark/docs/features/admin-panel/plan.md) and alignment with future per-module gates (see package `README.md`).
@@ -130,4 +134,4 @@ In those cases, the package must still publish a **clear contract**: required ta
 ## 10. Document maintenance
 
 - Any new **allowed** package-to-package edge, **new** shared package, or **change** to migration defaults requires an **update to this file** in the same change as the code.
-- Example: **`@workspace/rbac-contract`** added under §5.4 with rationale in [`apps/intradark/docs/features/admin-panel/plan.md`](apps/intradark/docs/features/admin-panel/plan.md).
+- Example: **`@workspace/rbac-contract`** added under §5.5 with rationale in [`apps/intradark/docs/features/admin-panel/plan.md`](apps/intradark/docs/features/admin-panel/plan.md).

@@ -1,34 +1,18 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": ["NEXT_RUNTIME"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**"],
       "env": [
-        "STEAM_API_KEY",
         "NEXT_PUBLIC_SUPABASE_*",
-        "POSTGRES_*",
         "SUPABASE_*",
+        "POSTGRES_*",
         "DATABASE_URL",
-        "DATABASE_URL_POOLER",
-        "SMTP_HOST",
-        "SMTP_PORT",
-        "SMTP_USER",
-        "SMTP_PASS",
-        "SMTP_FROM",
-        "TICKET_NOTIFY_EMAIL",
-        "SQUARE_*",
-        "ANTHROPIC_API_KEY",
-        "GOOGLE_CLIENT_ID",
-        "GOOGLE_CLIENT_SECRET",
-        "NEXT_PUBLIC_VAPID_PUBLIC_KEY",
-        "VAPID_PRIVATE_KEY",
-        "VAPID_SUBJECT",
-        "CRON_SECRET",
-        "NEWS_BOT_USER_ID",
-        "REDLINE_*"
+        "DATABASE_URL_POOLER"
       ]
     },
     "lint": {

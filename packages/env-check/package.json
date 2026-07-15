@@ -1,0 +1,20 @@
+{
+  "name": "@workspace/env-check",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "^9.31.0",
+    "typescript": "^5.7.3"
+  }
+}
