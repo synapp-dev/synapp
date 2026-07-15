@@ -6,18 +6,18 @@ import { useUserProfile } from "@/stores/user-profile/user-profile-store";
 
 export function UserProfileLoader() {
   const [userId, setUserId] = useState<string | null>(null);
-  const supabase = createBrowserClient();
 
   // Get the current user's ID from Supabase
   useEffect(() => {
     const getUser = async () => {
+      const supabase = createBrowserClient();
       const { data } = await supabase.auth.getUser();
       if (data.user?.id) {
         setUserId(data.user.id);
       }
     };
     getUser();
-  }, [supabase]);
+  }, []);
 
   // Call useUserProfile with the userId to fetch and set the user profile
   useUserProfile(userId || "");

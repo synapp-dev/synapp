@@ -6,10 +6,10 @@ import { createBrowserClient } from "@/utils/supabase/client";
 
 export default function LogoutPage() {
   const router = useRouter();
-  const supabase = createBrowserClient();
 
   useEffect(() => {
     const handleLogout = async () => {
+      const supabase = createBrowserClient();
       await supabase.auth.signOut();
       router.push("/auth");
     };

@@ -2,10 +2,9 @@ import { useCallback } from "react";
 import { createBrowserClient } from "@/utils/supabase/client";
 
 export function useAuthFetch() {
-  const supabase = createBrowserClient();
-
   return useCallback(
     async (input: RequestInfo, init: RequestInit = {}) => {
+      const supabase = createBrowserClient();
       const { data } = await supabase.auth.getSession();
       const token = data?.session?.access_token;
 
@@ -16,6 +15,6 @@ export function useAuthFetch() {
 
       return fetch(input, { ...init, headers });
     },
-    [supabase]
+    []
   );
 }

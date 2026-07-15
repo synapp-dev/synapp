@@ -37,10 +37,10 @@ import { createBrowserClient } from "@/utils/supabase/client";
 export function NavUser() {
   const { isMobile } = useSidebar();
   const router = useRouter();
-  const supabase = createBrowserClient();
   const { currentUser, setCurrentUser } = useUserProfileStore();
 
   const handleLogout = async () => {
+    const supabase = createBrowserClient();
     await supabase.auth.signOut();
     router.replace("/logout");
   };

@@ -30,12 +30,12 @@ export function AuthForm({ className, ...props }: React.ComponentProps<"div">) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const mode = (searchParams.get("mode") as AuthMode) || "login";
-  const supabase = createBrowserClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    const supabase = createBrowserClient();
 
     try {
       if (mode === "login") {
