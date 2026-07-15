@@ -3,7 +3,7 @@
  *
  * POST /api/lessons/[id]/take-over - Take over ownership of a lesson
  *
- * Only TEACHER at the lesson's school can take over. Blocked when status is feedback/completed/cancelled.
+ * Requires the lessons:take-over-lesson feature (TEACHER or SCHOOL_ADMIN role) plus membership at the lesson's school. Blocked when status is feedback/completed/cancelled.
  */
 import { NextResponse } from "next/server";
 import { lessonsService } from "@/server/lessons/lessons.service";

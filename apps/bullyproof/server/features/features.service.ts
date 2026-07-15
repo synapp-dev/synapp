@@ -45,9 +45,11 @@ export async function checkFeatureAccess(
     return userLevel.enabled;
   }
 
-  const schoolRoleLevel = permissions.find((p) => p.level === "school_role");
-  if (schoolRoleLevel) {
-    return schoolRoleLevel.enabled;
+  // A user can hold several roles; within a role-based level, any enabled
+  // role wins (mirrors checkFeatureAccessAndVisibleCached on the client).
+  const schoolRoleLevels = permissions.filter((p) => p.level === "school_role");
+  if (schoolRoleLevels.length > 0) {
+    return schoolRoleLevels.some((p) => p.enabled);
   }
 
   const schoolLevel = permissions.find((p) => p.level === "school");
@@ -55,9 +57,9 @@ export async function checkFeatureAccess(
     return schoolLevel.enabled;
   }
 
-  const roleLevel = permissions.find((p) => p.level === "role");
-  if (roleLevel) {
-    return roleLevel.enabled;
+  const roleLevels = permissions.filter((p) => p.level === "role");
+  if (roleLevels.length > 0) {
+    return roleLevels.some((p) => p.enabled);
   }
 
   const globalLevel = permissions.find((p) => p.level === "global");

@@ -33,7 +33,7 @@ async function seedFeatures() {
 
       // Action features – lessons
       { key: 'lessons:cancel-lesson', name: 'Cancel Lesson', description: 'Cancel lessons from the lesson sidebar (owner, or INTRADARK_DEV/PLATFORM_ADMIN). Sets status to cancelled for data persistence.', category: 'action', section: 'schools-lessons' },
-      { key: 'lessons:take-over-lesson', name: 'Take Over Lesson', description: 'Take over ownership of a lesson from another teacher (TEACHER role at school, when status is preparing/ready/in_progress)', category: 'action', section: 'schools-lessons' },
+      { key: 'lessons:take-over-lesson', name: 'Take Over Lesson', description: 'Take over ownership of a lesson from another teacher (TEACHER or SCHOOL_ADMIN role at school, when status is preparing/ready/in_progress)', category: 'action', section: 'schools-lessons' },
 
       // Action features – school settings
       { key: 'school:manage-school-user-roles', name: 'Manage School User Roles', description: 'School admin can assign/remove school roles (TEACHER, SCHOOL_ADMIN, SCHOOL_STAFF) for users at their school only', category: 'action', section: 'schools-settings' },
@@ -387,15 +387,19 @@ async function seedFeatures() {
       }
     }
 
-    // Take over lesson: TEACHER gets access
+    // Take over lesson: TEACHER and SCHOOL_ADMIN get access
     const takeOverLessonFeature = insertedFeatures.find(f => f.key === 'lessons:take-over-lesson');
-    if (takeOverLessonFeature && teacherRole.length > 0) {
-      permissionsToCreate.push({
-        featureId: takeOverLessonFeature.id,
-        level: 'role' as const,
-        targetId: teacherRole[0].id,
-        enabled: true,
-      });
+    if (takeOverLessonFeature) {
+      for (const role of [teacherRole, schoolAdminRole]) {
+        if (role.length > 0) {
+          permissionsToCreate.push({
+            featureId: takeOverLessonFeature.id,
+            level: 'role' as const,
+            targetId: role[0].id,
+            enabled: true,
+          });
+        }
+      }
     }
 
     // Restricted school features (/settings, /school/performance, /school/reports): INTRADARK_DEV and PLATFORM_ADMIN get access globally
