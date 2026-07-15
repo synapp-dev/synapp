@@ -50,14 +50,24 @@ export async function POST(
   }
 
   const { organisation, venue } = await context.params;
-  const input = (await request.json()) as CreateWasteEntryInput;
+  const body = (await request.json()) as
+    | CreateWasteEntryInput
+    | { entries: CreateWasteEntryInput[] };
 
   try {
-    const data = await wasteService.create(ctx, {
-      organisationSlug: organisation,
-      venueSlug: venue,
-      input,
-    });
+    // Bulk log: { entries: [...] } saves all lines with a shared timestamp.
+    const data =
+      "entries" in body && Array.isArray(body.entries)
+        ? await wasteService.createBulk(ctx, {
+            organisationSlug: organisation,
+            venueSlug: venue,
+            entries: body.entries,
+          })
+        : await wasteService.create(ctx, {
+            organisationSlug: organisation,
+            venueSlug: venue,
+            input: body as CreateWasteEntryInput,
+          });
     return jsonDataResponse(data);
   } catch (error) {
     return serviceErrorResponse(error, "waste-entries", {

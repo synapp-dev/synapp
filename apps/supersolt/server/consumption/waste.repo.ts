@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, isNull, lte } from "drizzle-orm";
 
 import type { RlsTx } from "@/server/db/drizzle";
-import { wasteEntries } from "@/server/db/schema";
+import { ingredients, recipes, userProfiles, wasteEntries } from "@/server/db/schema";
 
 export type WasteEntryInsert = {
   organisationId: string;
@@ -94,8 +94,17 @@ export const wasteRepo = {
         occurredAt: wasteEntries.occurredAt,
         createdBy: wasteEntries.createdBy,
         createdAt: wasteEntries.createdAt,
+        ingredientName: ingredients.name,
+        recipeName: recipes.name,
+        createdByFullName: userProfiles.fullName,
+        createdByFirstName: userProfiles.firstName,
+        createdByLastName: userProfiles.lastName,
+        createdByEmail: userProfiles.email,
       })
       .from(wasteEntries)
+      .leftJoin(ingredients, eq(wasteEntries.ingredientId, ingredients.id))
+      .leftJoin(recipes, eq(wasteEntries.recipeId, recipes.id))
+      .leftJoin(userProfiles, eq(wasteEntries.createdBy, userProfiles.id))
       .where(
         and(
           eq(wasteEntries.venueId, args.venueId),
@@ -105,5 +114,31 @@ export const wasteRepo = {
         ),
       )
       .orderBy(desc(wasteEntries.occurredAt));
+  },
+
+  async getEntry(tx: RlsTx, args: { id: string; venueId: string }) {
+    const [row] = await tx
+      .select({
+        id: wasteEntries.id,
+        venueId: wasteEntries.venueId,
+        parentEntryId: wasteEntries.parentEntryId,
+      })
+      .from(wasteEntries)
+      .where(
+        and(eq(wasteEntries.id, args.id), eq(wasteEntries.venueId, args.venueId)),
+      )
+      .limit(1);
+    return row ?? null;
+  },
+
+  /** Children cascade via waste_entries_parent_entry_id_fkey. */
+  async deleteEntry(tx: RlsTx, args: { id: string; venueId: string }) {
+    const deleted = await tx
+      .delete(wasteEntries)
+      .where(
+        and(eq(wasteEntries.id, args.id), eq(wasteEntries.venueId, args.venueId)),
+      )
+      .returning({ id: wasteEntries.id });
+    return deleted.length;
   },
 };

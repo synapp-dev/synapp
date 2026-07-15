@@ -1,4 +1,4 @@
-import { WastePageClient } from "./_components/waste-page-client";
+import { WastePage } from "@/entities/waste/components/waste-page";
 import { assertVenueReadinessOrRedirect } from "@/server/readiness/assert-venue-readiness";
 
 export default async function StockManagementWastePage({
@@ -9,5 +9,5 @@ export default async function StockManagementWastePage({
   const { organisation, venue } = await params;
   await assertVenueReadinessOrRedirect(organisation, venue, "stock-waste");
 
-  return <WastePageClient organisation={organisation} venue={venue} />;
+  return <WastePage organisation={organisation} venue={venue} />;
 }
