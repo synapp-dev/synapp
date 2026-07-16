@@ -1,18 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type OrderGuideReasoningStatus =
   | "idle"
-  | "streaming"
+  | "loading"
   | "done"
   | "error"
   | "unavailable";
 
+export type OrderGuideSupplierRead = {
+  supplierId: string;
+  headline: string;
+  points: string[];
+  watchouts: string[];
+};
+
+export type OrderGuideReasoning = {
+  runHeadline: string;
+  suppliers: OrderGuideSupplierRead[];
+};
+
 /**
- * Streams the Superbot order-run briefing token-by-token from the
- * reasoning endpoint. Re-runs whenever `runKey` changes (guide recompute,
- * period switch); `enabled: false` keeps it idle.
+ * Fetches Superbot's structured read on the order run — a run-level headline
+ * plus a per-supplier read keyed by supplierId — and exposes a lookup map so
+ * each supplier's dashboard can render its own briefing inline. Re-runs
+ * whenever `runKey` changes (guide recompute, period switch); `enabled: false`
+ * keeps it idle.
  */
 export function useOrderGuideReasoning(args: {
   organisation: string;
@@ -21,7 +35,7 @@ export function useOrderGuideReasoning(args: {
   runKey: string | null;
   enabled: boolean;
 }) {
-  const [text, setText] = useState("");
+  const [data, setData] = useState<OrderGuideReasoning | null>(null);
   const [status, setStatus] = useState<OrderGuideReasoningStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -31,9 +45,8 @@ export function useOrderGuideReasoning(args: {
     const controller = new AbortController();
     abortRef.current = controller;
 
-    setText("");
     setError(null);
-    setStatus("streaming");
+    setStatus("loading");
 
     try {
       const response = await fetch(
@@ -50,20 +63,15 @@ export function useOrderGuideReasoning(args: {
         setStatus("unavailable");
         return;
       }
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as {
           error?: { message?: string };
         } | null;
         throw new Error(payload?.error?.message ?? "Reasoning failed");
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        setText((prev) => prev + decoder.decode(value, { stream: true }));
-      }
+      const payload = (await response.json()) as OrderGuideReasoning;
+      setData(payload);
       setStatus("done");
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -80,5 +88,19 @@ export function useOrderGuideReasoning(args: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [args.enabled, args.runKey, start]);
 
-  return { text, status, error, regenerate: start };
+  const bySupplier = useMemo(() => {
+    const map = new Map<string, OrderGuideSupplierRead>();
+    for (const read of data?.suppliers ?? []) {
+      map.set(read.supplierId, read);
+    }
+    return map;
+  }, [data]);
+
+  return {
+    runHeadline: data?.runHeadline ?? null,
+    bySupplier,
+    status,
+    error,
+    regenerate: start,
+  };
 }

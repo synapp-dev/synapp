@@ -1,5 +1,6 @@
 import { anthropic } from "@ai-sdk/anthropic";
-import { streamText } from "ai";
+import { generateObject } from "ai";
+import { z } from "zod";
 
 import type { RequestAuthContext } from "@/server/auth/context";
 import {
@@ -10,7 +11,6 @@ import {
 import { PurchaseOrdersServiceError } from "./purchase-orders.service";
 
 const REASONING_MODEL = "claude-haiku-4-5";
-const MAX_OUTPUT_TOKENS = 700;
 
 function formatQty(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
@@ -18,10 +18,12 @@ function formatQty(value: number): string {
 
 /**
  * Condense the guide into a compact grounding payload — only what the
- * model needs to reason, never raw DB rows.
+ * model needs to reason, never raw DB rows. Every supplier carries its
+ * `supplierId` so the model can key its read back to the exact card.
  */
 function buildGroundingSummary(guide: OrderGuideResponse, venueName: string): string {
   const suppliers = guide.suggestionsBySupplier.map((group) => ({
+    supplierId: group.supplierId,
     supplier: group.supplierName,
     leadTimeDays: group.leadTimeDays,
     subtotal: `$${(group.subtotalCents / 100).toFixed(2)}`,
@@ -60,28 +62,63 @@ function buildGroundingSummary(guide: OrderGuideResponse, venueName: string): st
   );
 }
 
-const SYSTEM_PROMPT = `You are Superbot, the procurement brain inside Supersolt, briefing a venue operator on this order run. You are given the computed order guide as JSON: per supplier, the suggested lines with the exact math inputs (demand over the horizon, average daily usage, stock on hand, pending deliveries, buffer, pack rounding) and data-quality flags.
+const supplierReadSchema = z.object({
+  supplierId: z
+    .string()
+    .describe("The exact supplierId from the grounding payload this read is for"),
+  headline: z
+    .string()
+    .describe(
+      "One sharp sentence naming the line that matters most for this supplier and why (biggest spend or tightest stock), in operator language.",
+    ),
+  points: z
+    .array(z.string())
+    .describe(
+      "2 to 4 short operator-language notes, one per important line. Lead with the reason, e.g. 'Cotoletta: burning 45/day on 28 in stock — 333 units covers the week + 15% buffer.' Do not restate every line.",
+    ),
+  watchouts: z
+    .array(z.string())
+    .describe(
+      "Data-quality or risk caveats for this supplier only (revenue-proxy demand, stock assumed zero, below-minimum order, a line far bigger than its daily usage). Empty array when the run is clean.",
+    ),
+});
 
-Write a short, sharp briefing in plain text:
-- Start with a one-sentence read of the whole run (how many suppliers, rough total, anything urgent).
-- Then one short paragraph or 2-4 bullet lines per supplier: lead with the lines that matter (biggest spend or tightest stock) and give the reason in operator language, e.g. "you're burning ~2.4kg of pastrami a day and have under two days left on the shelf, so 3 cartons covers the week with the 15% buffer".
-- Call out data-quality caveats honestly: lines using a revenue proxy instead of real usage, stock assumed zero without a count, below-minimum supplier orders (say what to add or whether to hold the order).
-- Flag anything that looks off (a line far bigger than its daily usage implies, buffer doing all the work, etc.).
-- No headings, no markdown syntax beyond simple dashes for bullets, no restating every line — pick what matters. Keep it under 250 words. Do not use em dashes.`;
+const reasoningSchema = z.object({
+  runHeadline: z
+    .string()
+    .describe(
+      "One sentence read of the whole run: supplier count, rough total spend, and anything urgent across the board. No markdown.",
+    ),
+  suppliers: z.array(supplierReadSchema),
+});
+
+export type OrderGuideSupplierRead = z.infer<typeof supplierReadSchema>;
+export type OrderGuideReasoning = z.infer<typeof reasoningSchema>;
+
+const SYSTEM_PROMPT = `You are Superbot, the procurement brain inside Supersolt, briefing a venue operator on this order run. You are given the computed order guide as JSON: per supplier (each with a supplierId), the suggested lines with the exact math inputs (demand over the horizon, average daily usage, stock on hand, pending deliveries, buffer, pack rounding) and data-quality flags.
+
+Produce a structured read, not prose:
+- runHeadline: one sentence on the whole run (how many suppliers, rough total spend, anything urgent).
+- For every supplier in the payload, one entry keyed by its exact supplierId:
+  - headline: one sharp sentence on the single line that matters most (biggest spend or tightest stock), in operator language, e.g. "You're burning ~2.4kg of pastrami a day with under two days on the shelf, so 3 cartons covers the week with the 15% buffer."
+  - points: 2 to 4 short notes, one per important line, reason first. Do not restate every line — pick what matters (biggest spend, tightest stock, anything unusual). Keep each under ~20 words.
+  - watchouts: only real caveats — a line using a revenue proxy instead of usage, stock assumed zero without a count, a below-minimum supplier order (say what to add or whether to hold), or a line far bigger than its daily usage implies. Empty array when clean.
+
+Rules: plain operator language, no markdown syntax, no headings, no em dashes. Return an entry for every supplierId given, and never invent a supplierId that was not provided.`;
 
 export const orderGuideReasoningService = {
   isAvailable(): boolean {
     return Boolean(process.env.ANTHROPIC_API_KEY);
   },
 
-  async streamReasoning(
+  async generateReasoning(
     ctx: RequestAuthContext,
     args: {
       organisationSlug: string;
       venueSlug: string;
       periodPreset?: OrderGuidePeriodPreset;
     },
-  ): Promise<Response> {
+  ): Promise<OrderGuideReasoning> {
     if (!this.isAvailable()) {
       throw new PurchaseOrdersServiceError(
         503,
@@ -104,13 +141,15 @@ export const orderGuideReasoningService = {
       );
     }
 
-    const result = streamText({
+    const { object } = await generateObject({
       model: anthropic(REASONING_MODEL),
+      schema: reasoningSchema,
+      temperature: 0.3,
+      providerOptions: { anthropic: { structuredOutputMode: "jsonTool" } },
       system: SYSTEM_PROMPT,
       prompt: buildGroundingSummary(guide, args.venueSlug),
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
     });
 
-    return result.toTextStreamResponse();
+    return object;
   },
 };

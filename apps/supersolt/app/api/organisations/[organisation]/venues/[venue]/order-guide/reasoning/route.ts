@@ -1,3 +1,5 @@
+import { NextResponse } from "next/server";
+
 import { requireRequestAuth } from "@/lib/api/route-auth";
 import { serviceErrorResponse } from "@/lib/api/service-error-response";
 import { orderGuideReasoningService } from "@/server/purchase-orders/order-guide-reasoning.service";
@@ -20,11 +22,12 @@ export async function POST(
   };
 
   try {
-    return await orderGuideReasoningService.streamReasoning(ctx, {
+    const reasoning = await orderGuideReasoningService.generateReasoning(ctx, {
       organisationSlug: organisation,
       venueSlug: venue,
       periodPreset: body.periodPreset,
     });
+    return NextResponse.json(reasoning);
   } catch (error) {
     return serviceErrorResponse(error, "order-guide-reasoning");
   }
